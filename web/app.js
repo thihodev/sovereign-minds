@@ -254,6 +254,23 @@
     while (chron.children.length > 400) chron.lastChild.remove();
   }
 
+  // The Historian's chapters (§10.1), newest first; only the newest starts open.
+  const hist = $("#history");
+  function addChapters(list, prepend = true) {
+    for (const c of list) {
+      if (hist.querySelector(`[data-id="${c.id}"]`)) continue;
+      hist.querySelector(".note")?.remove();
+      const d = document.createElement("details"); d.className = "card2"; d.dataset.id = c.id;
+      d.innerHTML = `<summary><b></b> <span class="meta"></span></summary><p style="margin:6px 0 0;white-space:pre-wrap"></p>`;
+      d.querySelector("b").textContent = c.title;
+      d.querySelector(".meta").textContent = `lượt ${c.from_tick}–${c.to_tick} · năm ${c.from_tick * 10}–${(c.to_tick + 1) * 10} · ${c.author}`;
+      d.querySelector("p").textContent = c.text;
+      d.open = prepend || !hist.children.length;
+      prepend ? hist.prepend(d) : hist.append(d);
+    }
+  }
+  api("/api/history").then(list => addChapters(list, false)).catch(() => {});
+
   // ---------------------------------------------------------------- petitions & decrees
   const PSTATUS = { pending: ["Đang chờ", "warn"], accepted: ["Chấp thuận", "ok"], partial: ["Một phần", "ok"], rejected: ["Bác bỏ", "bad"], merged: ["Đã gộp", ""] };
   function renderPetitions() {
@@ -462,6 +479,7 @@
     es.addEventListener("status", e => applyStatus(JSON.parse(e.data)));
     es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh(); });
     es.addEventListener("reload", () => location.reload());
+    es.addEventListener("history", e => { const d = JSON.parse(e.data); addChapters([d.chapter]); addChronicle([d.entry]); });
     let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { layout(); drawBase(); render(); }, 150); });
     document.fonts?.ready.then(() => render());
   }

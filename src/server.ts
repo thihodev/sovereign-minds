@@ -32,6 +32,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
   runner.on(e => {
     if (e.type === "tick") push("tick", { tick: e.tick, chronicle: e.chronicle });
     else if (e.type === "turn") push("turn", { nation: e.nation, kind: e.kind });
+    else if (e.type === "history") push("history", { chapter: e.chapter, entry: e.entry });
     else if (e.type === "reload") push("reload", {});
     else push("status", statusPayload());
   });
@@ -109,6 +110,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         return t ? send(res, 200, t) : send(res, 404, { error: "no tile" });
       }
       if (path === "/api/chronicle") return send(res, 200, runner.store.chronicle(Math.min(500, Number(url.searchParams.get("limit")) || 100), Number(url.searchParams.get("before")) || undefined));
+      if (path === "/api/history") return send(res, 200, runner.store.history(Math.min(500, Number(url.searchParams.get("limit")) || 100)));
       if (path === "/api/stats") return send(res, 200, runner.store.stats());
       const turnsM = path.match(/^\/api\/nation\/(\d+)\/turns$/);
       if (turnsM) return send(res, 200, runner.store.turns(Number(turnsM[1]), Math.min(50, Number(url.searchParams.get("limit")) || 10)));

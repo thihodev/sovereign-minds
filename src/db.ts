@@ -6,6 +6,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ChronicleEntry, World } from "./types.ts";
+import type { HistoryChapter } from "./historian.ts";
 
 export class Store {
   db: DatabaseSync;
@@ -26,6 +27,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS nation_stats (tick INTEGER, nation INTEGER, population INTEGER, food REAL, stability INTEGER, tiles INTEGER, inventions INTEGER, status TEXT, PRIMARY KEY (tick, nation));
       CREATE TABLE IF NOT EXISTS watcher_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tick INTEGER, kind TEXT, payload TEXT, created_at TEXT);
       CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, text TEXT, tick INTEGER, created_at TEXT);
+      CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, from_tick INTEGER, to_tick INTEGER, title TEXT, text TEXT, author TEXT, created_at TEXT);
     `);
   }
 
@@ -68,11 +70,32 @@ export class Store {
       : this.db.prepare("SELECT * FROM chronicle ORDER BY id DESC LIMIT ?").all(limit);
   }
 
+  chronicleRange(fromTick: number, toTick: number): ChronicleEntry[] {
+    return this.db.prepare("SELECT tick, nation, kind, text FROM chronicle WHERE tick BETWEEN ? AND ? ORDER BY id").all(fromTick, toTick) as unknown as ChronicleEntry[];
+  }
+
+  // The Historian's chapters (§10.1), newest first.
+  addHistory(c: Omit<HistoryChapter, "id" | "created_at">): HistoryChapter {
+    const created_at = new Date().toISOString();
+    const r = this.db.prepare("INSERT INTO history (from_tick, to_tick, title, text, author, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(c.from_tick, c.to_tick, c.title, c.text, c.author, created_at);
+    return { id: Number(r.lastInsertRowid), ...c, created_at };
+  }
+  history(limit: number): HistoryChapter[] {
+    return this.db.prepare("SELECT * FROM history ORDER BY to_tick DESC, id DESC LIMIT ?").all(limit) as unknown as HistoryChapter[];
+  }
+  lastHistoryTick(): number {
+    const row = this.db.prepare("SELECT MAX(to_tick) AS t FROM history").get() as { t: number | null };
+    return row.t ?? -1;
+  }
+
   addStats(world: World): void {
     const ins = this.db.prepare("INSERT OR REPLACE INTO nation_stats (tick, nation, population, food, stability, tiles, inventions, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     const tiles = new Map<number, number>();
     for (const t of world.tiles) if (t.owner >= 0) tiles.set(t.owner, (tiles.get(t.owner) || 0) + 1);
     for (const n of world.nations) ins.run(world.tick, n.id, n.population, Math.round((n.stock.food || 0) * 10) / 10, n.stability, tiles.get(n.id) || 0, n.inventions.length, n.status);
+  }
+  statsAt(tick: number): unknown[] {
+    return this.db.prepare("SELECT nation, population, inventions, tiles FROM nation_stats WHERE tick = ?").all(tick);
   }
   stats(): unknown[] {
     return this.db.prepare("SELECT tick, nation, population, food, stability, tiles, inventions FROM nation_stats ORDER BY tick").all();

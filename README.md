@@ -99,10 +99,10 @@ Tạo thế giới mới: `docker compose down`, xóa (hoặc đổi tên) `data
 | Giao thương | Đề nghị và nhận trao đổi, đoàn buôn đi đường xa, hàng hư trên đường |
 | Chiến tranh | Tuyên chiến (có hiệu lực lượt sau), đồng minh và tông chủ tự tham chiến, tấn công chiếm ô, bao vây thủ đô, đột kích cướp kho, tù binh, mệt mỏi chiến tranh, độc lập |
 | Tình báo | Mức 1–4 theo tầm nhìn, buôn bán, hiệp ước, liên minh, gián điệp; tin phai dần nếu chưa có chữ viết |
-| Watcher | Bản đồ sống, suy nghĩ từng AI, thỉnh nguyện, Sắc lệnh, duyệt tay đơn phát minh, bảng quan hệ, biểu đồ, xếp hạng, chat Claude |
+| Watcher | Bản đồ sống, suy nghĩ từng AI, thỉnh nguyện, Sắc lệnh, duyệt tay đơn phát minh, bảng quan hệ, biểu đồ, xếp hạng, chat Claude, **Sử gia AI** viết một chương sử mỗi 10 lượt (`HISTORIAN_PROVIDER`, đọc trong tab Biên niên) |
 | Hạ tầng | Ngủ đông khi hết quota, sổ cái kiểm toán mỗi lượt, replay tất định, tự cập nhật khi `git pull` |
 
-Chưa có: phá hoại và đánh cắp công nghệ bằng gián điệp (§7.8), đổi tên quốc gia (§2.2), AI Sử gia (§10.1).
+Chưa có: phá hoại và đánh cắp công nghệ bằng gián điệp (§7.8), đổi tên quốc gia (§2.2).
 
 ## Phát triển
 
@@ -119,7 +119,7 @@ CUSTOM_BASE_URL=http://127.0.0.1:4010/v1 OLLAMA_BASE_URL=http://127.0.0.1:4010/v
 Dùng model chạy trên máy (Ollama) cho quốc gia hoặc trọng tài: đặt `OLLAMA_BASE_URL` và thêm `ollama` vào `NATIONS` hoặc `JUDGE_PROVIDERS`.
 
 ```bash
-npm test          # 18 bài test: sinh thế giới, sổ cái, replay, phát minh mở, ngoại giao, giao thương, chiến tranh, định cư…
+npm test          # 22 bài test: sinh thế giới, sổ cái, replay, phát minh mở, ngoại giao, giao thương, chiến tranh, định cư, Sử gia…
 npm start         # supervisor + engine, http://127.0.0.1:3000
 ```
 
