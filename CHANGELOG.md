@@ -1,0 +1,58 @@
+# Nhật ký thay đổi
+
+Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
+
+## v0.2 — 19/10/2026
+
+Commit `1aa9f78` (phát minh mở, ngoại giao, chiến tranh), `f34c5a1` (nhà cung cấp Ollama/custom, sửa lỗi), sau đó Sử gia AI, hoạt động gián điệp và đổi tên quốc gia.
+
+### Thêm mới
+
+- **Phát minh mở (§5):** quốc gia tự đề xuất phát minh bằng `propose_invention` (2 AP), với danh mục 11 loại hiệu ứng (`role_bonus`, `spoilage`, `recipe` kèm công cụ, `building`, `stability`, `ap`, `combat`, `move`, `reveal`, `research`, `tile_limit`) cộng tối đa 2 năng lực mới (3 điểm mỗi năng lực). Ngân sách sức mạnh 4 + 2d, RP = 15 × 1,4^d × (1 + điểm / 10) do Engine tính. Công thức mới tự định giá hàng theo đầu vào + công. Phát minh được duyệt vào Sổ chung với mã `X1`, `X2`…, người đề xuất được giảm 20% RP.
+- **Trọng tài AI (§5.4):** mỗi đơn được một trọng tài chấm nhân quả, vật chất, vật lý (0–2 mỗi tiêu chí, cần ≥ 4 và vật lý > 0), có thể thêm tiên quyết, bỏ hiệu ứng, bỏ năng lực, hoặc báo trùng. Trọng tài chọn từ `JUDGE_PROVIDERS`, không bao giờ trùng nhà cung cấp với bên đề xuất, ưu tiên nhà cung cấp không điều hành quốc gia nào; tối đa `JUDGES_PER_TICK` lời gọi mỗi lượt; hết quota thì nghỉ ít nhất 15 phút. Phán quyết được lưu nguyên văn để replay. Watcher chấm tay được trong tab Phát minh.
+- **Thất truyền (§5.5)** khi dân số mất quá nửa trong một lượt mà chưa có `ghi-chép`. **Cổng Đồ Đồng (§5.6):** `nhiệt-cao`, `nhận-biết-khoáng`, `chứa`, `luyện-đồng` + ô có quặng đồng.
+- **Ngoại giao (§7.2):** 20 cử chỉ trước khi có ngôn ngữ chung (cả hai có `ghi-chép`, hoặc 10 lần giao thương), tin nhắn ≤ 500 ký tự có lọc giả mạo mệnh lệnh hệ thống (uy tín −15). Sáu loại hiệp ước: bất tương xâm, đi lại, liên minh, hòa bình, cống nạp, chư hầu; có thời hạn, cống phẩm, bên trả, nhượng ô. `treaty` / `accept_treaty` (đề nghị hết hạn sau 2 lượt), `break_treaty` (hiệu lực từ lượt sau, uy tín −20), giữ ước đến hết hạn +5, không nộp đủ cống −10.
+- **Giao thương (§7.3):** `trade_offer` / `accept_trade`, giao ngay khi hai lãnh thổ cách ≤ 3 ô, xa hơn thì đi đoàn buôn tốc độ 8 ô/lượt; lương thực trên đường hư 30% mỗi lượt. Sổ cái kiểm toán cả hàng trên đường.
+- **Chiến tranh (§7.4):** `declare_war` (giao tranh từ lượt sau), đồng minh và tông chủ của bên bị tấn công tự tham chiến; `attack` (chiếm ô, tầm 2 ô, 3 ô khi có `đi-nước`), `raid` (cướp kho, 5 đơn vị mỗi chiến binh, tối đa 30% mỗi loại); công thức sức mạnh có vũ khí, thưởng chiến đấu, ổn định, may rủi, địa hình, sông, hàng rào; dân quân khi không còn chiến binh; tù binh; thủ đô và điểm định cư chỉ thất thủ khi bị bao vây; mệt mỏi chiến tranh sau 5 lượt; `declare_independence` cho chư hầu sau 10 lượt.
+- **Lan truyền tri thức (§7.5):** giảm 20% khi đã gặp, 40% khi giao thương ≥ 5 lần, 60% khi liên minh; chỉ lấy mức cao nhất.
+- **Tình báo (§7.8):** mức 2 cũng đạt được khi đã giao thương ít nhất 1 lần; mức 3 khi có bất kỳ hiệp ước nào hoặc giao thương ≥ 5 lần; mức 4 khi liên minh (trước đây chỉ gián điệp).
+- **Gián điệp ra tay (§7.8):** `sabotage` (xóa tiến độ công trình đang xây hoặc làm công trình đã xong mất tác dụng 3 lượt), `steal_tech` (giảm 50% RP cho một phát minh của họ, không cộng dồn với giảm giá khác), `incite` (ổn định của họ −5). Mỗi lần 2 AP, cần `ghi-chép` và gián điệp đang hoạt động, mỗi gián điệp một lần mỗi lượt, lượt ra tay cơ hội bị lộ nhân đôi.
+- **Đổi tên quốc gia (§2.2):** `rename_nation` (3 AP, −10 ổn định) trong 5 lượt sau khi bước vào kỷ nguyên mới, một lần mỗi lần đổi kỷ nguyên; tên cũ được giữ lại.
+- **Sử gia AI (§10.1):** mỗi `HISTORIAN_EVERY` lượt (mặc định 10) một AI trung lập viết một chương sử tiếng Việt từ Biên niên, đọc trong tab Biên niên và `/api/history`. Chọn bằng `HISTORIAN_PROVIDER` (mã nhà cung cấp, `claude`, hoặc `off`); không làm chậm vòng lượt và không ảnh hưởng replay.
+- **Lãnh thổ (§2.3):** `found_settlement` (3 AP; cần `tổ-chức`, dân ≥ 30, 20 lương thực, cách các trung tâm ≥ 4 ô, cách lãnh thổ ≤ 10 ô): mỗi điểm định cư +15 chỗ ở và +3 giới hạn ô. `abandon_tile` (0 AP) để bỏ ô. Ô bị cắt rời khỏi mọi trung tâm 5 lượt thì hoang hóa.
+- **Kinh tế:** vai **khai mỏ** (`mine`) và trường `mine_target` để chọn quặng nhìn thấy được, muối hoặc sậy; quặng ẩn chỉ khai được khi nhìn thấy. Tác dụng công trình thành dữ liệu (`effect`: chỗ ở, ổn định, hư hỏng, chỗ chế tác, phòng thủ, trồng trọt), nên công trình do phát minh mở tạo ra chạy cùng luật với công trình gốc; chỗ chế tác cộng từ mọi công trình. Công cụ mở hao mòn 1/10 mỗi lượt sử dụng.
+- **Nhà cung cấp:** `ollama` (model chạy trên máy, không cần key, không quota) và `custom` (bất kỳ endpoint tương thích OpenAI). `tools/mock-provider.ts` giả lập quốc gia và trọng tài để chạy thử không cần key.
+- **Watcher UI:** tab Phát minh có chấm tay, bảng quan hệ, chiến tranh, hiệp ước, trận đánh, biểu đồ, bảng xếp hạng; điểm định cư và trận đánh trên bản đồ.
+
+### Thay đổi
+
+- **Thám hiểm (§7.6):** đi xa tới 16 ô (trước đây 8), vòng qua nước và núi sang hai hướng lệch 60° thay vì dừng lại, có thể xuất phát từ một ô lãnh thổ bất kỳ (`from`). `đi-nước` không còn cho đi xuyên núi (lỗi v0.1). Phát hiện vi phạm biên giới bỏ qua nước có hiệp ước đi lại hoặc liên minh.
+- **Phạt vượt giới hạn ô (§2.3):** tối đa −10 ổn định mỗi lượt (trước đây −2 mỗi ô, không giới hạn), để quốc gia đang co lại không rơi vào vòng nội loạn chết người thấy trong mô phỏng 500 lượt.
+- **Lan truyền tri thức:** trước đây chỉ có một mức 20% khi đã gặp.
+- **Phân công mặc định:** 7 săn, 4 hái, 2 nghiên cứu, 1 chế tác (trước đây 9 săn, 2 hái).
+- Bỏ hành động `repair` (công trình chưa hao mòn).
+- `RULES_VERSION` 0.2; thế giới cũ được tự nâng cấp khi nạp (`migrate`).
+
+### Sửa lỗi
+
+- Phân công quá số lao động: phần lẻ trước đây chia theo thứ tự vai nên một người nghiên cứu duy nhất luôn bị thu về 0; nay chia cho phần thập phân lớn nhất.
+- Thống kê số lượt trả lời hợp lệ (`stats.ok`) trước đây không được đếm.
+
+### Tài liệu
+
+- `docs/RULES.md` được đồng bộ với engine v0.2: mọi con số và cơ chế theo code, danh mục hiệu ứng thật ở §5.3, những phần chưa thi hành được đánh dấu "(chưa có trong engine)".
+- Thêm `CHANGELOG.md`.
+
+## v0.1 — 19/10/2026
+
+Commit `32e1c7b`: bản đầu tiên của engine thế giới các quốc gia AI.
+
+- **Thế giới (§2.1, §12):** bản đồ lục giác 64 × 64 theo seed: hai lục địa, eo đất, quần đảo, tối đa 8 sông, 7 kỳ quan, 3 đới khí hậu, điểm khai sinh công bằng ±10%, vùng hoang.
+- **Lập quốc (§2.2):** tên, thủ đô, dân tộc, cờ (8 bố cục, 24 biểu tượng), tuyên ngôn; chặn trùng tên, tên model hoặc nhà cung cấp, màu cờ quá giống (ΔE < 25); tự đặt tên nếu AI không lập quốc.
+- **Kinh tế (§4, §6):** 12 vai lao động, săn bắt hái lượm đánh cá, khai thác, trữ lượng ô tái sinh, công cụ săn bắt hao mòn, 9 công thức chế tác, 8 công trình, ruộng và chuồng.
+- **Dân số và ổn định (§4):** ăn, đói, hư hỏng, tăng dân theo chỗ ở, ổn định, nội loạn, di cư; sự kiện thế giới (mùa đông, hạn hán, dịch bệnh, bội thu, đàn thú, cháy rừng, thiên thạch, núi lửa).
+- **Phát minh (§5.2):** cây gốc 18 phát minh, cổng Đồ Đá Mới. Phát minh mở, ngoại giao, giao thương và chiến tranh có trong luật nhưng engine trả "chưa có".
+- **Lãnh thổ:** khai hoang (`claim_tile`), giới hạn quản lý, thám hiểm 8 ô theo đường thẳng.
+- **Tình báo (§7.8):** mức hiểu biết 1, 2, 4 theo tầm nhìn và gián điệp, sai số ước lượng, tin phai dần khi chưa có `ghi-chép`; `plant_spy`.
+- **Watcher (§10):** thỉnh nguyện, Sắc lệnh (không được nêu tên quốc gia), bản đồ sống, dòng suy nghĩ, Biên niên sử, chat với Claude qua Claude Code CLI.
+- **Hạ tầng (§3, §11):** sổ cái kép kiểm toán mỗi lượt, replay giống hệt từng byte, AI Gateway cho các nhà cung cấp miễn phí kiểu OpenAI, ngủ đông khi hết quota (theo `retry-after` hoặc bậc 15 phút tới 6 giờ), sửa JSON hỏng một lần, SQLite, supervisor tự nạp code mới sau `git pull`, `docker compose up`.
