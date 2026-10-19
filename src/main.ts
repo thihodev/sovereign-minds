@@ -40,10 +40,15 @@ const runner = new Runner(store, {
   fillWithBots: (env.FILL_WITH_BOTS || "true") !== "false",
   tickSeconds: Number(env.TICK_SECONDS) || 600,
   aiTimeoutSec: Number(env.AI_TIMEOUT_SEC) || 90,
-  judgeProviders: (env.JUDGE_PROVIDERS || "groq,cohere,cloudflare,sambanova,gemini,zai,openrouter").split(",").map(s => s.trim()).filter(Boolean),
+  judgeProviders: (env.JUDGE_PROVIDERS || "claude,groq,cohere,cloudflare,sambanova,gemini,zai,openrouter").split(",").map(s => s.trim()).filter(Boolean),
   judgesPerTick: Number(env.JUDGES_PER_TICK) || 3,
 });
 const ver = version();
+if (runner.cfg.judgeProviders[0] === "claude") {
+  console.log(runner.claudeReady()
+    ? `[judge] Trọng tài: Claude ${env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5"} (tài khoản Claude đã đăng nhập)`
+    : "[judge] Claude chưa đăng nhập: trọng tài tạm dùng các nhà cung cấp miễn phí. Đăng nhập trong tab Chat Claude hoặc: docker compose exec -it sovereign-minds claude auth login");
+}
 console.log(`[boot] Sovereign Minds ${ver} · lượt ${runner.world.tick} · ${runner.world.nations.length} quốc gia`);
 startServer(runner, { host: env.HOST || "127.0.0.1", port: Number(env.PORT) || 3000, version: ver });
 runner.loop();

@@ -11,6 +11,7 @@ import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor } from "./rng.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
+import { askClaude, claudeStatus } from "./claude.ts";
 import type { Store } from "./db.ts";
 import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
 
@@ -159,6 +160,16 @@ export class Runner {
     try { for (const [id, r] of JSON.parse(this.store.getMeta("manual_rulings") || "[]")) this.manualRulings.set(Number(id), r); } catch { /* ignore */ }
   }
 
+  /** Is the Watcher's Claude login usable? Checked at most every 5 minutes. */
+  private claudeCheck = { at: 0, ok: false };
+  claudeReady(): boolean {
+    if (Date.now() - this.claudeCheck.at > 5 * 60 * 1000) {
+      const st = claudeStatus();
+      this.claudeCheck = { at: Date.now(), ok: st.available && st.loggedIn };
+    }
+    return this.claudeCheck.ok;
+  }
+
   /** Rulings for this tick: the Watcher's first, then an AI judge per pending proposal. */
   private async judgePending(): Promise<Record<number, Ruling>> {
     const w = this.world, out: Record<number, Ruling> = {};
@@ -173,6 +184,16 @@ export class Runner {
     for (const p of pending) {
       if (out[p.id] || calls >= this.cfg.judgesPerTick) continue;
       const proposer = w.nations[p.nation].provider;
+      // Claude (the Watcher's own login) comes first when it is listed and logged in.
+      if (this.cfg.judgeProviders.includes("claude") && (this.judgeSleep.get("claude") || 0) < Date.now() && this.claudeReady()) {
+        calls++;
+        const model = process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5", started = Date.now();
+        const r = await this.withLock("claude", () => askClaude(JUDGE_SYSTEM, judgeUserPrompt(w, p), { model, timeoutMs: Math.max(120, this.cfg.aiTimeoutSec) * 1000 }));
+        const j = r.ok ? extractJson(r.text) : null;
+        this.store.logTurn({ tick: w.tick, nation: -1, provider: "claude", model, kind: j ? "ruling" : (r.ok ? "invalid" : r.kind), raw: r.ok ? r.text : "", parsed: j ?? undefined, error: r.ok ? "" : r.message, latencyMs: Date.now() - started });
+        if (j) { out[p.id] = parseRuling(j, `Claude · ${model}`); continue; }
+        if (!r.ok && (r.kind === "ratelimit" || r.kind === "auth")) { this.judgeSleep.set("claude", Date.now() + 15 * 60 * 1000); this.claudeCheck = { at: 0, ok: false }; }
+      }
       const candidates = this.cfg.judgeProviders.map(id => PROVIDERS[id]).filter(pr => pr && providerKey(pr) && pr.id !== proposer && (this.judgeSleep.get(pr.id) || 0) < Date.now());
       candidates.sort((a, b) => Number(nationProviders.has(a.id)) - Number(nationProviders.has(b.id)));
       for (const pr of candidates) {
