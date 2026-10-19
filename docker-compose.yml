@@ -1,0 +1,19 @@
+services:
+  sovereign-minds:
+    build: .
+    image: sovereign-minds:latest
+    container_name: sovereign-minds
+    ports:
+      # Local only. Change to "3000:3000" (and set WATCHER_TOKEN) to open it on your network.
+      - "127.0.0.1:${PORT:-3000}:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+    volumes:
+      # The code is mounted, not baked in: after `git pull` the supervisor
+      # picks up the new code by itself. World data lives in ./data.
+      - ./:/app
+    restart: unless-stopped
