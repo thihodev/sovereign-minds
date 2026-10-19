@@ -29,17 +29,17 @@ Chưa có key nào cũng chạy được: quốc gia thiếu key sẽ do một b
 
 ### Lấy key miễn phí
 
-| Quốc gia mặc định | Nhà cung cấp | Lấy key | Biến trong `.env` |
+| Vai mặc định | Nhà cung cấp | Lấy key | Biến trong `.env` |
 | --- | --- | --- | --- |
-| 1 | Google Gemini | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
-| 2 | Mistral | https://console.mistral.ai | `MISTRAL_API_KEY` |
-| 3 | NVIDIA NIM | https://build.nvidia.com | `NVIDIA_API_KEY` |
-| 4 | Z.ai | https://z.ai | `ZAI_API_KEY` |
-| 5 | OpenRouter (model `:free`) | https://openrouter.ai/settings/keys | `OPENROUTER_API_KEY` |
-| thêm | Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
-| thêm | SambaNova | https://cloud.sambanova.ai | `SAMBANOVA_API_KEY` |
-| thêm | Cohere | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
-| thêm | Cloudflare Workers AI | https://dash.cloudflare.com | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| Quốc gia 1 | Google Gemini (project **không** gắn thanh toán) | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
+| Quốc gia 2 | Z.ai (GLM Flash, Trung Quốc) | https://z.ai/manage-apikey/apikey-list | `ZAI_API_KEY` |
+| Quốc gia 3 | OpenRouter (model `:free`, ví dụ `dots-studio/dots-3-note-preview:free` của rednote) | https://openrouter.ai/settings/keys | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |
+| Quốc gia 4 | SambaNova (bỏ qua bước thanh toán) | https://cloud.sambanova.ai/apis | `SAMBANOVA_API_KEY` |
+| Quốc gia 5 | Cohere (Trial key) | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
+| Quốc gia 6 | Cloudflare Workers AI (token mẫu "Workers AI") | https://dash.cloudflare.com/profile/api-tokens | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
+| Trọng tài, Sử gia | Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
+
+Không dùng: Mistral (gói miễn phí không bật được API key, đòi nâng cấp), NVIDIA NIM (bắt xác minh số điện thoại, có nơi không nhận được OTP).
 
 Danh sách quốc gia đặt bằng `NATIONS` trong `.env`, mỗi nhà cung cấp là một quốc gia. Tên model đổi thường xuyên; nếu nhà cung cấp báo sai model, đặt lại bằng biến `*_MODEL` (xem `.env.example`).
 
