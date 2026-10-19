@@ -8,53 +8,106 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/style.css">
+<script>try { const t = localStorage.getItem("sm-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch { }</script>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <h1>Sovereign Minds</h1>
-    <span class="world">Nguyên Địa</span>
-  </div>
-  <div class="clock">
-    <span class="tick mono" id="tick">Lượt —</span>
-    <span class="pill" id="run-state">…</span>
-    <span class="mono muted" id="countdown"></span>
-  </div>
-  <div class="controls">
-    <button id="btn-pause">Tạm dừng</button>
-    <button id="btn-step">Chạy 1 lượt</button>
-    <label class="muted" for="tick-seconds">Nhịp</label>
-    <select id="tick-seconds">
-      <option value="15">15 giây</option>
-      <option value="60">1 phút</option>
-      <option value="300">5 phút</option>
-      <option value="600">10 phút</option>
-      <option value="1800">30 phút</option>
-      <option value="3600">1 giờ</option>
-    </select>
-    <span class="mono muted" id="version"></span>
-  </div>
-</header>
+<a class="skip" href="#map">Tới bản đồ</a>
 
-<main class="layout">
-  <section class="mapbox">
-    <canvas id="map" aria-label="Bản đồ thế giới Nguyên Địa"></canvas>
-    <div class="tileinfo" id="tileinfo" hidden></div>
-    <div class="legend" id="legend"></div>
-    <div class="error" id="engine-error" hidden></div>
-  </section>
+<!-- The world map fills the screen; everything else floats over its edges. -->
+<main class="stage" id="mapview">
+  <canvas id="map" tabindex="0" role="img" aria-label="Bản đồ thế giới Nguyên Địa" aria-describedby="map-help"></canvas>
+  <p class="sr-only" id="map-help">Kéo để di chuyển, cuộn chuột hoặc chụm hai ngón để phóng to, nhấp vào một ô để xem chi tiết ở khung bên phải (nhấp lại hoặc Esc để bỏ chọn). Khi bản đồ đang được chọn: phím mũi tên để di chuyển, Enter để chọn ô ở giữa.</p>
+</main>
+<div class="tileinfo" id="tileinfo" hidden></div>
 
-  <aside class="side">
-    <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="nations" aria-selected="true">Quốc gia</button>
+<header class="topbar" id="topbar">
+  <div class="bar-row">
+    <div class="brand"><h1>Sovereign Minds</h1><span class="world">Nguyên Địa</span></div>
+    <div class="clock">
+      <span class="tick mono" id="tick">Lượt —</span>
+      <span class="pill" id="run-state">…</span>
+      <span class="countdown"><span class="mono muted" id="countdown" aria-live="off"></span><span class="tickbar" id="tickbar" hidden aria-hidden="true"><i></i></span></span>
+    </div>
+    <div class="summary" id="world-summary" aria-label="Tóm tắt thế giới"></div>
+    <div class="controls">
+      <button id="btn-pause" title="Tạm dừng / tiếp tục (phím Space)" aria-keyshortcuts="Space">Tạm dừng</button>
+      <button id="btn-step" title="Chạy ngay 1 lượt (phím N)" aria-keyshortcuts="N">Chạy 1 lượt</button>
+      <label class="muted" for="tick-seconds">Nhịp</label>
+      <select id="tick-seconds">
+        <option value="15">15 giây</option>
+        <option value="60">1 phút</option>
+        <option value="300">5 phút</option>
+        <option value="600">10 phút</option>
+        <option value="1800">30 phút</option>
+        <option value="3600">1 giờ</option>
+      </select>
+      <button class="icon" id="btn-theme" type="button" aria-label="Đổi giao diện sáng/tối">
+        <svg class="ico-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" hidden><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon" id="btn-help" type="button" aria-label="Phím tắt" title="Phím tắt (?)" aria-keyshortcuts="?">?</button>
+      <span class="mono muted" id="version"></span>
+    </div>
+  </div>
+  <div class="bar-row nav-row">
+    <button type="button" class="chat-toggle" id="btn-chat" aria-controls="dock-left" aria-expanded="false" title="Mở / thu gọn Chat Claude (phím C)" aria-keyshortcuts="C">Chat Claude</button>
+    <nav class="tabs" role="tablist" aria-label="Bảng của Watcher (mở ở khung bên phải)">
+      <button role="tab" data-tab="inspect">Chi tiết</button>
+      <button role="tab" data-tab="nations">Quốc gia</button>
       <button role="tab" data-tab="chronicle">Biên niên</button>
       <button role="tab" data-tab="inventions">Phát minh <span class="badge" id="prop-count" hidden></span></button>
+      <button role="tab" data-tab="tree">Cây phát minh</button>
       <button role="tab" data-tab="diplomacy">Ngoại giao</button>
       <button role="tab" data-tab="stats">Thống kê</button>
       <button role="tab" data-tab="petitions">Thỉnh nguyện <span class="badge" id="pet-count" hidden></span></button>
       <button role="tab" data-tab="decrees">Sắc lệnh</button>
-      <button role="tab" data-tab="chat">Chat Claude</button>
     </nav>
+  </div>
+</header>
+
+<div class="error" id="engine-error" role="alert" hidden></div>
+
+<div class="mapctl" role="toolbar" aria-label="Điều khiển bản đồ">
+  <button type="button" id="zoom-in" aria-label="Phóng to bản đồ" title="Phóng to (+)" aria-keyshortcuts="+">+</button>
+  <span class="zl mono" id="zoom-level" aria-live="polite">1.0×</span>
+  <button type="button" id="zoom-out" aria-label="Thu nhỏ bản đồ" title="Thu nhỏ (−)" aria-keyshortcuts="-">−</button>
+  <button type="button" id="zoom-fit" aria-label="Xem toàn thế giới" title="Xem toàn thế giới (0)" aria-keyshortcuts="0"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+<details class="legend-box" id="legend-box">
+  <summary>Chú giải</summary>
+  <div class="legend" id="legend"></div>
+</details>
+
+<!-- LEFT dock: always the Claude chat. -->
+<aside class="dock dock-left" id="dock-left" aria-label="Chat Claude" hidden>
+  <div class="dock-head">
+    <h2>Chat Claude</h2>
+    <button type="button" class="icon" id="dock-left-close" aria-label="Thu gọn Chat Claude" title="Thu gọn">‹</button>
+  </div>
+  <div class="dock-body chatpanel" id="tab-chat">
+    <div id="claude-login"></div>
+    <div class="chatlog" id="chatlog" aria-live="polite"></div>
+    <form class="chatform" id="chatform">
+      <label class="sr-only" for="chat-input">Tin nhắn cho Claude</label>
+      <textarea id="chat-input" rows="2" placeholder="Hỏi Claude về thế giới, ví dụ: Quốc gia nào đang gặp nguy?"></textarea>
+      <div class="row">
+        <button class="primary" type="submit" id="chat-send">Gửi</button>
+        <button type="button" id="chat-clear">Xóa hội thoại</button>
+      </div>
+    </form>
+  </div>
+  <div class="dock-resize" data-side="left" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng khung chat" tabindex="0"></div>
+</aside>
+<button type="button" class="dock-tab dock-tab-left" id="dock-left-open" aria-controls="dock-left" title="Mở Chat Claude">Chat</button>
+
+<!-- RIGHT dock: details of what you clicked, and every Watcher panel. -->
+<aside class="dock dock-right" id="dock-right" aria-label="Chi tiết và bảng" hidden>
+  <div class="dock-head">
+    <h2 id="dock-right-title">Chi tiết</h2>
+    <button type="button" class="icon" id="dock-right-close" aria-label="Đóng khung bên phải" title="Đóng (Esc khi không có ô đang chọn)">›</button>
+  </div>
+  <div class="dock-body">
+    <div class="panel" id="tab-inspect" hidden><div id="inspector"></div></div>
 
     <div class="panel" id="tab-nations"><div id="nations"></div></div>
 
@@ -70,6 +123,12 @@
       <div id="proposals"></div>
       <h3 class="sub">Sổ phát minh do các nước tạo</h3>
       <div id="custom-inventions"></div>
+    </div>
+
+    <div class="panel" id="tab-tree" hidden>
+      <div class="row"><p class="note" style="flex:1">Mỗi cột là một độ sâu; đường nối từ phát minh tiên quyết. Chấm màu là nước đã có (theo màu cờ). <span id="tree-count"></span></p><button type="button" id="tree-expand">Phóng to</button></div>
+      <div class="legend-inline tree-legend" id="tree-legend"></div>
+      <div class="treewrap"><div class="treebox" id="tree"></div><div class="tree-tip" role="tooltip" hidden></div></div>
     </div>
 
     <div class="panel" id="tab-diplomacy" hidden>
@@ -116,21 +175,29 @@
       <ol class="decrees" id="decrees"></ol>
     </div>
 
-    <div class="panel chatpanel" id="tab-chat" hidden>
-      <div id="claude-login"></div>
-      <div class="chatlog" id="chatlog"></div>
-      <form class="chatform" id="chatform">
-        <textarea id="chat-input" rows="2" placeholder="Hỏi Claude về thế giới, ví dụ: Quốc gia nào đang gặp nguy?"></textarea>
-        <div class="row">
-          <button class="primary" type="submit" id="chat-send">Gửi</button>
-          <button type="button" id="chat-clear">Xóa hội thoại</button>
-        </div>
-      </form>
-    </div>
-  </aside>
-</main>
+  </div>
+  <div class="dock-resize" data-side="right" role="separator" aria-orientation="vertical" aria-label="Kéo để đổi độ rộng khung bên phải" tabindex="0"></div>
+</aside>
 
 <dialog id="nation-dialog"><div id="nation-detail"></div></dialog>
+<dialog id="tree-dialog" class="wide" aria-labelledby="tree-dlg-title">
+  <div class="dlg-head"><h2 id="tree-dlg-title">Cây phát minh</h2><div class="legend-inline tree-legend" id="tree-big-legend"></div><button type="button" id="tree-close">Đóng</button></div>
+  <div class="treewrap big"><div class="treebox" id="tree-big"></div><div class="tree-tip" role="tooltip" hidden></div></div>
+</dialog>
+<dialog id="help-dialog" aria-labelledby="help-title">
+  <div class="dlg-head"><h2 id="help-title">Phím tắt</h2><button type="button" id="help-close">Đóng</button></div>
+  <dl class="keys">
+    <dt><kbd>Space</kbd></dt><dd>Tạm dừng / tiếp tục thế giới</dd>
+    <dt><kbd>N</kbd></dt><dd>Chạy ngay 1 lượt</dd>
+    <dt><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></dt><dd>Phóng to, thu nhỏ, xem toàn thế giới</dd>
+    <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt><dd>Di chuyển bản đồ (khi bản đồ đang được chọn)</dd>
+    <dt><kbd>Enter</kbd></dt><dd>Chọn ô ở giữa bản đồ (xem ở khung Chi tiết)</dd>
+    <dt><kbd>C</kbd></dt><dd>Mở / thu gọn Chat Claude</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Đóng hộp thoại, bỏ chọn ô</dd>
+    <dt><kbd>?</kbd></dt><dd>Mở bảng này</dd>
+  </dl>
+  <p class="note">Phím tắt không chạy khi bạn đang gõ chữ.</p>
+</dialog>
 <script src="/app.js"></script>
 </body>
 </html>

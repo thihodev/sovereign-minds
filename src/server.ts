@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
 import { RULES_VERSION } from "./rules.ts";
-import { buildingOf, inv, invName, describeEffects } from "./catalog.ts";
+import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
@@ -108,6 +108,13 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         });
       }
       if (path === "/api/state") return send(res, 200, statePayload());
+      if (path === "/api/inventions") {
+        const w = runner.world;
+        return send(res, 200, allInventions(w).map(v => ({
+          id: v.id, name: v.name, prereqs: v.prereqs, depth: depthOf(w, v.id), caps: v.caps, custom: !!v.custom, by: v.custom?.by ?? null,
+          rp: v.rp, desc: v.custom?.description || v.desc,
+        })));
+      }
       if (path === "/api/tile") {
         const i = Number(url.searchParams.get("i")), t = runner.world.tiles[i];
         return t ? send(res, 200, t) : send(res, 404, { error: "no tile" });
