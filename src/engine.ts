@@ -6,9 +6,9 @@ import { NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BRONZE_CAPS, INJECTION, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
-  FORBIDDEN_NAME_WORDS, GROWTH_RATE, GROWTH_SURPLUS, HIDDEN_ORES, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, REGEN, RENAME, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILE_LIMIT_BASE, TOOL_LIFE, WORKER_SHARE,
-  YIELD, apFor,
+  FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
+  ORE_SENSE_CAP, PETITION, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx } from "./diplomacy.ts";
@@ -164,11 +164,36 @@ function doneEffect(world: World, n: Nation, key: "housing" | "stability" | "spo
   return sum;
 }
 export function workers(n: Nation): number { return Math.floor(n.population * WORKER_SHARE); }
+/** §2.3 What a settlement takes from the stock: SETTLEMENT.materials units of wood and/or stone,
+ *  always from the larger pile first. null when the nation cannot pay. */
+export function settlementPayment(n: Nation): Record<string, number> | null {
+  const left: Record<string, number> = Object.fromEntries(SETTLEMENT.goods.map(g => [g, n.stock[g] || 0]));
+  const pay: Record<string, number> = {};
+  let need = SETTLEMENT.materials;
+  while (need > 1e-9) {
+    const g = SETTLEMENT.goods.reduce((a, b) => left[b] > left[a] ? b : a);
+    const q = Math.min(need, 1, left[g]);
+    if (q <= 1e-9) return null;
+    left[g] -= q; pay[g] = (pay[g] || 0) + q; need -= q;
+  }
+  return pay;
+}
+/** §4.2 Logistic growth: rate × pop × (1 − pop/housing), at least GROWTH.min, never past the roof. */
+export function growthFor(pop: number, roof: number): number {
+  if (pop >= roof) return 0;
+  return Math.min(roof - pop, Math.max(GROWTH.min, Math.floor(pop * GROWTH.rate * (1 - pop / roof))));
+}
+/** §4.2: how many housing buildings a nation may have, HOUSING.perCentre for the capital and each settlement. */
+export function housingSlots(n: Nation): number { return HOUSING.perCentre * (1 + n.settlements.length); }
+export function isHousing(world: World, type: string): boolean { return (buildingOf(world, type)?.effect.housing || 0) > 0; }
 export function housing(world: World, n: Nation): number {
-  return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + doneEffect(world, n, "housing") + (ownsWonder(world, n, "cave") ? 50 : 0);
+  // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
+  const roofs = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
+    .sort((a, b) => b - a).slice(0, housingSlots(n)).reduce((s, h) => s + h, 0);
+  return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + roofs + (ownsWonder(world, n, "cave") ? 50 : 0);
 }
 export function tileLimit(world: World, n: Nation): number {
-  return TILE_LIMIT_BASE + Math.floor(n.population / 10) + mods(world, n).tiles + n.settlements.length * 3;
+  return TILES.base + Math.floor(TILES.perSqrt * Math.sqrt(Math.max(0, n.population))) + mods(world, n).tiles + n.settlements.length * TILES.perSettlement;
 }
 export function actionPoints(world: World, n: Nation): number { return apFor(n.population, mods(world, n).ap); }
 export function canSeeRes(world: World, n: Nation, key: string): boolean {
@@ -190,7 +215,17 @@ export function inventionCost(world: World, n: Nation, id: string): number {
   }
   if (v.custom?.by === n.id) discount = Math.max(discount, 0.2);
   if (n.stolenTech.includes(id)) discount = Math.max(discount, SPY_OPS.stealDiscount);
-  return Math.ceil(v.rp * (1 - discount));
+  return Math.ceil(baseCost(world, id) * (1 - discount));
+}
+/** §5.5: the listed RP scaled by depth (depthCostMult: × (1 + 0.75 × (d − 1))), rounded up to a multiple of 5. */
+export function baseCost(world: World, id: string): number {
+  const v = inv(world, id); if (!v) return Infinity;
+  const mult = depthCostMult(depthOf(world, id));
+  return mult === 1 ? v.rp : Math.ceil(v.rp * mult / 5) * 5;
+}
+/** §5.5: RP made per tick by this many researchers before bonuses: diminishing returns. */
+export function researchPoints(researchers: number): number {
+  return researchers > 0 ? YIELD.research * Math.pow(researchers, RESEARCH.exponent) : 0;
 }
 
 export function envOk(world: World, n: Nation, id: string): boolean {
@@ -360,10 +395,10 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     const r = p.ruling!;
     if (id) {
       const v = inv(world, id)!;
-      say(n.id, "invention", `Trọng tài công nhận phát minh "${v.name}" của ${n.name} (độ sâu ${v.custom!.depth}, ${v.rp} RP). ${r.reason}`);
+      say(n.id, "invention", `Trọng tài công nhận phát minh "${v.name}" của ${n.name} (độ sâu ${v.custom!.depth}, ${baseCost(world, id)} RP). ${r.reason}`);
       n.lastEvents.push(`Đơn phát minh "${p.name}" được duyệt thành ${id}${v.prereqs.length > p.prereqs.length ? " (trọng tài thêm tiên quyết)" : ""}. ${n.research ? "Chọn research để bắt đầu." : "Bắt đầu nghiên cứu ngay, được giảm 20% RP."}`);
       if (!n.research && v.prereqs.every(x => n.inventions.includes(x)) && envOk(world, n, id)) n.research = { id, progress: 0 };
-    } else if (p.status === "duplicate") {
+    } else if (p.inventionId) { // applyRuling marked it a duplicate of an invention already in the book
       n.lastEvents.push(`Đơn "${p.name}" trùng với ${invName(world, p.inventionId!)} (${p.inventionId}) đã có trong Sổ: hãy nghiên cứu nó.`);
     } else {
       n.lastEvents.push(`Trọng tài bác đơn "${p.name}" (${r.causality + r.material + r.physics}/6): ${r.reason}`);
@@ -669,19 +704,18 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   } else {
     const surplus = (n.stock.food || 0) / Math.max(1, need);
     if (surplus > 0) n.stability += 1;
-    if (surplus >= GROWTH_SURPLUS && n.population < housing(world, n)) {
-      n.population += Math.min(housing(world, n) - n.population, Math.max(1, Math.floor(n.population * GROWTH_RATE)));
-    }
+    const roof = housing(world, n);
+    if (surplus >= GROWTH.surplus && n.population < roof) n.population += growthFor(n.population, roof);
   }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
-  if (n.inventions.includes("P18")) spoil -= 0.05;
+  spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
   if (ownsWonder(world, n, "salt")) spoil *= 0.5;
   spoil = Math.max(SPOILAGE.min, spoil);
   L.stock(n, "food", -(n.stock.food || 0) * spoil, "spoil");
   L.stock(n, "hide", -(n.stock.hide || 0) * SPOILAGE.hide, "spoil");
 
   // Research (§5.5)
-  const rp = labor.research * YIELD.research * (1 + m.rp) * mult("research");
+  const rp = researchPoints(labor.research) * (1 + m.rp) * mult("research");
   if (n.research) {
     if (!inv(world, n.research.id) || n.inventions.includes(n.research.id)) n.research = null;
     else {
@@ -706,6 +740,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const over = owned.length - tileLimit(world, n);
   if (over > 0) { const pen = Math.min(OVER_LIMIT_MAX, 2 * over); n.stability -= pen; n.lastEvents.push(`Vượt giới hạn quản lý ${over} ô: −${pen} ổn định (bỏ bớt ô bằng abandon_tile).`); }
   if (n.silentStreak >= 3) n.stability -= 5;
+  // Too many centres to govern from one hearth (§4.4)
+  const sprawl = n.settlements.length - SETTLEMENT.freeCentres;
+  if (sprawl > 0) n.stability -= sprawl * SETTLEMENT.sprawlStability;
   n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
   if (n.stability < 15 && n.population > 0) {
     const leave = Math.max(1, Math.floor(n.population * 0.05));
@@ -767,6 +804,10 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!def) return `Không có công trình "${String(a.building)}". Có: ${allBuildings(world).map(b => b.type).join(", ")}`;
       if (!n.inventions.includes(def.needs) && !m.unlocked.has(def.type)) return `Cần phát minh ${invName(world, def.needs)}`;
       if (def.max && n.buildings.filter(b => b.type === def.type).length >= def.max) return `Tối đa ${def.max} ${def.name}`;
+      if ((def.effect.housing || 0) > 0) {
+        const have = n.buildings.filter(b => isHousing(world, b.type)).length, slots = housingSlots(n);
+        if (have >= slots) return `Mỗi trung tâm (thủ đô, điểm định cư) chỉ chứa ${HOUSING.perCentre} công trình có chỗ ở: đã có ${have}/${slots}. Lập điểm định cư mới để dựng thêm`;
+      }
       const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
       const t = world.tiles[tile];
@@ -812,10 +853,14 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (centres(n).some(c => dist(c, tile) < SETTLEMENT.minDist)) return `Phải cách thủ đô và các điểm định cư khác ít nhất ${SETTLEMENT.minDist} ô`;
       if (!ownedTiles(world, n.id).some(o => dist(o.i, tile) <= SETTLEMENT.maxDist)) return `Phải trong vòng ${SETTLEMENT.maxDist} ô từ lãnh thổ`;
       if (n.population < SETTLEMENT.minPopulation) return `Cần ít nhất ${SETTLEMENT.minPopulation} dân`;
-      if ((n.stock.food || 0) < SETTLEMENT.food) return `Cần ${SETTLEMENT.food} lương thực`;
-      L.stock(n, "food", -SETTLEMENT.food, "settle");
+      const pay = settlementPayment(n);
+      if (!pay) return `Cần ${SETTLEMENT.materials} ${SETTLEMENT.goods.map(g => goodName(world, g)).join(" và/hoặc ")} (trộn tùy ý)`;
+      for (const [k, q] of Object.entries(pay)) L.stock(n, k, -q, "settle");
       for (const j of [tile, ...NEIGHBORS[tile]]) if (world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean") world.tiles[j].owner = n.id;
       n.settlements.push({ tile, name, tick: world.tick });
+      // The settlers stay citizens; leaving home unsettles the people (§2.3)
+      n.stability = Math.max(0, n.stability - SETTLEMENT.stability);
+      n.lastEvents.push(`${SETTLEMENT.people} người dời đi lập điểm định cư ${name}: ổn định −${SETTLEMENT.stability}.`);
       say(n.id, "settle", `${n.name} lập điểm định cư ${name} tại (${col(tile)}, ${row(tile)}).`);
       return null;
     }

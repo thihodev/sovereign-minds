@@ -1,6 +1,6 @@
 # Sovereign Minds — Bộ Luật Chơi
 
-Phiên bản 19/10/2026 · Đồng bộ với Engine v0.2 (`src/rules.ts`, `src/engine.ts`, `src/catalog.ts`, `src/diplomacy.ts`). Khi tài liệu và code khác nhau, **code là sự thật**. Những điều luật đã viết nhưng engine chưa thi hành được đánh dấu "(chưa có trong engine)". Lịch sử thay đổi: xem `CHANGELOG.md`.
+Phiên bản 19/10/2026 · Đồng bộ với Engine v0.3, gồm đợt cân bằng lại theo `docs/BALANCE.md` (`src/rules.ts`, `src/engine.ts`, `src/catalog.ts`, `src/diplomacy.ts`). Khi tài liệu và code khác nhau, **code là sự thật**. Những điều luật đã viết nhưng engine chưa thi hành được đánh dấu "(chưa có trong engine)". Lịch sử thay đổi: xem `CHANGELOG.md`.
 
 ## 1. Tổng quan và Hiến pháp
 
@@ -60,9 +60,9 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
 - **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc biển nông nếu đã đi được biển nông nhờ `đi-nước`; không bao giờ là biển sâu). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
-- **Giới hạn quản lý:** số ô tối đa = 7 + floor(dân số / 10) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
+- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư. Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
-- **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 4 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 30, 20 lương thực và một tên 2–30 ký tự. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +15 chỗ ở và +3 giới hạn ô. 10 dân di cư sang điểm mới (chưa có trong engine: dân không bị trừ).
+- **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
 - **Mất ô:** ô bị chiếm trong chiến tranh, nhượng qua hiệp ước, bị bỏ (`abandon_tile`), hoặc bị cắt rời: một ô không liền với thủ đô hay điểm định cư nào trong 5 lượt liên tiếp sẽ thành vô chủ.
 
@@ -118,7 +118,7 @@ Mọi thứ đều được ghi trên một sổ cái kép: đơn vị nào vào
 | Tri thức (RP) | điểm nghiên cứu | người nghiên cứu | không tích trữ ngoài dự án |
 | Ổn định | 0–100 | lương thực, tín ngưỡng, hòa bình | — |
 
-Hư hỏng lương thực mỗi lượt = mức gốc (30%, hoặc 15% khi có Gốm) − phần giảm từ phát minh mở − phần giảm từ công trình (tổng tối đa 10 điểm %) − 5 điểm % nếu có Đếm; nhân 0,5 nếu sở hữu Hồ Muối Trắng; không dưới 5%. Không có giới hạn sức chứa kho (sức chứa kho: chưa có trong engine).
+Hư hỏng lương thực mỗi lượt = mức gốc (30%, hoặc 15% khi có Gốm) − phần giảm từ phát minh mở − phần giảm từ công trình (tổng tối đa 10 điểm %) − 0,5 điểm % cho mỗi món gốm trong kho (tổng tối đa 5 điểm %, tức 10 món); nhân 0,5 nếu sở hữu Hồ Muối Trắng; không dưới 5%. Không có giới hạn sức chứa kho (sức chứa kho: chưa có trong engine).
 
 Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công cụ đá thô. Ổn định khởi đầu 60, uy tín 50.
 
@@ -126,8 +126,9 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 
 - **Ăn:** mỗi người tiêu 1 lương thực mỗi lượt (0,9 khi có Nấu chín).
 - **Thiếu ăn:** thiếu X đơn vị thì chết ceil(X / 2) người, −5 ổn định.
-- **Tăng dân:** sau khi ăn, nếu lương thực còn trong kho ≥ 20% nhu cầu và còn chỗ ở, dân tăng 4% (làm tròn xuống, tối thiểu 1, không vượt chỗ ở). Không còn chỗ ở thì không tăng.
-- **Chỗ ở:** thủ đô chứa 25 người tự nhiên (hang, bãi trú). Mỗi điểm định cư +15, Hang Đại Động +50, công trình có chỗ ở (Lều +10, công trình mở) cộng thêm.
+- **Tăng dân (logistic):** sau khi ăn, nếu lương thực còn trong kho ≥ 20% nhu cầu và còn chỗ ở, dân tăng floor(dân × 8% × (1 − dân / chỗ ở)), tối thiểu 1, không vượt chỗ ở. Dân tăng nhanh nhất khi mới dùng nửa chỗ ở và chậm dần khi gần kín (ví dụ 100 dân, 200 chỗ ở: +4; 190 dân, 200 chỗ ở: +1). Không còn chỗ ở thì không tăng.
+- **Chỗ ở:** thủ đô chứa 25 người tự nhiên (hang, bãi trú). Mỗi điểm định cư +10, Hang Đại Động +50, công trình có chỗ ở (Lều +10, công trình mở) cộng thêm.
+- **Trần chỗ ở theo trung tâm:** mỗi trung tâm (thủ đô và mỗi điểm định cư) chứa tối đa **3 công trình có chỗ ở** (Lều và công trình mở có `housing`). Engine từ chối lệnh `build` vượt trần (tính cả công trình đang xây), và khi tính chỗ ở chỉ cộng các công trình tốt nhất trong trần, nên mất một điểm định cư thì lều thừa bỏ trống. Như vậy thủ đô chứa tối đa 25 + 30 = 55 người, mỗi điểm định cư thêm tối đa 10 + 30 = 40 người: muốn đông dân thì phải mở rộng ra điểm định cư mới.
 - **Cơ cấu:** 30% dân là trẻ em và người già, không lao động; số lao động = floor(70% dân số). AI phân lao động vào 13 vai: hái lượm (`gather`), săn bắt (`hunt`), đánh cá (`fish`), nông dân (`farm`), đốn gỗ (`wood`), khai đá (`stone`), nhặt đá lửa (`flint`), lấy đất sét (`clay`), khai mỏ (`mine`), chế tác (`craft`), xây dựng (`build`), nghiên cứu (`research`), chiến binh (`warrior`). Người thám hiểm không phải một vai: họ được rút tạm từ nhóm hái lượm và người rảnh trong lượt đi thám hiểm.
 - **Phân quá số người:** Engine thu nhỏ theo tỷ lệ, phần lẻ chia cho các vai có phần thập phân lớn nhất, và báo lại trong danh sách bị từ chối.
 - **Người không được phân vai** tự động đi hái lượm.
@@ -145,7 +146,7 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 | Nông dân | 2 lương thực | chỉ làm việc trong công trình trồng trọt (Ruộng 6 người, Chuồng 2 người); thừa người thì không sản xuất |
 | Chế tác | 1 công | chỉ tính số thợ trong giới hạn chỗ chế tác của công trình (Bãi chế tác 4, Lò gốm 4) |
 | Xây dựng | 1 công | có công trình đang xây |
-| Nghiên cứu | 1 RP | — |
+| Nghiên cứu | N người làm ra N^0,85 RP | càng đông người càng ít RP mỗi người: 1 người 1 RP, 10 người 7,1 RP, 30 người 18 RP, 100 người 50 RP (mục 5.5) |
 
 Năng suất các vai hái lượm, săn bắt, đánh cá, khai thác và khai mỏ được nhân (1 + thưởng), trong đó thưởng = thưởng phát minh + thưởng công cụ mở, tối đa +150% (mục 5.7). Ổn định dưới 30 nhân mọi sản lượng (kể cả trồng trọt, chế tác, xây dựng, nghiên cứu) với 0,75. Sản lượng không vượt trữ lượng hiện có của các ô.
 
@@ -156,7 +157,7 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 ### 4.4 Ổn định
 
 - **Tăng:** còn lương thực trong kho sau khi ăn (+1/lượt), công trình ổn định như Bàn thờ (tổng từ mọi công trình tối đa +1/lượt), hiệu ứng ổn định của phát minh mở, Suối Nước Nóng (+2/lượt), thắng trận (+1), hoàn thành một nghiên cứu (+2 một lần, cộng thưởng một lần của phát minh như Nghi lễ +5).
-- **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), vượt giới hạn ô (−2 mỗi ô thừa, tối đa −10), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh).
+- **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), vượt giới hạn ô (−2 mỗi ô thừa, tối đa −10), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh), lập điểm định cư (−5 một lần, vì dời dân), **mỗi điểm định cư vượt quá 3: −1 mỗi lượt** (một bộ máy bộ lạc khó cai quản quá nhiều trung tâm; Bàn thờ, Suối Nước Nóng và hiệu ứng ổn định của phát minh mở bù lại được).
 - Ổn định được làm tròn và giữ trong 0–100 cuối mỗi lượt.
 - **Dưới 30:** mọi năng suất −25%.
 - **Dưới 15:** mỗi lượt 5% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang.
@@ -179,26 +180,28 @@ AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứ
 
 Mỗi quốc gia bắt đầu với 4 phát minh d = 0: **Lửa** (năng lực `lửa`), **Công cụ đá thô** (năng lực `ghè-đá`; mở Bãi chế tác, Hố trữ và công thức Công cụ đá thô), **Săn bắt hái lượm**, **Ngôn ngữ nói**. 18 phát minh dưới đây đã có sẵn trong Sổ. Ai nghiên cứu xong trước được ghi danh là người phát minh đầu tiên; hai quốc gia xong trong cùng một lượt được ghi danh cùng nhau.
 
-| ID | Phát minh | Tiên quyết | RP | Năng lực | Hiệu ứng chính |
-| --- | --- | --- | --- | --- | --- |
-| P1 | Ghè đá tinh xảo | Công cụ đá thô | 20 | cắt | Khai thác (gỗ, đá, đá lửa, đất sét, khai mỏ) +20%; công thức Lưỡi đá |
-| P2 | Nấu chín | Lửa | 15 | — | Mỗi người chỉ ăn 0,9 lương thực |
-| P3 | Sợi và dây | Săn bắt hái lượm | 20 | buộc | Công thức Dây thừng |
-| P4 | Hội đồng bộ lạc | Ngôn ngữ nói | 40 | tổ-chức | +1 AP; giới hạn ô +2 |
-| P5 | Nghi lễ | Ngôn ngữ nói, Lửa | 30 | tín-ngưỡng | Công trình Bàn thờ; +5 ổn định một lần |
-| P6 | Giáo | P1, P3 | 30 | săn-xa | Săn +25%; sức chiến binh +20%; công thức Giáo |
-| P7 | Thuộc da | P1, Săn bắt hái lượm | 30 | — | Công thức Áo da; thiệt hại mùa đông −50% |
-| P8 | Lều | P3, P7 | 25 | xây-dựng | Công trình Lều (+10 chỗ ở) |
-| P9 | Lưới và bẫy | P3 | 40 | — | Đánh cá +30%; săn +10% |
-| P10 | Đá mài | P1 | 60 | mài | Công thức Rìu đá mài (mỗi rìu: 2 người đốn gỗ +30%); công trình Hàng rào gỗ |
-| P11 | Cung tên | P6, P3 | 70 | săn-xa | Săn +30%; công thức Cung tên (vũ khí mạnh nhất) |
-| P12 | Ký hiệu | P5 | 50 | ghi-chép | Chống thất truyền; RP +10%; tình báo không phai |
-| P13 | Gốm | P2 + ô có đất sét | 80 | chứa | Công trình Lò gốm, công thức Gốm; hư lương thực 30% → 15% |
-| P14 | Trồng trọt sơ khai | P1, Săn bắt hái lượm + ô đồng cỏ, ven biển hoặc có sông | 120 | trồng-trọt | Công trình Ruộng |
-| P15 | Thuần dưỡng | P3, P6 | 120 | thuần-dưỡng | Công trình Chuồng |
-| P16 | Thuyền độc mộc | P10, Lửa | 90 | đi-nước | Đi được trên biển nông; đánh cá +20%; thám hiểm nhìn xa 3 ô; tấn công xa 3 ô |
-| P17 | Dệt | P3, P14 | 100 | dệt | Công thức Vải |
-| P18 | Đếm | P12, P14 | 100 | đếm | +1 AP; hư lương thực −5 điểm %; sai số tình báo giảm một nửa |
+Cột "RP gốc" là số ghi trong Sổ; giá thật = RP gốc × (1 + 0,75 × (d − 1)), làm tròn lên bội số của 5 (mục 5.5), trước khi trừ giảm giá lan truyền (mục 7.5). Cả cây gốc tốn 2.115 RP (v0.2: 1.040).
+
+| ID | Phát minh | Tiên quyết | d | RP gốc | RP thật | Năng lực | Hiệu ứng chính |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| P1 | Ghè đá tinh xảo | Công cụ đá thô | 1 | 20 | 20 | cắt | Khai thác (gỗ, đá, đá lửa, đất sét, khai mỏ) +20%; công thức Lưỡi đá |
+| P2 | Nấu chín | Lửa | 1 | 15 | 15 | — | Mỗi người chỉ ăn 0,9 lương thực |
+| P3 | Sợi và dây | Săn bắt hái lượm | 1 | 20 | 20 | buộc | Công thức Dây thừng |
+| P4 | Hội đồng bộ lạc | Ngôn ngữ nói | 1 | 40 | 40 | tổ-chức | +1 AP; giới hạn ô +2 |
+| P5 | Nghi lễ | Ngôn ngữ nói, Lửa | 1 | 30 | 30 | tín-ngưỡng | Công trình Bàn thờ; +5 ổn định một lần |
+| P6 | Giáo | P1, P3 | 2 | 30 | 55 | săn-xa | Săn +25%; sức chiến binh +20%; công thức Giáo |
+| P7 | Thuộc da | P1, Săn bắt hái lượm | 2 | 30 | 55 | — | Công thức Áo da; thiệt hại mùa đông −50% |
+| P8 | Lều | P3, P7 | 3 | 25 | 65 | xây-dựng | Công trình Lều (+10 chỗ ở; tối đa 3 mỗi trung tâm) |
+| P9 | Lưới và bẫy | P3 | 2 | 40 | 70 | — | Đánh cá +30%; săn +10% |
+| P10 | Đá mài | P1 | 2 | 60 | 105 | mài | Công thức Rìu đá mài (mỗi rìu: 2 người đốn gỗ +30%); công trình Hàng rào gỗ |
+| P11 | Cung tên | P6, P3 | 3 | 70 | 175 | săn-xa | Săn +30%; công thức Cung tên (vũ khí mạnh nhất) |
+| P12 | Ký hiệu | P5 | 2 | 50 | 90 | ghi-chép | Chống thất truyền; RP +10%; tình báo không phai |
+| P13 | Gốm | P2 + ô có đất sét | 2 | 80 | 140 | chứa | Công trình Lò gốm, công thức Gốm; hư lương thực 30% → 15%; mỗi món gốm trong kho −0,5 điểm % (tối đa −5) |
+| P14 | Trồng trọt sơ khai | P1, Săn bắt hái lượm + ô đồng cỏ, ven biển hoặc có sông | 2 | 120 | 210 | trồng-trọt | Công trình Ruộng |
+| P15 | Thuần dưỡng | P3, P6 | 3 | 120 | 300 | thuần-dưỡng | Công trình Chuồng |
+| P16 | Thuyền độc mộc | P10, Lửa | 3 | 90 | 225 | đi-nước | Đi được trên biển nông; đánh cá +20%; thám hiểm nhìn xa 3 ô; tấn công xa 3 ô |
+| P17 | Dệt | P3, P14 | 3 | 100 | 250 | dệt | Công thức Vải |
+| P18 | Đếm | P12, P14 | 3 | 100 | 250 | đếm | +1 AP; sai số ước lượng tình báo giảm một nửa |
 
 Cố ý **không có** phát minh nào cho năng lực `nhiệt-cao`, `nhận-biết-khoáng` và `luyện-đồng`. AI phải tự phát minh ra chúng nếu muốn bước vào thời đồ đồng.
 
@@ -221,7 +224,7 @@ Mỗi hiệu ứng có điểm sức mạnh. Tổng điểm của một phát mi
 | `tile_limit` | Giới hạn ô +1 hoặc +2 | 2 mỗi ô |
 | (năng lực mới) | Mỗi nhãn năng lực trong trường `capabilities`, tối đa 2 | 3 |
 
-Chi phí nghiên cứu do Engine tính: **RP = 15 × 1,4^d × (1 + điểm sức mạnh / 10)**, làm tròn lên bội số của 5.
+Chi phí nghiên cứu do Engine tính: **RP gốc = 15 × 1,4^d × (1 + điểm sức mạnh / 10)**, làm tròn lên bội số của 5, rồi nhân hệ số độ sâu như mọi phát minh: **× (1 + 0,75 × (d − 1))**, làm tròn lên bội số của 5 (mục 5.5). `research_options` trong gói trạng thái luôn ghi giá thật.
 
 - **Hàng mới và luật bảo toàn:** Engine tự định giá chuẩn của hàng mới = (tổng giá trị chuẩn đầu vào + công) / số lượng đầu ra, nên đầu ra không bao giờ "to" hơn đầu vào cộng công lao động (mục 6.2).
 - **Công cụ mở:** mỗi món trang bị cho `per` người của vai đó, cho họ thêm `percent`% năng suất. Mỗi lượt, mỗi món đang được dùng hao 1/10 (dùng được 10 lượt). Thưởng công cụ chỉ có tác dụng với hái lượm, săn bắt, đánh cá, khai thác và khai mỏ; công cụ cho vai khác vẫn hao mòn nhưng không có tác dụng (chưa có trong engine).
@@ -258,6 +261,7 @@ Trọng tài duyệt theo nhân quả và vật lý, không theo lịch sử Tr�
 ### 5.5 Nghiên cứu, lan truyền và thất truyền
 
 - Mỗi quốc gia có 1 dự án nghiên cứu tại một thời điểm (`research`, 1 AP). Muốn nghiên cứu phải đủ tiên quyết và điều kiện vật chất. Đổi dự án giữa chừng mất 50% RP đã tích. RP làm ra khi không có dự án thì mất.
+- **Nhịp nghiên cứu:** N người nghiên cứu làm ra **N^0,85** RP mỗi lượt (trước thưởng `research`, Thác Lớn và ổn định): thêm người thì thêm RP, nhưng mỗi người góp ít dần. Giá một phát minh độ sâu d là RP gốc × **(1 + 0,75 × (d − 1))**, làm tròn lên bội số của 5: d = 1 giữ nguyên giá, d = 2 nhân 1,75, d = 3 nhân 2,5, d = 4 nhân 3,25. Áp dụng cho cả cây gốc và phát minh mở. Mục đích: phát minh nông vẫn rẻ để bộ lạc nhỏ khởi đầu được, còn cây gốc kéo dài qua nửa mùa 500 lượt thay vì hết ở lượt khoảng 120 như v0.2.
 - Khi có năng lực `ghi-chép` thì được mở thêm 1 dự án phụ, nhận 30% số RP (chưa có trong engine).
 - **Thất truyền:** nếu dân số cuối lượt còn dưới 50% so với đầu lượt mà quốc gia chưa có `ghi-chép`, thì mất phát minh có được gần nhất không phải là phát minh khởi đầu và không phải là tiên quyết của phát minh nào khác đang có.
 - Lan truyền tri thức giữa các quốc gia: xem mục 7.5.
@@ -294,7 +298,7 @@ Công trình tốn vật liệu, tốn công và cần phát minh mở khóa. M�
 | Lửa trại | (có sẵn ở thủ đô) | — | — | Trung tâm quốc gia; mất thì mất nước (không phải công trình trong engine: vai trò này do ô thủ đô đảm nhận, mục 7.4) |
 | Bãi chế tác | Công cụ đá thô | 5 đá | 4 | 4 chỗ chế tác; cần cho mọi công thức trừ Gốm |
 | Hố trữ | Công cụ đá thô | 5 đá | 3 | Hư lương thực −5 điểm %; tối đa 2 mỗi quốc gia. Kho +50 đơn vị (chưa có trong engine) |
-| Lều | P8 Lều | 6 gỗ, 4 da, 2 dây thừng | 4 | +10 chỗ ở |
+| Lều | P8 Lều | 6 gỗ, 4 da, 2 dây thừng | 4 | +10 chỗ ở; mỗi trung tâm (thủ đô, điểm định cư) tối đa 3 công trình có chỗ ở (mục 4.2) |
 | Bàn thờ | P5 Nghi lễ | 10 đá | 6 | +1 ổn định/lượt; tối đa 1 mỗi quốc gia |
 | Hàng rào gỗ | P10 Đá mài | 15 gỗ, 3 dây thừng | 6 | Phòng thủ +40% cho ô đó và các ô kề |
 | Ruộng | P14 Trồng trọt | — (cần ô đồng cỏ, ven biển hoặc có sông) | 8 | 6 nông dân × 2 lương thực, thu hoạch ngay trong lượt |
@@ -303,7 +307,7 @@ Công trình tốn vật liệu, tốn công và cần phát minh mở khóa. M�
 | Bến thuyền | P16 Thuyền | 12 gỗ | 5 | Đóng thuyền; đánh cá +20% ở ô đó (chưa có trong engine; Thuyền độc mộc cho đánh cá +20% trực tiếp) |
 
 - Mỗi ô chỉ có 1 công trình sản xuất (Ruộng, Chuồng, Lò gốm). Các công trình khác không tính vào giới hạn này.
-- **Cộng dồn tác dụng:** chỗ ở và chỗ chế tác cộng dồn theo số công trình đã xong. Ổn định từ mọi công trình cộng lại tối đa +1/lượt. Giảm hư hỏng từ mọi công trình cộng lại tối đa 10 điểm %. Phòng thủ lấy công trình mạnh nhất trên ô bị đánh hoặc ô kề. Có ít nhất một công trình có chỗ ở thì thiệt hại mùa đông giảm một nửa.
+- **Cộng dồn tác dụng:** chỗ ở và chỗ chế tác cộng dồn theo số công trình đã xong; riêng công trình có chỗ ở chỉ tính tối đa 3 mỗi trung tâm, lấy các công trình nhiều chỗ ở nhất. Ổn định từ mọi công trình cộng lại tối đa +1/lượt. Giảm hư hỏng từ mọi công trình cộng lại tối đa 10 điểm %. Phòng thủ lấy công trình mạnh nhất trên ô bị đánh hoặc ô kề. Có ít nhất một công trình có chỗ ở thì thiệt hại mùa đông giảm một nửa.
 - **Xây dựng** là hành động `build` (1 AP) trên một ô đất liền của mình (bỏ trống thì xây ở thủ đô). Vật liệu bị trừ ngay; công trình xong khi đủ công từ người được phân vai xây dựng, theo thứ tự đặt xây. Hủy giữa chừng (chưa có trong engine: không có hành động hủy).
 - **Mất công trình:** khi bỏ ô, công trình trên ô mất; khi ô bị chiếm, công trình về tay bên chiếm; núi lửa phun trào phá công trình trong bán kính 2. Gián điệp phá hoại (`sabotage`, mục 7.8) xóa tiến độ một công trình đang xây, hoặc làm một công trình đã xong mất tác dụng 3 lượt.
 - **Hao mòn:** công trình mất 2% độ bền mỗi lượt, khôi phục bằng `repair`, dưới 50% hiệu quả giảm một nửa, 0% thì sập (chưa có trong engine).
@@ -322,7 +326,7 @@ Công trình tốn vật liệu, tốn công và cần phát minh mở khóa. M�
 | Gốm | 3 đất sét, 1 gỗ (củi) | 2 gốm | 1 | P13, làm ở Lò gốm |
 | Vải | 4 sợi | 1 vải | 2 | P17 |
 
-Mọi công thức trừ Gốm làm ở Bãi chế tác. Dây thừng từ da (chưa có trong engine). Gốm, vải và áo da (trừ khi chống rét, mục 9.2) hiện chưa có công dụng riêng ngoài trao đổi.
+Mọi công thức trừ Gốm làm ở Bãi chế tác. Dây thừng từ da (chưa có trong engine). Gốm trong kho giữ lương thực lâu hơn: mỗi món −0,5 điểm % hư hỏng, tối đa −5 điểm % (mục 4.1); gốm không hao mòn. Vải và áo da (trừ khi chống rét, mục 9.2) hiện chưa có công dụng riêng ngoài trao đổi.
 
 - **Luật bảo toàn công thức:** công thức mới từ phát minh mở phải có ít nhất một đầu vào vật chất. Engine giữ và công bố giá trị chuẩn mỗi loại hàng (lương thực 1, sợi 1, da 2, xương 1, gỗ 0,5, đá 0,3, đá lửa 1, đất sét 0,5, muối 2, sậy 0,5, đồng 3, thiếc 4, sắt 4, công cụ đá 2, lưỡi đá 3, dây thừng 2, áo da 8, giáo 6, cung 8, rìu 5, gốm 2, vải 5). Giá trị của hàng mới = (tổng giá trị đầu vào + công) / số đầu ra.
 - **Công cụ là điều kiện, không phải phép thuật:**
@@ -376,13 +380,14 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Đồng minh tham chiến:** khi một nước bị tuyên chiến, mọi đồng minh của nước đó và tông chủ của nó (nếu nó là chư hầu) tự động tuyên chiến với bên tấn công, cũng bắt đầu từ lượt sau. Đồng minh của bên tấn công không tự tham chiến.
 - **Quân đội** là những người được phân vai chiến binh. Họ không sản xuất nhưng vẫn ăn. Quân đội không phải đoàn có vị trí trên bản đồ, không có `move_army`, không cần mang lương thực (chưa có trong engine).
 - **Tấn công** (`attack`, 1 AP): đưa n chiến binh đánh một ô của nước đang chiến tranh với mình, cách lãnh thổ mình ≤ 2 ô (≤ 3 ô khi có năng lực `đi-nước`). Không đánh được ô núi nếu chưa đi được núi. **Đột kích** (`raid`, 1 AP): đánh vào ô thủ đô của nước địch để cướp kho, khi hai lãnh thổ cách nhau ≤ tầm đánh + 3 ô. Tổng số chiến binh gửi đi trong một lượt không vượt số chiến binh đang có.
-- **Sức mạnh** mỗi bên = (số người + thưởng vũ khí) × (1 + thưởng chiến binh từ phát minh + thưởng `combat`) × (ổn định / 100 + 0,5) × hệ số may rủi 0,8–1,2 từ RNG có seed. Thưởng vũ khí: mỗi người cầm được tối đa 1 vũ khí trong kho, cung +0,6 trước, rồi giáo +0,5. Bên thủ nhân thêm (1 + phòng thủ địa hình + phòng thủ công trình mạnh nhất trên ô hoặc ô kề + 0,25 nếu ô có sông).
-- **Bên thủ:** chiến binh của bên thủ chia đều cho mọi trận họ phải đỡ trong lượt. Không còn chiến binh thì dân quân ra trận: 10% số lao động (tối thiểu 1), chỉ tính nửa sức.
-- **Kết quả trận:** bên công thắng khi sức mạnh lớn hơn hẳn bên thủ (hòa thì bên thủ thắng). Bên thua mất 20–40% số người ra trận, bên thắng mất 5–15%, tỷ lệ cụ thể bốc thăm từ RNG có seed. Người chết bị trừ vào dân số. Thắng: bên công +1 ổn định, bên thủ −3; thua: bên công −2, bên thủ +1.
-- **Chiếm ô:** bên công thắng một trận `attack` thì chiếm ô đó, kèm công trình trên ô, dù bên thủ còn quân.
+- **Mặt trận:** một quốc gia đưa tối đa **5 + 5 × (số ô của mình kề ô bị đánh)** chiến binh vào một ô trong một lượt (cộng mọi lệnh `attack` vào ô đó). Ví dụ một ô địch chỉ kề 1 ô của mình nhận tối đa 10 người, kề 3 ô nhận 20 người. Vượt mức thì lệnh bị từ chối (vẫn mất AP). Muốn đánh lớn thì phải có biên giới rộng.
+- **Sức mạnh** mỗi bên = (số chiến binh + thưởng vũ khí + 0,5 × dân quân) × (1 + thưởng chiến binh từ phát minh + thưởng `combat`) × (ổn định / 100 + 0,5) × hệ số may rủi 0,8–1,2 từ RNG có seed. Thưởng vũ khí: mỗi chiến binh cầm được tối đa 1 vũ khí trong kho, cung +0,6 trước, rồi giáo +0,5. Bên thủ đánh trên đất nhà nên nhân thêm (1 + **0,5 lợi thế sân nhà** + phòng thủ địa hình + phòng thủ công trình mạnh nhất trên ô hoặc ô kề + 0,25 nếu ô có sông).
+- **Bên thủ:** chiến binh và dân quân của bên thủ (dân quân = 10% số lao động, luôn ra trận, chỉ tính nửa sức, không cầm vũ khí) **dàn đều trên cả mặt trận**: chia cho số ô của mình kề đất của mọi nước đang giao chiến với mình, và ít nhất cho số trận phải đỡ trong lượt; mỗi ô tối thiểu 1 dân quân. Biên giới hẹp thì dễ giữ, biên giới dài thì mỏng.
+- **Kết quả trận:** bên công thắng khi sức mạnh lớn hơn hẳn bên thủ (hòa thì bên thủ thắng). Bên thua mất 20–40% số người ra trận (với bên thủ: cả chiến binh lẫn dân quân, cùng một tỷ lệ), bên thắng mất 5–15%, tỷ lệ cụ thể bốc thăm từ RNG có seed. Người chết bị trừ vào dân số. Thắng: bên công +1 ổn định, bên thủ −3; thua: bên công −2, bên thủ +1.
+- **Chiếm ô:** bên công thắng một trận `attack` thì chiếm ô đó, kèm công trình trên ô, dù bên thủ còn quân, và **thu chiến lợi phẩm**: 15% mỗi loại hàng trong kho của bên thua, tổng không quá 5 đơn vị mỗi chiến binh của trận đó, lương thực trước, rồi các loại khác theo thứ tự chữ cái. Chiếm được một trung tâm (thủ đô hoặc điểm định cư) thì thu 50% mỗi loại hàng, không giới hạn sức mang.
 - **Cướp:** bên công thắng một trận `raid` thì mỗi chiến binh mang về tối đa 5 đơn vị, lấy tối đa 30% mỗi loại hàng trong kho của cả nước bị cướp, lương thực trước, rồi các loại khác theo thứ tự chữ cái.
-- **Thủ đô và điểm định cư** chỉ bị chiếm khi mọi ô đất liền kề đã thuộc bên tấn công. Mất thủ đô thì điểm định cư lập sớm nhất thành thủ đô mới. Không còn định cư nào thì quốc gia diệt vong.
-- **Tù binh:** khi bên công thắng, 20% số quân thủ tử trận trở thành dân của bên thắng, ổn định bên thắng −1 mỗi 5 tù binh.
+- **Thủ đô và điểm định cư** chỉ bị chiếm (khi bên công thắng một trận `attack` vào chính ô đó) nếu bên công đã giữ **ít nhất 4 ô đất liền kề** của nó (hoặc mọi ô đất liền kề, nếu nó có ít hơn 4). Mất thủ đô thì điểm định cư lập sớm nhất thành thủ đô mới. Không còn định cư nào thì quốc gia diệt vong.
+- **Tù binh:** khi bên công thắng, 50% số người bên thủ tử trận trở thành dân của bên thắng, ổn định bên thắng −1 mỗi 5 tù binh.
 - **Kết thúc:** hiệp ước hòa bình (có thể kèm nhượng ô và cống nạp), hoặc diệt vong. Đầu hàng thành chư hầu ngay giữa chiến tranh (chưa có trong engine: phải ký hòa bình trước rồi mới ký chư hầu). Từ lượt thứ 5 tính từ khi giao tranh bắt đầu, chiến tranh gây −1 ổn định mỗi lượt cho cả hai bên.
 
 ### 7.5 Lan truyền tri thức

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createWorld, housing, ownedTiles, step, type NationSpec } from "../src/engine.ts";
 import { activeWar } from "../src/diplomacy.ts";
-import { dist, within } from "../src/hex.ts";
+import { NEIGHBORS, dist, within } from "../src/hex.ts";
 import { botTurn } from "../src/ai/bot.ts";
 import { rngFor } from "../src/rng.ts";
 import { ERAS, START } from "../src/rules.ts";
@@ -76,9 +76,16 @@ test("a strong bot attacks a much weaker neighbour, takes land, then makes peace
   A.met.push(B.id); B.met.push(A.id);
   w.tick = 60;
   tick(w); // sight and intel catch up
-  const r = botTurn(w, A, () => 0.01);
-  assert.ok(r.actions?.some(a => a.type === "declare_war" && a.target === B.name), `declares war: ${JSON.stringify(r.actions)}`);
-  const audits = tick(w, { [A.id]: r });
+  // A first widens the front to 3 tiles (§7.4: a narrow front lets them mass on it), then declares
+  const audits: string[] = [];
+  let declared = false;
+  for (let t = 0; t < 15 && !declared; t++) {
+    const r = botTurn(w, A, () => 0.01);
+    declared = !!r.actions?.some(a => a.type === "declare_war" && a.target === B.name);
+    audits.push(...tick(w, { [A.id]: r }));
+  }
+  assert.ok(declared, "declares war once the front is wide enough");
+  assert.ok(ownedTiles(w, B.id).filter(t => NEIGHBORS[t.i].some(j => w.tiles[j].owner === A.id)).length >= 3, "a front of 3 tiles");
   const war = w.wars.find(x => x.a === A.id && x.b === B.id);
   assert.ok(war, "war declared");
   const tilesB = ownedTiles(w, B.id).length;

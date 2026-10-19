@@ -4,17 +4,18 @@
 // know: intel estimates, offers made to it, public treaties and wars, land in sight.
 // Deterministic: the same (world, nation, rand) always gives the same answer.
 //
-// Plan each turn: feed everyone with a margin, grow housing (tents, then
-// settlements) as far as the land can feed, push research down the Neolithic
-// path, keep tools and materials stocked, expand onto good land, meet the
-// neighbours, trade surplus, sign non-aggression, and very rarely pick a fight
-// with a much weaker neighbour, then make peace.
+// Plan each turn: feed everyone with a margin, grow housing (three tents per
+// centre, then a settlement) as far as the land can feed, push research down the
+// Neolithic path, keep tools, pots and materials stocked, expand onto good land,
+// meet the neighbours, trade surplus, sign non-aggression, and now and then widen
+// a front against a clearly weaker neighbour, fight where the odds are good, and
+// take tribute or make peace.
 
 import { AP_COST, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, GOOD_VALUE, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, housing, inventionCost, mods, ownedTiles, researchOptions, tileLimit, workers, type Mods } from "../engine.ts";
-import { pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
+import { actionPoints, canSeeRes, deltaE, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
 
@@ -170,18 +171,30 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // A new settlement is the best way to more housing and land (§2.3). It brings its
   // own ring of tiles, so make room under the limit it raises before founding it.
   const lastSettled = Math.max(-99, ...n.settlements.map(s => s.tick));
-  const wantSettle = n.founded && v.m.caps.has(SETTLEMENT.cap) && v.pop >= SETTLEMENT.minPopulation && v.house - v.pop <= 6 && !atWar && tick - lastSettled >= 5;
+  // Tents first: a settlement only once the centres we have are full of them
+  const roofsFull = !v.has("P8") || n.buildings.filter(b => isHousing(world, b.type)).length >= housingSlots(n);
+  const wantSettle = n.founded && v.m.caps.has(SETTLEMENT.cap) && v.pop >= SETTLEMENT.minPopulation && v.house - v.pop <= Math.max(6, v.house * 0.12) && roofsFull && !atWar && tick - lastSettled >= 5
+    && (n.settlements.length < SETTLEMENT.freeCentres || n.stability >= 50); // each centre beyond the free ones wears on stability
   const sett = wantSettle ? settlementSite(v) : null;
   const ring = sett === null ? 0 : [sett, ...NEIGHBORS[sett]].filter(j => world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean").length;
-  const settleNow = sett !== null && v.food >= SETTLEMENT.food + v.need * 0.3 && ap >= (AP_COST.found_settlement ?? 3) + 1
+  const payment = sett !== null ? settlementPayment(n) : null;
+  const settleNow = payment !== null && ap >= (AP_COST.found_settlement ?? 3) + 1
     && capFood > (v.pop + SETTLEMENT.housing * 0.5) * v.m.foodPerPerson;
+  if (settleNow) for (const [k, q] of Object.entries(payment)) reserved[k] = (reserved[k] || 0) + q;
+
+  // A much weaker neighbour close by that nothing protects: a possible war of conquest (§7.4)
+  const canWage = n.founded && !atWar && tick >= 60 && v.pop >= 30 && n.stability >= 60 && v.food >= v.need * 0.5
+    && !world.wars.some(w => w.a === n.id && tick - w.declared < 80);
+  const prey = canWage ? others.filter(o => weakNeighbour(v, o)).sort((a, b) => a.id - b.id)[0] : undefined;
 
   // 0. Too much land: give up the poorest, far from any centre (free)
   const extra = Math.max(v.owned.length - v.limit, settleNow ? v.owned.length + ring - (v.limit + 3) : 0);
   if (n.founded && extra > 0) {
     const centreSet = new Set(v.centres);
     const far = (t: Tile) => Math.min(...v.centres.map(c => dist(c, t.i)));
-    const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i))
+    // Never give up ground that faces an enemy we fight, or the one we mean to fight
+    const foes = new Set([...v.wars.map(w => w.a === n.id ? w.b : w.a), ...(prey ? [prey.id] : [])]);
+    const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i) && !NEIGHBORS[t.i].some(j => foes.has(world.tiles[j].owner)) && (!foes.size || !atWarFront(v, t.i, foes)))
       .sort((a, b) => tileWorth(v, a) - far(a) * 2 - (tileWorth(v, b) - far(b) * 2) || a.i - b.i).slice(0, extra);
     for (const t of poor) spend("abandon_tile", { tile: xy(t.i) });
   }
@@ -200,34 +213,44 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 2. War: fight, then make peace (§7.4)
   const war = n.founded ? warPlan(v) : null;
   if (war) {
-    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && !Object.keys(o.tribute).length && tick - o.tick <= 2)) {
+    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && (!Object.keys(o.tribute).length || o.payer === o.from) && tick - o.tick <= 2)) {
       const w = v.wars.find(x => x.a === off.from || x.b === off.from);
       const mineWar = w && w.a === n.id && !w.reason.startsWith("bảo vệ");
-      if (!w || !mineWar || tick - w.start >= 3) spend("accept_treaty", { offer: off.id });
+      // The aggressor takes a peace that pays at once, a plain one only after a few turns of fighting
+      const pays = Object.keys(off.tribute).length > 0;
+      if (!w || !mineWar || tick - w.start >= (pays ? 1 : 4)) spend("accept_treaty", { offer: off.id });
     }
     for (const w of v.wars) {
       const enemy = world.nations[w.a === n.id ? w.b : w.a];
       const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ");
       const age = tick - w.start;
       const lost = world.battles.filter(b => b.tick >= w.start && b.attacker === n.id && b.defender === enemy.id && !b.won).length;
-      const wantPeace = aggressor ? age >= 4 || lost >= 2 : age >= 0;
+      const tilesLost = world.battles.filter(b => b.tick >= w.start && b.attacker === enemy.id && b.defender === n.id && b.won && b.note.startsWith("chiếm")).length;
+      const wantPeace = aggressor ? age >= 8 || lost >= 3 : age >= 0;
       if (wantPeace && (tick + n.id) % 2 === 0 && !world.treatyOffers.some(o => o.from === n.id && o.to === enemy.id && o.type === "peace")) {
-        spend("treaty", { to: enemy.name, kind: "peace", duration: 40 });
+        // A defender that is losing land buys peace with tribute (§7.2)
+        const tribute = !aggressor && tilesLost >= 1 ? { food: Math.min(50, Math.round(v.need * 0.2), Math.max(5, Math.round(v.need * 0.05 * tilesLost))) } : undefined;
+        spend("treaty", { to: enemy.name, kind: "peace", ...(tribute ? { duration: 20, tribute, payer: "me" } : { duration: 40 }) });
       }
     }
     for (const s of war.strikes) spend("attack", { tile: xy(s.tile), warriors: s.warriors });
+    if (war.bridge !== undefined && v.food >= CLAIM_FOOD) spend("claim_tile", { tile: xy(war.bridge) });
   }
 
-  // 3. Rarely, a war of conquest against a much weaker neighbour we border
-  if (n.founded && !atWar && tick >= 60 && v.pop >= 30 && n.stability >= 60 && v.food >= v.need * 0.5) {
-    const recent = world.wars.some(w => w.a === n.id && tick - w.declared < 80);
-    const prey = recent ? undefined : others.filter(o => weakNeighbour(v, o)).sort((a, b) => a.id - b.id)[0];
-    if (prey && rand() < 0.05) spend("declare_war", { target: prey.name });
+  // 3. Rarely, a war of conquest against that neighbour: first build a front at least 3 tiles wide
+  // (a narrow front lets them mass every warrior on it, §7.4), then declare
+  let preparing = false;
+  if (prey) {
+    const border = ownedTiles(world, prey.id).filter(t => NEIGHBORS[t.i].some(j => v.mine.has(j))).length;
+    if (border < 3) {
+      const step = frontStep(v, prey.id);
+      if (step !== undefined && v.food >= CLAIM_FOOD + v.need * 0.4) preparing = spend("claim_tile", { tile: xy(step) });
+    } else if (rand() < 0.1) spend("declare_war", { target: prey.name });
   }
 
   // 4. The settlement itself
   let settling = false;
-  if (settleNow) {
+  if (settleNow && sett !== null) {
     const names = ["Bến", "Đồi", "Suối", "Bãi", "Gò", "Làng", "Trại", "Rừng"];
     settling = spend("found_settlement", { tile: xy(sett), name: `${names[n.settlements.length % names.length]} ${pickOne(SYL, rand).toUpperCase()[0]}${pickOne(SYL, rand)}${n.settlements.length + 1}` });
   }
@@ -243,7 +266,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (count("workshop") < 1 + Math.floor(n.labor.hunt / 48) && !pendingType("workshop")) queue("workshop");
     // Housing: a tent when the people are close to the roof and the land can feed ten more
     const roomy = v.house - v.pop > 3;
-    if (can("tent") && !roomy && !pendingType("tent") && !settling && capFood >= (v.house + 10) * v.m.foodPerPerson * 1.1) queue("tent");
+    const roofSlot = n.buildings.filter(b => isHousing(world, b.type)).length < housingSlots(n);
+    if (can("tent") && roofSlot && !roomy && !pendingType("tent") && !settling && capFood >= (v.house + 10) * v.m.foodPerPerson * 1.1) queue("tent");
     // Farms: more slots when the wild runs short of what the people need
     if (can("field") && !pendingType("field")) {
       const wanted = (v.house + 10) * v.m.foodPerPerson * 1.25 > capFood || count("field") < 1;
@@ -266,7 +290,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   }
 
   // 6. Land: claim the best free tile next to ours while under the limit
-  if (n.founded && !settling && sett === null && extra <= 0 && v.food >= CLAIM_FOOD + v.need * 0.4) {
+  if (n.founded && !settling && !preparing && war?.bridge === undefined && sett === null && extra <= 0 && v.food >= CLAIM_FOOD + v.need * 0.4) {
     const best = claimTile(v);
     if (best.tile >= 0 && v.owned.length < v.limit) spend("claim_tile", { tile: xy(best.tile) });
     else if (best.tile >= 0 && best.fills && ap >= (AP_COST.claim_tile ?? 2)) {
@@ -303,9 +327,14 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const unsigned = near.filter(o => !treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace"]).length
       && !world.treatyOffers.some(x => (x.from === n.id && x.to === o.id) || (x.from === o.id && x.to === n.id)) && !weakNeighbour(v, o));
     if (unsigned.length && tick % 3 === n.id % 3) spend("treaty", { to: pickOne(unsigned, rand).name, kind: "non_aggression", duration: 60 });
-    // Goods travel by caravan, so any partner at peace will do; neighbours first
-    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id)).sort((a, b) => v.gap(a.id) - v.gap(b.id) || a.id - b.id);
+    // Goods travel by caravan, so any partner at peace will do: first those whose land we have seen holds
+    // what we lack, then neighbours
     const deal = tradeIdea(v);
+    const source = deal ? SOURCE[Object.keys(deal.get)[0]] : undefined;
+    const rich = new Set<number>();
+    if (source !== undefined && tick % 3 === n.id % 3) for (const i of n.seen) { const t = world.tiles[i]; if (t.owner >= 0 && (t.res[source] || 0) > 30) rich.add(t.owner); }
+    const holds = (o: Nation) => rich.has(o.id) ? 0 : 1;
+    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id)).sort((a, b) => holds(a) - holds(b) || v.gap(a.id) - v.gap(b.id) || a.id - b.id);
     if (deal && partners.length && tick % 3 === n.id % 3) spend("trade_offer", { to: partners[Math.floor(rand() * Math.min(3, partners.length))].name, give: deal.give, get: deal.get });
     if (tick % 10 === n.id % 10 && ap >= 1) {
       const o = pickOne(others, rand);
@@ -327,7 +356,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const pendingWork = pending.reduce((s, b) => s + Math.max(0, (buildingOf(world, b.type)?.work ?? 0) - b.progress), 0)
     + builds.reduce((s, b) => s + (buildingOf(world, b.type)?.work ?? 0), 0);
   const researching = !!n.research || actions.some(a => a.type === "research");
-  const { labor, crafts, mineTarget } = planLabor(v, { explorers, pendingWork, war, reserved, saveFood: sett !== null && !settling ? SETTLEMENT.food + v.need * 0.3 : 0, researching });
+  const { labor, crafts, mineTarget } = planLabor(v, { explorers, pendingWork, war, reserved, save: sett !== null && !settling ? { wood: SETTLEMENT.materials * 0.6, stone: SETTLEMENT.materials * 0.4 } : {}, researching });
   // Strikes can only use the warriors the labour plan could spare
   let free = labor.warrior;
   for (const a of actions) if (a.type === "attack") { a.warriors = Math.min(Number(a.warriors), free); free -= Number(a.warriors); }
@@ -343,6 +372,23 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
 
 // ---------------------------------------------------------------- land
 
+/** The free tile next to ours closest to another nation's land: one step toward (or along) a front. */
+function frontStep(v: View, enemy: number): number | undefined {
+  const enemyLand = ownedTiles(v.world, enemy).map(t => t.i);
+  if (!enemyLand.length) return undefined;
+  let best = Infinity, pick: number | undefined;
+  for (const t of v.owned) for (const j of NEIGHBORS[t.i]) {
+    const u = v.world.tiles[j];
+    if (u.owner !== -1 || !u.land || u.terrain === "mountain") continue;
+    const d = Math.min(...enemyLand.map(k => dist(j, k)));
+    if (d < best || (d === best && pick !== undefined && j < pick)) { best = d; pick = j; }
+  }
+  return pick;
+}
+/** A tile of ours within 3 steps of a foe's land: the way to the front. */
+function atWarFront(v: View, i: number, foes: Set<number>): boolean {
+  return within(i, 3).some(j => foes.has(v.world.tiles[j].owner));
+}
 function freeTile(v: View, t: Tile): boolean {
   return t.land && t.terrain !== "mountain" && !v.n.buildings.some(b => b.tile === t.i && buildingOf(v.world, b.type)?.perTile);
 }
@@ -437,48 +483,64 @@ function estPop(v: View, o: Nation): number | null {
   const p = intel.report.population_est;
   return typeof p === "number" ? p : null;
 }
-/** Borders us, is much smaller, and nothing binds us to leave it alone. */
+/** Borders us (or nearly), is clearly smaller, and nothing binds us to leave it alone. */
 function weakNeighbour(v: View, o: Nation): boolean {
   if (!o.alive || treatiesBetween(v.world, v.n.id, o.id).length) return false;
   const p = estPop(v, o);
-  if (p === null || p > v.pop * 0.6) return false;
-  return v.gap(o.id) <= 1;
+  if (p === null || p > v.pop * 0.7) return false;
+  return v.gap(o.id) <= 4;
 }
 /** A strong people does not always tie its own hands with a weak neighbour. */
 function keepOptionsOpen(v: View, o: Nation, rand: Rand): boolean {
-  return weakNeighbour(v, o) && rand() < 0.5;
+  return weakNeighbour(v, o) && rand() < 0.85;
 }
 function hostileBorder(v: View): boolean {
   return v.n.met.some(id => { const o = v.world.nations[id]; return o.alive && !treatiesBetween(v.world, v.n.id, id).length && v.gap(id) <= 2 && (estPop(v, o) ?? 0) > v.pop; });
 }
 
-interface WarPlan { warriors: number; strikes: Array<{ tile: number; warriors: number }> }
+interface WarPlan { warriors: number; strikes: Array<{ tile: number; warriors: number }>; bridge?: number }
 function warPlan(v: View): WarPlan | null {
   const { world, n } = v;
   if (!v.wars.length) return null;
   const aggressor = v.wars.some(w => w.a === n.id && !w.reason.startsWith("bảo vệ"));
   const warriors = Math.max(2, Math.round(v.workers * (aggressor ? 0.3 : 0.25)));
   const strikes: WarPlan["strikes"] = [];
+  let bridge: number | undefined;
   if (!aggressor) return { warriors, strikes };
-  const reach = v.m.caps.has("đi-nước") ? WAR.reachSail : WAR.reach;
   for (const w of v.activeWars) {
     if (w.a !== n.id) continue;
     const enemy = world.nations[w.b];
-    const est = enemy.intel ? (v.n.intel[String(enemy.id)]?.report.warriors_est as number | undefined) : undefined;
-    if (typeof est === "number" && est * 1.2 + 1 > warriors) continue; // they are ready for us
+    const report = v.n.intel[String(enemy.id)]?.report;
+    const theirPop = typeof report?.population_est === "number" ? report.population_est : estPop(v, enemy) ?? v.pop * 0.5;
+    const theirWarriors = typeof report?.warriors_est === "number" ? report.warriors_est : theirPop * 0.7 * 0.25;
+    // What stands on each tile of their front (every tile of theirs touching ours, or at least each attack):
+    // warriors and half-strength militia spread evenly (§7.4)
+    const border = ownedTiles(world, enemy.id).filter(t => NEIGHBORS[t.i].some(j => v.mine.has(j))).length;
+    const guard = (k: number) => (theirWarriors + 0.5 * theirPop * 0.7 * WAR.militiaShare) / Math.max(k, border);
     const centres = new Set([enemy.capital, ...enemy.settlements.map(s => s.tile)]);
+    const held = (c: number) => NEIGHBORS[c].filter(j => world.tiles[j].land && world.tiles[j].owner === n.id).length;
+    // Only tiles that touch our land: what we take stays joined, and the front is wider (§7.4)
     const targets = ownedTiles(world, enemy.id).filter(t => {
       if (t.terrain === "mountain" && !v.m.move.has("mountain")) return false;
-      if (!NEIGHBORS[t.i].some(j => v.mine.has(j))) return false; // keep what we take joined to our land
-      if (centres.has(t.i)) return NEIGHBORS[t.i].every(j => !world.tiles[j].land || world.tiles[j].owner === n.id || j === t.i);
-      return v.owned.some(o => dist(o.i, t.i) <= reach);
+      if (!NEIGHBORS[t.i].some(j => v.mine.has(j))) return false;
+      return !centres.has(t.i) || held(t.i) >= centreFallNeed(world, t.i);
     });
     const defence = (t: Tile) => TERRAIN[t.terrain].defense + (t.river ? 0.25 : 0) + (enemy.buildings.some(b => b.done && dist(b.tile, t.i) <= 1 && (buildingOf(world, b.type)?.effect.defense || 0) > 0) ? 0.4 : 0);
-    targets.sort((a, b) => defence(a) - defence(b) || tileWorth(v, b) - tileWorth(v, a) || a.i - b.i);
-    if (targets.length) strikes.push({ tile: targets[0].i, warriors });
-    break; // one front at a time, all warriors together
+    // A centre we can take first, then the ring around their capital, then the weakest ground
+    const score = (t: Tile) => (centres.has(t.i) ? 100 : 0) + (NEIGHBORS[t.i].includes(enemy.capital) ? 3 : 0) - defence(t) * 4 + frontCap(world, n.id, t.i) / 5;
+    targets.sort((a, b) => score(b) - score(a) || a.i - b.i);
+    // Spread the army over the most fronts that each look winnable: more fronts thin their guard,
+    // but each front holds only so many of ours
+    for (let f = Math.min(3, targets.length); f >= 1 && !strikes.length; f--) {
+      const plan = targets.slice(0, f).map(t => ({ tile: t.i, warriors: Math.min(Math.floor(warriors / f), frontCap(world, n.id, t.i)) }));
+      const winnable = plan.every((p, k) => p.warriors >= 3 && p.warriors > 1.15 * guard(f) * (1 + WAR.home + defence(targets[k])));
+      if (winnable) strikes.push(...plan);
+    }
+    // Front too narrow (or none yet): claim a free tile next to ours toward their land to widen it
+    if (!strikes.length) bridge = frontStep(v, enemy.id);
+    break; // one enemy at a time
   }
-  return { warriors, strikes };
+  return { warriors, strikes, bridge };
 }
 
 // ---------------------------------------------------------------- trade
@@ -522,7 +584,7 @@ function fairTrade(v: View, give: Record<string, number>, get: Record<string, nu
 
 // ---------------------------------------------------------------- labour
 
-interface LaborCtx { explorers: number; pendingWork: number; war: WarPlan | null; reserved: Record<string, number>; saveFood: number; researching: boolean }
+interface LaborCtx { explorers: number; pendingWork: number; war: WarPlan | null; reserved: Record<string, number>; save: Record<string, number>; researching: boolean }
 
 function planLabor(v: View, c: LaborCtx): { labor: Record<Role, number>; crafts: Record<string, number>; mineTarget: string } {
   const { world, n, m } = v;
@@ -533,7 +595,7 @@ function planLabor(v: View, c: LaborCtx): { labor: Record<Role, number>; crafts:
   const stock = (k: string) => v.stock(k) - (c.reserved[k] || 0);
 
   // Food: aim for 20% over need, more when the store is thin
-  let target = v.need * 1.2 + 0.5 * (Math.max(v.need * 0.7, c.saveFood) - v.food);
+  let target = v.need * 1.2 + 0.5 * (v.need * 0.7 - v.food);
   target = Math.max(v.need * 0.85, Math.min(v.need * 1.9, target));
   const tools = HUNT_TOOLS.reduce((s, k) => s + v.stock(k), 0);
   // Gatherers make the fibre that becomes rope; explorers are taken from them
@@ -581,6 +643,8 @@ function planLabor(v: View, c: LaborCtx): { labor: Record<Role, number>; crafts:
   if (can("blade") && stock("flint") >= 2 && (v.stock("blade") < 2 || (c.war && v.stock("blade") < 4))) crafts.blade = 1;
   if (can("hide_coat") && world.tiles[n.capital].zone !== "trop" && v.stock("hide_coat") < v.pop / 2 && stock("hide") >= 3 + (v.has("P8") ? 4 : 0) && stock("bone") >= 1) crafts.hide_coat = 1;
   if (can("axe") && v.stock("axe") < 2 && stock("rope") >= 3 && stock("stone") >= 6) crafts.axe = 1;
+  // Sealed pots keep food longer, up to ten of them (§4.1)
+  if (can("pottery") && v.stock("pottery") < 10 && stock("clay") >= 3 && stock("wood") >= 1) crafts.pottery = 1;
   const craftWork = Object.entries(crafts).reduce((s, [id, q]) => s + (recipeOf(world, id)?.work ?? 1) * q, 0);
   const slots = n.buildings.filter(b => b.done).reduce((s, b) => s + (buildingOf(world, b.type)?.effect.craftSlots || 0), 0);
   if (craftWork > 0 && slots > 0) give("craft", Math.min(slots, craftWork));
@@ -590,9 +654,11 @@ function planLabor(v: View, c: LaborCtx): { labor: Record<Role, number>; crafts:
   const owns = (key: ResKey) => v.owned.some(t => (t.res[key] || 0) >= 1);
   const tentSoon = v.has("P8") || v.has("P7");
   // Stone for tools: replace wear (a tool lasts ~10 turns) and close the gap within a few turns
-  const stoneNeed = 2 * (toolsWanted / 10 + toolGap / 4) + (stock("stone") < k.stone ? 1 : 0);
-  if (owns("stone") && (stock("stone") < k.stone + 6 || toolGap > 0)) give("stone", Math.min(10, Math.max(1, Math.ceil(stoneNeed / (YIELD.extract * mult("stone"))))));
-  if (owns("wood") && stock("wood") < k.wood + (tentSoon ? 8 : 0)) give("wood", stock("wood") < 8 ? 2 : 1);
+  // Saving for a settlement: wood and stone on top of the usual reserve
+  const saveStone = c.save.stone || 0, saveWood = c.save.wood || 0;
+  const stoneNeed = 2 * (toolsWanted / 10 + toolGap / 4) + (stock("stone") < k.stone ? 1 : 0) + (stock("stone") < k.stone + saveStone ? saveStone / 8 : 0);
+  if (owns("stone") && (stock("stone") < k.stone + 6 + saveStone || toolGap > 0)) give("stone", Math.min(10, Math.max(1, Math.ceil(stoneNeed / (YIELD.extract * mult("stone"))))));
+  if (owns("wood") && stock("wood") < k.wood + (tentSoon ? 8 : 0) + saveWood) give("wood", stock("wood") < 8 ? 2 : saveWood ? 3 : 1);
   if (v.has("P1") && owns("flint") && stock("flint") < k.flint + (c.war ? 6 : 0)) give("flint", 1);
   if ((v.has("P13") || v.has("P2")) && owns("clay") && stock("clay") < (v.has("P13") ? 25 : 0)) give("clay", 1);
   // Miners dig ore when they can see it, else salt (worth trading)

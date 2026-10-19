@@ -1,7 +1,7 @@
 // Scenario tests for spy operations (§7.8) and renaming a nation (§2.2).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, buildingWorks, housing, inventionCost, spyDetectChance, type NationSpec } from "../src/engine.ts";
+import { createWorld, step, baseCost, buildingWorks, housing, inventionCost, spyDetectChance, type NationSpec } from "../src/engine.ts";
 import { migrate } from "../src/catalog.ts";
 import { rngFor } from "../src/rng.ts";
 import { SPY_OPS } from "../src/rules.ts";
@@ -104,7 +104,9 @@ test("steal_tech: 50% off, never stacked with other discounts", () => {
   const [a, b] = w.nations;
   writing(a); b.inventions.push("P3", "P9");
   let spy = addSpy(w, a, b);
-  assert.equal(inventionCost(w, a, "P9"), Math.ceil(40 * 0.8), "diffusion: 20% off from a known nation");
+  const p9 = baseCost(w, "P9");
+  assert.equal(p9, 70, "P9 lists 40 RP; depth 2 costs × 1.75");
+  assert.equal(inventionCost(w, a, "P9"), Math.ceil(p9 * 0.8), "diffusion: 20% off from a known nation");
   turn(w, { 0: act({ type: "steal_tech", target: b.name, invention: "P7" }) });
   assert.match(a.lastRejected[0].reason, /không có phát minh/);
   if (!spy.active) spy = addSpy(w, a, b);
@@ -113,10 +115,10 @@ test("steal_tech: 50% off, never stacked with other discounts", () => {
   if (!spy.active) spy = addSpy(w, a, b);
   const lines = turn(w, { 0: act({ type: "steal_tech", target: b.name, invention: "Lưới và bẫy" }) }); // by name
   assert.deepEqual(a.stolenTech, ["P9"]);
-  assert.equal(inventionCost(w, a, "P9"), Math.ceil(40 * 0.5));
+  assert.equal(inventionCost(w, a, "P9"), Math.ceil(p9 * 0.5));
   assert.ok(!lines.some(l => /đánh cắp/.test(l) && l.includes(a.name)));
   w.treaties.push({ id: 99, type: "alliance", a: a.id, b: b.id, tribute: {}, cede: [], start: w.tick, end: null, active: true, brokenBy: null });
-  assert.equal(inventionCost(w, a, "P9"), Math.ceil(40 * 0.4), "the alliance's 60% wins; no stacking");
+  assert.equal(inventionCost(w, a, "P9"), Math.ceil(p9 * 0.4), "the alliance's 60% wins; no stacking");
   const obs = buildObservation(w, a) as { stolen_tech?: Array<{ id: string }> };
   assert.equal(obs.stolen_tech?.[0].id, "P9");
 });

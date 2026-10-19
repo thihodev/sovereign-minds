@@ -7,6 +7,18 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 - Sửa theo rà soát luật ↔ code: thưởng nghề và công cụ tự phát minh có tác dụng với nông dân, chế tác, xây dựng, nghiên cứu và chiến binh; vũ khí mất theo thương vong, rìu mòn; giữ ô biển nông cần `đi-nước`; kỷ nguyên không lùi; nghiên cứu tự bắt đầu chỉ khi đủ điều kiện vật chất; hai đơn cùng tên duyệt cùng lượt được gộp; chặn giả mạo mệnh lệnh trong đơn phát minh và thỉnh nguyện; đồng minh chia sẻ tầm nhìn; uy tín công khai; tuyên chiến không chính nghĩa −5 uy tín; quyết định duyệt tay của Watcher không mất khi khởi động lại; `move` chỉ nhận biển nông và núi; chỗ chế tác của công trình mở tính điểm.
 - Xếp hạng tính ở Engine theo độ sâu phát minh (src/ranking.ts).
 - Sử gia AI, gián điệp ra tay (phá hoại, đánh cắp công nghệ, kích động), đổi tên sau khi sang kỷ nguyên.
+- **Cân bằng lại cho một mùa 500 lượt** (đo bằng `tools/simulate.ts`, chi tiết và bảng trước/sau trong `docs/BALANCE.md`; `RULES_VERSION` 0.3):
+  - **Chỗ ở (§4.2):** mỗi trung tâm (thủ đô, mỗi điểm định cư) tối đa 3 công trình có chỗ ở (Lều, công trình mở); `build` vượt trần bị từ chối, và chỉ các công trình trong trần được tính.
+  - **Tăng dân logistic (§4.2):** +floor(dân × 8% × (1 − dân/chỗ ở)), tối thiểu 1 (trước đây 4% cố định).
+  - **Giới hạn ô (§2.3):** 7 + floor(√dân) + thưởng + 3 mỗi điểm định cư (trước đây 7 + dân/10).
+  - **Định cư (§2.3):** cần 50 dân (trước đây 30), cách các trung tâm ≥ 6 ô (trước đây 4), trả 25 gỗ và/hoặc đá, loại nhiều hơn trả trước (trước đây 20 lương thực), +10 chỗ ở (trước đây +15); 10 người dời đi vẫn là dân của nước nhưng ổn định −5; mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (§4.4).
+  - **Nghiên cứu (§5.5):** N người làm ra N^0,85 RP; giá phát minh × (1 + 0,75 × (d − 1)) theo độ sâu, cho cả cây gốc và phát minh mở (cây gốc 2.115 RP thay vì 1.040).
+  - **Chiến tranh (§7.4):** mặt trận tối đa 5 + 5 × số ô của bên công kề ô bị đánh; bên thủ +50% lợi thế sân nhà, dân quân (10% lao động, nửa sức) luôn ra trận cùng chiến binh, lực lượng thủ dàn đều trên mọi ô biên giới giáp kẻ thù; chiếm ô thì thu 15% kho của bên thua (tối đa 5 đơn vị mỗi chiến binh), chiếm trung tâm thì thu 50%; tù binh 50% số người bên thủ tử trận (trước đây 20%); thủ đô và điểm định cư thất thủ khi bên công giữ 4 ô đất liền kề (trước đây phải bao vây kín).
+  - **Gốm (§4.1):** mỗi món gốm trong kho giảm hư lương thực 0,5 điểm %, tối đa 5 điểm %.
+  - **Sửa nhỏ:** `ROLE_NAME` có vai `mine` ("khai mỏ"); bỏ phép so sánh chết sau `applyRuling` ở đầu `step()`; Đếm (P18) chỉ còn +1 AP và sai số tình báo giảm một nửa, như mô tả trong luật (bỏ −5 điểm % hư hỏng ẩn trong engine).
+  - **Bot:** dựng đủ lều trước khi lập điểm định cư, gom gỗ/đá cho định cư, không lập điểm định cư thứ 4 trở đi khi ổn định < 50; mở mặt trận rộng ≥ 3 ô trước khi tuyên chiến, chia quân theo trần mặt trận và chỉ đánh khi ước tính thắng, giữ đất ở mặt trận; bên thua đất xin hòa kèm cống nạp lương thực; tìm bạn hàng có đất chứa thứ mình thiếu; làm gốm (giữ tới 10 món).
+  - **`tools/simulate.ts`:** các tham số trên là trường của object xuất khẩu (`GROWTH`, `HOUSING`, `TILES`, `RESEARCH`, `SETTLEMENT`, `WAR`, `SPOILAGE`), chỉnh được bằng `--variant` hoặc `--set OBJ.field=số`; `--tag` để ghi nhiều khối (ví dụ chạy 4 nước); bảng chiến tranh có chiến lợi phẩm, trung tâm thất thủ và kết cục (hòa, cống nạp, diệt vong).
+  - **System prompt (§8.1)** nêu các con số mới.
 
 ## v0.2 — 19/10/2026
 

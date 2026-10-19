@@ -210,11 +210,32 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       if (kind === "attack" && !near) return `Ô mục tiêu cách lãnh thổ bạn quá ${reach} ô`;
       if (kind === "raid" && landGap(world, n.id, target.id) > reach + 3) return "Quá xa để đột kích";
       if (kind === "attack" && world.tiles[tile].terrain === "mountain" && !mods(world, n).move.has("mountain")) return "Không vượt núi được";
+      if (kind === "attack") {
+        const cap = frontCap(world, n.id, tile), sent = ctx.strikes.filter(s => s.n === n && s.tile === tile).reduce((s, x) => s + x.warriors, 0);
+        if (warriors + sent > cap) return `Mặt trận ở ô này chỉ chứa ${cap} chiến binh của bạn (${WAR.frontBase} + ${WAR.frontPerTile} × số ô của bạn kề ô đó)${sent ? `, đã gửi ${sent}` : ""}`;
+      }
       ctx.strikes.push({ n, target, tile, warriors, kind });
       return null;
     }
   }
   return "Không có hành động này";
+}
+
+/** §7.4 Front: the most warriors one nation can send at one tile in a tick. */
+export function frontCap(world: World, nid: number, tile: number): number {
+  return WAR.frontBase + WAR.frontPerTile * NEIGHBORS[tile].filter(j => world.tiles[j].owner === nid).length;
+}
+/** §7.4 The defender's front: its tiles that touch land of a nation it is fighting. */
+export function borderTiles(world: World, nid: number): number {
+  const foes = new Set(world.wars.filter(w => w.end === null && w.start <= world.tick && (w.a === nid || w.b === nid)).map(w => w.a === nid ? w.b : w.a));
+  if (!foes.size) return 0;
+  let k = 0;
+  for (const t of world.tiles) if (t.owner === nid && NEIGHBORS[t.i].some(j => foes.has(world.tiles[j].owner))) k++;
+  return k;
+}
+/** §7.4 How many of a centre's land neighbours the attacker must hold before it falls. */
+export function centreFallNeed(world: World, tile: number): number {
+  return Math.min(WAR.centreFallsAt, NEIGHBORS[tile].filter(j => world.tiles[j].land).length);
 }
 
 export function fmtGoods(world: World, g: Record<string, number>): string {
@@ -312,37 +333,48 @@ export function resolveBattles(ctx: DiploCtx): void {
   const { world, tick, L, say } = ctx;
   const facing = new Map<number, number>();
   for (const s of ctx.strikes) facing.set(s.target.id, (facing.get(s.target.id) || 0) + 1);
+  const frontMemo = new Map<number, number>();
+  const frontOf = (D: Nation): number => {
+    if (!frontMemo.has(D.id)) frontMemo.set(D.id, Math.max(facing.get(D.id) || 1, borderTiles(world, D.id)));
+    return frontMemo.get(D.id)!;
+  };
   for (const s of ctx.strikes) {
     const A = s.n, D = s.target;
     if (!A.alive || !D.alive || !activeWar(world, A.id, D.id)) continue;
     const r = rngFor(world.seed, tick, "battle", A.id, D.id, s.tile);
     const luck = () => WAR.luck[0] + r() * (WAR.luck[1] - WAR.luck[0]);
-    const strength = (n: Nation, men: number, defending: boolean) => {
-      if (men <= 0) return 0;
+    /** (armed men + militia at half strength) × bonuses × morale × luck; defenders also get home, terrain, walls and river. */
+    const strength = (n: Nation, men: number, militiaMen: number, defending: boolean) => {
+      if (men + militiaMen <= 0) return 0;
       const m = mods(world, n);
       let weapons = 0, left = men;
       for (const [k, bonus] of Object.entries(WAR.weapon)) { const k2 = Math.min(left, Math.floor(n.stock[k] || 0)); weapons += k2 * bonus; left -= k2; }
       // Weapons a nation invented itself (recipe tools for warriors)
       for (const [k, q] of Object.entries(n.stock)) { const use = recipeOf(world, k)?.use; if (use?.role !== "warrior" || left <= 0) continue; const k2 = Math.min(left, Math.floor(q) * use.per); weapons += k2 * use.bonus * 2; left -= k2; }
-      let v = (men + weapons) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5) * luck();
+      let v = (men + weapons + militiaMen * WAR.militiaStrength) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5) * luck();
       if (defending) {
         const t = world.tiles[s.tile];
         const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
-        v *= 1 + TERRAIN[t.terrain].defense + wall + (t.river ? 0.25 : 0);
+        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river ? 0.25 : 0);
       }
       return v;
     };
-    let dMen = Math.floor(D.labor.warrior / (facing.get(D.id) || 1)), militia = false;
-    if (dMen <= 0) { dMen = Math.max(1, Math.floor(D.population * 0.7 * WAR.militiaShare)); militia = true; }
-    const aStr = strength(A, s.warriors, false), dStr = strength(D, dMen, true) * (militia ? WAR.militiaStrength : 1);
+    // Defenders spread their warriors and militia over the whole front: every tile of theirs that touches
+    // an enemy at war with them, or at least every attack they face this tick
+    const fronts = frontOf(D);
+    const dMen = Math.floor(D.labor.warrior / fronts);
+    const militia = Math.max(1, Math.floor(D.population * 0.7 * WAR.militiaShare / fronts));
+    const aStr = strength(A, s.warriors, 0, false), dStr = strength(D, dMen, militia, true);
     const won = aStr > dStr;
     const lossRate = (win: boolean) => { const [lo, hi] = win ? WAR.winLoss : WAR.loseLoss; return lo + r() * (hi - lo); };
-    const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won))), lossD = Math.min(dMen, Math.round(dMen * lossRate(!won)));
+    const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won)));
+    const rateD = lossRate(!won), lossDW = Math.min(dMen, Math.round(dMen * rateD)), lossDM = Math.min(militia, Math.round(militia * rateD));
+    const lossD = Math.min(D.population, lossDW + lossDM);
     A.population -= lossA; A.labor.warrior = Math.max(0, A.labor.warrior - lossA);
     // The fallen lose their weapons (bows first, then spears)
     const loseWeapons = (n: Nation, k: number) => { for (const w of Object.keys(WAR.weapon)) { if (k <= 0) break; const q = Math.min(k, Math.floor(n.stock[w] || 0)); if (q) { L.stock(n, w, -q, "battle"); k -= q; } } };
-    loseWeapons(A, lossA); if (!militia) loseWeapons(D, lossD);
-    D.population -= lossD; if (!militia) D.labor.warrior = Math.max(0, D.labor.warrior - lossD);
+    loseWeapons(A, lossA); loseWeapons(D, lossDW);
+    D.population -= lossD; D.labor.warrior = Math.max(0, D.labor.warrior - lossDW);
     const prisoners = won ? Math.floor(lossD * WAR.prisoners) : 0;
     if (prisoners) { A.population += prisoners; A.stability -= Math.floor(prisoners / 5); }
     let note = "";
@@ -356,10 +388,25 @@ export function resolveBattles(ctx: DiploCtx): void {
         L.stock(D, k, -q, "raid"); L.stock(A, k, q, "raid"); loot[k] = q; carry -= q;
       }
       note = Object.keys(loot).length ? `cướp ${fmtGoods(world, loot)}` : "không cướp được gì";
-    } else if (won && s.kind === "attack") note = captureTile(world, A, D, s.tile, say);
+    } else if (won && s.kind === "attack") {
+      const centre = s.tile === D.capital || D.settlements.some(x => x.tile === s.tile);
+      note = captureTile(world, A, D, s.tile, say);
+      // Spoils (§7.4): a taken tile yields a share of the loser's stores, a fallen centre half of them
+      if (world.tiles[s.tile].owner === A.id) { // taken (a centre that did not fall stays theirs)
+        let carry = centre ? Infinity : s.warriors * WAR.carryPerWarrior;
+        const loot: Record<string, number> = {};
+        for (const k of ["food", ...Object.keys(D.stock).filter(k => k !== "food").sort()]) {
+          if (carry <= 0) break;
+          const q = Math.min(carry, (D.stock[k] || 0) * (centre ? WAR.centreLoot : WAR.lootShare));
+          if (q < 0.5) continue;
+          L.stock(D, k, -q, "loot"); L.stock(A, k, q, "loot"); loot[k] = q; carry -= q;
+        }
+        if (Object.keys(loot).length) note += `, thu ${fmtGoods(world, loot)}`;
+      }
+    }
     world.battles.push({ tick, attacker: A.id, defender: D.id, tile: s.tile, kind: s.kind, a: Math.round(aStr * 10) / 10, d: Math.round(dStr * 10) / 10, won, lossA, lossD, note } as Battle);
     const where = `(${col(s.tile)}, ${row(s.tile)})`;
-    say(A.id, "battle", `${A.name} ${s.kind === "raid" ? "đột kích" : "tấn công"} ${D.name} tại ${where}: ${won ? "thắng" : "thua"}. Thương vong ${lossA} / ${lossD}${militia ? " (dân quân)" : ""}${prisoners ? `, bắt ${prisoners} tù binh` : ""}${note ? `; ${note}` : ""}.`);
+    say(A.id, "battle", `${A.name} ${s.kind === "raid" ? "đột kích" : "tấn công"} ${D.name} tại ${where}: ${won ? "thắng" : "thua"}. Thương vong ${lossA} / ${lossD}${dMen <= 0 ? " (dân quân)" : ""}${prisoners ? `, bắt ${prisoners} tù binh` : ""}${note ? `; ${note}` : ""}.`);
     D.lastEvents.push(`Bị ${A.name} ${s.kind === "raid" ? "đột kích" : "tấn công"} tại ${where}: ta ${won ? "thua" : "thắng"}, mất ${lossD} người.`);
     A.stability += won ? 1 : -2; D.stability += won ? -3 : 1;
   }
@@ -374,12 +421,12 @@ export function resolveBattles(ctx: DiploCtx): void {
   }
 }
 
-/** Take a tile. A capital or settlement falls only when surrounded. */
+/** Take a tile. A capital or settlement falls only when the attacker holds WAR.centreFallsAt of its land neighbours. */
 function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say): string {
   const centres = [D.capital, ...D.settlements.map(s => s.tile)];
   if (centres.includes(tile)) {
-    const surrounded = NEIGHBORS[tile].every(j => !world.tiles[j].land || world.tiles[j].owner === A.id);
-    if (!surrounded) return "trung tâm chưa bị bao vây nên không thất thủ";
+    const held = NEIGHBORS[tile].filter(j => world.tiles[j].land && world.tiles[j].owner === A.id).length, need = centreFallNeed(world, tile);
+    if (held < need) return `trung tâm chưa bị vây đủ (${held}/${need} ô kề) nên không thất thủ`;
     world.tiles[tile].owner = A.id;
     if (tile === D.capital) {
       if (D.settlements.length) {

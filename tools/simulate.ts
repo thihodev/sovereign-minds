@@ -3,12 +3,12 @@
 //
 //   node --disable-warning=ExperimentalWarning tools/simulate.ts \
 //     --seeds a,b,c --ticks 500 --nations 7 [--out docs/BALANCE.md] [--json out.json]
-//     [--every 50] [--variant base|tent-max4|settle-hard|...] [--brief] [--quiet]
+//     [--every 50] [--variant base|growth-6|tents-4|rp-flat|...] [--set GROWTH.rate=0.05,...] [--brief] [--quiet]
 //
 // With --out, the report replaces the text between the markers
-// <!-- simulate:begin --> and <!-- simulate:end --> (or, with a variant,
-// <!-- simulate:<variant>:begin --> ...) if the file has them, so hand-written
-// analysis around the numbers survives a re-run.
+// <!-- simulate:begin --> and <!-- simulate:end --> (or, with a variant or
+// --tag name, <!-- simulate:<name>:begin --> ...) if the file has them, so
+// hand-written analysis around the numbers survives a re-run.
 //
 // --variant changes rule tables in this process only (never the files), to
 // estimate what a proposed rule change would do before anyone writes it.
@@ -17,8 +17,9 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import { createWorld, housing, ownedTiles, step, type NationSpec } from "../src/engine.ts";
 import { botTurn } from "../src/ai/bot.ts";
+import { fmtGoods } from "../src/diplomacy.ts";
 import { rngFor } from "../src/rng.ts";
-import { BUILDING_BY_TYPE, ERAS, EVENTS, INVENTIONS, SETTLEMENT, START } from "../src/rules.ts";
+import { BUILDING_BY_TYPE, ERAS, EVENTS, GROWTH, HOUSING, INVENTIONS, RESEARCH, SETTLEMENT, SPOILAGE, START, TILES, WAR } from "../src/rules.ts";
 import type { TurnInput, World } from "../src/types.ts";
 
 // ---------------------------------------------------------------- options
@@ -34,38 +35,34 @@ const EVERY = Math.max(1, Number(arg("every", "50")));
 const OUT = arg("out", "");
 const JSON_OUT = arg("json", "");
 const VARIANT = arg("variant", "base");
+const TAG = arg("tag", ""); // marker name for --out (default: the variant), e.g. --tag n4 for a 4-nation run
 const QUIET = process.argv.includes("--quiet");
 const BRIEF = process.argv.includes("--brief"); // aggregate only, no per-seed tables
+
+/** The tunable rule objects --set and the variants may change (in this process only). */
+const TUNABLE: Record<string, Record<string, unknown>> = { GROWTH, HOUSING, TILES, RESEARCH, SETTLEMENT, WAR, SPOILAGE, EVENTS };
 
 /** Rule experiments, applied to the in-memory tables only. */
 const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   base: { desc: "luật hiện tại, không đổi gì", apply: () => {} },
-  "tent-max4": { desc: "mỗi quốc gia tối đa 4 lều", apply: () => { if (BUILDING_BY_TYPE.tent) BUILDING_BY_TYPE.tent.max = 4; } },
-  "settle-hard": {
-    desc: "định cư cần 60 dân, 60 lương thực, cách các trung tâm ≥ 6 ô, chỉ +10 chỗ ở",
-    apply: () => { SETTLEMENT.minPopulation = 60; SETTLEMENT.food = 60; SETTLEMENT.minDist = 6; SETTLEMENT.housing = 10; },
-  },
-  "housing-capped": {
-    desc: "tối đa 4 lều và định cư khó (gộp tent-max4 + settle-hard)",
-    apply: () => { VARIANTS["tent-max4"].apply(); VARIANTS["settle-hard"].apply(); },
-  },
+  "growth-4": { desc: "tăng dân logistic với hệ số 4% (như v0.2) thay vì 8%", apply: () => { GROWTH.rate = 0.04; } },
+  "tents-4": { desc: "4 công trình có chỗ ở mỗi trung tâm thay vì 3", apply: () => { HOUSING.perCentre = 4; } },
+  "tiles-2sqrt": { desc: "giới hạn ô 7 + ⌊2·√dân⌋ thay vì 7 + ⌊√dân⌋", apply: () => { TILES.perSqrt = 2; } },
+  "rp-flat": { desc: "nghiên cứu như v0.2: RP tỷ lệ thuận số người, giá không nhân theo độ sâu", apply: () => { RESEARCH.exponent = 1; RESEARCH.depthStep = 0; } },
+  "rp-steep": { desc: "giá × (1 + (d − 1)) thay vì × (1 + 0,75 (d − 1))", apply: () => { RESEARCH.depthStep = 1; } },
+  "no-sprawl": { desc: "bỏ phạt ổn định cho điểm định cư thứ 4 trở đi", apply: () => { SETTLEMENT.sprawlStability = 0; } },
+  "no-home": { desc: "bỏ lợi thế sân nhà và giới hạn mặt trận", apply: () => { WAR.home = 0; WAR.frontBase = 1e6; } },
   "plague-x2": { desc: "dịch bệnh gấp đôi (4%/lượt, 8% khi > 80 dân)", apply: () => { EVENTS.plague.chance *= 2; } },
-  "rp-x3": { desc: "RP của 18 phát minh cây gốc ×3", apply: () => { for (const v of INVENTIONS) v.rp *= 3; } },
-  "rp-depth": {
-    desc: "RP cây gốc × (1 + độ sâu): P1 40, P8 100, P14 360, P18 400",
-    apply: () => {
-      const depth = (id: string): number => { const v = INVENTIONS.find(x => x.id === id); return v && v.prereqs.length ? 1 + Math.max(...v.prereqs.map(depth)) : 0; };
-      const d = new Map(INVENTIONS.map(v => [v.id, depth(v.id)]));
-      for (const v of INVENTIONS) v.rp *= 1 + (d.get(v.id) ?? 0);
-    },
-  },
-  season: {
-    desc: "gộp housing-capped + RP cây gốc × (1 + độ sâu)",
-    apply: () => { VARIANTS["housing-capped"].apply(); VARIANTS["rp-depth"].apply(); },
-  },
 };
 if (!VARIANTS[VARIANT]) { console.error(`Không có biến thể "${VARIANT}". Có: ${Object.keys(VARIANTS).join(", ")}`); process.exit(1); }
 VARIANTS[VARIANT].apply();
+// --set GROWTH.rate=0.05,WAR.home=0.3 : any number in a tunable object, after the variant
+const SETS = arg("set", "").split(",").map(s => s.trim()).filter(Boolean);
+for (const s of SETS) {
+  const m = /^([A-Z]+)\.([A-Za-z]+)=(-?[\d.]+)$/.exec(s);
+  if (!m || !TUNABLE[m[1]] || typeof TUNABLE[m[1]][m[2]] !== "number") { console.error(`--set không hợp lệ: "${s}" (dạng OBJ.field=số; OBJ là ${Object.keys(TUNABLE).join(", ")})`); process.exit(1); }
+  TUNABLE[m[1]][m[2]] = Number(m[3]);
+}
 
 // ---------------------------------------------------------------- data shapes
 
@@ -81,6 +78,8 @@ interface NationRun {
 interface WarRun {
   id: number; a: number; b: number; declared: number; end: number | null; ally: boolean;
   popA: number; popB: number; battles: number; won: number; tiles: number; lossA: number; lossD: number;
+  /** Battles that carried off spoils, centres taken, and how it ended. */
+  looted: number; centres: number; outcome: string;
 }
 interface Sample { tick: number; alive: number; pop: number; maxPop: number; housing: number; tiles: number; inventions: number; stability: number; food: number; neo: number }
 interface SeedRun {
@@ -153,7 +152,7 @@ function runSeed(seed: string): SeedRun {
     // Wars: who started them, how big each side was, what the fighting gained
     for (const x of w.wars) {
       if (wars.has(x.id)) { wars.get(x.id)!.end = x.end; continue; }
-      wars.set(x.id, { id: x.id, a: x.a, b: x.b, declared: x.declared, end: x.end, ally: x.reason.startsWith("bảo vệ"), popA: w.nations[x.a].population, popB: w.nations[x.b].population, battles: 0, won: 0, tiles: 0, lossA: 0, lossD: 0 });
+      wars.set(x.id, { id: x.id, a: x.a, b: x.b, declared: x.declared, end: x.end, ally: x.reason.startsWith("bảo vệ"), popA: w.nations[x.a].population, popB: w.nations[x.b].population, battles: 0, won: 0, tiles: 0, lossA: 0, lossD: 0, looted: 0, centres: 0, outcome: "" });
     }
     for (const bt of w.battles) {
       if (bt.tick !== t) continue;
@@ -162,7 +161,11 @@ function runSeed(seed: string): SeedRun {
       if (bt.won) { A.battlesWon++; D.battlesLost++; } else { A.battlesLost++; D.battlesWon++; }
       if (took) { A.tilesTaken++; D.tilesLost++; }
       const wr = [...wars.values()].reverse().find(x => ((x.a === bt.attacker && x.b === bt.defender) || (x.a === bt.defender && x.b === bt.attacker)));
-      if (wr) { wr.battles++; if (bt.won) wr.won++; if (took) wr.tiles++; wr.lossA += bt.lossA; wr.lossD += bt.lossD; }
+      if (wr) {
+        wr.battles++; if (bt.won) wr.won++; if (took) wr.tiles++; wr.lossA += bt.lossA; wr.lossD += bt.lossD;
+        if (bt.note.includes(", thu ")) wr.looted++;
+        if (bt.note.startsWith("chiếm được trung tâm")) wr.centres++;
+      }
     }
     for (const n of w.nations) {
       const r = runs[n.id];
@@ -199,6 +202,14 @@ function runSeed(seed: string): SeedRun {
   }
   for (const t of w.treaties) out.treaties[t.type] = (out.treaties[t.type] || 0) + 1;
   out.wars = [...wars.values()];
+  for (const x of out.wars) {
+    const B = runs[x.b];
+    const peace = w.treaties.find(t => t.type === "peace" && [t.a, t.b].includes(x.a) && [t.a, t.b].includes(x.b) && t.start === x.end);
+    if (!B.alive && B.diedAt !== null && B.diedAt >= x.declared && B.diedAt <= (x.end ?? TICKS) + 1) x.outcome = "diệt vong";
+    else if (peace && Object.keys(peace.tribute).length) x.outcome = `hòa, ${w.nations[peace.a].name} nộp ${fmtGoods(w, peace.tribute)}/lượt × ${peace.end === null ? "∞" : peace.end - peace.start}`;
+    else if (peace) x.outcome = "hòa";
+    else x.outcome = x.end === null ? "chưa xong" : "kết thúc";
+  }
   out.eraGates = { ...w.eraGates };
   return out;
 }
@@ -223,10 +234,10 @@ function table(head: string[], rows: Array<Array<string | number>>): string {
 function warTable(runs: SeedRun[]): string {
   const rows = runs.flatMap(s => s.wars.map(x => {
     const A = s.nations[x.a], B = s.nations[x.b];
-    return [`\`${s.seed}\``, `${A.name} → ${B.name}${x.ally ? " (đồng minh tham chiến)" : ""}`, `${x.declared}–${or(x.end)}`, `${x.popA} : ${x.popB}`, `${x.won}/${x.battles}`, x.tiles, `${x.lossA} / ${x.lossD}`];
+    return [`\`${s.seed}\``, `${A.name} → ${B.name}${x.ally ? " (đồng minh tham chiến)" : ""}`, `${x.declared}–${or(x.end)}`, `${x.popA} : ${x.popB}`, `${x.won}/${x.battles}`, `${x.tiles}${x.centres ? ` (${x.centres} trung tâm)` : ""}`, x.looted, `${x.lossA} / ${x.lossD}`, x.outcome];
   }));
   if (!rows.length) return "Không có cuộc chiến nào.";
-  return table(["Seed", "Bên tuyên chiến → bên bị đánh", "Lượt", "Dân lúc tuyên chiến", "Trận thắng/tổng", "Ô chiếm", "Thương vong công / thủ"], rows);
+  return table(["Seed", "Bên tuyên chiến → bên bị đánh", "Lượt", "Dân lúc tuyên chiến", "Trận thắng/tổng", "Ô chiếm", "Trận có chiến lợi phẩm", "Thương vong công / thủ", "Kết cục"], rows);
 }
 
 function seedSection(s: SeedRun): string {
@@ -286,6 +297,7 @@ function aggregate(runs: SeedRun[]): string {
     ["Lượt gặp gỡ đầu tiên (trung vị theo seed)", or(median(reached(runs.map(r => r.firstContact))))],
     ["Hiệp ước / giao dịch / trận mỗi seed (TB)", `${f1(mean(runs.map(r => Object.values(r.treaties).reduce((a, b) => a + b, 0))))} / ${f1(mean(runs.map(r => r.trades)))} / ${f1(mean(runs.map(r => r.battles)))}`],
     ["Chiến tranh tự phát (tổng) · trận bên công thắng · ô chiếm được", `${wars.length} · ${wars.reduce((s, x) => s + x.won, 0)}/${wars.reduce((s, x) => s + x.battles, 0)} · ${wars.reduce((s, x) => s + x.tiles, 0)}`],
+    ["Chiến tranh có kết quả: chiến lợi phẩm · trung tâm thất thủ · hòa kèm cống nạp · diệt vong", `${wars.filter(x => x.looted > 0).length} · ${wars.reduce((s, x) => s + x.centres, 0)} · ${wars.filter(x => x.outcome.includes("nộp")).length} · ${wars.filter(x => x.outcome === "diệt vong").length}`],
     ["Đơn phát minh mở mỗi seed (TB)", f1(mean(runs.map(r => r.proposals)))],
     ["Thời gian: engine / bot (ms mỗi lượt, TB)", `${f1(mean(runs.map(r => r.msStep / r.ticks)))} / ${f1(mean(runs.map(r => r.msBot / r.ticks)))}`],
     ["Lỗi kiểm toán sổ cái", String(runs.reduce((s, r) => s + r.audit, 0))],
@@ -310,14 +322,14 @@ for (const seed of SEEDS) {
 }
 
 const report = [
-  `_Sinh bởi \`tools/simulate.ts\` — biến thể \`${VARIANT}\` (${VARIANTS[VARIANT].desc}); seeds: ${SEEDS.map(s => `\`${s}\``).join(", ")}; ${TICKS} lượt; ${NATIONS} quốc gia bot._`, "",
+  `_Sinh bởi \`tools/simulate.ts\` — biến thể \`${VARIANT}\` (${VARIANTS[VARIANT].desc}${SETS.length ? `; --set ${SETS.join(", ")}` : ""}); seeds: ${SEEDS.map(s => `\`${s}\``).join(", ")}; ${TICKS} lượt; ${NATIONS} quốc gia bot._`, "",
   aggregate(runs),
   ...(BRIEF ? [] : [`## Chi tiết từng seed`, "", ...runs.map(seedSection)]),
 ].join("\n");
 
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({ variant: VARIANT, runs }, null, 1));
 if (OUT) {
-  const tag = VARIANT === "base" ? "simulate" : `simulate:${VARIANT}`;
+  const tag = TAG ? `simulate:${TAG}` : VARIANT === "base" ? "simulate" : `simulate:${VARIANT}`;
   const BEGIN = `<!-- ${tag}:begin -->`, END = `<!-- ${tag}:end -->`;
   const old = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
   const a = old.indexOf(BEGIN), b = old.indexOf(END);
