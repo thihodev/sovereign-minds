@@ -11,6 +11,8 @@ export interface ProviderDef {
   defaultModel: string;
   json: boolean; // supports response_format: json_object
   extraHeaders?: Record<string, string>;
+  /** Local servers (Ollama) need no key; they are on when their URL is set. */
+  keyless?: boolean;
 }
 
 const cfAccount = () => process.env.CLOUDFLARE_ACCOUNT_ID || "ACCOUNT_ID";
@@ -25,12 +27,23 @@ export const PROVIDERS: Record<string, ProviderDef> = {
   groq: { id: "groq", label: "Groq", base: "https://api.groq.com/openai/v1", keyEnv: "GROQ_API_KEY", modelEnv: "GROQ_MODEL", defaultModel: "qwen/qwen3.8-27b", json: true },
   sambanova: { id: "sambanova", label: "SambaNova", base: "https://api.sambanova.ai/v1", keyEnv: "SAMBANOVA_API_KEY", modelEnv: "SAMBANOVA_MODEL", defaultModel: "DeepSeek-V3.2", json: false },
   cohere: { id: "cohere", label: "Cohere", base: "https://api.cohere.ai/compatibility/v1", keyEnv: "COHERE_API_KEY", modelEnv: "COHERE_MODEL", defaultModel: "command-a-03-2025", json: true },
+  // Local models on your own machine: free and without quota (§3.4).
+  get ollama(): ProviderDef {
+    return { id: "ollama", label: "Ollama (máy bạn)", base: (process.env.OLLAMA_BASE_URL || "").replace(/\/$/, ""), keyEnv: "OLLAMA_BASE_URL", modelEnv: "OLLAMA_MODEL", defaultModel: "qwen3:8b", json: true, keyless: true };
+  },
+  // Any other OpenAI-compatible endpoint.
+  get custom(): ProviderDef {
+    return { id: "custom", label: process.env.CUSTOM_LABEL || "Custom", base: (process.env.CUSTOM_BASE_URL || "").replace(/\/$/, ""), keyEnv: "CUSTOM_API_KEY", modelEnv: "CUSTOM_MODEL", defaultModel: "default", json: (process.env.CUSTOM_JSON_MODE || "true") !== "false", keyless: !process.env.CUSTOM_API_KEY && !!process.env.CUSTOM_BASE_URL };
+  },
   get cloudflare(): ProviderDef {
     return { id: "cloudflare", label: "Cloudflare Workers AI", base: `https://api.cloudflare.com/client/v4/accounts/${cfAccount()}/ai/v1`, keyEnv: "CLOUDFLARE_API_TOKEN", modelEnv: "CLOUDFLARE_MODEL", defaultModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", json: false };
   },
 };
 
-export function providerKey(p: ProviderDef): string { return (process.env[p.keyEnv] || "").trim(); }
+export function providerKey(p: ProviderDef): string {
+  if (p.keyless) return p.base ? "local" : "";
+  return (process.env[p.keyEnv] || "").trim();
+}
 /** The judge may use a different model than the nation on the same provider. */
 export const JUDGE_DEFAULT_MODEL: Record<string, string> = { groq: "openai/gpt-oss-120b" };
 export function judgeModel(p: ProviderDef): string { return (process.env[`JUDGE_MODEL_${p.id.toUpperCase()}`] || JUDGE_DEFAULT_MODEL[p.id] || providerModel(p)).trim(); }
@@ -80,7 +93,7 @@ export async function callModel(p: ProviderDef, system: string, user: string, op
   try {
     const res = await fetch(`${p.base}/chat/completions`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}`, ...(p.extraHeaders || {}) },
+      headers: { "content-type": "application/json", ...(p.keyless ? {} : { authorization: `Bearer ${key}` }), ...(p.extraHeaders || {}) },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });

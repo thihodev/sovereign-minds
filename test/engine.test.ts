@@ -112,3 +112,13 @@ test("gateway helpers: JSON extraction and retry hints", () => {
   assert.equal(parseRetryAfter({ "x-ratelimit-reset-requests": "2m30s" }, ""), 150);
   assert.equal(parseRetryAfter({}, '{"error":{"details":[{"retryDelay":"41s"}]}}'), 41);
 });
+
+test("over-assigned labour scales down without wiping small roles", () => {
+  const w = createWorld("labor", bots(1));
+  run(w, 1);
+  const n = w.nations[0];
+  n.population = 19; // 13 workers
+  step(w, { 0: { kind: "ok", response: { labor: { hunt: 8, gather: 5, research: 1 } } } });
+  assert.equal(n.labor.research, 1);
+  assert.equal(Object.values(n.labor).reduce((a, b) => a + b, 0), 13);
+});

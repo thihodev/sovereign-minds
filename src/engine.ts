@@ -288,9 +288,11 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
   const out = Object.fromEntries(ROLES.map(r => [r, Math.max(0, Math.floor(num(wanted[r])))])) as Record<Role, number>;
   const total = ROLES.reduce((s, r) => s + out[r], 0), w = workers(n);
   if (total > w) {
-    const scaled = Object.fromEntries(ROLES.map(r => [r, Math.floor(out[r] * w / total)])) as Record<Role, number>;
+    // Scale down; hand the remainder to the largest fractions so small roles survive.
+    const exact = ROLES.map(r => ({ r, x: out[r] * w / total }));
+    const scaled = Object.fromEntries(exact.map(e => [e.r, Math.floor(e.x)])) as Record<Role, number>;
     let left = w - ROLES.reduce((s, r) => s + scaled[r], 0);
-    for (const r of ROLES) if (left > 0 && out[r] > scaled[r]) { scaled[r]++; left--; }
+    for (const e of exact.slice().sort((a, b) => (b.x - Math.floor(b.x)) - (a.x - Math.floor(a.x)) || ROLES.indexOf(a.r) - ROLES.indexOf(b.r))) { if (left <= 0) break; if (e.x > 0) { scaled[e.r]++; left--; } }
     n.lastRejected.push({ action: "labor", reason: `Phân công ${total} người nhưng chỉ có ${w} người lao động; đã thu nhỏ theo tỷ lệ` });
     n.labor = scaled;
   } else n.labor = out;
@@ -315,7 +317,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     const inp = inputs[n.id] ?? { kind: "silent", reason: "không có câu trả lời" };
     if (inp.kind === "asleep") { n.stats.asleepTicks++; continue; }
     if (inp.kind === "silent") { n.stats.silentTicks++; n.silentStreak++; continue; }
-    n.silentStreak = 0;
+    n.silentStreak = 0; n.stats.ok++;
     const r = inp.response as Record<string, unknown>;
     if (r.thought !== undefined) n.lastThought = String(r.thought).slice(0, 300);
     if (r.memory !== undefined) n.memory = String(r.memory).slice(0, 2000);
