@@ -122,6 +122,14 @@
       label(g, n.founded ? n.name : `Bộ lạc ${n.id + 1}`, x, y + s * 1.6, Math.max(10, s * 1.1));
       if (n.status === "asleep" || n.status === "error") label(g, n.status === "asleep" ? "đang ngủ" : "lỗi key", x, y + s * 3, Math.max(9, s * .9), "#ffd0a0", 500);
     }
+    for (const n of S.nations) for (const st of n.settlements || []) {
+      const [x, y] = center(st.tile); g.beginPath(); g.arc(x, y, s * .7, 0, 7); g.fillStyle = n.flag.colors[0]; g.fill(); g.lineWidth = 1.5; g.strokeStyle = "#0b1a22"; g.stroke();
+      label(g, st.name, x, y + s * 1.5, Math.max(9, s * .95), "#fff", 500);
+    }
+    for (const b of (S.battles || []).filter(b => b.tick >= S.tick - 3)) {
+      const [x, y] = center(b.tile), r = s * .8; g.strokeStyle = "#ff4d3d"; g.lineWidth = Math.max(2, s * .25);
+      g.beginPath(); g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); g.stroke();
+    }
     if (hoverI >= 0) { const [x, y] = center(hoverI); hexPath(g, x, y, s * 1.05); g.lineWidth = 2; g.strokeStyle = "#fff"; g.stroke(); }
   }
 
@@ -180,6 +188,7 @@
     for (const p of document.querySelectorAll(".panel")) p.hidden = p.id !== `tab-${b.dataset.tab}`;
     try { localStorage.setItem("sm-tab", b.dataset.tab); } catch { }
     if (b.dataset.tab === "chat") loadChat();
+    if (b.dataset.tab === "stats" && S) renderStats();
   };
   try { const t = localStorage.getItem("sm-tab"); if (t) document.querySelector(`.tabs button[data-tab="${t}"]`)?.click(); } catch { }
 
@@ -221,6 +230,9 @@
       <h3>Kho</h3><p>${esc(stock || "—")}</p>
       <h3>Phát minh</h3><div class="chips">${n.inventions.map(v => `<span>${esc(v.name)}</span>`).join("")}</div>
       <h3>Công trình</h3><div class="chips">${n.buildings.map(b => `<span>${esc(b.name)}${b.done ? "" : " (đang xây)"}</span>`).join("") || "—"}</div>
+      <h3>Điểm định cư</h3><p>${esc((n.settlements || []).map(x => x.name).join(", ") || "—")}</p>
+      <h3>Quan hệ</h3><p>${esc(Object.entries(n.relations || {}).filter(([, r]) => r !== "chưa biết").map(([id, r]) => `${nm(id)}: ${r}`).join(" · ") || "—")}</p>
+      <h3>Hộp thư lượt này (do nước khác viết)</h3>${(n.inbox || []).map(m => `<pre>${esc(m.fromName)}${m.gesture ? " (cử chỉ)" : ""}: ${esc(m.text)}</pre>`).join("") || "<p>—</p>"}
       <h3>Tình báo về nước khác</h3>${intel ? `<table><tr><th>Nước</th><th>Mức</th><th>Từ</th><th>Biết gì</th></tr>${intel}</table>` : "<p>Chưa gặp ai.</p>"}
       <h3>Sự kiện lượt trước</h3><p>${esc((n.events || []).join(" · ") || "—")}</p>
       <h3>Hành động bị từ chối</h3><p>${esc((n.rejected || []).map(r => `${r.action}: ${r.reason}`).join(" · ") || "—")}</p>
@@ -346,10 +358,97 @@
   $("#chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatform").requestSubmit(); } });
   $("#chat-clear").onclick = async () => { await api("/api/chat", { method: "DELETE" }); log.innerHTML = ""; };
 
+  // ---------------------------------------------------------------- inventions
+  const nm = id => S.nations[id]?.name ?? `#${id}`;
+  function renderInventions() {
+    const props = (S.proposals || []).slice().reverse();
+    const pending = props.filter(p => p.status === "pending").length, badge = $("#prop-count");
+    badge.hidden = !pending; badge.textContent = pending;
+    const box = $("#proposals"); box.innerHTML = props.length ? "" : `<p class="note">Chưa có đơn phát minh nào.</p>`;
+    const ST2 = { pending: ["Chờ trọng tài", "warn"], approved: ["Được duyệt", "ok"], rejected: ["Bị bác", "bad"], duplicate: ["Trùng", ""] };
+    for (const p of props) {
+      const [st, cls] = ST2[p.status], el = document.createElement("article"); el.className = "card2";
+      const r = p.ruling;
+      el.innerHTML = `<div class="row"><b class="pname"></b><span style="flex:1"></span><span class="pill ${cls}">${st}</span></div>
+        <div class="meta">#${p.id} · ${esc(nm(p.nation))} · lượt ${p.tick} · độ sâu ${p.depth} · ${p.power} điểm · tiên quyết ${esc(p.prereqs.join(", "))}${p.caps.length ? ` · năng lực ${esc(p.caps.join(", "))}` : ""}</div>
+        <div class="pdesc"></div><pre class="peff"></pre>
+        ${r ? `<div class="meta">Trọng tài ${esc(r.judge)}: nhân quả ${r.causality}, vật chất ${r.material}, vật lý ${r.physics}${r.add_prereqs?.length ? ` · thêm tiên quyết ${esc(r.add_prereqs.join(", "))}` : ""} — ${esc(r.reason)}</div>` : ""}
+        ${p.status === "pending" ? `<div class="row"><input type="text" placeholder="Lý do (tùy chọn)" style="flex:1"><button class="primary" data-a="1">Duyệt</button><button data-a="0">Bác</button></div>` : ""}`;
+      el.querySelector(".pname").textContent = p.name;
+      el.querySelector(".pdesc").textContent = p.description;
+      el.querySelector(".peff").textContent = p.effects.map(e => JSON.stringify(e)).join("\n");
+      for (const b of el.querySelectorAll("button[data-a]")) b.onclick = async () => {
+        await api(`/api/proposals/${p.id}`, { method: "POST", body: { approve: b.dataset.a === "1", reason: el.querySelector("input").value } }).catch(e => alert(e.message));
+        b.textContent = "Đã ghi, áp dụng lượt sau"; b.disabled = true;
+      };
+      box.append(el);
+    }
+    const cbox = $("#custom-inventions"), list = (S.customInventions || []).slice().reverse();
+    cbox.innerHTML = list.length ? "" : `<p class="note">Chưa có phát minh mới nào được công nhận.</p>`;
+    for (const v of list) {
+      const el = document.createElement("article"); el.className = "card2";
+      el.innerHTML = `<div class="row"><b class="vname"></b><span class="meta">${esc(v.id)} · độ sâu ${v.depth} · ${v.rp} RP</span></div>
+        <div class="meta">Phát minh bởi ${esc(nm(v.by))} ở lượt ${v.tick} · tiên quyết ${esc(v.prereqs.map(p => p.name).join(", "))}${v.caps.length ? ` · năng lực ${esc(v.caps.join(", "))}` : ""}</div>
+        <div class="vdesc"></div><div class="meta">Hiệu ứng: ${esc(v.effects || "—")}</div>`;
+      el.querySelector(".vname").textContent = v.name; el.querySelector(".vdesc").textContent = v.description;
+      cbox.append(el);
+    }
+  }
+
+  // ---------------------------------------------------------------- diplomacy
+  function relClass(r) { return /chiến/.test(r) ? "war" : /liên minh|tông chủ|chư hầu/.test(r) ? "ally" : /hòa bình|bất tương/.test(r) ? "peace" : ""; }
+  function renderDiplomacy() {
+    const alive = S.nations.filter(n => n.founded);
+    $("#relations").innerHTML = `<tr><th></th>${alive.map(n => `<th>${esc(n.name)}</th>`).join("")}</tr>` + alive.map(a => `<tr><th>${esc(a.name)}</th>${alive.map(b => {
+      if (a.id === b.id) return `<td>—</td>`;
+      const r = a.relations?.[b.id] ?? ""; return `<td class="rel ${relClass(r)}">${esc(r)}${a.trades?.[b.id] ? ` · ${a.trades[b.id]} lần buôn` : ""}</td>`;
+    }).join("")}</tr>`).join("");
+    $("#wars").innerHTML = (S.wars || []).map(w => `<div class="card2"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}</span></div>`).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
+    const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
+    $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;
+    $("#battles").innerHTML = (S.battles || []).slice().reverse().map(b => `<li><span class="t">${b.tick}</span><span>${esc(nm(b.attacker))} ${b.kind === "raid" ? "đột kích" : "tấn công"} ${esc(nm(b.defender))}: ${b.won ? "thắng" : "thua"} (${b.a} vs ${b.d}), thương vong ${b.lossA}/${b.lossD}${b.note ? ` · ${esc(b.note)}` : ""}</span></li>`).join("") || `<li class="note">Chưa có trận đánh.</li>`;
+  }
+
+  // ---------------------------------------------------------------- stats
+  let statsCache = null;
+  async function renderStats() {
+    statsCache = await api("/api/stats").catch(() => []);
+    drawChart();
+    const rows = S.nations.filter(n => n.founded).map(n => {
+      const first = Object.values(S.registry || {}).filter(r => r.by[0] === n.id).length;
+      const custom = (S.customInventions || []).filter(v => v.by === n.id).length;
+      const score = n.population + n.inventions.length * 10 + first * 15 + custom * 25 + n.tiles * 3 + n.reputation;
+      return { n, first, custom, score };
+    }).sort((a, b) => b.score - a.score);
+    $("#ranking").innerHTML = `<tr><th>#</th><th>Quốc gia</th><th>Điểm</th><th>Dân</th><th>Phát minh</th><th>Đầu tiên</th><th>Tự tạo</th><th>Ô</th><th>Uy tín</th></tr>` +
+      rows.map((r, k) => `<tr><td>${k + 1}</td><td>${esc(r.n.name)}${r.n.alive ? "" : " †"}</td><td>${r.score}</td><td>${r.n.population}</td><td>${r.n.inventions.length}</td><td>${r.first}</td><td>${r.custom}</td><td>${r.n.tiles}</td><td>${r.n.reputation}</td></tr>`).join("");
+  }
+  function drawChart() {
+    const c = $("#chart"), g = c.getContext("2d"), key = $("#stat-key").value, data = statsCache || [];
+    const W = c.width, H = c.height, P = 40;
+    g.clearRect(0, 0, W, H);
+    if (!data.length) return;
+    const ticks = [...new Set(data.map(d => d.tick))], maxT = Math.max(...ticks, 1), maxV = Math.max(1, ...data.map(d => d[key]));
+    const css = getComputedStyle(document.documentElement);
+    g.strokeStyle = css.getPropertyValue("--line"); g.fillStyle = css.getPropertyValue("--muted"); g.font = "12px sans-serif"; g.lineWidth = 1;
+    for (let k = 0; k <= 4; k++) { const y = H - P - (H - 2 * P) * k / 4; g.beginPath(); g.moveTo(P, y); g.lineTo(W - 10, y); g.stroke(); g.fillText(String(Math.round(maxV * k / 4)), 4, y + 4); }
+    g.fillText(`lượt ${maxT}`, W - 60, H - 12);
+    const legend = [];
+    for (const n of S.nations) {
+      const pts = data.filter(d => d.nation === n.id); if (!pts.length) continue;
+      g.strokeStyle = n.flag.colors[0]; g.lineWidth = 2; g.beginPath();
+      pts.forEach((d, k) => { const x = P + (W - P - 10) * d.tick / maxT, y = H - P - (H - 2 * P) * d[key] / maxV; k ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.stroke(); legend.push(`<span><i style="background:${n.flag.colors[0]}"></i>${esc(n.name)}</span>`);
+    }
+    $("#chart-legend").innerHTML = legend.join("");
+  }
+  $("#stat-key").onchange = drawChart;
+
   // ---------------------------------------------------------------- data flow
   async function refresh() {
     S = await api("/api/state");
-    applyStatus(S); render(); renderNations(); renderPetitions(); renderDecrees();
+    applyStatus(S); render(); renderNations(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
+    if (!$("#tab-stats").hidden) renderStats();
   }
   function legend() {
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>`;

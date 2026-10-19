@@ -40,6 +40,8 @@ const runner = new Runner(store, {
   fillWithBots: (env.FILL_WITH_BOTS || "true") !== "false",
   tickSeconds: Number(env.TICK_SECONDS) || 600,
   aiTimeoutSec: Number(env.AI_TIMEOUT_SEC) || 90,
+  judgeProviders: (env.JUDGE_PROVIDERS || "groq,cohere,cloudflare,sambanova,mistral,gemini,openrouter,nvidia,zai").split(",").map(s => s.trim()).filter(Boolean),
+  judgesPerTick: Number(env.JUDGES_PER_TICK) || 3,
 });
 const ver = version();
 console.log(`[boot] Sovereign Minds ${ver} · lượt ${runner.world.tick} · ${runner.world.nations.length} quốc gia`);

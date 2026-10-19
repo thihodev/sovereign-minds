@@ -1,22 +1,24 @@
 // The World Engine: the only thing that changes the world (§1, rule 1).
-// step(world, inputs) applies one tick. It is deterministic: the same world,
-// the same inputs and the same seed always give the same result.
+// step(world, inputs, rulings) applies one tick. It is deterministic: the same
+// world, inputs, judge rulings and seed always give the same result.
 
-import { N, NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./hex.ts";
+import { NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./hex.ts";
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
-  AP_COST, BUILDINGS, BUILDING_BY_TYPE, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS,
-  FOOD_PER_PERSON, FORBIDDEN_NAME_WORDS, GROWTH_RATE, GROWTH_SURPLUS, HUNT_TOOLS, INTEL_DECAY_TICKS, INVENTIONS,
-  INVENTION_BY_ID, MAX_ROLE_BONUS, NOT_YET, PETITION, RECIPES, RECIPE_BY_ID, REGEN, RES_NAME, ROLE_RESOURCE, SPOILAGE,
-  SPY, START, TILE_LIMIT_BASE, TOOL_LIFE, WORKER_SHARE, YIELD, apFor,
+  AP_COST, BRONZE_CAPS, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
+  FORBIDDEN_NAME_WORDS, GROWTH_RATE, GROWTH_SURPLUS, HIDDEN_ORES, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
+  ORE_SENSE_CAP, PETITION, REGEN, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, START, TILE_LIMIT_BASE, TOOL_LIFE, WORKER_SHARE,
+  YIELD, apFor,
 } from "./rules.ts";
+import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
+import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx } from "./diplomacy.ts";
 import { generateWorld } from "./worldgen.ts";
-import { ROLES, type ChronicleEntry, type Flag, type Nation, type ResKey, type Role, type Tile, type TurnInput, type World } from "./types.ts";
+import { ROLES, type ChronicleEntry, type Nation, type ResKey, type Role, type Ruling, type Tile, type TurnInput, type World } from "./types.ts";
 
 // ---------------------------------------------------------------- ledger
 
-/** Every change to a tile reserve or a stock goes through here, so the
- *  end-of-tick audit can prove nothing appeared or vanished unrecorded. */
+/** Every change to a tile reserve, a stock or a caravan goes through here, so
+ *  the end-of-tick audit proves nothing appeared or vanished unrecorded. */
 export class Ledger {
   before: Record<string, number>;
   flows: Record<string, number> = {};
@@ -33,6 +35,10 @@ export class Ledger {
     if (Math.abs(n.stock[key]) < 1e-9) n.stock[key] = 0;
     this.note(key, delta, reason);
   }
+  /** Goods taken from a stock now ride in a caravan. */
+  toCaravan(g: Record<string, number>): void { for (const [k, q] of Object.entries(g)) this.note(k, q, "caravan"); }
+  /** Goods leave a caravan (delivered or spoiled). */
+  caravanLoss(key: string, q: number): void { this.note(key, -q, "caravan"); }
   private note(key: string, delta: number, reason: string): void {
     this.flows[key] = (this.flows[key] || 0) + delta;
     this.reasons[`${key}:${reason}`] = (this.reasons[`${key}:${reason}`] || 0) + delta;
@@ -51,8 +57,10 @@ export class Ledger {
 
 export function totals(world: World): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const t of world.tiles) for (const [k, v] of Object.entries(t.res)) out[k] = (out[k] || 0) + (v || 0);
-  for (const n of world.nations) for (const [k, v] of Object.entries(n.stock)) out[k] = (out[k] || 0) + (v || 0);
+  const add = (k: string, v: number) => { out[k] = (out[k] || 0) + (v || 0); };
+  for (const t of world.tiles) for (const [k, v] of Object.entries(t.res)) add(k, v || 0);
+  for (const n of world.nations) for (const [k, v] of Object.entries(n.stock)) add(k, v);
+  for (const c of world.caravans || []) for (const [k, v] of Object.entries(c.goods)) add(k, v);
   return out;
 }
 
@@ -66,6 +74,8 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
   const world: World = {
     version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
+    custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
+    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {},
   };
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
@@ -76,7 +86,7 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
 
 function newNation(id: number, spec: NationSpec, capital: number): Nation {
   const labor = Object.fromEntries(ROLES.map(r => [r, 0])) as Record<Role, number>;
-  labor.hunt = 9; labor.gather = 2; labor.research = 2; labor.craft = 1;
+  labor.hunt = 7; labor.gather = 4; labor.research = 2; labor.craft = 1;
   return {
     id, controller: spec.controller, provider: spec.provider, model: spec.model,
     founded: false, name: `Bộ lạc ${id + 1}`, capitalName: "", people: "", flag: { layout: "plain", colors: ["#888888", "#ffffff"], symbol: "circle" }, manifesto: "",
@@ -86,6 +96,7 @@ function newNation(id: number, spec: NationSpec, capital: number): Nation {
     status: "active", sleepUntil: 0, sleepBackoffMin: 0, statusNote: "",
     stats: { calls: 0, ok: 0, invalid: 0, asleepTicks: 0, silentTicks: 0 },
     lastRejected: [], lastEvents: [], eventTimers: {}, intel: {}, casusBelli: {},
+    settlements: [], trades: {}, mineTarget: "", peakPopulation: START.population, inbox: [],
   };
 }
 
@@ -98,31 +109,41 @@ export interface Mods {
   tiles: number;
   rp: number;
   spoilage: number;
+  spoilageCut: number;
+  stabilityPerTick: number;
+  combat: number;
   winter: number;
   caps: Set<string>;
   unlocked: Set<string>;
+  move: Set<string>;
+  reveal: Set<string>;
 }
 
 export function mods(world: World, n: Nation): Mods {
-  const m: Mods = { role: {}, foodPerPerson: FOOD_PER_PERSON, ap: 0, tiles: 0, rp: 0, spoilage: SPOILAGE.food, winter: 1, caps: new Set(), unlocked: new Set() };
+  const m: Mods = { role: {}, foodPerPerson: FOOD_PER_PERSON, ap: 0, tiles: 0, rp: 0, spoilage: SPOILAGE.food, spoilageCut: 0, stabilityPerTick: 0, combat: 0, winter: 1, caps: new Set(), unlocked: new Set(), move: new Set(), reveal: new Set() };
   for (const id of n.inventions) {
-    const inv = INVENTION_BY_ID[id]; if (!inv) continue;
-    for (const c of inv.caps) m.caps.add(c);
-    const e = inv.effects;
-    for (const [r, v] of Object.entries(e.role || {})) m.role[r] = (m.role[r] || 0) + (v || 0);
+    const v = inv(world, id); if (!v) continue;
+    for (const c of v.caps) m.caps.add(c);
+    const e = v.effects;
+    for (const [r, x] of Object.entries(e.role || {})) m.role[r] = (m.role[r] || 0) + (x || 0);
     if (e.foodPerPerson) m.foodPerPerson = Math.min(m.foodPerPerson, e.foodPerPerson);
     m.ap += e.ap || 0; m.tiles += e.tiles || 0; m.rp += e.rp || 0;
+    m.spoilageCut += e.spoilageCut || 0; m.stabilityPerTick += e.stabilityPerTick || 0; m.combat += e.combat || 0;
     if (e.spoilage !== undefined) m.spoilage = Math.min(m.spoilage, e.spoilage);
     if (e.winter !== undefined) m.winter *= e.winter;
     for (const u of e.unlocks || []) m.unlocked.add(u);
+    for (const t of e.move || []) m.move.add(t);
+    for (const r of e.reveal || []) m.reveal.add(r);
   }
+  if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
+  if (m.caps.has("đi-nước")) m.move.add("shallow");
   if (ownsWonder(world, n, "falls")) m.rp += 0.2;
   return m;
 }
 
 function roleBonus(m: Mods, r: Role): number {
-  const extract = ["wood", "stone", "flint", "clay"].includes(r) ? (m.role.extract || 0) : 0;
-  return Math.min(MAX_ROLE_BONUS, (m.role[r] || 0) + extract);
+  const extract = ["wood", "stone", "flint", "clay", "mine"].includes(r) ? (m.role.extract || 0) : 0;
+  return (m.role[r] || 0) + extract;
 }
 
 export function ownedTiles(world: World, nid: number): Tile[] {
@@ -132,24 +153,41 @@ function ownsWonder(world: World, n: Nation, key: string): boolean {
   const w = world.wonders.find(x => x.key === key);
   return !!w && world.tiles[w.i].owner === n.id;
 }
+function doneEffect(world: World, n: Nation, key: "housing" | "stability" | "spoilage" | "craftSlots"): number {
+  let sum = 0;
+  for (const b of n.buildings) if (b.done) sum += buildingOf(world, b.type)?.effect[key] || 0;
+  return sum;
+}
 export function workers(n: Nation): number { return Math.floor(n.population * WORKER_SHARE); }
 export function housing(world: World, n: Nation): number {
-  const tents = n.buildings.filter(b => b.type === "tent" && b.done).length;
-  return START.naturalHousing + tents * 10 + (ownsWonder(world, n, "cave") ? 50 : 0);
+  return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + doneEffect(world, n, "housing") + (ownsWonder(world, n, "cave") ? 50 : 0);
 }
 export function tileLimit(world: World, n: Nation): number {
-  return TILE_LIMIT_BASE + Math.floor(n.population / 10) + mods(world, n).tiles;
+  return TILE_LIMIT_BASE + Math.floor(n.population / 10) + mods(world, n).tiles + n.settlements.length * 3;
 }
 export function actionPoints(world: World, n: Nation): number { return apFor(n.population, mods(world, n).ap); }
+export function canSeeRes(world: World, n: Nation, key: string): boolean {
+  return !(HIDDEN_ORES as string[]).includes(key) || mods(world, n).reveal.has(key);
+}
 
+/** §7.5 diffusion: knowing someone who has it makes it cheaper (best discount only). */
 export function inventionCost(world: World, n: Nation, id: string): number {
-  const inv = INVENTION_BY_ID[id]; if (!inv) return Infinity;
-  const knownByMet = n.met.some(o => world.nations[o]?.inventions.includes(id));
-  return Math.ceil(inv.rp * (knownByMet ? 0.8 : 1));
+  const v = inv(world, id); if (!v) return Infinity;
+  let discount = 0;
+  for (const o of n.met) {
+    const other = world.nations[o];
+    if (!other?.inventions.includes(id)) continue;
+    let d = 0.2;
+    if ((n.trades[String(o)] || 0) >= 5) d = 0.4;
+    if (treatiesBetween(world, n.id, o, ["alliance"]).length) d = 0.6;
+    discount = Math.max(discount, d);
+  }
+  if (v.custom?.by === n.id) discount = Math.max(discount, 0.2);
+  return Math.ceil(v.rp * (1 - discount));
 }
 
 export function envOk(world: World, n: Nation, id: string): boolean {
-  const env = INVENTION_BY_ID[id]?.env; if (!env) return true;
+  const env = inv(world, id)?.env; if (!env) return true;
   const owned = ownedTiles(world, n.id);
   if (env.res && !owned.some(t => (t.cap[env.res!] || 0) > 0)) return false;
   if (env.terrains && !owned.some(t => env.terrains!.includes(t.terrain) || (env.river && t.river))) return false;
@@ -157,7 +195,7 @@ export function envOk(world: World, n: Nation, id: string): boolean {
 }
 
 export function researchOptions(world: World, n: Nation): string[] {
-  return INVENTIONS.filter(v => !n.inventions.includes(v.id) && v.prereqs.every(p => n.inventions.includes(p)) && envOk(world, n, v.id)).map(v => v.id);
+  return allInventions(world).filter(v => !n.inventions.includes(v.id) && v.prereqs.every(p => n.inventions.includes(p)) && envOk(world, n, v.id)).map(v => v.id);
 }
 
 // ---------------------------------------------------------------- flags & names
@@ -250,7 +288,6 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
   const out = Object.fromEntries(ROLES.map(r => [r, Math.max(0, Math.floor(num(wanted[r])))])) as Record<Role, number>;
   const total = ROLES.reduce((s, r) => s + out[r], 0), w = workers(n);
   if (total > w) {
-    // Scale down evenly, then hand out the remainder by role order.
     const scaled = Object.fromEntries(ROLES.map(r => [r, Math.floor(out[r] * w / total)])) as Record<Role, number>;
     let left = w - ROLES.reduce((s, r) => s + scaled[r], 0);
     for (const r of ROLES) if (left > 0 && out[r] > scaled[r]) { scaled[r]++; left--; }
@@ -259,24 +296,49 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
   } else n.labor = out;
 }
 
+/** Centres a tile must stay connected to (§2.3). */
+function centres(n: Nation): number[] { return [n.capital, ...n.settlements.map(s => s.tile)]; }
+
 // ---------------------------------------------------------------- step
 
 export interface StepResult { chronicle: ChronicleEntry[]; audit: string[] }
 
-export function step(world: World, inputs: Record<number, TurnInput>): StepResult {
+export function step(world: World, inputs: Record<number, TurnInput>, rulings: Record<number, Ruling> = {}): StepResult {
   const tick = world.tick, L = new Ledger(world), chronicle: ChronicleEntry[] = [];
   const say = (nation: number | null, kind: string, text: string) => chronicle.push({ tick, nation, kind, text });
   const alive = world.nations.filter(n => n.alive);
+  const popStart = new Map(alive.map(n => [n.id, n.population]));
 
   // 1. Read inputs
   for (const n of alive) {
-    n.lastRejected = []; n.lastEvents = [];
+    n.lastRejected = []; n.lastEvents = []; n.inbox = [];
     const inp = inputs[n.id] ?? { kind: "silent", reason: "không có câu trả lời" };
     if (inp.kind === "asleep") { n.stats.asleepTicks++; continue; }
     if (inp.kind === "silent") { n.stats.silentTicks++; n.silentStreak++; continue; }
     n.silentStreak = 0;
-    if (inp.response.thought !== undefined) n.lastThought = String(inp.response.thought).slice(0, 300);
-    if (inp.response.memory !== undefined) n.memory = String(inp.response.memory).slice(0, 2000);
+    const r = inp.response as Record<string, unknown>;
+    if (r.thought !== undefined) n.lastThought = String(r.thought).slice(0, 300);
+    if (r.memory !== undefined) n.memory = String(r.memory).slice(0, 2000);
+    if (typeof r.mine_target === "string") n.mineTarget = r.mine_target;
+  }
+
+  // 1b. The judge's rulings on pending inventions (§5.4)
+  for (const p of world.proposals) {
+    if (p.status !== "pending" || !rulings[p.id]) continue;
+    const n = world.nations[p.nation];
+    const id = applyRuling(world, p, rulings[p.id]);
+    const r = p.ruling!;
+    if (id) {
+      const v = inv(world, id)!;
+      say(n.id, "invention", `Trọng tài công nhận phát minh "${v.name}" của ${n.name} (độ sâu ${v.custom!.depth}, ${v.rp} RP). ${r.reason}`);
+      n.lastEvents.push(`Đơn phát minh "${p.name}" được duyệt thành ${id}${v.prereqs.length > p.prereqs.length ? " (trọng tài thêm tiên quyết)" : ""}. ${n.research ? "Chọn research để bắt đầu." : "Bắt đầu nghiên cứu ngay, được giảm 20% RP."}`);
+      if (!n.research && v.prereqs.every(x => n.inventions.includes(x))) n.research = { id, progress: 0 };
+    } else if (p.status === "duplicate") {
+      n.lastEvents.push(`Đơn "${p.name}" trùng với ${invName(world, p.inventionId!)} (${p.inventionId}) đã có trong Sổ: hãy nghiên cứu nó.`);
+    } else {
+      n.lastEvents.push(`Trọng tài bác đơn "${p.name}" (${r.causality + r.material + r.physics}/6): ${r.reason}`);
+      say(n.id, "proposal", `Trọng tài bác đơn phát minh "${p.name}" của ${n.name}.`);
+    }
   }
 
   // Deliver the gods' answers to petitions (§10.5)
@@ -288,7 +350,7 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
     n.lastEvents.push(`Các vị thần đã ${word} thỉnh nguyện "${p.title}"${p.verdict ? `: ${p.verdict}` : ""}`);
   }
 
-  // 2. Founding (tick 0). Order of priority comes from the seed.
+  // 2. Founding (tick 0). Priority order comes from the seed.
   const order = shuffle(alive.slice(), rngFor(world.seed, tick, "order"));
   for (const n of order) {
     if (n.founded) continue;
@@ -308,6 +370,7 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
   // 3. Labour, craft orders and actions
   const claims: Array<{ n: Nation; tile: number }> = [];
   const explorers = new Map<number, number>();
+  const ctx: DiploCtx = { world, tick, L, say, strikes: [], sent: new Set(), accepts: [], treatyAccepts: [] };
   for (const n of alive) {
     const inp = inputs[n.id];
     if (n.riot) { n.riot = false; n.lastEvents.push("Nội loạn: lượt này các thủ lĩnh không ra được lệnh nào."); continue; }
@@ -315,7 +378,7 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
     normalizeLabor(n, inp.response.labor);
     if (inp.response.crafts && typeof inp.response.crafts === "object") {
       n.crafts = {};
-      for (const [k, v] of Object.entries(inp.response.crafts)) if (RECIPE_BY_ID[k] && num(v) > 0) n.crafts[k] = Math.min(50, Math.floor(num(v)));
+      for (const [k, v] of Object.entries(inp.response.crafts)) if (recipeOf(world, k) && num(v) > 0) n.crafts[k] = Math.min(50, Math.floor(num(v)));
     }
     if (tick === 0) continue; // tick 0 is for founding only
     let ap = actionPoints(world, n);
@@ -328,7 +391,7 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
       const cost = AP_COST[type];
       if (cost === undefined) { reject("Không có hành động này"); continue; }
       if (cost > ap) { reject(`Không đủ AP (cần ${cost}, còn ${ap})`); continue; }
-      const err = doAction(world, n, type, a, L, claims, explorers, say);
+      const err = ENGINE_ACTIONS.has(type) ? doAction(world, n, type, a, L, claims, explorers, say) : doDiplomacy(ctx, n, type, a);
       if (err) { reject(err); ap -= Math.min(cost, ap); continue; } // §1 rule 2: AP is spent anyway
       ap -= cost;
     }
@@ -348,189 +411,41 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
     winner.lastEvents.push(`Khai hoang thêm ô (${col(tile)}, ${row(tile)}).`);
   }
 
-  // 5. Production, crafting, building, events, eating, research, stability
+  // 5. Treaties, trade, caravans, then battles (§3.1 order)
+  resolveRelations(ctx);
+  resolveBattles(ctx);
+
+  // 6. Economy
   for (const n of alive) {
-    const m = mods(world, n), erand = rngFor(world.seed, tick, "nation", n.id);
-    const owned = ownedTiles(world, n.id);
-    const stabMult = n.stability < 30 ? 0.75 : 1;
-    const away = explorers.get(n.id) || 0;
-    const labor = { ...n.labor };
-    labor.gather = Math.max(0, labor.gather - away);
-    const assigned = ROLES.reduce((s, r) => s + labor[r], 0);
-    labor.gather += Math.max(0, workers(n) - away - assigned); // idle hands forage (§4.2)
-
-    const take = (key: ResKey, want: number, reason: string): number => {
-      let got = 0;
-      const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (b.res[key]! - a.res[key]!) || a.i - b.i);
-      for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; }
-      return got;
-    };
-    const drought = (n.eventTimers.drought || 0) > 0 ? 0.5 : 1;
-    let foodMade = 0;
-    // Foraging
-    const g = take("plants", labor.gather * YIELD.gather * (1 + roleBonus(m, "gather")) * stabMult * drought, "gather");
-    L.stock(n, "food", g, "gather"); L.stock(n, "fiber", g * YIELD.gatherFiber, "gather"); foodMade += g;
-    // Hunting: one tool serves four hunters; hunters without tools work at half strength
-    const tools = HUNT_TOOLS.reduce((s, k) => s + (n.stock[k] || 0), 0);
-    const equipped = Math.min(labor.hunt, Math.floor(tools) * 4);
-    const h = take("game", (equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * (1 + roleBonus(m, "hunt")) * stabMult, "hunt");
-    L.stock(n, "food", h, "hunt"); L.stock(n, "hide", h * YIELD.huntHide, "hunt"); L.stock(n, "bone", h * YIELD.huntBone, "hunt"); foodMade += h;
-    n.toolWear += Math.ceil(equipped / 4) / TOOL_LIFE;
-    while (n.toolWear >= 1) {
-      n.toolWear -= 1;
-      const k = HUNT_TOOLS.slice().reverse().find(t => (n.stock[t] || 0) >= 1);
-      if (k) L.stock(n, k, -1, "wear");
-    }
-    // Fishing
-    const f = take("fish", labor.fish * YIELD.fish * (1 + roleBonus(m, "fish")) * stabMult, "fish");
-    L.stock(n, "food", f, "fish"); foodMade += f;
-    // Extraction; an axe lets two woodcutters work 30% faster (§6.2)
-    for (const r of ["wood", "stone", "flint", "clay"] as Role[]) {
-      if (!labor[r]) continue;
-      let effort = labor[r];
-      if (r === "wood") effort += Math.min(labor.wood, (n.stock.axe || 0) * 2) * 0.3;
-      const got = take(ROLE_RESOURCE[r]!, effort * YIELD.extract * (1 + roleBonus(m, r)) * stabMult, "extract");
-      L.stock(n, r, got, "extract");
-    }
-    // Farming: fields and pens grow food from soil and labour
-    const fields = n.buildings.filter(b => b.done && b.type === "field"), pens = n.buildings.filter(b => b.done && b.type === "pen");
-    let farmers = labor.farm;
-    const volcano = world.wonders.find(w => w.key === "volcano");
-    for (const fld of fields) {
-      const k = Math.min(farmers, YIELD.fieldWorkers); farmers -= k;
-      const fertile = volcano && dist(volcano.i, fld.tile) <= 1 ? 2 : 1;
-      const x = k * YIELD.fieldFood * fertile * drought * stabMult; L.stock(n, "food", x, "growth"); foodMade += x;
-    }
-    for (const _p of pens) { const k = Math.min(farmers, YIELD.penWorkers); farmers -= k; const x = k * YIELD.penFood * stabMult; L.stock(n, "food", x, "growth"); foodMade += x; }
-
-    // Crafting
-    let craftWork = Math.min(labor.craft, 4 * n.buildings.filter(b => b.done && (b.type === "workshop" || b.type === "kiln")).length) * stabMult;
-    const hasKiln = n.buildings.some(b => b.done && b.type === "kiln"), hasShop = n.buildings.some(b => b.done && b.type === "workshop");
-    for (const [rid, want] of Object.entries(n.crafts)) {
-      const rec = RECIPE_BY_ID[rid]; if (!rec) continue;
-      if (!n.inventions.includes(rec.needs) && !m.unlocked.has(rid)) continue;
-      if (rec.building === "kiln" ? !hasKiln : !hasShop) continue;
-      for (let k = 0; k < want; k++) {
-        if (craftWork < rec.work) break;
-        if (!Object.entries(rec.input).every(([key, q]) => (n.stock[key] || 0) >= q)) break;
-        for (const [key, q] of Object.entries(rec.input)) L.stock(n, key, -q, "craft");
-        for (const [key, q] of Object.entries(rec.output)) L.stock(n, key, q, "craft");
-        craftWork -= rec.work;
-      }
-    }
-
-    // Building
-    let buildWork = labor.build * stabMult;
-    for (const b of n.buildings) {
-      if (b.done || buildWork <= 0) continue;
-      const need = BUILDING_BY_TYPE[b.type].work - b.progress, x = Math.min(need, buildWork);
-      b.progress += x; buildWork -= x;
-      if (b.progress >= BUILDING_BY_TYPE[b.type].work - 1e-9) { b.done = true; n.lastEvents.push(`Hoàn thành ${BUILDING_BY_TYPE[b.type].name}.`); say(n.id, "build", `${n.name} xây xong ${BUILDING_BY_TYPE[b.type].name}.`); }
-    }
-
-    // World events (§9.2)
-    for (const k of Object.keys(n.eventTimers)) if (n.eventTimers[k] > 0) n.eventTimers[k]--;
-    const capZone = world.tiles[n.capital].zone;
-    const winterChance = capZone === "trop" ? 0 : EVENTS.winter.chance * (capZone === "cold" ? EVENTS.winter.coldMult : 1);
-    if (erand() < winterChance) {
-      const lost = Math.min(n.stock.food || 0, foodMade * EVENTS.winter.foodLoss); L.stock(n, "food", -lost, "winter");
-      let mult = m.winter;
-      if (n.buildings.some(b => b.done && b.type === "tent")) mult *= 0.5;
-      if ((n.stock.hide_coat || 0) >= n.population / 2) mult *= 0.5;
-      const dead = Math.floor(n.population * EVENTS.winter.deaths * mult);
-      n.population -= dead;
-      n.lastEvents.push(`Mùa đông khắc nghiệt: mất ${fmt(lost)} lương thực, ${dead} người chết rét.`);
-      say(n.id, "event", `Mùa đông khắc nghiệt ở ${n.name}: ${dead} người chết rét.`);
-    }
-    if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
-    const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1);
-    if (erand() < plagueChance) {
-      const dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)));
-      n.population -= dead; n.lastEvents.push(`Dịch bệnh: ${dead} người chết.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
-    }
-    if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
-    const grassTile = owned.find(t => t.terrain === "grass");
-    if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
-    const forestTile = owned.find(t => t.terrain === "forest" && (t.res.wood || 0) > 0);
-    if (forestTile && erand() < EVENTS.wildfire.chance) { L.tile(forestTile, "wood", -(forestTile.res.wood || 0) * 0.5, "fire"); n.lastEvents.push("Cháy rừng: một khu rừng mất nửa số gỗ."); }
-    const landTile = owned.find(t => t.land);
-    if (landTile && erand() < EVENTS.meteor.chance) { L.tile(landTile, "iron", EVENTS.meteor.iron, "meteor"); say(n.id, "event", `Một thiên thạch rơi xuống lãnh thổ ${n.name}.`); }
-    if (volcano && n.buildings.some(b => dist(b.tile, volcano.i) <= 2) && erand() < EVENTS.eruption.chance) {
-      const lostB = n.buildings.filter(b => dist(b.tile, volcano.i) <= 2);
-      n.buildings = n.buildings.filter(b => dist(b.tile, volcano.i) > 2);
-      say(n.id, "event", `Núi lửa Tro Đen phun trào, ${n.name} mất ${lostB.length} công trình.`);
-    }
-
-    // Eating, starvation, spoilage, growth (§4.2)
-    const need = n.population * m.foodPerPerson;
-    const eaten = Math.min(n.stock.food || 0, need); L.stock(n, "food", -eaten, "eat");
-    const shortage = need - eaten;
-    if (shortage > 1e-9) {
-      const dead = Math.min(n.population, Math.ceil(shortage / 2));
-      n.population -= dead; n.stability -= 5;
-      n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói.`);
-      say(n.id, "famine", `Nạn đói ở ${n.name}: ${dead} người chết.`);
-    } else {
-      const surplus = (n.stock.food || 0) / Math.max(1, need);
-      if (surplus > 0) n.stability += 1;
-      if (surplus >= GROWTH_SURPLUS && n.population < housing(world, n)) {
-        const born = Math.min(housing(world, n) - n.population, Math.max(1, Math.floor(n.population * GROWTH_RATE)));
-        n.population += born;
-      }
-    }
-    let spoil = m.spoilage - 0.05 * Math.min(2, n.buildings.filter(b => b.done && b.type === "pit").length);
-    if (n.inventions.includes("P18")) spoil -= 0.05;
-    if (ownsWonder(world, n, "salt")) spoil *= 0.5;
-    spoil = Math.max(SPOILAGE.min, spoil);
-    L.stock(n, "food", -(n.stock.food || 0) * spoil, "spoil");
-    L.stock(n, "hide", -(n.stock.hide || 0) * SPOILAGE.hide, "spoil");
-
-    // Research (§5.5)
-    const rp = labor.research * YIELD.research * (1 + m.rp) * stabMult;
-    if (n.research) {
-      n.research.progress += rp;
-      const cost = inventionCost(world, n, n.research.id);
-      if (n.research.progress >= cost) {
-        const inv = INVENTION_BY_ID[n.research.id];
-        n.inventions.push(inv.id); n.research = null;
-        n.stability += 2 + (inv.effects.stabilityOnce || 0);
-        const reg = world.registry[inv.id];
-        if (!reg) { world.registry[inv.id] = { by: [n.id], tick }; say(n.id, "invention", `${n.name} phát minh ra ${inv.name}, lần đầu tiên trên thế giới.`); }
-        else if (reg.tick === tick) { reg.by.push(n.id); say(n.id, "invention", `${n.name} cùng phát minh ra ${inv.name}.`); }
-        else say(n.id, "invention", `${n.name} làm chủ ${inv.name}.`);
-        n.lastEvents.push(`Hoàn thành nghiên cứu ${inv.name}.`);
-      }
-    }
-
-    // Stability (§4.4)
-    if (n.buildings.some(b => b.done && b.type === "altar")) n.stability += 1;
-    if (ownsWonder(world, n, "spring")) n.stability += 2;
-    const over = owned.length - tileLimit(world, n);
-    if (over > 0) { n.stability -= 2 * over; n.lastEvents.push(`Vượt giới hạn quản lý ${over} ô: −${2 * over} ổn định.`); }
-    if (n.silentStreak >= 3) n.stability -= 5;
-    n.stability = Math.max(0, Math.min(100, n.stability));
-    if (n.stability < 15 && n.population > 0) {
-      const leave = Math.max(1, Math.floor(n.population * 0.05));
-      n.population -= leave;
-      const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
-      if (dest) dest.population += leave;
-      n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
-    }
-    if (n.stability === 0) { n.riot = true; n.stability = 20; say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+    if (!n.alive) continue;
+    economy(world, n, L, say, explorers.get(n.id) || 0);
   }
 
-  // 6. Explorers come home; sight and meetings
+  // 7. Sight, meetings, intel. Allies share sight (§7.8 level 4).
   for (const n of alive) {
+    if (!n.alive) continue;
     const sight = new Set(n.seen);
     for (const t of ownedTiles(world, n.id)) for (const j of within(t.i, 3)) sight.add(j);
     n.seen = [...sight].sort((a, b) => a - b);
   }
   updateMeetings(world, say);
+  updateIntel(world, tick);
 
-  // 7. Intelligence and spies (§7.8)
-  updateIntel(world, tick, say);
+  // 8. Tiles cut off from every centre go wild after 5 ticks (§2.3)
+  for (const n of alive) {
+    if (!n.alive) continue;
+    const reach = new Set<number>(), stack = centres(n).filter(i => world.tiles[i].owner === n.id);
+    for (const s of stack) reach.add(s);
+    while (stack.length) { const k = stack.pop()!; for (const j of NEIGHBORS[k]) if (!reach.has(j) && world.tiles[j].owner === n.id) { reach.add(j); stack.push(j); } }
+    for (const t of ownedTiles(world, n.id)) {
+      const key = String(t.i);
+      if (reach.has(t.i)) { delete world.cutoff[key]; continue; }
+      world.cutoff[key] = (world.cutoff[key] || 0) + 1;
+      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên bỏ hoang.`); }
+    }
+  }
 
-  // 8. Regrowth of renewable reserves
+  // 9. Regrowth of renewable reserves
   for (const t of world.tiles) {
     for (const [k, share] of Object.entries(REGEN) as Array<[ResKey, number]>) {
       const cap = t.cap[k] || 0, cur = t.res[k] || 0;
@@ -538,8 +453,9 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
     }
   }
 
-  // 9. Death and eras
+  // 10. Death, lost knowledge, eras
   for (const n of alive) {
+    if (!n.alive) continue;
     if (n.population <= 0) {
       n.population = 0; n.alive = false; n.status = "dead";
       for (const t of world.tiles) if (t.owner === n.id) t.owner = -1;
@@ -547,17 +463,226 @@ export function step(world: World, inputs: Record<number, TurnInput>): StepResul
       continue;
     }
     const caps = mods(world, n).caps;
-    const era = caps.has("mài") && (caps.has("trồng-trọt") || caps.has("thuần-dưỡng")) && n.population >= 50 ? ERAS.neo : ERAS.paleo;
-    if (era !== n.era) { n.era = era; say(n.id, "era", `${n.name} bước vào thời ${era}.`); }
+    // §5.5 Lost knowledge: a population halved in one tick, with no writing, forgets its newest idea
+    if (n.population < (popStart.get(n.id) || 0) * 0.5 && !caps.has("ghi-chép")) {
+      const lost = [...n.inventions].reverse().find(id => !START.inventions.includes(id) && !n.inventions.some(o => inv(world, o)?.prereqs.includes(id)));
+      if (lost) { n.inventions = n.inventions.filter(x => x !== lost); say(n.id, "lost", `${n.name} mất quá nửa dân số và thất truyền ${invName(world, lost)}.`); }
+    }
+    n.peakPopulation = Math.max(n.peakPopulation, n.population);
+    const owned = ownedTiles(world, n.id);
+    let era = ERAS.paleo;
+    if (caps.has("mài") && (caps.has("trồng-trọt") || caps.has("thuần-dưỡng")) && n.population >= 50) era = ERAS.neo;
+    if (BRONZE_CAPS.every(c => caps.has(c)) && owned.some(t => (t.cap.copper || 0) > 0)) era = ERAS.bronze;
+    if (era !== n.era) {
+      n.era = era;
+      say(n.id, "era", `${n.name} bước vào thời ${era}.`);
+      if (world.eraGates[era] === undefined) {
+        world.eraGates[era] = tick;
+        if (era === ERAS.bronze) say(null, "gate", `${n.name} là quốc gia đầu tiên chạm Cổng Đồ Đồng. Theo luật §5.6, Watcher sẽ ban luật cho kỷ nguyên mới.`);
+      }
+    }
   }
 
   world.tick++;
   return { chronicle, audit: L.audit(world) };
 }
 
+// ---------------------------------------------------------------- economy (§4, §6)
+
+function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null, kind: string, text: string) => void, away: number): void {
+  const tick = world.tick, m = mods(world, n), erand = rngFor(world.seed, tick, "nation", n.id);
+  const owned = ownedTiles(world, n.id);
+  const stabMult = n.stability < 30 ? 0.75 : 1;
+  const labor = { ...n.labor };
+  labor.gather = Math.max(0, labor.gather - away);
+  const assigned = ROLES.reduce((s, r) => s + labor[r], 0);
+  labor.gather += Math.max(0, workers(n) - away - assigned); // idle hands forage (§4.2)
+
+  // Tools invented by the nations themselves (§5.3 recipe.tool)
+  const toolBonus: Record<string, number> = {};
+  for (const [good, q] of Object.entries(n.stock)) {
+    const use = recipeOf(world, good)?.use; if (!use || q < 1 || !labor[use.role as Role]) continue;
+    const equipped = Math.min(labor[use.role as Role], Math.floor(q) * use.per);
+    toolBonus[use.role] = (toolBonus[use.role] || 0) + use.bonus * equipped / labor[use.role as Role];
+    L.stock(n, good, -Math.min(q, equipped / use.per / TOOL_LIFE), "wear");
+  }
+  const mult = (r: Role) => (1 + Math.min(MAX_ROLE_BONUS, roleBonus(m, r) + (toolBonus[r] || 0))) * stabMult;
+
+  const take = (key: ResKey, want: number, reason: string): number => {
+    let got = 0;
+    const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (b.res[key]! - a.res[key]!) || a.i - b.i);
+    for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; }
+    return got;
+  };
+  const drought = (n.eventTimers.drought || 0) > 0 ? 0.5 : 1;
+  let foodMade = 0;
+  const g = take("plants", labor.gather * YIELD.gather * mult("gather") * drought, "gather");
+  L.stock(n, "food", g, "gather"); L.stock(n, "fiber", g * YIELD.gatherFiber, "gather"); foodMade += g;
+  // Hunting: one tool serves four hunters; hunters without tools work at half strength
+  const tools = HUNT_TOOLS.reduce((s, k) => s + (n.stock[k] || 0), 0);
+  const equipped = Math.min(labor.hunt, Math.floor(tools) * 4);
+  const h = take("game", (equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt"), "hunt");
+  L.stock(n, "food", h, "hunt"); L.stock(n, "hide", h * YIELD.huntHide, "hunt"); L.stock(n, "bone", h * YIELD.huntBone, "hunt"); foodMade += h;
+  n.toolWear += Math.ceil(equipped / 4) / TOOL_LIFE;
+  while (n.toolWear >= 1) {
+    n.toolWear -= 1;
+    const k = HUNT_TOOLS.slice().reverse().find(t => (n.stock[t] || 0) >= 1);
+    if (k) L.stock(n, k, -1, "wear");
+  }
+  const f = take("fish", labor.fish * YIELD.fish * mult("fish"), "fish");
+  L.stock(n, "food", f, "fish"); foodMade += f;
+  for (const r of ["wood", "stone", "flint", "clay"] as Role[]) {
+    if (!labor[r]) continue;
+    let effort = labor[r];
+    if (r === "wood") effort += Math.min(labor.wood, (n.stock.axe || 0) * 2) * 0.3;
+    const got = take(ROLE_RESOURCE[r]!, effort * YIELD.extract * mult(r), "extract");
+    L.stock(n, r, got, "extract");
+  }
+  // Mining: visible ores first (the nation's choice), then salt and reeds
+  if (labor.mine) {
+    const visible = ["copper", "tin", "iron"].filter(k => m.reveal.has(k));
+    const order = [n.mineTarget, ...visible, "salt", "reeds"].filter((k, i, a) => k && a.indexOf(k) === i && (["salt", "reeds"].includes(k) || m.reveal.has(k))) as ResKey[];
+    let want = labor.mine * YIELD.extract * mult("mine");
+    for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= got; }
+  }
+  // Farming buildings grow food from soil and labour
+  let farmers = labor.farm;
+  const volcano = world.wonders.find(w => w.key === "volcano");
+  for (const b of n.buildings) {
+    const e = buildingOf(world, b.type)?.effect; if (!b.done || !e?.farmSlots || farmers <= 0) continue;
+    const k = Math.min(farmers, e.farmSlots); farmers -= k;
+    const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
+    const x = k * (e.farmFood || 0) * fertile * (b.type === "field" ? drought : 1) * stabMult;
+    L.stock(n, "food", x, "growth"); foodMade += x;
+  }
+
+  // Crafting: workshop-like buildings give slots; a recipe needs its building
+  let craftWork = Math.min(labor.craft, doneEffect(world, n, "craftSlots")) * stabMult;
+  const doneTypes = new Set(n.buildings.filter(b => b.done).map(b => b.type));
+  for (const [rid, want] of Object.entries(n.crafts)) {
+    const rec = recipeOf(world, rid); if (!rec) continue;
+    if (!n.inventions.includes(rec.needs) && !m.unlocked.has(rid)) continue;
+    if (!doneTypes.has(rec.building)) continue;
+    for (let k = 0; k < want; k++) {
+      if (craftWork < rec.work) break;
+      if (!Object.entries(rec.input).every(([key, q]) => (n.stock[key] || 0) >= q)) break;
+      for (const [key, q] of Object.entries(rec.input)) L.stock(n, key, -q, "craft");
+      for (const [key, q] of Object.entries(rec.output)) L.stock(n, key, q, "craft");
+      craftWork -= rec.work;
+    }
+  }
+
+  // Building
+  let buildWork = labor.build * stabMult;
+  for (const b of n.buildings) {
+    if (b.done || buildWork <= 0) continue;
+    const def = buildingOf(world, b.type); if (!def) continue;
+    const x = Math.min(def.work - b.progress, buildWork);
+    b.progress += x; buildWork -= x;
+    if (b.progress >= def.work - 1e-9) { b.done = true; n.lastEvents.push(`Hoàn thành ${def.name}.`); say(n.id, "build", `${n.name} xây xong ${def.name}.`); }
+  }
+
+  // World events (§9.2)
+  for (const k of Object.keys(n.eventTimers)) if (n.eventTimers[k] > 0) n.eventTimers[k]--;
+  const capZone = world.tiles[n.capital].zone;
+  const winterChance = capZone === "trop" ? 0 : EVENTS.winter.chance * (capZone === "cold" ? EVENTS.winter.coldMult : 1);
+  if (erand() < winterChance) {
+    const lost = Math.min(n.stock.food || 0, foodMade * EVENTS.winter.foodLoss); L.stock(n, "food", -lost, "winter");
+    let wm = m.winter;
+    if (doneEffect(world, n, "housing") > 0) wm *= 0.5;
+    if ((n.stock.hide_coat || 0) >= n.population / 2) wm *= 0.5;
+    const dead = Math.floor(n.population * EVENTS.winter.deaths * wm);
+    n.population -= dead;
+    n.lastEvents.push(`Mùa đông khắc nghiệt: mất ${fmt(lost)} lương thực, ${dead} người chết rét.`);
+    say(n.id, "event", `Mùa đông khắc nghiệt ở ${n.name}: ${dead} người chết rét.`);
+  }
+  if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
+  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1);
+  if (erand() < plagueChance) {
+    const dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)));
+    n.population -= dead; n.lastEvents.push(`Dịch bệnh: ${dead} người chết.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
+  }
+  if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
+  const grassTile = owned.find(t => t.terrain === "grass");
+  if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
+  const forestTile = owned.find(t => t.terrain === "forest" && (t.res.wood || 0) > 0);
+  if (forestTile && erand() < EVENTS.wildfire.chance) { L.tile(forestTile, "wood", -(forestTile.res.wood || 0) * 0.5, "fire"); n.lastEvents.push("Cháy rừng: một khu rừng mất nửa số gỗ."); }
+  const landTile = owned.find(t => t.land);
+  if (landTile && erand() < EVENTS.meteor.chance) { L.tile(landTile, "iron", EVENTS.meteor.iron, "meteor"); say(n.id, "event", `Một thiên thạch rơi xuống lãnh thổ ${n.name}.`); }
+  if (volcano && n.buildings.some(b => dist(b.tile, volcano.i) <= 2) && erand() < EVENTS.eruption.chance) {
+    const lostB = n.buildings.filter(b => dist(b.tile, volcano.i) <= 2);
+    n.buildings = n.buildings.filter(b => dist(b.tile, volcano.i) > 2);
+    say(n.id, "event", `Núi lửa Tro Đen phun trào, ${n.name} mất ${lostB.length} công trình.`);
+  }
+
+  // Eating, starvation, growth, spoilage (§4.2)
+  const need = n.population * m.foodPerPerson;
+  const eaten = Math.min(n.stock.food || 0, need); L.stock(n, "food", -eaten, "eat");
+  const shortage = need - eaten;
+  if (shortage > 1e-9) {
+    const dead = Math.min(n.population, Math.ceil(shortage / 2));
+    n.population -= dead; n.stability -= 5;
+    n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói.`);
+    say(n.id, "famine", `Nạn đói ở ${n.name}: ${dead} người chết.`);
+  } else {
+    const surplus = (n.stock.food || 0) / Math.max(1, need);
+    if (surplus > 0) n.stability += 1;
+    if (surplus >= GROWTH_SURPLUS && n.population < housing(world, n)) {
+      n.population += Math.min(housing(world, n) - n.population, Math.max(1, Math.floor(n.population * GROWTH_RATE)));
+    }
+  }
+  let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
+  if (n.inventions.includes("P18")) spoil -= 0.05;
+  if (ownsWonder(world, n, "salt")) spoil *= 0.5;
+  spoil = Math.max(SPOILAGE.min, spoil);
+  L.stock(n, "food", -(n.stock.food || 0) * spoil, "spoil");
+  L.stock(n, "hide", -(n.stock.hide || 0) * SPOILAGE.hide, "spoil");
+
+  // Research (§5.5)
+  const rp = labor.research * YIELD.research * (1 + m.rp) * stabMult;
+  if (n.research) {
+    if (!inv(world, n.research.id) || n.inventions.includes(n.research.id)) n.research = null;
+    else {
+      n.research.progress += rp;
+      const cost = inventionCost(world, n, n.research.id);
+      if (n.research.progress >= cost) {
+        const v = inv(world, n.research.id)!;
+        n.inventions.push(v.id); n.research = null;
+        n.stability += 2 + (v.effects.stabilityOnce || 0);
+        const reg = world.registry[v.id];
+        if (!reg) { world.registry[v.id] = { by: [n.id], tick }; say(n.id, "invention", `${n.name} làm chủ ${v.name}, lần đầu tiên trên thế giới.`); }
+        else if (reg.tick === tick) { reg.by.push(n.id); say(n.id, "invention", `${n.name} cùng làm chủ ${v.name}.`); }
+        else say(n.id, "invention", `${n.name} làm chủ ${v.name}.`);
+        n.lastEvents.push(`Hoàn thành nghiên cứu ${v.name}.`);
+      }
+    }
+  }
+
+  // Stability (§4.4)
+  n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
+  if (ownsWonder(world, n, "spring")) n.stability += 2;
+  const over = owned.length - tileLimit(world, n);
+  if (over > 0) { const pen = Math.min(OVER_LIMIT_MAX, 2 * over); n.stability -= pen; n.lastEvents.push(`Vượt giới hạn quản lý ${over} ô: −${pen} ổn định (bỏ bớt ô bằng abandon_tile).`); }
+  if (n.silentStreak >= 3) n.stability -= 5;
+  n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
+  if (n.stability < 15 && n.population > 0) {
+    const leave = Math.max(1, Math.floor(n.population * 0.05));
+    n.population -= leave;
+    const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
+    if (dest) dest.population += leave;
+    n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
+  }
+  if (n.stability === 0) { n.riot = true; n.stability = 20; say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+}
+
 // ---------------------------------------------------------------- actions
 
 type Say = (nation: number | null, kind: string, text: string) => void;
+const ENGINE_ACTIONS = new Set(["research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement"]);
+/** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
+const OVER_LIMIT_MAX = 10;
+/** §7.6: an expedition walks up to 16 tiles out and back within one turn (10 years). */
+const EXPLORE_RANGE = 16;
 
 function doAction(world: World, n: Nation, type: string, a: Record<string, unknown>, L: Ledger,
   claims: Array<{ n: Nation; tile: number }>, explorers: Map<number, number>, say: Say): string | null {
@@ -565,32 +690,46 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
   switch (type) {
     case "research": {
       const id = String(a.invention ?? a.id ?? "");
-      const inv = INVENTION_BY_ID[id];
-      if (!inv) return `Không có phát minh "${id}" trong Sổ`;
-      if (n.inventions.includes(id)) return `Đã có ${inv.name}`;
-      const missing = inv.prereqs.filter(p => !n.inventions.includes(p));
-      if (missing.length) return `Thiếu tiên quyết: ${missing.map(p => INVENTION_BY_ID[p].name).join(", ")}`;
-      if (!envOk(world, n, id)) return `Lãnh thổ chưa có điều kiện vật chất cho ${inv.name}`;
+      const v = inv(world, id);
+      if (!v) return `Không có phát minh "${id}" trong Sổ`;
+      if (n.inventions.includes(id)) return `Đã có ${v.name}`;
+      const missing = v.prereqs.filter(p => !n.inventions.includes(p));
+      if (missing.length) return `Thiếu tiên quyết: ${missing.map(p => invName(world, p)).join(", ")}`;
+      if (!envOk(world, n, id)) return `Lãnh thổ chưa có điều kiện vật chất cho ${v.name}`;
       if (n.research?.id === id) return null;
       const kept = n.research ? n.research.progress * 0.5 : 0; // switching loses half (§5.5)
       if (n.research) n.lastEvents.push(`Đổi dự án nghiên cứu: giữ lại ${fmt(kept)} RP, mất một nửa.`);
       n.research = { id, progress: kept };
       return null;
     }
+    case "propose_invention": {
+      const check = checkProposal(world, n, a);
+      if (!check.ok) {
+        if (check.duplicateOf) {
+          const v = inv(world, check.duplicateOf)!;
+          if (!n.inventions.includes(v.id) && v.prereqs.every(p => n.inventions.includes(p)) && !n.research) { n.research = { id: v.id, progress: 0 }; n.lastEvents.push(`${v.name} đã có trong Sổ; chuyển thành dự án nghiên cứu ${v.id}.`); return null; }
+        }
+        return check.error;
+      }
+      const id = world.proposals.length + 1;
+      world.proposals.push({ id, tick: world.tick, status: "pending", ruling: null, inventionId: null, ...check.proposal });
+      say(n.id, "proposal", `${n.name} nộp đơn phát minh "${check.proposal.name}" (độ sâu ${check.proposal.depth}, ${check.proposal.power} điểm sức mạnh). Đơn chờ trọng tài.`);
+      return null;
+    }
     case "build": {
-      const def = BUILDING_BY_TYPE[String(a.building ?? "")];
-      if (!def) return `Không có công trình "${String(a.building)}". Có: ${BUILDINGS.map(b => b.type).join(", ")}`;
-      if (!n.inventions.includes(def.needs) && !m.unlocked.has(def.type)) return `Cần phát minh ${INVENTION_BY_ID[def.needs]?.name ?? def.needs}`;
+      const def = buildingOf(world, String(a.building ?? ""));
+      if (!def) return `Không có công trình "${String(a.building)}". Có: ${allBuildings(world).map(b => b.type).join(", ")}`;
+      if (!n.inventions.includes(def.needs) && !m.unlocked.has(def.type)) return `Cần phát minh ${invName(world, def.needs)}`;
       if (def.max && n.buildings.filter(b => b.type === def.type).length >= def.max) return `Tối đa ${def.max} ${def.name}`;
-      let tile = a.tile === undefined ? n.capital : parseTile(a.tile);
+      const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
       const t = world.tiles[tile];
       if (!t.land) return "Không xây được trên biển";
       if (def.perTile) {
-        if (n.buildings.some(b => b.tile === tile && BUILDING_BY_TYPE[b.type].perTile)) return "Ô này đã có công trình sản xuất";
+        if (n.buildings.some(b => b.tile === tile && buildingOf(world, b.type)?.perTile)) return "Ô này đã có công trình sản xuất";
         if (def.terrains && !(def.terrains.includes(t.terrain) || (def.river && t.river))) return `${def.name} cần ô ${def.terrains.join("/")}${def.river ? " hoặc ô có sông" : ""}`;
       }
-      for (const [k, q] of Object.entries(def.cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${RES_NAME[k] ?? k}`;
+      for (const [k, q] of Object.entries(def.cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)}`;
       for (const [k, q] of Object.entries(def.cost)) L.stock(n, k, -q, "build");
       n.buildings.push({ id: world.nextBuildingId++, type: def.type, tile, progress: 0, done: false, hp: 100 });
       return null;
@@ -607,6 +746,32 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       claims.push({ n, tile });
       return null;
     }
+    case "abandon_tile": {
+      const tile = parseTile(a.tile);
+      if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô không thuộc lãnh thổ của bạn";
+      if (centres(n).includes(tile)) return "Không bỏ được thủ đô hay điểm định cư";
+      world.tiles[tile].owner = -1;
+      n.buildings = n.buildings.filter(b => b.tile !== tile);
+      n.lastEvents.push(`Bỏ ô (${col(tile)}, ${row(tile)}).`);
+      return null;
+    }
+    case "found_settlement": {
+      if (!m.caps.has(SETTLEMENT.cap)) return "Cần năng lực tổ-chức (Hội đồng bộ lạc)";
+      const tile = parseTile(a.tile);
+      if (tile < 0) return "Cần tile [cột, hàng]";
+      const t = world.tiles[tile], name = String(a.name ?? "").trim().slice(0, 30);
+      if (name.length < 2) return "Đặt tên cho điểm định cư (2–30 ký tự)";
+      if (t.owner !== -1 || !t.land || t.terrain === "mountain") return "Phải là ô đất liền vô chủ, không phải núi";
+      if (centres(n).some(c => dist(c, tile) < SETTLEMENT.minDist)) return `Phải cách thủ đô và các điểm định cư khác ít nhất ${SETTLEMENT.minDist} ô`;
+      if (!ownedTiles(world, n.id).some(o => dist(o.i, tile) <= SETTLEMENT.maxDist)) return `Phải trong vòng ${SETTLEMENT.maxDist} ô từ lãnh thổ`;
+      if (n.population < SETTLEMENT.minPopulation) return `Cần ít nhất ${SETTLEMENT.minPopulation} dân`;
+      if ((n.stock.food || 0) < SETTLEMENT.food) return `Cần ${SETTLEMENT.food} lương thực`;
+      L.stock(n, "food", -SETTLEMENT.food, "settle");
+      for (const j of [tile, ...NEIGHBORS[tile]]) if (world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean") world.tiles[j].owner = n.id;
+      n.settlements.push({ tile, name, tick: world.tick });
+      say(n.id, "settle", `${n.name} lập điểm định cư ${name} tại (${col(tile)}, ${row(tile)}).`);
+      return null;
+    }
     case "explore": {
       const dir = String(a.direction ?? "").toUpperCase();
       if (!DIR_STEPS[dir]) return "Hướng phải là E, NE, NW, W, SW hoặc SE";
@@ -615,19 +780,28 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if ((explorers.get(n.id) || 0) + people > spare) return "Người thám hiểm được lấy từ nhóm hái lượm và người rảnh, nhưng không đủ người";
       explorers.set(n.id, (explorers.get(n.id) || 0) + people);
       const rand = rngFor(world.seed, world.tick, "explore", n.id, dir);
-      const seen = new Set(n.seen), canSail = m.caps.has("đi-nước");
-      let cur = n.capital, danger = false;
-      for (let s = 0; s < 8; s++) {
-        const nx = stepDir(cur, dir); if (nx < 0) break;
+      const seen = new Set(n.seen), canSail = m.move.has("shallow");
+      let cur = parseTile(a.from) >= 0 && world.tiles[parseTile(a.from)].owner === n.id ? parseTile(a.from) : n.capital, danger = false;
+      const passable = (i: number) => {
+        if (i < 0) return false;
+        const t = world.tiles[i];
+        if (!t.land && !(canSail && t.terrain === "shallow")) return false;
+        return !(t.terrain === "mountain" && !m.move.has("mountain"));
+      };
+      const DIRS = ["E", "NE", "NW", "W", "SW", "SE"], k0 = DIRS.indexOf(dir);
+      for (let s = 0; s < EXPLORE_RANGE; s++) {
+        // Walk the chosen way; skirt around water and mountains to either side
+        const tries = [0, 1, -1].map(o => stepDir(cur, DIRS[(k0 + o + 6) % 6])).filter(passable);
+        if (!tries.length) break;
+        const nx = tries[0];
         const t = world.tiles[nx];
-        if (!t.land && !(canSail && t.terrain === "shallow")) break;
-        if (t.terrain === "mountain" && !canSail) break;
         cur = nx;
         if (t.terrain === "jungle" || t.terrain === "mountain") danger = true;
         for (const j of within(cur, canSail ? 3 : 2)) seen.add(j);
         if (t.owner !== -1 && t.owner !== n.id) {
           const o = world.nations[t.owner];
-          if (o.alive && rand() < 0.3) { o.lastEvents.push(`Phát hiện người lạ của ${n.name} trong lãnh thổ.`); if (!o.met.includes(n.id)) o.met.push(n.id); }
+          const passage = treatiesBetween(world, n.id, o.id, ["passage", "alliance"]).length > 0;
+          if (o.alive && !passage && rand() < 0.3) { o.lastEvents.push(`Phát hiện người lạ của ${n.name} trong lãnh thổ (vi phạm biên giới).`); if (!o.met.includes(n.id)) o.met.push(n.id); }
         }
       }
       n.seen = [...seen].sort((x, y) => x - y);
@@ -674,7 +848,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
   return "Không có hành động này";
 }
 
-// ---------------------------------------------------------------- meetings & intel
+// ---------------------------------------------------------------- meetings & intel (§7.8)
 
 function updateMeetings(world: World, say: Say): void {
   for (const n of world.nations) {
@@ -691,8 +865,7 @@ function updateMeetings(world: World, say: Say): void {
 
 function sizeWord(pop: number): string { return pop < 30 ? "nhỏ" : pop < 80 ? "vừa" : "lớn"; }
 
-function updateIntel(world: World, tick: number, say: Say): void {
-  // Spies first: detection, then reports
+function updateIntel(world: World, tick: number): void {
   for (const s of world.spies) {
     if (!s.active) continue;
     const owner = world.nations[s.owner], target = world.nations[s.target];
@@ -704,9 +877,8 @@ function updateIntel(world: World, tick: number, say: Say): void {
       if (r() < 0.5) {
         owner.reputation = Math.max(0, owner.reputation - SPY.reputationLoss);
         target.casusBelli[String(owner.id)] = tick + SPY.casusBelliTicks;
-        target.lastEvents.push(`Bắt được gián điệp của ${owner.name}. Có thể tuyên chiến với họ mà không mất uy tín trong ${SPY.casusBelliTicks} lượt.`);
+        target.lastEvents.push(`Bắt được gián điệp của ${owner.name}. Có thể tuyên chiến với họ có chính nghĩa trong ${SPY.casusBelliTicks} lượt.`);
         owner.lastEvents.push(`Gián điệp ở ${target.name} bị bắt và khai ra nguồn gốc. Uy tín −${SPY.reputationLoss}.`);
-        say(target.id, "spy", `${target.name} bắt được gián điệp của ${owner.name}.`);
       } else {
         target.lastEvents.push("Bắt được một gián điệp, không rõ của nước nào.");
         owner.lastEvents.push(`Mất liên lạc với gián điệp ở ${target.name}.`);
@@ -717,46 +889,47 @@ function updateIntel(world: World, tick: number, say: Say): void {
     if (!a.alive) continue;
     const caps = mods(world, a).caps, noise = caps.has("đếm") ? 0.5 : 1, sight = new Set(a.seen);
     for (const b of world.nations) {
-      if (b.id === a.id || !b.alive) continue;
+      if (b.id === a.id || !b.alive || !a.met.includes(b.id)) continue;
       const key = String(b.id), prev = a.intel[key];
-      if (!a.met.includes(b.id)) continue;
       const bTiles = ownedTiles(world, b.id), visible = bTiles.filter(t => sight.has(t.i));
       const spy = world.spies.some(s => s.active && s.owner === a.id && s.target === b.id);
+      const allied = treatiesBetween(world, a.id, b.id, ["alliance"]).length > 0;
+      const friendly = treatiesBetween(world, a.id, b.id).length > 0 || (a.trades[key] || 0) >= 5;
       let level = 1;
-      if (visible.length) level = 2;
-      if (spy) level = 4;
+      if (visible.length || (a.trades[key] || 0) >= 1) level = 2;
+      if (friendly) level = 3;
+      if (spy || allied) level = 4;
       const contact = level >= 2;
-      // Without writing, knowledge fades one level per 10 ticks without contact
       if (!contact && prev && prev.level > 1) {
-        const fadeTicks = caps.has("ghi-chép") ? Infinity : INTEL_DECAY_TICKS;
-        const lvl = Math.max(1, prev.level - Math.floor((tick - prev.lastContact) / fadeTicks));
-        a.intel[key] = { ...prev, level: lvl };
+        const fade = caps.has("ghi-chép") ? Infinity : INTEL_DECAY_TICKS;
+        a.intel[key] = { ...prev, level: Math.max(1, prev.level - Math.floor((tick - prev.lastContact) / fade)) };
         continue;
       }
       const r = rngFor(world.seed, tick, "intel", a.id, b.id);
       const est = (x: number, e: number) => Math.max(0, Math.round(x * (1 + (r() * 2 - 1) * e * noise)));
-      const report: Record<string, unknown> = {
-        name: b.name, flag: b.flag, people: b.people, capital: b.capitalName,
-        size: sizeWord(b.population), tiles_seen: visible.map(t => [col(t.i), row(t.i)]),
-      };
+      const report: Record<string, unknown> = { name: b.name, flag: b.flag, people: b.people, capital: b.capitalName, size: sizeWord(b.population), tiles_seen: visible.map(t => [col(t.i), row(t.i)]) };
       if (level >= 2) {
-        report.population_est = est(b.population, 0.3);
+        report.population_est = est(b.population, level >= 3 ? 0.1 : 0.3);
         report.tiles_count = bTiles.length;
         report.era = b.era;
-        report.buildings_seen = b.buildings.filter(x => x.done && sight.has(x.tile)).map(x => BUILDING_BY_TYPE[x.type].name);
-        report.warriors_est = est(b.labor.warrior, 0.4);
+        report.buildings_seen = b.buildings.filter(x => x.done && sight.has(x.tile)).map(x => buildingOf(world, x.type)?.name ?? x.type);
+        report.warriors_est = est(b.labor.warrior, level >= 3 ? 0.2 : 0.4);
+      }
+      if (level >= 3) {
+        report.visible_inventions = b.inventions.filter(id => { const v = inv(world, id); return v && ((v.effects.unlocks?.length ?? 0) > 0 || (v.effects.combat ?? 0) > 0); }).map(id => invName(world, id));
       }
       if (level >= 4) {
         report.population = b.population;
         report.warriors = b.labor.warrior;
         report.stock = Object.fromEntries(Object.entries(b.stock).filter(([, v]) => v >= 1).map(([k, v]) => [k, Math.floor(v)]));
-        report.inventions = b.inventions.map(id => INVENTION_BY_ID[id]?.name ?? id);
-        report.researching = b.research ? INVENTION_BY_ID[b.research.id]?.name : null;
+        report.inventions = b.inventions.map(id => invName(world, id));
+        report.researching = b.research ? invName(world, b.research.id) : null;
         report.stability = b.stability;
+        report.pending_proposal = world.proposals.find(p => p.nation === b.id && p.status === "pending")?.name ?? null;
       }
       a.intel[key] = { level, lastContact: contact ? tick : (prev?.lastContact ?? tick), asOf: tick, report };
     }
   }
 }
 
-export { NEIGHBORS, N };
+export { depthOf, activeWar };

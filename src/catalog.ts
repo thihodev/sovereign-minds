@@ -1,0 +1,264 @@
+// One place to look up inventions, recipes, buildings and goods, whether they
+// come from the seed tree or were invented by the nations themselves (§5).
+// Also: the open-invention rules — effect catalogue, power budget, depth, cost.
+
+import {
+  BUILDINGS, BUILDING_BY_TYPE, GOOD_VALUE, INVENTIONS, INVENTION_BY_ID, RECIPES, RECIPE_BY_ID, RES_NAME, TERRAIN,
+  type BuildingDef, type Invention, type Recipe,
+} from "./rules.ts";
+import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
+
+// ---------------------------------------------------------------- lookups
+
+export function inv(world: World, id: string): Invention | undefined { return INVENTION_BY_ID[id] ?? world.custom.inventions[id]; }
+export function allInventions(world: World): Invention[] { return [...INVENTIONS, ...Object.values(world.custom.inventions)]; }
+export function recipeOf(world: World, id: string): Recipe | undefined { return RECIPE_BY_ID[id] ?? world.custom.recipes[id]; }
+export function allRecipes(world: World): Recipe[] { return [...RECIPES, ...Object.values(world.custom.recipes)]; }
+export function buildingOf(world: World, type: string): BuildingDef | undefined { return BUILDING_BY_TYPE[type] ?? world.custom.buildings[type]; }
+export function allBuildings(world: World): BuildingDef[] { return [...BUILDINGS, ...Object.values(world.custom.buildings)]; }
+export function invName(world: World, id: string): string { return inv(world, id)?.name ?? id; }
+export function goodValue(world: World, key: string): number { return GOOD_VALUE[key] ?? world.custom.goods[key]?.value ?? 1; }
+export function goodName(world: World, key: string): string { return RES_NAME[key] ?? world.custom.goods[key]?.name ?? key; }
+export function knownGood(world: World, key: string): boolean { return key in GOOD_VALUE || key in world.custom.goods; }
+
+/** Old saves gain the fields added after v0.1. */
+export function migrate(world: World): World {
+  world.custom ??= { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 };
+  world.proposals ??= [];
+  world.petitions ??= [];
+  world.decrees ??= [];
+  world.spies ??= [];
+  world.nextSpyId ??= 1;
+  world.treaties ??= []; world.treatyOffers ??= []; world.tradeOffers ??= []; world.caravans ??= [];
+  world.wars ??= []; world.battles ??= []; world.nextId ??= 1; world.cutoff ??= {}; world.eraGates ??= {};
+  for (const n of world.nations) {
+    n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];
+    n.labor.mine ??= 0;
+  }
+  return world;
+}
+
+const depthMemo = new WeakMap<World, Map<string, number>>();
+export function depthOf(world: World, id: string): number {
+  let memo = depthMemo.get(world); if (!memo) { memo = new Map(); depthMemo.set(world, memo); }
+  if (memo.has(id)) return memo.get(id)!;
+  const v = inv(world, id); if (!v) return 0;
+  if (v.custom) { memo.set(id, v.custom.depth); return v.custom.depth; }
+  const d = v.prereqs.length ? 1 + Math.max(...v.prereqs.map(p => depthOf(world, p))) : 0;
+  memo.set(id, d); return d;
+}
+
+/** §5.3: RP = 15 × 1.4^d × (1 + power/10), rounded up to a multiple of 5. */
+export function costFor(depth: number, power: number): number {
+  return Math.ceil(15 * Math.pow(1.4, depth) * (1 + power / 10) / 5) * 5;
+}
+export const budgetFor = (depth: number) => 4 + 2 * depth;
+
+// ---------------------------------------------------------------- effect catalogue (§5.3)
+
+export const EFFECT_KINDS: Record<string, string> = {
+  role_bonus: '{"kind":"role_bonus","role":"hunt|gather|fish|farm|wood|stone|flint|clay|mine|craft|build|research|warrior|extract","percent":10|20|30} — 2 points per 10%',
+  spoilage: '{"kind":"spoilage","percent":10|20|30} — food spoils that much less; 1 point per 10%',
+  recipe: '{"kind":"recipe","id":"slug","name":"…","input":{"good":qty},"output_qty":1-3,"work":1-3,"at":"workshop|kiln|<your building id>","tool":{"role":"…","percent":10-30,"per":1-4}?} — a NEW good made from goods that exist; 3 points (+2 per 10% if it is a tool)',
+  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3',
+  stability: '{"kind":"stability","per_tick":1|2} — 4 points each',
+  ap: '{"kind":"ap","amount":1} — 5 points',
+  combat: '{"kind":"combat","percent":10|20|30} — 3 points per 10%',
+  move: '{"kind":"move","terrain":"shallow|mountain|swamp|jungle"} — that terrain becomes passable for explorers/armies; 4 points',
+  reveal: '{"kind":"reveal","resource":"copper|tin|iron"} — that hidden ore becomes visible; 4 points',
+  research: '{"kind":"research","percent":10|20} — RP +; 3 points per 10%',
+  tile_limit: '{"kind":"tile_limit","amount":1|2} — 2 points each',
+};
+const SLUG = /^[a-z][a-z0-9_]{1,23}$/;
+const CAP = /^[\p{Ll}0-9][\p{Ll}0-9-]{1,23}$/u;
+const pct = (v: unknown, allowed: number[]) => { const x = Math.round(Number(v)); return allowed.includes(x) ? x : NaN; };
+
+export interface ParsedEffects { effects: Invention["effects"]; recipes: Recipe[]; buildings: BuildingDef[]; goods: Record<string, { name: string; value: number }>; power: number; errors: string[] }
+
+/** Turn the AI's effect list into engine effects, pricing each one. */
+export function parseEffects(world: World, raw: Array<Record<string, unknown>>, ownedRecipesAt: (at: string) => boolean): ParsedEffects {
+  const out: ParsedEffects = { effects: {}, recipes: [], buildings: [], goods: {}, power: 0, errors: [] };
+  const E = out.effects, err = (s: string) => out.errors.push(s);
+  const newBuildingIds = new Set<string>();
+  for (const e of raw) if (e?.kind === "building" && typeof e.id === "string") newBuildingIds.add(e.id);
+  for (const [i, e] of raw.entries()) {
+    const kind = String(e?.kind ?? "");
+    const at = `hiệu ứng ${i + 1} (${kind || "?"})`;
+    switch (kind) {
+      case "role_bonus": {
+        const role = String(e.role), p = pct(e.percent, [10, 20, 30]);
+        if (![...ROLES, "extract", "mine"].includes(role)) { err(`${at}: vai "${role}" không tồn tại`); break; }
+        if (Number.isNaN(p)) { err(`${at}: percent phải là 10, 20 hoặc 30`); break; }
+        E.role = { ...(E.role || {}), [role]: ((E.role as Record<string, number> | undefined)?.[role] || 0) + p / 100 };
+        out.power += 2 * p / 10; break;
+      }
+      case "spoilage": {
+        const p = pct(e.percent, [10, 20, 30]); if (Number.isNaN(p)) { err(`${at}: percent phải là 10, 20 hoặc 30`); break; }
+        E.spoilageCut = (E.spoilageCut || 0) + p / 100 * 0.3; out.power += p / 10; break;
+      }
+      case "recipe": {
+        const id = String(e.id ?? ""), name = String(e.name ?? "").trim().slice(0, 40);
+        if (!SLUG.test(id)) { err(`${at}: id phải là slug chữ thường, ví dụ "charcoal"`); break; }
+        if (knownGood(world, id) || recipeOf(world, id) || out.goods[id]) { err(`${at}: "${id}" đã tồn tại; đặt id khác`); break; }
+        if (!name) { err(`${at}: thiếu tên`); break; }
+        const input: Record<string, number> = {};
+        for (const [k, q] of Object.entries((e.input ?? {}) as Record<string, unknown>)) {
+          const qty = Math.round(Number(q));
+          if (!knownGood(world, k) && !out.goods[k]) { err(`${at}: nguyên liệu "${k}" không tồn tại`); continue; }
+          if (!(qty >= 1 && qty <= 10)) { err(`${at}: số lượng "${k}" phải 1–10`); continue; }
+          input[k] = qty;
+        }
+        if (!Object.keys(input).length) { err(`${at}: cần ít nhất một nguyên liệu có thật (không có gì sinh ra từ hư không)`); break; }
+        const qty = Math.max(1, Math.min(3, Math.round(Number(e.output_qty ?? 1)))), work = Math.max(1, Math.min(3, Math.round(Number(e.work ?? 1))));
+        const where = String(e.at ?? "workshop");
+        if (!["workshop", "kiln"].includes(where) && !newBuildingIds.has(where) && !buildingOf(world, where) && !ownedRecipesAt(where)) { err(`${at}: nơi làm "${where}" không tồn tại`); break; }
+        // §6.2: the output is worth exactly what went in plus labour
+        const value = Math.round((Object.entries(input).reduce((s, [k, q]) => s + goodValue(world, k) * q, 0) + work) / qty * 100) / 100;
+        const r: Recipe = { id, name, needs: "", input, output: { [id]: qty }, work, building: where };
+        out.power += 3;
+        if (e.tool && typeof e.tool === "object") {
+          const t = e.tool as Record<string, unknown>, role = String(t.role), p = pct(t.percent, [10, 20, 30]), per = Math.max(1, Math.min(4, Math.round(Number(t.per ?? 1))));
+          if (![...ROLES, "mine"].includes(role) || Number.isNaN(p)) err(`${at}: tool cần role hợp lệ và percent 10/20/30`);
+          else { r.use = { role, bonus: p / 100, per }; out.power += 2 * p / 10; }
+        }
+        out.recipes.push(r); out.goods[id] = { name, value }; break;
+      }
+      case "building": {
+        const id = String(e.id ?? ""), name = String(e.name ?? "").trim().slice(0, 40);
+        if (!SLUG.test(id)) { err(`${at}: id phải là slug chữ thường`); break; }
+        if (buildingOf(world, id)) { err(`${at}: công trình "${id}" đã tồn tại`); break; }
+        if (!name) { err(`${at}: thiếu tên`); break; }
+        const cost: Record<string, number> = {};
+        for (const [k, q] of Object.entries((e.cost ?? {}) as Record<string, unknown>)) {
+          const qty = Math.round(Number(q));
+          if (!knownGood(world, k) && !out.goods[k]) { err(`${at}: vật liệu "${k}" không tồn tại`); continue; }
+          if (qty >= 1 && qty <= 40) cost[k] = qty;
+        }
+        const work = Math.max(3, Math.min(12, Math.round(Number(e.work ?? 6))));
+        const f = (e.effect ?? {}) as Record<string, unknown>, n = (k: string, max: number) => Math.max(0, Math.min(max, Math.round(Number(f[k] ?? 0))));
+        const effect = { housing: n("housing", 15), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4), defense: n("defense", 40) / 100, farmSlots: n("farm_slots", 6), farmFood: n("farm_food", 2) };
+        if (effect.farmSlots && !effect.farmFood) effect.farmSlots = 0;
+        out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0);
+        if (!Object.keys(cost).length && !effect.farmSlots) { err(`${at}: công trình phải tốn ít nhất một vật liệu`); break; }
+        out.buildings.push({ type: id, name, needs: "", cost, work, desc: describeBuilding(effect), effect }); break;
+      }
+      case "stability": { const k = pct(e.per_tick, [1, 2]); if (Number.isNaN(k)) { err(`${at}: per_tick 1 hoặc 2`); break; } E.stabilityPerTick = (E.stabilityPerTick || 0) + k; out.power += 4 * k; break; }
+      case "ap": { E.ap = 1; out.power += 5; break; }
+      case "combat": { const p = pct(e.percent, [10, 20, 30]); if (Number.isNaN(p)) { err(`${at}: percent 10/20/30`); break; } E.combat = (E.combat || 0) + p / 100; out.power += 3 * p / 10; break; }
+      case "move": { const t = String(e.terrain); if (!["shallow", "mountain", "swamp", "jungle"].includes(t)) { err(`${at}: terrain không hợp lệ`); break; } E.move = [...(E.move || []), t]; out.power += 4; break; }
+      case "reveal": { const r = String(e.resource); if (!["copper", "tin", "iron"].includes(r)) { err(`${at}: resource phải là copper, tin hoặc iron`); break; } E.reveal = [...(E.reveal || []), r]; out.power += 4; break; }
+      case "research": { const p = pct(e.percent, [10, 20]); if (Number.isNaN(p)) { err(`${at}: percent 10 hoặc 20`); break; } E.rp = (E.rp || 0) + p / 100; out.power += 3 * p / 10; break; }
+      case "tile_limit": { const k = pct(e.amount, [1, 2]); if (Number.isNaN(k)) { err(`${at}: amount 1 hoặc 2`); break; } E.tiles = (E.tiles || 0) + k; out.power += 2 * k; break; }
+      default: err(`${at}: loại hiệu ứng không có. Có: ${Object.keys(EFFECT_KINDS).join(", ")}`);
+    }
+  }
+  const unlocks = [...out.recipes.map(r => r.id), ...out.buildings.map(b => b.type)];
+  if (unlocks.length) E.unlocks = unlocks;
+  return out;
+}
+
+export function describeBuilding(e: BuildingDef["effect"]): string {
+  const p: string[] = [];
+  if (e.housing) p.push(`+${e.housing} chỗ ở`);
+  if (e.stability) p.push(`+${e.stability} ổn định/lượt`);
+  if (e.spoilage) p.push(`hư hỏng −${Math.round(e.spoilage * 100)}%`);
+  if (e.craftSlots) p.push(`${e.craftSlots} chỗ chế tác`);
+  if (e.defense) p.push(`phòng thủ +${Math.round(e.defense * 100)}%`);
+  if (e.farmSlots) p.push(`${e.farmSlots} người × ${e.farmFood} lương thực`);
+  return p.join(", ") || "không có tác dụng";
+}
+
+export function describeEffects(world: World, e: Invention["effects"]): string {
+  const p: string[] = [];
+  for (const [r, v] of Object.entries(e.role || {})) p.push(`${r} +${Math.round((v || 0) * 100)}%`);
+  if (e.spoilageCut) p.push(`hư hỏng −${Math.round(e.spoilageCut * 100)} điểm %`);
+  if (e.stabilityPerTick) p.push(`+${e.stabilityPerTick} ổn định/lượt`);
+  if (e.ap) p.push(`+${e.ap} AP`);
+  if (e.combat) p.push(`chiến đấu +${Math.round(e.combat * 100)}%`);
+  if (e.move?.length) p.push(`đi được: ${e.move.map(t => TERRAIN[t as keyof typeof TERRAIN]?.name ?? t).join(", ")}`);
+  if (e.reveal?.length) p.push(`thấy: ${e.reveal.map(r => RES_NAME[r] ?? r).join(", ")}`);
+  if (e.rp) p.push(`RP +${Math.round(e.rp * 100)}%`);
+  if (e.tiles) p.push(`+${e.tiles} ô quản lý`);
+  for (const u of e.unlocks || []) { const r = recipeOf(world, u), b = buildingOf(world, u); if (r) p.push(`công thức ${r.name}`); if (b) p.push(`công trình ${b.name}`); }
+  return p.join("; ");
+}
+
+// ---------------------------------------------------------------- proposals
+
+export function normInv(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function tokens(s: string): Set<string> { return new Set(normInv(s).split(" ").filter(w => w.length > 1)); }
+/** Existing inventions whose name or description looks like this one. */
+export function similarInventions(world: World, name: string, description: string, limit = 6): Invention[] {
+  const a = tokens(`${name} ${description}`);
+  return allInventions(world).map(v => {
+    const b = tokens(`${v.name} ${v.desc} ${v.custom?.description ?? ""}`);
+    const inter = [...a].filter(x => b.has(x)).length;
+    return { v, score: inter / Math.max(1, Math.min(a.size, b.size)) };
+  }).filter(x => x.score > 0.2).sort((x, y) => y.score - x.score || x.v.id.localeCompare(y.v.id)).slice(0, limit).map(x => x.v);
+}
+
+export type ProposalCheck = { ok: true; proposal: Omit<Proposal, "id" | "tick" | "status" | "ruling" | "inventionId"> } | { ok: false; error: string; duplicateOf?: string };
+
+export function checkProposal(world: World, n: Nation, a: Record<string, unknown>): ProposalCheck {
+  const name = String(a.name ?? "").trim(), description = String(a.description ?? "").trim();
+  if (name.length < 3 || name.length > 40) return { ok: false, error: "Tên phát minh 3–40 ký tự" };
+  if (!description || description.length > 300) return { ok: false, error: "Mô tả 1–300 ký tự: nó là gì, làm ra sao" };
+  const same = allInventions(world).find(v => normInv(v.name) === normInv(name));
+  if (same) return { ok: false, error: `"${name}" đã có trong Sổ (${same.id})`, duplicateOf: same.id };
+  if (world.proposals.some(p => p.nation === n.id && p.status === "pending")) return { ok: false, error: "Đã có một đơn đang chờ trọng tài" };
+  const lastRejected = world.proposals.filter(p => p.nation === n.id && p.status === "rejected" && normInv(p.name) === normInv(name)).at(-1);
+  if (lastRejected && world.tick - lastRejected.tick < 3) return { ok: false, error: "Đơn cùng ý tưởng chỉ được nộp lại sau 3 lượt" };
+  const prereqs = Array.isArray(a.prereqs) ? [...new Set(a.prereqs.map(String))] : [];
+  if (prereqs.length < 1 || prereqs.length > 4) return { ok: false, error: "Cần 1–4 tiên quyết (id phát minh bạn đã có)" };
+  const missing = prereqs.filter(p => !n.inventions.includes(p));
+  if (missing.length) return { ok: false, error: `Bạn chưa có tiên quyết: ${missing.join(", ")}` };
+  const caps = Array.isArray(a.capabilities) ? [...new Set(a.capabilities.map(c => String(c).trim().toLowerCase()))] : [];
+  if (caps.length > 2) return { ok: false, error: "Tối đa 2 năng lực mới" };
+  for (const c of caps) if (!CAP.test(c)) return { ok: false, error: `Năng lực "${c}" phải là chữ thường nối bằng gạch ngang, ví dụ "nhiệt-cao"` };
+  let requires: Proposal["requires"] = null;
+  if (a.requires && typeof a.requires === "object") {
+    const r = a.requires as Record<string, unknown>;
+    if (r.resource) { if (!(String(r.resource) in RES_NAME)) return { ok: false, error: `Tài nguyên "${r.resource}" không tồn tại` }; requires = { res: String(r.resource) }; }
+    else if (r.terrain) { if (!(String(r.terrain) in TERRAIN)) return { ok: false, error: `Địa hình "${r.terrain}" không tồn tại` }; requires = { terrain: String(r.terrain) }; }
+  }
+  const effects = Array.isArray(a.effects) ? a.effects.filter(e => e && typeof e === "object").slice(0, 6) as Array<Record<string, unknown>> : [];
+  const ownBuildings = new Set(n.buildings.map(b => b.type));
+  const parsed = parseEffects(world, effects, at => ownBuildings.has(at));
+  if (parsed.errors.length) return { ok: false, error: parsed.errors.slice(0, 3).join("; ") };
+  const power = parsed.power + caps.length * 3;
+  if (power <= 0) return { ok: false, error: "Phát minh phải có ít nhất một hiệu ứng hoặc một năng lực mới" };
+  const depth = 1 + Math.max(...prereqs.map(p => depthOf(world, p)));
+  if (power > budgetFor(depth)) return { ok: false, error: `Tổng điểm sức mạnh ${power} vượt ngân sách ${budgetFor(depth)} của độ sâu ${depth} (4 + 2d)` };
+  return { ok: true, proposal: { nation: n.id, name, description, prereqs, requires, caps, effects, depth, power } };
+}
+
+/** Apply the judge's ruling (§5.4). Returns the new invention id, or null. */
+export function applyRuling(world: World, p: Proposal, r: Ruling): string | null {
+  p.ruling = r;
+  if (r.duplicate_of && inv(world, r.duplicate_of)) { p.status = "duplicate"; p.inventionId = r.duplicate_of; return null; }
+  // Amendments: extra prerequisites, fewer effects, fewer capabilities
+  const extra = (r.add_prereqs || []).filter(x => inv(world, x) && !p.prereqs.includes(x)).slice(0, 2);
+  const effects = p.effects.filter((_, i) => !(r.remove_effects || []).includes(i));
+  const caps = p.caps.filter(c => !(r.remove_capabilities || []).includes(c));
+  const score = r.causality + r.material + r.physics;
+  if (score < 4 || r.physics === 0) { p.status = "rejected"; return null; }
+  const parsed = parseEffects(world, effects, () => true);
+  if (parsed.errors.length) { p.status = "rejected"; p.ruling = { ...r, reason: `${r.reason} (sau sửa đổi không hợp lệ: ${parsed.errors[0]})` }; return null; }
+  const prereqs = [...p.prereqs, ...extra];
+  const depth = 1 + Math.max(...prereqs.map(x => depthOf(world, x)));
+  const power = parsed.power + caps.length * 3;
+  const id = `X${world.custom.next++}`;
+  for (const rc of parsed.recipes) { rc.needs = id; world.custom.recipes[rc.id] = rc; }
+  for (const b of parsed.buildings) { b.needs = id; world.custom.buildings[b.type] = b; }
+  for (const [k, g] of Object.entries(parsed.goods)) world.custom.goods[k] = { ...g, by: p.nation };
+  const env: Invention["env"] = p.requires?.res ? { res: p.requires.res as never } : p.requires?.terrain ? { terrains: [p.requires.terrain as never] } : undefined;
+  world.custom.inventions[id] = {
+    id, name: p.name, prereqs, rp: costFor(depth, power), caps, env, effects: parsed.effects,
+    desc: describeEffects(world, parsed.effects) || p.description.slice(0, 120),
+    custom: { by: p.nation, tick: world.tick, depth, power, description: p.description, judge: r.judge },
+  };
+  p.status = "approved"; p.inventionId = id; p.depth = depth; p.power = power;
+  return id;
+}

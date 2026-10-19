@@ -31,6 +31,9 @@ export const PROVIDERS: Record<string, ProviderDef> = {
 };
 
 export function providerKey(p: ProviderDef): string { return (process.env[p.keyEnv] || "").trim(); }
+/** The judge may use a different model than the nation on the same provider. */
+export const JUDGE_DEFAULT_MODEL: Record<string, string> = { groq: "openai/gpt-oss-120b" };
+export function judgeModel(p: ProviderDef): string { return (process.env[`JUDGE_MODEL_${p.id.toUpperCase()}`] || JUDGE_DEFAULT_MODEL[p.id] || providerModel(p)).trim(); }
 export function providerModel(p: ProviderDef): string { return (process.env[p.modelEnv] || p.defaultModel).trim(); }
 
 export type CallResult =
@@ -63,14 +66,14 @@ export function parseRetryAfter(headers: Record<string, string>, body: string, n
 
 const QUOTA_WORDS = /quota|rate.?limit|too many requests|resource_exhausted|exceeded|insufficient_quota|limit reached|tokens per (day|minute)|requests per (day|minute)/i;
 
-export async function callModel(p: ProviderDef, system: string, user: string, opts: { timeoutMs: number; maxTokens?: number }): Promise<CallResult> {
+export async function callModel(p: ProviderDef, system: string, user: string, opts: { timeoutMs: number; maxTokens?: number; model?: string; temperature?: number }): Promise<CallResult> {
   const key = providerKey(p), started = Date.now();
   if (!key) return { ok: false, kind: "auth", message: `Thiếu ${p.keyEnv}`, retryAfterSec: null, latencyMs: 0, headers: {} };
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), opts.timeoutMs);
   const body: Record<string, unknown> = {
-    model: providerModel(p),
+    model: opts.model || providerModel(p),
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
-    temperature: 0.7,
+    temperature: opts.temperature ?? 0.7,
     max_tokens: opts.maxTokens ?? 2000,
   };
   if (p.json) body.response_format = { type: "json_object" };

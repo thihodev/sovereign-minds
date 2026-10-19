@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.1";
+export const RULES_VERSION = "0.2";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -73,16 +73,47 @@ export function apFor(population: number, bonus: number): number {
   return Math.min(12, 3 + Math.floor(population / 50) + bonus);
 }
 export const AP_COST: Record<string, number> = {
-  found_nation: 0, build: 1, repair: 1, research: 1, explore: 1, claim_tile: 2, plant_spy: 2, petition: 1,
+  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, plant_spy: 2, petition: 1,
+  propose_invention: 2, found_settlement: 3,
+  message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
+  declare_war: 2, declare_independence: 2, attack: 1, raid: 1,
 };
 // §10.5 Petitions
 export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
 // Actions written in the rulebook that this engine version does not run yet.
 export const NOT_YET: Record<string, string> = {
-  propose_invention: "§5.4", found_settlement: "§2.3", message: "§7.2", trade_offer: "§7.3", accept_trade: "§7.3",
-  treaty: "§7.2", break_treaty: "§7.2", declare_war: "§7.4", move_army: "§7.4", attack: "§7.4", raid: "§7.4",
-  declare_independence: "§7.7", rename_nation: "§2.2", sabotage: "§7.8", steal_tech: "§7.8", incite: "§7.8",
+  rename_nation: "§2.2", sabotage: "§7.8", steal_tech: "§7.8", incite: "§7.8", move_army: "§7.4 (dùng attack/raid)",
 };
+
+// §7.2 Diplomacy. Before a shared language, only these gestures can be sent.
+export const GESTURES = [
+  "chào hỏi", "tặng quà", "muốn trao đổi", "muốn hòa bình", "cảm ơn", "đồng ý", "từ chối", "cảnh cáo", "đe dọa",
+  "hãy rời khỏi lãnh thổ", "xin giúp đỡ", "chúng tôi đói", "chúng tôi mạnh", "cùng đi săn", "kết đồng minh",
+  "rút lui", "đầu hàng", "tha thứ", "chúng tôi theo dõi các người", "tạm biệt",
+];
+export const SHARED_LANGUAGE_TRADES = 10;
+export const MESSAGE_MAX = 500;
+/** Text that tries to pass as a system instruction is blocked (§8.5). */
+export const INJECTION = /(^|\s)(system|hệ thống|developer|assistant)\s*:|ignore (all|previous|the)|bỏ qua (mọi |các |toàn bộ )?(luật|hướng dẫn|chỉ dẫn)|"type"\s*:\s*"|<\/?(system|instructions?)>|you are now|từ giờ bạn là/i;
+export const TREATY_TYPES = ["non_aggression", "passage", "alliance", "peace", "tribute", "vassal"] as const;
+export const TREATY_NAME: Record<string, string> = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
+export const TREATY = { offerTicks: 2, minDuration: 5, maxDuration: 200, maxTributePerGood: 50, maxCede: 3, keepBonus: 5, breakPenalty: 20, violationPenalty: 10, injectionPenalty: 15 };
+
+// §7.3 Trade
+export const TRADE = { offerTicks: 2, maxQty: 500, nearDistance: 3, caravanSpeed: 8 };
+
+// §7.4 War
+export const WAR = {
+  reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.2,
+  raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
+  weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10,
+};
+
+// §2.3 Settlements
+export const SETTLEMENT = { cap: "tổ-chức", people: 10, minPopulation: 30, food: 20, minDist: 4, maxDist: 10, housing: 15, cutoffTicks: 5 };
+
+// §5.6 Era gates
+export const BRONZE_CAPS = ["nhiệt-cao", "nhận-biết-khoáng", "chứa", "luyện-đồng"];
 
 // §2.3 Territory
 export const TILE_LIMIT_BASE = 7;
@@ -102,12 +133,19 @@ export interface Invention {
     ap?: number;
     tiles?: number;
     stabilityOnce?: number;
+    stabilityPerTick?: number;
     rp?: number;
     spoilage?: number; // new base food spoilage
+    spoilageCut?: number; // subtract from spoilage (open inventions)
     winter?: number; // damage multiplier
+    combat?: number; // +share to attack and defence
+    move?: string[]; // terrains that become passable
+    reveal?: string[]; // hidden resources that become visible
     unlocks?: string[]; // buildings or recipes
   };
   desc: string;
+  /** Open inventions only (§5): who proposed it, when, depth and power points. */
+  custom?: { by: number; tick: number; depth: number; power: number; description: string; judge: string };
 }
 
 export const INVENTIONS: Invention[] = [
@@ -137,24 +175,28 @@ export const INVENTIONS: Invention[] = [
 export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INVENTIONS.map(v => [v.id, v]));
 
 // §6.1 Buildings
+export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
+  effect: BuildingEffect;
 }
 export const BUILDINGS: BuildingDef[] = [
-  { type: "workshop", name: "Bãi chế tác", needs: "stone_tools", cost: { stone: 5 }, work: 4, desc: "Cho 4 thợ chế tác làm việc." },
-  { type: "pit", name: "Hố trữ", needs: "stone_tools", cost: { stone: 5 }, work: 3, max: 2, desc: "Hư lương thực −5%." },
-  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở." },
-  { type: "altar", name: "Bàn thờ", needs: "P5", cost: { stone: 10 }, work: 6, max: 1, desc: "+1 ổn định mỗi lượt." },
-  { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%." },
-  { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực." },
-  { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực." },
-  { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác." },
+  { type: "workshop", name: "Bãi chế tác", needs: "stone_tools", cost: { stone: 5 }, work: 4, desc: "Cho 4 thợ chế tác làm việc.", effect: { craftSlots: 4 } },
+  { type: "pit", name: "Hố trữ", needs: "stone_tools", cost: { stone: 5 }, work: 3, max: 2, desc: "Hư lương thực −5%.", effect: { spoilage: 0.05 } },
+  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở.", effect: { housing: 10 } },
+  { type: "altar", name: "Bàn thờ", needs: "P5", cost: { stone: 10 }, work: 6, max: 1, desc: "+1 ổn định mỗi lượt.", effect: { stability: 1 } },
+  { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%.", effect: { defense: 0.4 } },
+  { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
+  { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực.", effect: { farmSlots: 2, farmFood: 2 } },
+  { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác.", effect: { craftSlots: 4 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
 
 // §6.2 Recipes
-export interface Recipe { id: string; name: string; needs: string; input: Record<string, number>; output: Record<string, number>; work: number; building: "workshop" | "kiln" }
+/** A tool: each unit equips `per` workers of `role` for `bonus` extra output. */
+export interface ToolUse { role: string; bonus: number; per: number }
+export interface Recipe { id: string; name: string; needs: string; input: Record<string, number>; output: Record<string, number>; work: number; building: string; use?: ToolUse }
 export const RECIPES: Recipe[] = [
   { id: "stone_tool", name: "Công cụ đá thô", needs: "stone_tools", input: { stone: 2 }, output: { stone_tool: 1 }, work: 1, building: "workshop" },
   { id: "blade", name: "Lưỡi đá", needs: "P1", input: { flint: 2 }, output: { blade: 1 }, work: 1, building: "workshop" },
@@ -169,6 +211,11 @@ export const RECIPES: Recipe[] = [
 export const RECIPE_BY_ID: Record<string, Recipe> = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 /** Tools that let a hunter work at full strength; one tool serves 4 hunters. */
 export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
+/** Standard value of each good (§6.2): an open recipe's output is worth what went in plus labour. */
+export const GOOD_VALUE: Record<string, number> = {
+  food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5,
+  copper: 3, tin: 4, iron: 4, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
+};
 export const TOOL_LIFE = 10; // ticks
 
 // §2.2 Founding

@@ -85,37 +85,42 @@ Mọi thứ nằm trong `data/`:
 
 Tạo thế giới mới: `docker compose down`, xóa (hoặc đổi tên) `data/world.db`, sửa `WORLD_SEED`/`NATIONS` nếu muốn, rồi `docker compose up -d`. Xem trước bản đồ của một seed bằng trang [Bản đồ Nguyên Địa](https://claude.ai/artifact/AmRBWhcD9RBa7VATJAnMaK).
 
-## Engine v0.1 làm được gì
+## Engine làm được gì
 
-| Đã chạy | Chưa có (đã viết trong luật) |
+| Hệ thống | Đã chạy |
 | --- | --- |
-| Bản đồ 64×64 ô lục giác theo seed: 2 lục địa, eo đất, quần đảo, sông, 7 kỳ quan | Ngoại giao, hiệp ước, tin nhắn giữa các nước (§7.2) |
-| Lập quốc: tên, cờ, tuyên ngôn, kiểm tra trùng tên và màu cờ | Giao thương, chợ biên giới (§7.3) |
-| Lao động, săn bắt hái lượm, khai thác, trữ lượng ô tái sinh | Chiến tranh, chư hầu (§7.4, §7.7) |
-| Cây gốc 18 phát minh, công trình, công thức chế tác | Phát minh mở + trọng tài (§5.4) |
-| Dân số, nạn đói, hư hỏng, ổn định, nội loạn, di cư | Định cư mới (§2.3) |
-| Sự kiện thế giới (mùa đông, hạn hán, dịch bệnh, bội thu…) | Phá hoại, đánh cắp công nghệ (§7.8) |
-| Khai hoang, thám hiểm, gặp gỡ, tình báo mức 1/2/4, gián điệp | |
-| Thỉnh nguyện, Sắc lệnh, ngủ đông khi hết quota | |
-| Sổ cái kiểm toán, replay tất định, chat Claude | |
+| Thế giới | Bản đồ 64×64 ô lục giác theo seed: 2 lục địa, eo đất, quần đảo, sông, 7 kỳ quan, 3 đới khí hậu |
+| Lập quốc | Tên, cờ, tuyên ngôn; chặn trùng tên, tên model, màu cờ giống nhau |
+| Kinh tế | Lao động, săn bắt hái lượm, khai thác, khai mỏ, trữ lượng ô tái sinh, công cụ hao mòn, chế tác, công trình, ruộng, chuồng |
+| Dân số | Ăn, đói, hư hỏng, tăng dân, ổn định, nội loạn, di cư, sự kiện thế giới |
+| Phát minh | Cây gốc 18 phát minh + **phát minh mở**: AI tự đề xuất (11 loại hiệu ứng, ngân sách 4 + 2d), Engine kiểm tra cứng, **Trọng tài AI** chấm điểm, phát minh được duyệt vào Sổ chung; thất truyền; cổng kỷ nguyên Đồ Đá Mới và Đồ Đồng |
+| Lãnh thổ | Khai hoang, bỏ ô, định cư mới, ô bị cắt rời thì hoang hóa |
+| Ngoại giao | Thám hiểm, gặp gỡ, cử chỉ trước khi có ngôn ngữ chung, tin nhắn (chặn giả mạo mệnh lệnh), hiệp ước bất tương xâm / đi lại / liên minh / hòa bình / cống nạp / chư hầu, phá ước, uy tín |
+| Giao thương | Đề nghị và nhận trao đổi, đoàn buôn đi đường xa, hàng hư trên đường |
+| Chiến tranh | Tuyên chiến (có hiệu lực lượt sau), đồng minh và tông chủ tự tham chiến, tấn công chiếm ô, bao vây thủ đô, đột kích cướp kho, tù binh, mệt mỏi chiến tranh, độc lập |
+| Tình báo | Mức 1–4 theo tầm nhìn, buôn bán, hiệp ước, liên minh, gián điệp; tin phai dần nếu chưa có chữ viết |
+| Watcher | Bản đồ sống, suy nghĩ từng AI, thỉnh nguyện, Sắc lệnh, duyệt tay đơn phát minh, bảng quan hệ, biểu đồ, xếp hạng, chat Claude |
+| Hạ tầng | Ngủ đông khi hết quota, sổ cái kiểm toán mỗi lượt, replay tất định, tự cập nhật khi `git pull` |
 
-AI gửi hành động chưa có sẽ nhận lý do "chưa có trong phiên bản engine này".
+Chưa có: phá hoại và đánh cắp công nghệ bằng gián điệp (§7.8), đổi tên quốc gia (§2.2), AI Sử gia (§10.1).
 
 ## Phát triển
 
 Không cần cài thư viện nào: Node 24 chạy TypeScript trực tiếp và có sẵn SQLite.
 
 ```bash
-npm test          # 9 bài test: sinh thế giới, sổ cái, replay, luật lập quốc, thỉnh nguyện…
+npm test          # 17 bài test: sinh thế giới, sổ cái, replay, phát minh mở, ngoại giao, giao thương, chiến tranh, định cư…
 npm start         # supervisor + engine, http://127.0.0.1:3000
 ```
 
 ```
 src/engine.ts      luật và hàm step() của một lượt
+src/catalog.ts     phát minh mở: danh mục hiệu ứng, ngân sách, độ sâu, phán quyết
+src/diplomacy.ts   tin nhắn, hiệp ước, giao thương, chiến tranh
 src/worldgen.ts    sinh thế giới
 src/rules.ts       bảng số liệu của bộ luật
 src/runner.ts      vòng lượt, gọi AI, ngủ đông, quyền của Watcher
-src/ai/            gateway nhà cung cấp, prompt, bot dự phòng
+src/ai/            gateway nhà cung cấp, prompt, trọng tài, bot dự phòng
 src/claude.ts      đăng nhập và chat Claude
 src/server.ts      API + SSE cho giao diện
 src/supervisor.ts  tự nạp code mới

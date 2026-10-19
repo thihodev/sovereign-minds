@@ -5,8 +5,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
-import { INVENTION_BY_ID, BUILDING_BY_TYPE, RULES_VERSION } from "./rules.ts";
-import { housing, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { RULES_VERSION } from "./rules.ts";
+import { buildingOf, inv, invName, describeEffects } from "./catalog.ts";
+import { relation } from "./diplomacy.ts";
+import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
 import { chat, claudeStatus, login, logout } from "./claude.ts";
 import type { Runner } from "./runner.ts";
 
@@ -55,9 +57,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n),
         stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, Math.round(v * 10) / 10])),
         labor: n.labor, crafts: n.crafts,
-        inventions: n.inventions.map(id => ({ id, name: INVENTION_BY_ID[id]?.name ?? id })),
-        research: n.research ? { id: n.research.id, name: INVENTION_BY_ID[n.research.id]?.name, progress: Math.round(n.research.progress * 10) / 10, cost: INVENTION_BY_ID[n.research.id]?.rp } : null,
-        buildings: n.buildings.map(b => ({ type: b.type, name: BUILDING_BY_TYPE[b.type]?.name ?? b.type, tile: b.tile, done: b.done })),
+        inventions: n.inventions.map(id => ({ id, name: invName(w, id), custom: !!inv(w, id)?.custom })),
+        research: n.research ? { id: n.research.id, name: invName(w, n.research.id), progress: Math.round(n.research.progress * 10) / 10, cost: inventionCost(w, n, n.research.id) } : null,
+        buildings: n.buildings.map(b => ({ type: b.type, name: buildingOf(w, b.type)?.name ?? b.type, tile: b.tile, done: b.done })),
+        settlements: n.settlements, trades: n.trades, inbox: n.inbox.map(m => ({ ...m, fromName: w.nations[m.from]?.name })),
+        relations: Object.fromEntries(w.nations.filter(o => o.id !== n.id).map(o => [o.id, relation(w, n.id, o.id)])),
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
       })),
@@ -65,6 +69,13 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       petitions: w.petitions,
       decrees: w.decrees,
       registry: w.registry,
+      proposals: w.proposals.slice(-60),
+      customInventions: Object.values(w.custom.inventions).map(v => ({ id: v.id, name: v.name, prereqs: v.prereqs.map(p => ({ id: p, name: invName(w, p) })), rp: v.rp, caps: v.caps, desc: v.desc, by: v.custom?.by, tick: v.custom?.tick, depth: v.custom?.depth, description: v.custom?.description, effects: describeEffects(w, v.effects) })),
+      treaties: w.treaties.filter(t => t.active).map(t => ({ ...t, aName: w.nations[t.a]?.name, bName: w.nations[t.b]?.name })),
+      wars: w.wars.filter(x => x.end === null).map(x => ({ ...x, aName: w.nations[x.a]?.name, bName: w.nations[x.b]?.name })),
+      battles: w.battles.slice(-20),
+      caravans: w.caravans,
+      eraGates: w.eraGates,
     };
   }
 
@@ -124,6 +135,12 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (petM && method === "POST") {
         const b = await readBody(req);
         const err = runner.decidePetition(Number(petM[1]), String(b.status), String(b.verdict ?? ""), b.mergedInto ? Number(b.mergedInto) : null);
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      const propM = path.match(/^\/api\/proposals\/(\d+)$/);
+      if (propM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.judgeByHand(Number(propM[1]), b.approve === true, String(b.reason ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
       if (path === "/api/decrees" && method === "POST") {

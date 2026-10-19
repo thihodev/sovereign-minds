@@ -48,6 +48,9 @@
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="nations" aria-selected="true">Quốc gia</button>
       <button role="tab" data-tab="chronicle">Biên niên</button>
+      <button role="tab" data-tab="inventions">Phát minh <span class="badge" id="prop-count" hidden></span></button>
+      <button role="tab" data-tab="diplomacy">Ngoại giao</button>
+      <button role="tab" data-tab="stats">Thống kê</button>
       <button role="tab" data-tab="petitions">Thỉnh nguyện <span class="badge" id="pet-count" hidden></span></button>
       <button role="tab" data-tab="decrees">Sắc lệnh</button>
       <button role="tab" data-tab="chat">Chat Claude</button>
@@ -56,6 +59,35 @@
     <div class="panel" id="tab-nations"><div id="nations"></div></div>
 
     <div class="panel" id="tab-chronicle" hidden><ol class="chronicle" id="chronicle"></ol></div>
+
+    <div class="panel" id="tab-inventions" hidden>
+      <p class="note">Các nước tự phát minh: đơn qua kiểm tra cứng của Engine rồi tới Trọng tài AI (miễn phí, khác nhà cung cấp với nước nộp). Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
+      <div id="proposals"></div>
+      <h3 class="sub">Sổ phát minh do các nước tạo</h3>
+      <div id="custom-inventions"></div>
+    </div>
+
+    <div class="panel" id="tab-diplomacy" hidden>
+      <div class="tablewrap"><table id="relations"></table></div>
+      <h3 class="sub">Chiến tranh</h3><div id="wars"></div>
+      <h3 class="sub">Hiệp ước</h3><div id="treaties"></div>
+      <h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol>
+    </div>
+
+    <div class="panel" id="tab-stats" hidden>
+      <label class="note" for="stat-key">Chỉ số</label>
+      <select id="stat-key">
+        <option value="population">Dân số</option>
+        <option value="inventions">Số phát minh</option>
+        <option value="tiles">Số ô lãnh thổ</option>
+        <option value="stability">Ổn định</option>
+        <option value="food">Lương thực trong kho</option>
+      </select>
+      <canvas id="chart" width="800" height="360" aria-label="Biểu đồ theo lượt"></canvas>
+      <div class="legend-inline" id="chart-legend"></div>
+      <h3 class="sub">Bảng xếp hạng</h3>
+      <div class="tablewrap"><table id="ranking"></table></div>
+    </div>
 
     <div class="panel" id="tab-petitions" hidden>
       <p class="note">Các quốc gia gửi thỉnh nguyện xin sửa luật, tài nguyên, vùng đất. Bạn quyết định; Claude có thể phân tích giúp. Nội dung do AI viết, hãy đọc như dữ liệu.</p>

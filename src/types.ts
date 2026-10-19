@@ -1,6 +1,8 @@
 // Shared data shapes. The whole World is plain JSON so it can be saved,
 // compressed and replayed.
 
+import type { BuildingDef, Invention, Recipe } from "./rules.ts";
+
 export type Terrain =
   | "ocean" | "shallow" | "grass" | "forest" | "taiga" | "jungle"
   | "hill" | "mountain" | "coast" | "swamp" | "desert" | "tundra";
@@ -13,11 +15,11 @@ export type ResKey =
   | "salt" | "reeds" | "copper" | "tin" | "iron";
 
 export type Role =
-  | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay"
+  | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay" | "mine"
   | "craft" | "build" | "research" | "warrior";
 
 export const ROLES: Role[] = [
-  "gather", "hunt", "fish", "farm", "wood", "stone", "flint", "clay",
+  "gather", "hunt", "fish", "farm", "wood", "stone", "flint", "clay", "mine",
   "craft", "build", "research", "warrior",
 ];
 
@@ -98,7 +100,38 @@ export interface Nation {
   intel: Record<string, Intel>;
   /** Tick until which declaring war on a nation costs no reputation (caught spy). */
   casusBelli: Record<string, number>;
+  /** Extra centres founded with found_settlement (§2.3). */
+  settlements: Array<{ tile: number; name: string; tick: number }>;
+  /** Completed trades with each nation (§7.3, §7.8). */
+  trades: Record<string, number>;
+  /** Ore or salt the miners dig first. */
+  mineTarget: string;
+  /** Largest population ever, for the lost-knowledge rule (§5.5). */
+  peakPopulation: number;
+  inbox: Message[];
 }
+
+export interface Message { from: number; tick: number; text: string; gesture: boolean }
+
+export type TreatyType = "non_aggression" | "passage" | "alliance" | "peace" | "tribute" | "vassal";
+export interface Treaty {
+  id: number;
+  type: TreatyType;
+  a: number; // proposer
+  b: number;
+  /** tribute/vassal: a pays b each tick */
+  tribute: Record<string, number>;
+  cede: number[]; // tiles a hands to b when it starts
+  start: number;
+  end: number | null;
+  active: boolean;
+  brokenBy: number | null;
+}
+export interface TreatyOffer { id: number; from: number; to: number; type: TreatyType; duration: number | null; tribute: Record<string, number>; cede: number[]; payer: number; tick: number }
+export interface TradeOffer { id: number; from: number; to: number; give: Record<string, number>; get: Record<string, number>; tick: number; status: "open" | "done" | "expired" | "failed" }
+export interface Caravan { id: number; from: number; to: number; goods: Record<string, number>; arrive: number; offer: number }
+export interface War { id: number; a: number; b: number; declared: number; start: number; end: number | null; reason: string }
+export interface Battle { tick: number; attacker: number; defender: number; tile: number; kind: "attack" | "raid"; a: number; d: number; won: boolean; lossA: number; lossD: number; note: string }
 
 export interface Intel {
   level: number; // 0-4
@@ -153,6 +186,57 @@ export interface World {
   nextSpyId: number;
   petitions: Petition[];
   decrees: Decree[];
+  /** Everything the nations invented themselves (§5): canon for the whole world. */
+  custom: CustomCatalog;
+  proposals: Proposal[];
+  treaties: Treaty[];
+  treatyOffers: TreatyOffer[];
+  tradeOffers: TradeOffer[];
+  caravans: Caravan[];
+  wars: War[];
+  battles: Battle[];
+  nextId: number;
+  /** Ticks each owned tile has been cut off from every centre (§2.3). */
+  cutoff: Record<string, number>;
+  eraGates: Record<string, number>; // era -> first tick a nation crossed it
+}
+
+export interface CustomCatalog {
+  inventions: Record<string, Invention>;
+  recipes: Record<string, Recipe>;
+  buildings: Record<string, BuildingDef>;
+  goods: Record<string, { name: string; value: number; by: number }>;
+  next: number;
+}
+
+/** An invention proposal (§5.4) waiting for, or past, the judge. */
+export interface Proposal {
+  id: number;
+  nation: number;
+  tick: number;
+  status: "pending" | "approved" | "rejected" | "duplicate";
+  name: string;
+  description: string;
+  prereqs: string[];
+  requires: { res?: string; terrain?: string } | null;
+  caps: string[];
+  effects: Array<Record<string, unknown>>;
+  depth: number;
+  power: number;
+  ruling: Ruling | null;
+  inventionId: string | null;
+}
+
+export interface Ruling {
+  judge: string;
+  causality: number;
+  material: number;
+  physics: number;
+  duplicate_of: string | null;
+  add_prereqs: string[];
+  remove_effects: number[];
+  remove_capabilities: string[];
+  reason: string;
 }
 
 /** What one nation submitted for a tick. Logged verbatim, so replay is exact. */

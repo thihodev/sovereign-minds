@@ -1,7 +1,8 @@
 // A simple rule-based player. It stands in for a nation whose API key is
 // missing, and it drives the engine tests. It sends the same JSON an AI sends.
 
-import { BUILDING_BY_TYPE, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_SYMBOLS, INVENTION_BY_ID } from "../rules.ts";
+import { CLAIM_FOOD, FLAG_LAYOUTS, FLAG_SYMBOLS } from "../rules.ts";
+import { buildingOf, invName } from "../catalog.ts";
 import { col, row, NEIGHBORS } from "../hex.ts";
 import { housing, inventionCost, mods, ownedTiles, researchOptions, tileLimit, workers } from "../engine.ts";
 import { pickOne, type Rand } from "../rng.ts";
@@ -42,7 +43,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const huntCap = Math.min(sum("game") > 5 ? Math.floor(sum("game") / 2.5) + 1 : 0, Math.floor(tools) * 4 + (sum("plants") > 10 ? 0 : 99));
   let hunters = Math.min(foodWorkers - fishers, huntCap);
   let gatherers = Math.max(0, foodWorkers - fishers - hunters);
-  if (gatherers > 0 && sum("plants") < gatherers * 2) { hunters += gatherers; gatherers = 0; }
+  if (gatherers > 2 && sum("plants") < gatherers * 2) { hunters += gatherers - 2; gatherers = 2; }
   let left = w - fishers - hunters - gatherers;
   const pending = n.buildings.filter(b => !b.done);
   const builders = pending.length ? Math.min(left, 2) : 0; left -= builders;
@@ -53,7 +54,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const stone = Math.min(left, tools < toolsWanted || (n.stock.stone || 0) < 6 ? 2 : 1); left -= stone;
   let research = left;
   if (research === 0 && gatherers + hunters > 3) { research = 1; if (gatherers) gatherers--; else hunters--; }
-  const labor = { gather: gatherers, hunt: hunters, fish: fishers, farm: 0, wood, stone, flint: 0, clay: 0, craft: crafters, build: builders, research, warrior: 0 };
+  const labor = { gather: gatherers, hunt: hunters, fish: fishers, farm: 0, wood, stone, flint: 0, clay: 0, mine: 0, craft: crafters, build: builders, research, warrior: 0 };
   const fields = n.buildings.filter(b => b.done && b.type === "field").length;
   if (fields && labor.gather >= 2) { const k = Math.min(labor.gather, fields * 6); labor.gather -= k; labor.farm += k; }
 
@@ -68,7 +69,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (opts.length) actions.push({ type: "research", invention: opts[0] });
   }
   const want = (type: string) => !n.buildings.some(b => b.type === type);
-  const affordable = (type: string) => Object.entries(BUILDING_BY_TYPE[type].cost).every(([k, q]) => (n.stock[k] || 0) >= q);
+  const affordable = (type: string) => Object.entries(buildingOf(world, type)?.cost ?? {}).every(([k, q]) => (n.stock[k] || 0) >= q);
   if (want("workshop") && affordable("workshop")) actions.push({ type: "build", building: "workshop" });
   else if (n.inventions.includes("P8") && n.population > housing(world, n) - 4 && affordable("tent") && pending.length === 0) actions.push({ type: "build", building: "tent" });
   else if (n.inventions.includes("P5") && want("altar") && affordable("altar")) actions.push({ type: "build", building: "altar" });
@@ -83,7 +84,38 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const best = [...frontier.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
     if (best) actions.push({ type: "claim_tile", tile: [col(best[0]), row(best[0])] });
   }
-  if (world.tick % 12 === 5) actions.push({ type: "explore", direction: pickOne(["E", "NE", "NW", "W", "SW", "SE"], rand), people: 2 });
-  const projectName = n.research ? INVENTION_BY_ID[n.research.id]?.name : "chưa chọn";
+  if (world.tick % 8 === n.id % 8 && labor.gather >= 2) {
+    const from = pickOne(owned, rand);
+    actions.push({ type: "explore", direction: pickOne(["E", "NE", "NW", "W", "SW", "SE"], rand), people: 2, from: [col(from.i), row(from.i)] });
+  }
+  // Give up the poorest land when over the limit
+  const extra = owned.length - tileLimit(world, n);
+  if (extra > 0) {
+    const centres = new Set([n.capital, ...n.settlements.map(x => x.tile)]);
+    const poor = owned.filter(t => !centres.has(t.i) && !n.buildings.some(b => b.tile === t.i)).sort((a, b) => tileValue(a) - tileValue(b) || a.i - b.i).slice(0, extra);
+    for (const t of poor) actions.push({ type: "abandon_tile", tile: [col(t.i), row(t.i)] });
+  }
+
+  // Peaceful diplomacy: greet, trade surplus for shortage, accept fair deals and non-aggression.
+  const others = n.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded);
+  for (const off of world.tradeOffers.filter(o => o.to === n.id && o.status === "open")) {
+    const affordable = Object.entries(off.get).every(([k, q]) => (n.stock[k] || 0) >= q * 1.5);
+    const giveValue = Object.values(off.give).reduce((x, q) => x + q, 0), getValue = Object.values(off.get).reduce((x, q) => x + q, 0);
+    if (affordable && giveValue >= getValue * 0.8) { actions.push({ type: "accept_trade", offer: off.id }); break; }
+  }
+  for (const off of world.treatyOffers.filter(o => o.to === n.id && (o.type === "non_aggression" || o.type === "peace") && !Object.keys(o.tribute).length)) {
+    actions.push({ type: "accept_treaty", offer: off.id }); break;
+  }
+  if (others.length && world.tick % 7 === n.id % 7) {
+    const o = pickOne(others, rand);
+    actions.push({ type: "message", to: o.name, gesture: pickOne(["chào hỏi", "muốn trao đổi", "muốn hòa bình", "cùng đi săn"], rand) });
+    const surplus = (["hide", "stone", "wood", "bone"] as const).find(k => (n.stock[k] || 0) > 20);
+    const want = (["flint", "stone", "wood", "hide"] as const).find(k => k !== surplus && (n.stock[k] || 0) < 5);
+    if (surplus && want) actions.push({ type: "trade_offer", to: o.name, give: { [surplus]: 6 }, get: { [want]: 5 } });
+    if (world.tick % 21 === n.id % 21 && !world.treaties.some(t => t.active && ((t.a === n.id && t.b === o.id) || (t.a === o.id && t.b === n.id)))) {
+      actions.push({ type: "treaty", to: o.name, kind: "non_aggression", duration: 50 });
+    }
+  }
+  const projectName = n.research ? invName(world, n.research.id) : "chưa chọn";
   return { thought: `Giữ đủ ăn, nghiên cứu ${projectName}.`, labor, crafts, actions, memory: n.memory };
 }
