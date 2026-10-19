@@ -1,7 +1,7 @@
 // Scenario tests for open inventions (§5), relations (§7) and settlements (§2.3).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, ownedTiles, mods, inventionCost, type NationSpec } from "../src/engine.ts";
+import { createWorld, step, ownedTiles, mods, baseCost, inventionCost, type NationSpec } from "../src/engine.ts";
 import { inv, costFor } from "../src/catalog.ts";
 import { activeWar, treatiesBetween } from "../src/diplomacy.ts";
 import { col, row, NEIGHBORS, dist } from "../src/hex.ts";
@@ -52,8 +52,9 @@ test("open invention: propose, judge, research, unlock a new recipe", () => {
   const v = inv(w, p.inventionId!)!;
   assert.equal(v.rp, costFor(p.depth, p.power));
   assert.equal(n.research?.id, v.id, "proposer starts researching at once");
-  assert.equal(inventionCost(w, n, v.id), Math.ceil(v.rp * 0.8), "20% off for the inventor");
-  n.labor.research = 20; n.research!.progress = v.rp;
+  assert.equal(baseCost(w, v.id), Math.ceil(v.rp * 2.5 / 5) * 5, "depth 3 costs × (1 + 0.75 × 2)");
+  assert.equal(inventionCost(w, n, v.id), Math.ceil(baseCost(w, v.id) * 0.8), "20% off for the inventor");
+  n.labor.research = 20; n.research!.progress = baseCost(w, v.id);
   turn(w, { 0: { labor: { ...n.labor, research: 20 } } });
   assert.ok(n.inventions.includes(v.id));
   assert.ok(mods(w, n).caps.has("nhiệt-cao"));
@@ -168,7 +169,12 @@ test("war: declare, wait a tick, attack and take a tile; allies join; peace ends
   assert.equal(war.start, war.declared + 1, "fighting starts the tick after the declaration");
   a.labor.warrior = 25; a.stock.spear = 25; b.labor.warrior = 0;
   const army = { gather: 3, hunt: 0, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: 0, research: 0, warrior: 25 };
-  turn(w, { 0: { labor: army, actions: [{ type: "attack", tile: xy(target.i), warriors: 25 }] } });
+  // §7.4 front: one tile of ours touches the target, so at most 5 + 5 × 1 warriors may go at it
+  turn(w, { 0: { actions: [{ type: "attack", tile: xy(target.i), warriors: 25 }] } });
+  assert.match(a.lastRejected[0].reason, /Mặt trận ở ô này chỉ chứa 10 chiến binh/);
+  assert.equal(w.battles.length, 0);
+  a.population = 40; a.stock.food = 200; // keep the army fed through the test
+  turn(w, { 0: { labor: army, actions: [{ type: "attack", tile: xy(target.i), warriors: 10 }] } });
   assert.deepEqual(a.lastRejected, []);
   assert.equal(w.battles.length, 1);
   assert.equal(w.tiles[target.i].owner, a.id, "tile taken from a defenceless enemy");
@@ -183,10 +189,26 @@ test("settlements: found one, tiles cut off go wild", () => {
   const w = founded(1, "settle");
   const n = w.nations[0];
   n.inventions.push("P4");
-  const far = w.tiles.find(t => t.land && t.terrain !== "mountain" && t.owner === -1 && dist(t.i, n.capital) >= 5 && dist(t.i, n.capital) <= 7)!;
-  turn(w, { 0: { actions: [{ type: "found_settlement", tile: xy(far.i), name: "Bến Mới" }] } });
+  const far = w.tiles.find(t => t.land && t.terrain !== "mountain" && t.owner === -1 && dist(t.i, n.capital) >= 6 && dist(t.i, n.capital) <= 8)!;
+  const near = w.tiles.find(t => t.land && t.terrain !== "mountain" && t.owner === -1 && dist(t.i, n.capital) === 4)!;
+  const go = (tile: number) => turn(w, { 0: { actions: [{ type: "found_settlement", tile: xy(tile), name: "Bến Mới" }] } });
+  go(far.i);
+  assert.match(n.lastRejected[0].reason, /Cần ít nhất 50 dân/);
+  n.population = 60;
+  go(near.i);
+  assert.match(n.lastRejected[0].reason, /ít nhất 6 ô/);
+  n.stock.wood = 4; n.stock.stone = 10;
+  go(far.i);
+  assert.match(n.lastRejected[0].reason, /Cần 25 gỗ và\/hoặc đá/);
+  // 25 units of wood and stone, always from the larger pile: 30 wood + 9 stone leaves 7 + 7
+  n.stock.wood = 30; n.stock.stone = 9;
+  go(far.i);
   assert.equal(n.settlements.length, 1);
   assert.equal(w.tiles[far.i].owner, n.id);
+  assert.ok(n.population >= 60, "the settlers stay citizens");
+  assert.equal(Math.round(n.stock.wood), 7);
+  assert.equal(Math.round(n.stock.stone), 7);
+  assert.ok(n.lastEvents.some(e => /ổn định −5/.test(e)), "the move unsettles the people");
   // an isolated tile far away is lost after 5 ticks
   const lonely = w.tiles.find(t => t.land && t.owner === -1 && dist(t.i, n.capital) > 15)!;
   lonely.owner = n.id;

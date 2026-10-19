@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.2";
+export const RULES_VERSION = "0.3";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -50,8 +50,11 @@ export const START = {
 };
 export const WORKER_SHARE = 0.7;
 export const FOOD_PER_PERSON = 1;
-export const GROWTH_RATE = 0.04;
-export const GROWTH_SURPLUS = 0.2;
+/** §4.2 Growth is logistic toward housing: +floor(pop × rate × (1 − pop/housing)), at least `min`,
+ *  when the food left after eating is ≥ `surplus` of need. Mutable so tools/simulate.ts --variant can tune it. */
+export const GROWTH = { rate: 0.08, surplus: 0.2, min: 1 };
+/** §4.2 Buildings that give housing (tents, open-invention housing): at most `perCentre` per centre (capital + each settlement). */
+export const HOUSING = { perCentre: 3 };
 
 /** Output per worker per tick (§4.3). */
 export const YIELD = {
@@ -63,9 +66,10 @@ export const ROLE_RESOURCE: Partial<Record<Role, ResKey>> = {
 };
 export const ROLE_NAME: Record<Role, string> = {
   gather: "hái lượm", hunt: "săn bắt", fish: "đánh cá", farm: "nông dân", wood: "đốn gỗ", stone: "khai đá",
-  flint: "nhặt đá lửa", clay: "lấy đất sét", craft: "chế tác", build: "xây dựng", research: "nghiên cứu", warrior: "chiến binh",
+  flint: "nhặt đá lửa", clay: "lấy đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây dựng", research: "nghiên cứu", warrior: "chiến binh",
 };
-export const SPOILAGE = { food: 0.30, hide: 0.05, min: 0.05 };
+/** §4.1 Food spoilage; each pottery in stock cuts it by `potteryEach` (at most `potteryMax` in all). */
+export const SPOILAGE = { food: 0.30, hide: 0.05, min: 0.05, potteryEach: 0.005, potteryMax: 0.05 };
 export const MAX_ROLE_BONUS = 1.5; // §5.7 +150% cap in the stone age
 
 // §3.2 Action points
@@ -104,20 +108,41 @@ export const TRADE = { offerTicks: 2, maxQty: 500, nearDistance: 3, caravanSpeed
 
 // §7.4 War
 export const WAR = {
-  reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.2,
+  reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.5,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
   weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10, unprovokedPenalty: 5,
+  /** Defenders fight at home: strength × (1 + home + terrain + walls + river). */
+  home: 0.5,
+  /** Front: one attacker sends at most frontBase + frontPerTile × (its tiles next to the target) warriors at one tile per tick. */
+  frontBase: 5, frontPerTile: 5,
+  /** Taking a tile carries off lootShare of each good in the loser's stock (at most carryPerWarrior per warrior); a centre gives centreLoot, uncapped. */
+  lootShare: 0.15, centreLoot: 0.5,
+  /** A capital or settlement falls once the attacker holds this many of its land neighbours (all of them if it has fewer). */
+  centreFallsAt: 4,
 };
 
 // §2.3 Settlements
-export const SETTLEMENT = { cap: "tổ-chức", people: 10, minPopulation: 30, food: 20, minDist: 4, maxDist: 10, housing: 15, cutoffTicks: 5 };
+/** `people` settlers move to the new centre: the nation keeps them, the move costs `stability`.
+ *  Paid with `materials` units of goods that do not spoil, any mix of `goods` (the engine takes from the larger stock first).
+ *  Every settlement beyond `freeCentres` costs `sprawlStability` stability per tick (§4.4). */
+export const SETTLEMENT = {
+  cap: "tổ-chức", people: 10, minPopulation: 50, materials: 25, goods: ["wood", "stone"], stability: 5, minDist: 6, maxDist: 10, housing: 10, cutoffTicks: 5,
+  freeCentres: 3, sprawlStability: 1,
+};
 
 // §5.6 Era gates
 export const BRONZE_CAPS = ["nhiệt-cao", "nhận-biết-khoáng", "chứa", "luyện-đồng"];
 
-// §2.3 Territory
-export const TILE_LIMIT_BASE = 7;
+// §2.3 Territory. Tile limit = base + floor(perSqrt × √population) + invention bonuses + perSettlement × settlements.
+export const TILES = { base: 7, perSqrt: 1, perSettlement: 3 };
 export const CLAIM_FOOD = 5;
+
+/** §5.5 Research pace. RP per tick = researchers^exponent (more hands, less from each);
+ *  each level of depth beyond `depthFree` adds `depthStep` to the cost, seed tree and open inventions alike. */
+export const RESEARCH = { exponent: 0.85, depthFree: 1, depthStep: 0.75 };
+export function depthCostMult(depth: number): number {
+  return 1 + RESEARCH.depthStep * Math.max(0, depth - RESEARCH.depthFree);
+}
 
 // §5.2 Seed tree. Effects are read by engine.mods().
 export interface Invention {
@@ -165,12 +190,12 @@ export const INVENTIONS: Invention[] = [
   { id: "P10", name: "Đá mài", prereqs: ["P1"], rp: 60, caps: ["mài"], effects: { unlocks: ["axe", "palisade"] }, desc: "Rìu đá mài: đốn gỗ +30% cho người có rìu." },
   { id: "P11", name: "Cung tên", prereqs: ["P6", "P3"], rp: 70, caps: ["săn-xa"], effects: { role: { hunt: 0.3 }, unlocks: ["bow"] }, desc: "Săn +30%, chiến binh tầm xa." },
   { id: "P12", name: "Ký hiệu", prereqs: ["P5"], rp: 50, caps: ["ghi-chép"], effects: { rp: 0.1 }, desc: "Chống thất truyền; RP +10%." },
-  { id: "P13", name: "Gốm", prereqs: ["P2"], rp: 80, caps: ["chứa"], env: { res: "clay" }, effects: { spoilage: 0.15, unlocks: ["kiln", "pottery"] }, desc: "Lò gốm; hư lương thực 30% → 15%." },
+  { id: "P13", name: "Gốm", prereqs: ["P2"], rp: 80, caps: ["chứa"], env: { res: "clay" }, effects: { spoilage: 0.15, unlocks: ["kiln", "pottery"] }, desc: "Lò gốm; hư lương thực 30% → 15%; mỗi món gốm trong kho −0,5 điểm % (tối đa −5)." },
   { id: "P14", name: "Trồng trọt sơ khai", prereqs: ["P1", "foraging"], rp: 120, caps: ["trồng-trọt"], env: { terrains: ["grass", "coast"], river: true }, effects: { unlocks: ["field"] }, desc: "Ruộng: 6 nông dân × 2 lương thực." },
   { id: "P15", name: "Thuần dưỡng", prereqs: ["P3", "P6"], rp: 120, caps: ["thuần-dưỡng"], effects: { unlocks: ["pen"] }, desc: "Chuồng nuôi thú." },
   { id: "P16", name: "Thuyền độc mộc", prereqs: ["P10", "fire"], rp: 90, caps: ["đi-nước"], effects: { role: { fish: 0.2 } }, desc: "Đi trên sông, biển ven bờ; đánh cá +20%." },
   { id: "P17", name: "Dệt", prereqs: ["P3", "P14"], rp: 100, caps: ["dệt"], effects: { unlocks: ["cloth"] }, desc: "Dệt vải." },
-  { id: "P18", name: "Đếm", prereqs: ["P12", "P14"], rp: 100, caps: ["đếm"], effects: { ap: 1 }, desc: "+1 AP; ước lượng tình báo chính xác gấp đôi." },
+  { id: "P18", name: "Đếm", prereqs: ["P12", "P14"], rp: 100, caps: ["đếm"], effects: { ap: 1 }, desc: "+1 AP; sai số ước lượng tình báo giảm một nửa." },
 ];
 export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INVENTIONS.map(v => [v.id, v]));
 
@@ -184,7 +209,7 @@ export interface BuildingDef {
 export const BUILDINGS: BuildingDef[] = [
   { type: "workshop", name: "Bãi chế tác", needs: "stone_tools", cost: { stone: 5 }, work: 4, desc: "Cho 4 thợ chế tác làm việc.", effect: { craftSlots: 4 } },
   { type: "pit", name: "Hố trữ", needs: "stone_tools", cost: { stone: 5 }, work: 3, max: 2, desc: "Hư lương thực −5%.", effect: { spoilage: 0.05 } },
-  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở.", effect: { housing: 10 } },
+  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở; mỗi trung tâm tối đa 3 công trình có chỗ ở.", effect: { housing: 10 } },
   { type: "altar", name: "Bàn thờ", needs: "P5", cost: { stone: 10 }, work: 6, max: 1, desc: "+1 ổn định mỗi lượt.", effect: { stability: 1 } },
   { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%.", effect: { defense: 0.4 } },
   { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
