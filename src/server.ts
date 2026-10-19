@@ -191,5 +191,21 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (!res.headersSent) send(res, 500, { error: (e as Error).message });
     }
   });
-  server.listen(opts.port, opts.host, () => console.log(`[http] Watcher UI: http://${opts.host === "0.0.0.0" ? "localhost" : opts.host}:${opts.port}`));
+  // If the port is taken (another app, or an old run), try the next ones instead of crash-looping.
+  let port = opts.port;
+  const shown = () => `http://${opts.host === "0.0.0.0" ? "localhost" : opts.host}:${port}`;
+  server.on("error", (e: NodeJS.ErrnoException) => {
+    if (e.code === "EADDRINUSE" && port < opts.port + 20) {
+      console.warn(`[http] Cổng ${port} đang bị chương trình khác dùng; thử cổng ${port + 1}…`);
+      port++;
+      setTimeout(() => server.listen(port, opts.host), 100);
+      return;
+    }
+    console.error(`[http] Không mở được cổng ${port}: ${e.message}. Đặt PORT khác trong .env.`);
+    process.exit(1);
+  });
+  server.listen(port, opts.host, () => {
+    console.log(`[http] Watcher UI: ${shown()}`);
+    if (port !== opts.port) console.log(`[http] (cổng ${opts.port} bận nên dùng cổng ${port}; muốn cố định thì đặt PORT trong .env)`);
+  });
 }
