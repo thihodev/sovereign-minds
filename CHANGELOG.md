@@ -4,6 +4,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.3 (đang làm)
 
+- Điểm khai sinh công bằng hơn: mỗi điểm phải có đủ gỗ (≥150), đá (≥150) và thịt hoặc cá (≥80) trong bán kính 2; khi chọn bộ điểm khai sinh, ưu tiên láng giềng gần nhất trong khoảng 12–18 ô. Với 4 quốc gia: 20/20 vào Đồ Đá Mới (trước là 13/20), không còn nước kẹt ở 25–35 dân (trước là 7/20).
 - Sửa theo rà soát luật ↔ code: thưởng nghề và công cụ tự phát minh có tác dụng với nông dân, chế tác, xây dựng, nghiên cứu và chiến binh; vũ khí mất theo thương vong, rìu mòn; giữ ô biển nông cần `đi-nước`; kỷ nguyên không lùi; nghiên cứu tự bắt đầu chỉ khi đủ điều kiện vật chất; hai đơn cùng tên duyệt cùng lượt được gộp; chặn giả mạo mệnh lệnh trong đơn phát minh và thỉnh nguyện; đồng minh chia sẻ tầm nhìn; uy tín công khai; tuyên chiến không chính nghĩa −5 uy tín; quyết định duyệt tay của Watcher không mất khi khởi động lại; `move` chỉ nhận biển nông và núi; chỗ chế tác của công trình mở tính điểm.
 - Xếp hạng tính ở Engine theo độ sâu phát minh (src/ranking.ts).
 - Sử gia AI, gián điệp ra tay (phá hoại, đánh cắp công nghệ, kích động), đổi tên sau khi sang kỷ nguyên.

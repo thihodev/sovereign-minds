@@ -193,6 +193,14 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     const t = tiles[i], c = i % N, r = (i / N) | 0;
     return t.region !== "isl" && okTerr.includes(t.terrain) && !t.wonder && r >= 3 && r <= N - 4 && c >= 3 && c <= N - 4 && wonders.every(w => dist(w.i, i) > 3);
   }).map(i => ({ i, v: areaVal(i), zone: tiles[i].zone }));
+  // Every people needs the basics within reach: wood, stone and meat or fish (§2.1).
+  const basics = (i: number) => {
+    let wood = 0, stone = 0, meat = 0;
+    for (const j of within(i, 2)) { const R = tiles[j].res; wood += R.wood || 0; stone += R.stone || 0; meat += (R.game || 0) + (R.fish || 0); }
+    return wood >= 150 && stone >= 150 && meat >= 80;
+  };
+  const withBasics = cands.filter(c => basics(c.i));
+  if (withBasics.length >= nNations * 6) cands.splice(0, cands.length, ...withBasics);
   const sortedV = cands.map(c => c.v).sort((a, b) => a - b);
   let best: { score: number; chosen: typeof cands } | null = null;
   for (const p of [0.5, 0.6, 0.4, 0.7, 0.3, 0.55, 0.45, 0.65, 0.35]) {
@@ -202,8 +210,10 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
       for (const c of shuffle(band.slice(), rand)) { if (chosen.every(o => dist(o.i, c.i) >= 12)) chosen.push(c); if (chosen.length === nNations) break; }
       if (chosen.length < nNations) continue;
       const zones = new Set(chosen.map(c => c.zone)).size;
-      const minD = Math.min(...chosen.flatMap((c, k) => chosen.slice(k + 1).map(o => dist(c.i, o.i))));
-      const score = zones * 1000 + minD;
+      // Neighbours 12–18 tiles apart meet within a few dozen ticks; farther apart they never do.
+      const nearest = chosen.map(c => Math.min(...chosen.filter(o => o !== c).map(o => dist(c.i, o.i))));
+      const tooFar = nearest.reduce((x, d) => x + Math.max(0, d - 18), 0);
+      const score = zones * 1000 - tooFar * 10 + Math.min(...nearest);
       if (!best || score > best.score) best = { score, chosen };
     }
     if (best && new Set(best.chosen.map(c => c.zone)).size >= Math.min(3, nNations)) break;

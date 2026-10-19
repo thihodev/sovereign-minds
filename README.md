@@ -119,7 +119,7 @@ CUSTOM_BASE_URL=http://127.0.0.1:4010/v1 OLLAMA_BASE_URL=http://127.0.0.1:4010/v
 Dùng model chạy trên máy (Ollama) cho quốc gia hoặc trọng tài: đặt `OLLAMA_BASE_URL` và thêm `ollama` vào `NATIONS` hoặc `JUDGE_PROVIDERS`.
 
 ```bash
-npm test          # 22 bài test: sinh thế giới, sổ cái, replay, phát minh mở, ngoại giao, giao thương, chiến tranh, định cư, Sử gia…
+npm test          # 41 bài test: sinh thế giới, sổ cái, replay, phát minh mở, ngoại giao, giao thương, chiến tranh, định cư, Sử gia…
 npm start         # supervisor + engine, http://127.0.0.1:3000
 ```
 
