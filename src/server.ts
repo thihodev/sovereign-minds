@@ -65,6 +65,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         relations: Object.fromEntries(w.nations.filter(o => o.id !== n.id).map(o => [o.id, relation(w, n.id, o.id)])),
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
+        formerNames: n.formerNames,
       })),
       spies: w.spies,
       petitions: w.petitions,

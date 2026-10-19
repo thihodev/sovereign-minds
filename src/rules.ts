@@ -74,7 +74,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, plant_spy: 2, petition: 1,
-  propose_invention: 2, found_settlement: 3,
+  propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1,
 };
@@ -82,7 +82,7 @@ export const AP_COST: Record<string, number> = {
 export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
 // Actions written in the rulebook that this engine version does not run yet.
 export const NOT_YET: Record<string, string> = {
-  rename_nation: "§2.2", sabotage: "§7.8", steal_tech: "§7.8", incite: "§7.8", move_army: "§7.4 (dùng attack/raid)",
+  move_army: "§7.4 (dùng attack/raid)",
 };
 
 // §7.2 Diplomacy. Before a shared language, only these gestures can be sent.
@@ -230,6 +230,8 @@ export const FORBIDDEN_NAME_WORDS = [
   "anthropic", "jev", "grok", "phi", "kimi",
 ];
 export const FLAG_MIN_DELTA_E = 25;
+/** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
+export const RENAME = { windowTicks: 5, stability: 10 };
 
 // §9.2 World events (chance per nation per tick)
 export const EVENTS = {
@@ -257,5 +259,7 @@ export const WONDER_DEFS = [
 // §7.8 Intelligence and spies
 export const SPY = { needsCap: "tổ-chức", successChance: 0.6, maxDistance: 20, baseDetect: 0.05, perFiveWarriors: 0.01, maxDetect: 0.4, reputationLoss: 10, casusBelliTicks: 10 };
 export const INTEL_DECAY_TICKS = 10;
+/** §7.8 Spy operations: need writing and an active spy; one per spy per tick; acting doubles that tick's detection chance. */
+export const SPY_OPS = { needsCap: "ghi-chép", detectMult: 2, disableTicks: 3, stealDiscount: 0.5, incite: 5 };
 
 export const ERAS = { paleo: "Đồ Đá Cũ", neo: "Đồ Đá Mới", bronze: "Đồ Đồng" };

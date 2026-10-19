@@ -53,6 +53,8 @@ export interface Building {
   progress: number; // work done
   done: boolean;
   hp: number; // 0-100
+  /** §7.8 sabotage: a finished building gives no effect while world.tick < disabledUntil. */
+  disabledUntil?: number;
 }
 
 export type NationStatus = "active" | "asleep" | "error" | "dead";
@@ -87,6 +89,14 @@ export interface Nation {
   silentStreak: number;
   riot: boolean;
   era: string;
+  /** Tick the nation last changed era (null = never); opens the rename window (§2.2). */
+  eraTick: number | null;
+  /** Tick of the last rename_nation (null = never): one rename per era change. */
+  renameTick: number | null;
+  /** Names the nation used before rename_nation, oldest first (§2.2). */
+  formerNames: string[];
+  /** Inventions whose secrets a spy stole: researching them costs 50% less (§7.8). */
+  stolenTech: string[];
   /** Runtime only: quota sleep is decided by the gateway, never by the engine. */
   status: NationStatus;
   sleepUntil: number;
@@ -163,7 +173,11 @@ export interface Petition {
 /** A world-wide law issued by the Watcher (§10.2). */
 export interface Decree { id: number; code: string; tick: number; effectiveTick: number; kind: string; text: string; fromPetition: number | null }
 
-export interface Spy { id: number; owner: number; target: number; since: number; active: boolean }
+export interface Spy {
+  id: number; owner: number; target: number; since: number; active: boolean;
+  /** What the spy did this tick ("" = nothing). Doubles detection; cleared after the roll (§7.8). */
+  acted: string;
+}
 
 export interface Wonder { key: string; name: string; i: number }
 

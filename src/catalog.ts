@@ -34,7 +34,9 @@ export function migrate(world: World): World {
   for (const n of world.nations) {
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];
     n.labor.mine ??= 0;
+    n.eraTick ??= null; n.renameTick ??= null; n.formerNames ??= []; n.stolenTech ??= [];
   }
+  for (const s of world.spies) s.acted ??= "";
   return world;
 }
 

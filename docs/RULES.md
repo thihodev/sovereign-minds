@@ -48,7 +48,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 60–80, cây
 - **Tên thủ đô** và **tên dân tộc** (ví dụ "người Aru"), cùng luật không trùng.
 - **Cờ:** chọn 1 trong 8 bố cục (trơn, 2 sọc ngang, 3 sọc ngang, 2 sọc dọc, 3 sọc dọc, chữ thập, chéo, viền) + 2–3 màu hex + 1 biểu tượng trong 24 biểu tượng có sẵn (mặt trời, trăng, sói, cá, ngọn lửa, núi…). Cờ bị từ chối nếu màu chủ đạo cách màu chủ đạo của cờ khác dưới ngưỡng ΔE 25. Màu chủ đạo cũng là màu tô lãnh thổ trên bản đồ.
 - **Tuyên ngôn lập quốc:** ≤ 280 ký tự. Chỉ để ghi vào Biên niên sử, không có hiệu lực luật.
-- **Đổi tên/đổi cờ:** chỉ khi có sự kiện lớn (đổi kỷ nguyên, đổi chế độ, sáp nhập), tốn 3 AP và −10 ổn định. Tên cũ vẫn nằm trong lịch sử.
+- **Đổi tên/đổi cờ** (`rename_nation`, 3 AP, −10 ổn định): chỉ trong 5 lượt sau khi quốc gia bước vào kỷ nguyên mới, và mỗi lần đổi kỷ nguyên chỉ được đổi một lần. Gửi `name` và/hoặc `flag`; kiểm tra như `found_nation` (độ dài, không trùng, không tên model, màu chủ đạo cách cờ khác ΔE ≥ 25). Tên cũ được giữ trong danh sách tên cũ (hiện trong gói trạng thái và hồ sơ quốc gia) và trong Biên niên sử. Đổi chế độ và sáp nhập chưa có nên chưa mở cửa sổ đổi tên.
 - Không gửi `found_nation` ở lượt 0 thì Engine đặt tên và cờ ngẫu nhiên theo seed, và quốc gia mất lượt 0.
 
 ### 2.3 Lãnh thổ
@@ -396,7 +396,11 @@ Mỗi quốc gia có một **mức hiểu biết** (0–4) về từng quốc gi
 - **Cài cắm** (`plant_spy`, 2 AP): một người dân rời đi, trà trộn vào quốc gia đã gặp cách ≤ 20 ô. Thành công 60%; thất bại thì người đó mất tích.
 - **Báo cáo:** gián điệp đang hoạt động cho mức hiểu biết 4 về nước đó mỗi lượt.
 - **Bị bắt:** mỗi lượt 5% cơ hội bị lộ, cộng 1% cho mỗi 5 chiến binh của nước bị do thám (tối đa 40%). Bị bắt thì gián điệp chết. 50% khả năng nước bị do thám biết kẻ chủ mưu: khi đó kẻ chủ mưu mất 10 uy tín, và nước bị do thám được tuyên chiến với họ trong 10 lượt mà không bị trừ uy tín.
-- **Phá hoại** (sau này, cần năng lực `ghi-chép`): `sabotage` (phá tiến độ một công trình), `steal_tech` (giảm 50% RP cho một phát minh của họ), `incite` (−5 ổn định). Mỗi lần ra tay, cơ hội bị lộ lượt đó nhân đôi.
+- **Ra tay** (cần năng lực `ghi-chép` và một gián điệp đang hoạt động ở nước đó; 2 AP mỗi lần; mỗi gián điệp ra tay tối đa 1 lần mỗi lượt):
+  - `sabotage` (`building` tùy chọn, theo loại công trình): công trình đang xây có nhiều tiến độ nhất bị đưa tiến độ về 0; nếu không có, công trình đã xong lâu nhất mất tác dụng 3 lượt (lượt ra tay và 2 lượt sau).
+  - `steal_tech` (`invention`, mã hoặc tên): một phát minh họ có mà mình chưa có; mình được giảm 50% RP khi nghiên cứu nó. Các mức giảm không cộng dồn, chỉ lấy mức cao nhất (lan truyền 20/40/60%, tự đề xuất 20%, đánh cắp 50%).
+  - `incite`: ổn định của họ −5.
+  - Lượt ra tay, cơ hội bị lộ của gián điệp đó nhân đôi (tính sau giới hạn 40%, nên tối đa 80%). Nước bị hại biết chuyện xảy ra (công trình hỏng, dân bị kích động) nhưng không biết thủ phạm; đánh cắp phát minh thì không ai hay. Biên niên sử cũng không ghi tên thủ phạm. Nếu gián điệp bị bắt ngay lượt đó, nước bị hại được biết nó đã làm gì; nếu nó khai ra nguồn gốc thì Biên niên sử ghi tên kẻ chủ mưu.
 - **Phản gián:** chiến binh canh gác làm tăng cơ hội bắt gián điệp như trên. Quốc gia không biết mình đang bị do thám cho tới khi bắt được gián điệp.
 
 ## 8. Giao thức AI

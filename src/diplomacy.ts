@@ -8,7 +8,7 @@ import {
 } from "./rules.ts";
 import { buildingOf, goodName, knownGood } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
-import { mods, ownedTiles, parseTile } from "./engine.ts";
+import { buildingWorks, mods, ownedTiles, parseTile } from "./engine.ts";
 import type { Battle, Nation, Treaty, TreatyType, War, World } from "./types.ts";
 
 export type Say = (nation: number | null, kind: string, text: string) => void;
@@ -324,7 +324,7 @@ export function resolveBattles(ctx: DiploCtx): void {
       let v = (men + weapons) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5) * luck();
       if (defending) {
         const t = world.tiles[s.tile];
-        const wall = n.buildings.filter(b => b.done && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
+        const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
         v *= 1 + TERRAIN[t.terrain].defense + wall + (t.river ? 0.25 : 0);
       }
       return v;
