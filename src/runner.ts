@@ -10,6 +10,7 @@ import { JUDGE_SYSTEM, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor } from "./rng.ts";
+import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
 import type { Store } from "./db.ts";
 import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
 
@@ -27,6 +28,7 @@ export type RunnerEvent =
   | { type: "tick"; tick: number; chronicle: ChronicleEntry[] }
   | { type: "status" }
   | { type: "turn"; nation: number; kind: string }
+  | { type: "history"; chapter: HistoryChapter; entry: ChronicleEntry }
   | { type: "reload" };
 
 const SLEEP_STEPS_MIN = [15, 30, 60, 120, 240, 360];
@@ -58,6 +60,8 @@ export class Runner {
   /** Watcher rulings waiting for the next tick (§5.4: the Watcher can judge by hand). */
   manualRulings = new Map<number, Ruling>();
   private judgeSleep = new Map<string, number>();
+  /** §10.1: writes a chapter every few ticks, off the tick loop. */
+  historian: Historian | null;
 
   store: Store;
   cfg: RunnerConfig;
@@ -83,6 +87,7 @@ export class Runner {
     const ts = Number(store.getMeta("tick_seconds"));
     if (ts > 0) this.cfg.tickSeconds = ts;
     this.nextTickAt = Date.now() + 3000;
+    this.historian = historianFromEnv(store, this.world, cfg.aiTimeoutSec, (chapter, entry) => this.emit({ type: "history", chapter, entry }));
   }
 
   on(fn: (e: RunnerEvent) => void): () => void { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -101,6 +106,7 @@ export class Runner {
   /** Resolves once the current tick (if any) has finished; used before an update. */
   async stop(): Promise<void> {
     this.stopping = true;
+    if (this.historian) this.historian.stopped = true;
     while (this.busy) await sleep(200);
     this.store.saveState(this.world);
   }
@@ -132,6 +138,7 @@ export class Runner {
       this.store.addStats(w);
       this.nextTickAt = Date.now() + this.cfg.tickSeconds * 1000;
       this.emit({ type: "tick", tick: w.tick, chronicle: res.chronicle });
+      void this.historian?.maybeWrite(w); // not awaited: the next tick never waits for the Historian
     } finally { this.busy = false; this.emit({ type: "status" }); }
   }
 

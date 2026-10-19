@@ -1,6 +1,6 @@
 // A fake OpenAI-compatible provider for development and demos, no keys needed.
 // It reads the observation the engine sends and answers like a (simple) AI
-// nation, or like the judge. It also misbehaves on purpose: ~5% of calls get
+// nation, the judge or the Historian. It also misbehaves on purpose: ~5% of calls get
 // HTTP 429 with retry-after, ~5% get prose instead of JSON.
 //
 //   node tools/mock-provider.ts            # listens on :4010
@@ -63,6 +63,23 @@ function judgeTurn(text: string): Record<string, unknown> {
   return { causality: ok ? 2 : 1, material: ok ? 2 : 1, physics: ok ? 1 : 1, duplicate_of: null, add_prereqs: [], remove_effects: [], remove_capabilities: [], reason: ok ? "Bước tiến nhỏ, có nền tảng." : "Chưa đủ nền tảng cho bước này." };
 }
 
+/** A plausible chapter built only from the facts in the Historian's prompt. */
+function historianTurn(text: string): Record<string, unknown> {
+  const range = text.match(/các lượt (\d+)–(\d+)/), from = Number(range?.[1] ?? 0), to = Number(range?.[2] ?? 0);
+  const nations = [...text.matchAll(/^- (.+?) \((.+?), thủ đô (.+?)\)( — đã diệt vong)? \| dân (\d+) \| (\S+) ô \| (\d+) phát minh/gm)]
+    .map(m => ({ name: m[1], people: m[2], capital: m[3], dead: !!m[4], pop: Number(m[5]), inv: Number(m[7]) }));
+  const events = [...text.matchAll(/^- lượt (\d+)(?: \[(.+?)\])?: (.+)$/gm)].map(m => ({ tick: Number(m[1]), nation: m[2], text: m[3] }));
+  const h = hash(text);
+  const top = nations.slice().sort((a, b) => b.pop - a.pop)[0];
+  const paras: string[] = [];
+  paras.push(`Trong ${(to - from + 1) * 10} năm từ năm ${from * 10} đến năm ${(to + 1) * 10}, đất Nguyên Địa vẫn là cõi của lửa trại, đá mài và những cánh rừng chưa ai đặt tên. ${nations.length ? `Có ${nations.length} dân tộc cùng sống dưới một bầu trời: ${nations.map(n => `${n.people} ở ${n.capital}`).join(", ")}.` : "Các bộ lạc còn chưa kịp đặt tên cho mình."}`);
+  const picked = events.filter(e => /phát minh|lập quốc|chiến|hiệp ước|định cư|đói|kỷ/i.test(e.text)).slice(0, 4);
+  if (picked.length) paras.push(`Sử sách ghi lại rằng ${picked.map(e => `vào lượt ${e.tick}, ${e.text.replace(/\.$/, "").replace(/^./, c => c.toLowerCase())}`).join("; rồi ")}. Mỗi việc ấy đều nhỏ, nhưng người đời sau sẽ thấy đó là những viên đá đầu tiên của một con đường dài.`);
+  else paras.push("Không có biến cố lớn nào được chép lại. Người ta săn, hái, giữ lửa và chờ mùa sau, và chính sự lặng lẽ ấy cũng là một phần của lịch sử.");
+  if (top) paras.push(`Đến cuối giai đoạn, ${top.name} là nước đông người nhất với ${top.pop} dân và ${top.inv} phát minh, ${pick(["nhưng chưa ai dám nói vận nước sẽ bền lâu", "và tiếng trống của họ vang xa nhất bên bờ sông", "song cái đói vẫn rình rập ngoài bìa rừng"], h)}. ${nations.filter(n => n !== top && !n.dead).map(n => `${n.name} có ${n.pop} người`).join(", ") || "Các nước khác còn nhỏ bé"}. ${nations.some(n => n.dead) ? `Có nước đã tắt lửa vĩnh viễn: ${nations.filter(n => n.dead).map(n => n.name).join(", ")}.` : "Chưa nước nào tắt lửa."} Bánh xe thời gian vẫn quay, và chương sau còn chờ được viết.`);
+  return { title: `${pick(["Lửa trại", "Đá và sông", "Những mùa săn", "Tiếng trống đầu tiên", "Bước chân trên đồng cỏ"], h)} (năm ${from * 10}–${(to + 1) * 10})`, text: paras.join("\n\n") };
+}
+
 createServer((req, res) => {
   let body = "";
   req.on("data", c => { body += c; });
@@ -76,6 +93,7 @@ createServer((req, res) => {
     const system = j.messages?.[0]?.content ?? "", user = j.messages?.[1]?.content ?? "";
     let content: string;
     if (/Judge of Inventions/.test(system)) content = JSON.stringify(judgeTurn(user));
+    else if (/You are the Historian of/.test(system)) content = JSON.stringify(historianTurn(user));
     else {
       if (r < FAIL * 2) content = "Tôi nghĩ chúng ta nên đi săn nhiều hơn.";
       else {

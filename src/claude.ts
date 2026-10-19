@@ -4,9 +4,11 @@
 //   shows the sign-in link and passes the code back.
 // - credentials live in CLAUDE_CONFIG_DIR (data/claude), never in the database.
 // - chat: `claude -p --output-format stream-json`, no tools, one resumable session.
+// - askClaude: `claude -p --output-format json`, one answer for the Historian.
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 const CLI = () => process.env.CLAUDE_CLI || "claude";
@@ -172,4 +174,34 @@ export function chat(message: string, context: string, sessionId: string | null,
   });
   p.stdin.write(`<trang_thai_the_gioi>\n${context}\n</trang_thai_the_gioi>\n\n${message}`);
   p.stdin.end();
+}
+
+// ---------------------------------------------------------------- one-shot (the Historian)
+
+export type AskClaudeResult = { ok: true; text: string } | { ok: false; kind: "ratelimit" | "auth" | "timeout" | "error"; message: string; retryAfterSec: number | null };
+
+/** One prompt, one answer: no tools, no session to resume. Used by the Historian (§10.1). */
+export function askClaude(system: string, user: string, opts: { model: string; timeoutMs: number }): Promise<AskClaudeResult> {
+  const args = ["-p", "--output-format", "json", "--model", opts.model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", system, "--tools", ""];
+  return new Promise(res => {
+    const p = spawn(CLI(), args, { env: cliEnv(), cwd: tmpdir() });
+    let out = "", stderr = "", timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; p.kill("SIGTERM"); }, opts.timeoutMs);
+    p.stdout.on("data", (d: Buffer) => { out += d.toString("utf8"); });
+    p.stderr.on("data", (d: Buffer) => { stderr += d.toString("utf8"); });
+    p.on("error", e => { clearTimeout(timer); res({ ok: false, kind: "error", message: `Không chạy được Claude CLI: ${e.message}`, retryAfterSec: null }); });
+    p.on("close", code => {
+      clearTimeout(timer);
+      if (timedOut) return res({ ok: false, kind: "timeout", message: `Quá hạn ${opts.timeoutMs / 1000}s`, retryAfterSec: null });
+      let j: Record<string, any> = {};
+      try { j = JSON.parse(out); } catch { /* reported below */ }
+      if (code === 0 && !j.is_error && typeof j.result === "string" && j.result) return res({ ok: true, text: j.result });
+      const msg = String(j.result || stderr.slice(-400) || `Claude CLI thoát với mã ${code}`);
+      const kind = /limit|quota|overloaded/i.test(msg) ? "ratelimit" : /log ?in|auth|credential|401/i.test(msg) ? "auth" : "error";
+      res({ ok: false, kind, message: msg.slice(0, 400), retryAfterSec: null });
+    });
+    p.stdin.on("error", () => { /* the CLI exited early; reported on close */ });
+    p.stdin.write(user);
+    p.stdin.end();
+  });
 }
