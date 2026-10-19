@@ -41,6 +41,7 @@ test("open invention: propose, judge, research, unlock a new recipe", () => {
   const w = founded(1);
   const n = w.nations[0];
   n.inventions.push("P1", "P2", "P10", "P13");
+  const clayTile = ownedTiles(w, n.id)[0]; clayTile.cap.clay = 100; // the kiln needs clay in the territory
   turn(w, { 0: { actions: [kiln] } });
   const p = w.proposals[0];
   assert.equal(p.status, "pending");
@@ -191,4 +192,20 @@ test("settlements: found one, tiles cut off go wild", () => {
   lonely.owner = n.id;
   for (let k = 0; k < 6; k++) turn(w, {});
   assert.equal(w.tiles[lonely.i].owner, -1);
+});
+
+test("material conditions gate research; equal proposals merge; eras never fall back", () => {
+  const w = founded(2, "gates");
+  const [a, b] = w.nations;
+  for (const n of [a, b]) n.inventions.push("P1", "P2", "P10", "P13");
+  for (const t of w.tiles) if (t.owner === a.id || t.owner === b.id) delete t.cap.clay;
+  turn(w, { 0: { actions: [kiln] }, 1: { actions: [kiln] } });
+  const [p1, p2] = w.proposals;
+  turn(w, {}, { [p1.id]: approve(), [p2.id]: approve() });
+  assert.equal(p1.status, "approved");
+  assert.equal(p2.status, "duplicate", "same invention in the same tick joins the first");
+  assert.equal(a.research, null, "no clay in the land: research does not start");
+  a.era = "Đồ Đá Mới";
+  turn(w, {});
+  assert.equal(a.era, "Đồ Đá Mới", "a people that loses farming keeps its era");
 });

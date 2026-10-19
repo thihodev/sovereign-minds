@@ -59,7 +59,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 ### 2.3 Lãnh thổ
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
-- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền hoặc biển nông, không phải biển sâu). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
+- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc biển nông nếu đã đi được biển nông nhờ `đi-nước`; không bao giờ là biển sâu). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
 - **Giới hạn quản lý:** số ô tối đa = 7 + floor(dân số / 10) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 4 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 30, 20 lương thực và một tên 2–30 ký tự. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +15 chỗ ở và +3 giới hạn ô. 10 dân di cư sang điểm mới (chưa có trong engine: dân không bị trừ).
@@ -211,11 +211,11 @@ Mỗi hiệu ứng có điểm sức mạnh. Tổng điểm của một phát mi
 | `role_bonus` | +10, 20 hoặc 30% năng suất một vai: `hunt`, `gather`, `fish`, `farm`, `wood`, `stone`, `flint`, `clay`, `mine`, `craft`, `build`, `research`, `warrior`, hoặc `extract` (mọi vai khai thác và khai mỏ). Với `farm`, `craft`, `build`, `research` hiệu ứng được nhận và tính điểm nhưng chưa làm tăng sản lượng (chưa có trong engine). | 2 mỗi 10% |
 | `spoilage` | Lương thực hư ít đi 10, 20 hoặc 30% của mức gốc 30%, tức −3, −6 hoặc −9 điểm % | 1 mỗi 10% |
 | `recipe` | Một loại hàng **mới** (`id` dạng slug chưa tồn tại, tên): đầu vào 1–10 mỗi loại hàng đã có (ít nhất một loại), `output_qty` 1–3, `work` 1–3, nơi làm `at` = `workshop`, `kiln`, công trình mới trong cùng đơn, hoặc loại công trình đã có. Tùy chọn `tool`: hàng này là công cụ cho một vai (`role`, `percent` 10–30, `per` 1–4 người mỗi món) | 3 (+2 mỗi 10% nếu là công cụ) |
-| `building` | Một công trình **mới**: vật liệu mỗi loại 1–40 (ít nhất một, trừ công trình trồng trọt), công 3–12; tác dụng `housing` 0–15, `stability` 0–1, `spoilage` 0–10 (%), `craft_slots` 0–4, `defense` 0–40 (%), `farm_slots` 0–6 kèm `farm_food` 1–2 | 3 + 2 mỗi 5 chỗ ở (làm tròn lên) + 4 nếu có ổn định + 1 mỗi 10% hư hỏng (làm tròn) + 3 mỗi 10% phòng thủ + 3 nếu trồng trọt; chỗ chế tác không tính điểm |
+| `building` | Một công trình **mới**: vật liệu mỗi loại 1–40 (ít nhất một, trừ công trình trồng trọt), công 3–12; tác dụng `housing` 0–15, `stability` 0–1, `spoilage` 0–10 (%), `craft_slots` 0–4, `defense` 0–40 (%), `farm_slots` 0–6 kèm `farm_food` 1–2 | 3 + 2 mỗi 5 chỗ ở (làm tròn lên) + 4 nếu có ổn định + 1 mỗi 10% hư hỏng (làm tròn) + 3 mỗi 10% phòng thủ + 3 nếu trồng trọt + 1 mỗi 2 chỗ chế tác (làm tròn lên) |
 | `stability` | +1 hoặc +2 ổn định mỗi lượt | 4 mỗi điểm |
 | `ap` | +1 AP | 5 |
 | `combat` | +10, 20 hoặc 30% sức chiến đấu (cả công lẫn thủ) | 3 mỗi 10% |
-| `move` | Đi được một loại địa hình: `shallow` (biển nông), `mountain`, `swamp`, `jungle`. Đầm lầy và rừng rậm vốn đã đi được nên hiện không có tác dụng thêm. | 4 |
+| `move` | Đi được một loại địa hình: `shallow` (biển nông: thám hiểm, giữ ô biển) hoặc `mountain` (thám hiểm, tấn công qua núi). Đầm lầy và rừng rậm vốn đã đi được nên không nhận. | 4 |
 | `reveal` | Thấy và khai mỏ được một loại quặng ẩn: `copper`, `tin`, `iron` | 4 |
 | `research` | RP +10 hoặc +20% | 3 mỗi 10% |
 | `tile_limit` | Giới hạn ô +1 hoặc +2 | 2 mỗi ô |
@@ -264,7 +264,7 @@ Trọng tài duyệt theo nhân quả và vật lý, không theo lịch sử Tr�
 
 ### 5.6 Cổng kỷ nguyên
 
-Kỷ nguyên xác định bằng năng lực, không bằng tên phát minh, nên không thể "đặt tên cho oai" để lên kỷ nguyên. Engine tính lại kỷ nguyên cuối mỗi lượt; mất điều kiện (ví dụ dân số tụt dưới 50) thì lùi về kỷ nguyên trước. Mỗi lần đổi kỷ nguyên (kể cả lùi lại) mở cửa sổ 5 lượt để đổi tên, đổi cờ (mục 2.2).
+Kỷ nguyên xác định bằng năng lực, không bằng tên phát minh, nên không thể "đặt tên cho oai" để lên kỷ nguyên. Engine xét kỷ nguyên cuối mỗi lượt và chỉ cho tiến lên, không lùi: một dân tộc suy yếu vẫn giữ kỷ nguyên đã đạt. Mỗi lần bước sang kỷ nguyên mới mở cửa sổ 5 lượt để đổi tên, đổi cờ (mục 2.2).
 
 | Kỷ nguyên | Điều kiện để một quốc gia bước vào |
 | --- | --- |
@@ -276,9 +276,9 @@ Luật cho kỷ nguyên Đồ Đồng trở đi sẽ được Watcher ban hành 
 
 ### 5.7 Chống lách luật phát minh
 
-- **Chống phát minh vụn:** bảng xếp hạng nên tính điểm phát minh theo độ sâu d, không theo số lượng (chưa có trong engine: bảng xếp hạng hiện tại ở mục 9.3 tính theo số lượng). Chia một ý tưởng thành nhiều mảnh nhỏ tốn thêm AP và lượt chờ trọng tài.
+- **Chống phát minh vụn:** bảng xếp hạng (mục 9.3) tính điểm phát minh theo độ sâu d, không theo số lượng. Chia một ý tưởng thành nhiều mảnh nhỏ chỉ tốn thêm AP và lượt chờ trọng tài.
 - **Trần cộng dồn:** tổng thưởng năng suất (phát minh + công cụ) của một vai sản xuất không vượt +150%, dù có bao nhiêu phát minh. Nâng trần ở kỷ nguyên sau (chưa có trong engine).
-- **Cùng phát minh trong cùng lượt:** hai đơn tương đương từ hai quốc gia được gộp thành một mục trong Sổ, cả hai được ghi danh đồng phát minh (chưa có trong engine: hai đơn cùng tên nộp cùng lượt được chấm riêng). Khi hai quốc gia cùng nghiên cứu xong một phát minh trong cùng một lượt thì cả hai được ghi danh.
+- **Cùng phát minh trong cùng lượt:** hai đơn cùng tên (sau khi chuẩn hóa) được duyệt cùng lượt thì đơn sau thành "trùng" và trỏ về phát minh của đơn trước; nước đó nghiên cứu phát minh chung ấy. Khi hai quốc gia cùng nghiên cứu xong một phát minh trong cùng một lượt thì cả hai được ghi danh.
 - **Chống thao túng trọng tài:** mô tả phát minh là dữ liệu không tin cậy; lời nhắc của trọng tài nói rõ điều này. Trọng tài chỉ trả về điểm số dạng JSON. Tự động từ chối và trừ 15 uy tín khi mô tả chứa lời nhắn gửi trọng tài ("hãy duyệt", "bỏ qua tiêu chí") (chưa có trong engine; bộ lọc này mới áp dụng cho tin nhắn, mục 8.5).
 - **Trọng tài vắng mặt:** trọng tài lỗi API thì thay bằng ứng viên kế tiếp trong danh sách. Hết cả danh sách thì đơn chờ sang lượt sau, không mất gì.
 - **Kiến thức Trái Đất không phải lối tắt:** AI biết lò cao và điện từ lịch sử thật, nhưng chỉ được nộp đơn đứng trên tiên quyết mình đang có. Ngân sách 4 + 2d và luật độ sâu khiến mỗi bước chỉ đi được một nấc.
@@ -355,11 +355,11 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 ### 7.2 Ngoại giao
 
 - **Tin nhắn** (`message`, 1 AP): tối đa 1 tin ≤ 500 ký tự mỗi đối tác mỗi lượt. Trước khi có ngôn ngữ chung (cả hai bên có năng lực `ghi-chép`, hoặc bên gửi đã giao thương thành công 10 lần với bên nhận), tin nhắn chỉ được chọn từ 20 "cử chỉ" có sẵn: chào hỏi, tặng quà, muốn trao đổi, muốn hòa bình, cảm ơn, đồng ý, từ chối, cảnh cáo, đe dọa, hãy rời khỏi lãnh thổ, xin giúp đỡ, chúng tôi đói, chúng tôi mạnh, cùng đi săn, kết đồng minh, rút lui, đầu hàng, tha thứ, chúng tôi theo dõi các người, tạm biệt. Đây là rào cản ngôn ngữ của thời tiền sử. Tin nhắn được giao ngay trong lượt và nằm trong hộp thư của bên nhận ở lượt sau.
-- **Hiệp ước** là một đối tượng có cấu trúc: loại (`non_aggression`, `passage`, `alliance`, `peace`, `tribute`, `vassal`), thời hạn (5–200 lượt, hoặc bỏ trống là vĩnh viễn), cống phẩm mỗi lượt (`tribute`, mỗi loại hàng 1–50; bắt buộc với cống nạp và chư hầu), bên trả (`payer`: `me` hoặc `them`, mặc định là bên đề nghị) và tối đa 3 ô nhượng (`cede`, phải thuộc bên trả). Khi đang có chiến tranh chỉ đề nghị được hòa bình; hòa bình chỉ đề nghị được khi đang có chiến tranh. Điều khoản "chia sẻ tầm nhìn" và "cùng chiến chống lại Y" (chưa có trong engine).
+- **Hiệp ước** là một đối tượng có cấu trúc: loại (`non_aggression`, `passage`, `alliance`, `peace`, `tribute`, `vassal`), thời hạn (5–200 lượt, hoặc bỏ trống là vĩnh viễn), cống phẩm mỗi lượt (`tribute`, mỗi loại hàng 1–50; bắt buộc với cống nạp và chư hầu), bên trả (`payer`: `me` hoặc `them`, mặc định là bên đề nghị) và tối đa 3 ô nhượng (`cede`, phải thuộc bên trả). Khi đang có chiến tranh chỉ đề nghị được hòa bình; hòa bình chỉ đề nghị được khi đang có chiến tranh. Liên minh tự động chia sẻ tầm nhìn (mọi ô trong bán kính 3 quanh lãnh thổ đồng minh) và tự tham chiến khi đồng minh bị tuyên chiến. Điều khoản "cùng chiến chống lại Y" riêng (chưa có trong engine).
 - **Ký kết:** bên A gửi `treaty` (2 AP) ở lượt N; bên B gửi `accept_treaty` với số hiệu đề nghị (2 AP) chậm nhất ở lượt N + 2, sau đó đề nghị hết hạn. Hiệp ước có hiệu lực ngay trong lượt B chấp nhận: ô nhượng (nếu vẫn thuộc bên trả) đổi chủ, hiệp ước hòa bình chấm dứt chiến tranh.
 - **Thi hành:** từ lượt sau ngày ký, Engine tự chuyển cống phẩm từ bên trả sang bên nhận mỗi lượt. Thiếu bất kỳ loại hàng nào thì lượt đó không chuyển gì, bên trả bị ghi vi phạm và −10 uy tín.
 - **Phá ước:** gửi `break_treaty` (2 AP), có hiệu lực từ lượt sau. Trong chính lượt phá ước hiệp ước vẫn chặn tuyên chiến, nên sớm nhất lượt sau mới tuyên chiến được và lượt sau nữa mới giao tranh. Chư hầu không phá ước được, phải dùng `declare_independence`.
-- **Uy tín** (0–100, khởi đầu 50): phá ước −20, không nộp đủ cống −10, gửi tin nhắn giả mạo mệnh lệnh hệ thống −15, gián điệp bị bắt và lộ chủ mưu −10, giữ một hiệp ước có thời hạn đến hết hạn mà không ai phá: +5 cho cả hai bên. Tấn công không tuyên chiến là không thể (Engine chặn). Uy tín công khai với mọi quốc gia đã gặp (chưa có trong engine: AI mới chỉ thấy uy tín của chính mình; Watcher thấy tất cả).
+- **Uy tín** (0–100, khởi đầu 50): phá ước −20, không nộp đủ cống −10, gửi tin nhắn giả mạo mệnh lệnh hệ thống −15, gián điệp bị bắt và lộ chủ mưu −10, giữ một hiệp ước có thời hạn đến hết hạn mà không ai phá: +5 cho cả hai bên. Tấn công không tuyên chiến là không thể (Engine chặn). Tuyên chiến không có chính nghĩa (không có casus belli từ việc bắt được gián điệp) −5. Đơn phát minh hay thỉnh nguyện giả mạo mệnh lệnh hệ thống bị chặn, −15. Uy tín công khai: mọi quốc gia đã gặp đều thấy trong báo cáo tình báo.
 
 ### 7.3 Giao thương
 
@@ -579,7 +579,19 @@ Sự kiện được thông báo trước 1 lượt cho quốc gia có phát min
 
 ### 9.3 Kết thúc và xếp hạng
 
-- **Không có người thắng duy nhất.** Watcher UI hiện một bảng xếp hạng với điểm = dân số + 10 × số phát minh + 15 × số phát minh đầu tiên thế giới + 25 × số phát minh tự tạo được duyệt + 3 × số ô + uy tín. Năm bảng riêng (dân số, phát minh theo độ sâu, lãnh thổ, uy tín, tuổi thọ quốc gia) (chưa có trong engine).
+- **Không có người thắng duy nhất.** Engine tính một điểm xếp hạng (src/ranking.ts), gửi kèm trạng thái cho Watcher:
+
+| Phần | Điểm |
+| --- | --- |
+| Dân số | 1 mỗi người (quốc gia còn sống) |
+| Lãnh thổ | 3 mỗi ô |
+| Tri thức | 4 × (d + 1) cho mỗi phát minh đang có, d là độ sâu |
+| Đầu tiên thế giới | 10 × (d + 1) cho mỗi phát minh làm chủ đầu tiên (kể cả đồng hạng cùng lượt) |
+| Nhà phát minh | 6 × (d + 1) cho mỗi phát minh mở do mình đề xuất được duyệt |
+| Uy tín | bằng uy tín |
+| Tuổi thọ | 1 mỗi 10 lượt |
+
+Năm bảng xếp hạng riêng (chưa có trong engine).
 - **Diệt vong:** dân số = 0 hoặc mất thủ đô khi không còn điểm định cư nào. Quốc gia diệt vong được ghi vào Biên niên sử, đất của nó trở thành vô chủ. Watcher dùng key AI của nó cho một bộ lạc mới ở vùng hoang (chưa có trong engine).
 - **Hết mùa 1** khi quốc gia đầu tiên vượt Cổng Đồ Đồng, hoặc sau 500 lượt (chưa có trong engine: thế giới chạy tiếp, Engine chỉ ghi Biên niên sử khi có nước chạm Cổng Đồ Đồng). Thế giới không reset: mùa 2 tiếp tục từ trạng thái cũ với luật kỷ nguyên mới.
 

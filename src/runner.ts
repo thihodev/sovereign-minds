@@ -84,6 +84,7 @@ export class Runner {
       if (p && n.controller === "ai") n.model = providerModel(p);
     }
     this.paused = store.getMeta("paused") === "1";
+    this.loadManual();
     const ts = Number(store.getMeta("tick_seconds"));
     if (ts > 0) this.cfg.tickSeconds = ts;
     this.nextTickAt = Date.now() + 3000;
@@ -149,6 +150,15 @@ export class Runner {
     return next;
   }
 
+  /** Watcher rulings survive a restart: they are kept in the database until used. */
+  private setManual(id: number, r: Ruling): void {
+    this.manualRulings.set(id, r);
+    this.store.setMeta("manual_rulings", JSON.stringify([...this.manualRulings.entries()]));
+  }
+  private loadManual(): void {
+    try { for (const [id, r] of JSON.parse(this.store.getMeta("manual_rulings") || "[]")) this.manualRulings.set(Number(id), r); } catch { /* ignore */ }
+  }
+
   /** Rulings for this tick: the Watcher's first, then an AI judge per pending proposal. */
   private async judgePending(): Promise<Record<number, Ruling>> {
     const w = this.world, out: Record<number, Ruling> = {};
@@ -157,6 +167,7 @@ export class Runner {
       const manual = this.manualRulings.get(p.id);
       if (manual) { out[p.id] = manual; this.manualRulings.delete(p.id); }
     }
+    this.store.setMeta("manual_rulings", JSON.stringify([...this.manualRulings.entries()]));
     const nationProviders = new Set(w.nations.filter(n => n.alive && n.controller === "ai").map(n => n.provider));
     let calls = 0;
     for (const p of pending) {
@@ -180,7 +191,7 @@ export class Runner {
   judgeByHand(id: number, approve: boolean, reason: string): string | null {
     const p = this.world.proposals.find(x => x.id === id && x.status === "pending");
     if (!p) return "Không có đơn đang chờ này";
-    this.manualRulings.set(id, { judge: "Watcher", causality: approve ? 2 : 0, material: approve ? 2 : 0, physics: approve ? 2 : 1, duplicate_of: null, add_prereqs: [], remove_effects: [], remove_capabilities: [], reason: reason || (approve ? "Các vị thần chấp thuận." : "Các vị thần bác bỏ.") });
+    this.setManual(id, { judge: "Watcher", causality: approve ? 2 : 0, material: approve ? 2 : 0, physics: approve ? 2 : 1, duplicate_of: null, add_prereqs: [], remove_effects: [], remove_capabilities: [], reason: reason || (approve ? "Các vị thần chấp thuận." : "Các vị thần bác bỏ.") });
     this.store.logWatcher(this.world.tick, "ruling", { id, approve, reason });
     return null;
   }

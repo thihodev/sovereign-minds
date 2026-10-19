@@ -62,11 +62,11 @@ export const EFFECT_KINDS: Record<string, string> = {
   role_bonus: '{"kind":"role_bonus","role":"hunt|gather|fish|farm|wood|stone|flint|clay|mine|craft|build|research|warrior|extract","percent":10|20|30} — 2 points per 10%',
   spoilage: '{"kind":"spoilage","percent":10|20|30} — food spoils that much less; 1 point per 10%',
   recipe: '{"kind":"recipe","id":"slug","name":"…","input":{"good":qty},"output_qty":1-3,"work":1-3,"at":"workshop|kiln|<your building id>","tool":{"role":"…","percent":10-30,"per":1-4}?} — a NEW good made from goods that exist; 3 points (+2 per 10% if it is a tool)',
-  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3',
+  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3, craft slots 1/2',
   stability: '{"kind":"stability","per_tick":1|2} — 4 points each',
   ap: '{"kind":"ap","amount":1} — 5 points',
   combat: '{"kind":"combat","percent":10|20|30} — 3 points per 10%',
-  move: '{"kind":"move","terrain":"shallow|mountain|swamp|jungle"} — that terrain becomes passable for explorers/armies; 4 points',
+  move: '{"kind":"move","terrain":"shallow|mountain"} — explorers and armies can cross it; shallow also lets you hold sea tiles; 4 points',
   reveal: '{"kind":"reveal","resource":"copper|tin|iron"} — that hidden ore becomes visible; 4 points',
   research: '{"kind":"research","percent":10|20} — RP +; 3 points per 10%',
   tile_limit: '{"kind":"tile_limit","amount":1|2} — 2 points each',
@@ -140,14 +140,14 @@ export function parseEffects(world: World, raw: Array<Record<string, unknown>>, 
         const f = (e.effect ?? {}) as Record<string, unknown>, n = (k: string, max: number) => Math.max(0, Math.min(max, Math.round(Number(f[k] ?? 0))));
         const effect = { housing: n("housing", 15), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4), defense: n("defense", 40) / 100, farmSlots: n("farm_slots", 6), farmFood: n("farm_food", 2) };
         if (effect.farmSlots && !effect.farmFood) effect.farmSlots = 0;
-        out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0);
+        out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0) + Math.ceil(effect.craftSlots / 2);
         if (!Object.keys(cost).length && !effect.farmSlots) { err(`${at}: công trình phải tốn ít nhất một vật liệu`); break; }
         out.buildings.push({ type: id, name, needs: "", cost, work, desc: describeBuilding(effect), effect }); break;
       }
       case "stability": { const k = pct(e.per_tick, [1, 2]); if (Number.isNaN(k)) { err(`${at}: per_tick 1 hoặc 2`); break; } E.stabilityPerTick = (E.stabilityPerTick || 0) + k; out.power += 4 * k; break; }
       case "ap": { E.ap = 1; out.power += 5; break; }
       case "combat": { const p = pct(e.percent, [10, 20, 30]); if (Number.isNaN(p)) { err(`${at}: percent 10/20/30`); break; } E.combat = (E.combat || 0) + p / 100; out.power += 3 * p / 10; break; }
-      case "move": { const t = String(e.terrain); if (!["shallow", "mountain", "swamp", "jungle"].includes(t)) { err(`${at}: terrain không hợp lệ`); break; } E.move = [...(E.move || []), t]; out.power += 4; break; }
+      case "move": { const t = String(e.terrain); if (!["shallow", "mountain"].includes(t)) { err(`${at}: terrain phải là shallow hoặc mountain (đầm lầy và rừng rậm vốn đi được)`); break; } E.move = [...(E.move || []), t]; out.power += 4; break; }
       case "reveal": { const r = String(e.resource); if (!["copper", "tin", "iron"].includes(r)) { err(`${at}: resource phải là copper, tin hoặc iron`); break; } E.reveal = [...(E.reveal || []), r]; out.power += 4; break; }
       case "research": { const p = pct(e.percent, [10, 20]); if (Number.isNaN(p)) { err(`${at}: percent 10 hoặc 20`); break; } E.rp = (E.rp || 0) + p / 100; out.power += 3 * p / 10; break; }
       case "tile_limit": { const k = pct(e.amount, [1, 2]); if (Number.isNaN(k)) { err(`${at}: amount 1 hoặc 2`); break; } E.tiles = (E.tiles || 0) + k; out.power += 2 * k; break; }
@@ -240,6 +240,9 @@ export function checkProposal(world: World, n: Nation, a: Record<string, unknown
 export function applyRuling(world: World, p: Proposal, r: Ruling): string | null {
   p.ruling = r;
   if (r.duplicate_of && inv(world, r.duplicate_of)) { p.status = "duplicate"; p.inventionId = r.duplicate_of; return null; }
+  // Two nations invented the same thing in the same tick: the second joins the first (§5.7)
+  const same = allInventions(world).find(v => normInv(v.name) === normInv(p.name));
+  if (same) { p.status = "duplicate"; p.inventionId = same.id; return null; }
   // Amendments: extra prerequisites, fewer effects, fewer capabilities
   const extra = (r.add_prereqs || []).filter(x => inv(world, x) && !p.prereqs.includes(x)).slice(0, 2);
   const effects = p.effects.filter((_, i) => !(r.remove_effects || []).includes(i));

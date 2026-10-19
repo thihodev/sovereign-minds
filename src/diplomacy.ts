@@ -6,7 +6,7 @@ import { rngFor } from "./rng.ts";
 import {
   GESTURES, INJECTION, MESSAGE_MAX, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
-import { buildingOf, goodName, knownGood } from "./catalog.ts";
+import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
 import { buildingWorks, mods, ownedTiles, parseTile } from "./engine.ts";
 import type { Battle, Nation, Treaty, TreatyType, War, World } from "./types.ts";
@@ -183,6 +183,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
         if (blocking.length) return `Đang có hiệp ước ${blocking.map(t => `${TREATY_NAME[t.type]} #${t.id}`).join(", ")}; phải phá ước trước`;
       }
       const free = (n.casusBelli[String(o.id)] ?? -1) >= tick || type === "declare_independence";
+      if (!free) n.reputation = Math.max(0, n.reputation - WAR.unprovokedPenalty);
       startWar(world, n, o, tick, free ? "có chính nghĩa" : "", say);
       return null;
     }
@@ -321,6 +322,8 @@ export function resolveBattles(ctx: DiploCtx): void {
       const m = mods(world, n);
       let weapons = 0, left = men;
       for (const [k, bonus] of Object.entries(WAR.weapon)) { const k2 = Math.min(left, Math.floor(n.stock[k] || 0)); weapons += k2 * bonus; left -= k2; }
+      // Weapons a nation invented itself (recipe tools for warriors)
+      for (const [k, q] of Object.entries(n.stock)) { const use = recipeOf(world, k)?.use; if (use?.role !== "warrior" || left <= 0) continue; const k2 = Math.min(left, Math.floor(q) * use.per); weapons += k2 * use.bonus * 2; left -= k2; }
       let v = (men + weapons) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5) * luck();
       if (defending) {
         const t = world.tiles[s.tile];
@@ -336,6 +339,9 @@ export function resolveBattles(ctx: DiploCtx): void {
     const lossRate = (win: boolean) => { const [lo, hi] = win ? WAR.winLoss : WAR.loseLoss; return lo + r() * (hi - lo); };
     const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won))), lossD = Math.min(dMen, Math.round(dMen * lossRate(!won)));
     A.population -= lossA; A.labor.warrior = Math.max(0, A.labor.warrior - lossA);
+    // The fallen lose their weapons (bows first, then spears)
+    const loseWeapons = (n: Nation, k: number) => { for (const w of Object.keys(WAR.weapon)) { if (k <= 0) break; const q = Math.min(k, Math.floor(n.stock[w] || 0)); if (q) { L.stock(n, w, -q, "battle"); k -= q; } } };
+    loseWeapons(A, lossA); if (!militia) loseWeapons(D, lossD);
     D.population -= lossD; if (!militia) D.labor.warrior = Math.max(0, D.labor.warrior - lossD);
     const prisoners = won ? Math.floor(lossD * WAR.prisoners) : 0;
     if (prisoners) { A.population += prisoners; A.stability -= Math.floor(prisoners / 5); }

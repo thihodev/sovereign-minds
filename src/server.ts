@@ -8,6 +8,7 @@ import { N } from "./hex.ts";
 import { RULES_VERSION } from "./rules.ts";
 import { buildingOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
+import { ranking } from "./ranking.ts";
 import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
 import { chat, claudeStatus, login, logout } from "./claude.ts";
 import type { Runner } from "./runner.ts";
@@ -78,6 +79,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       battles: w.battles.slice(-20),
       caravans: w.caravans,
       eraGates: w.eraGates,
+      ranking: ranking(w),
     };
   }
 

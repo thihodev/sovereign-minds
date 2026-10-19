@@ -2,6 +2,12 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.3 (đang làm)
+
+- Sửa theo rà soát luật ↔ code: thưởng nghề và công cụ tự phát minh có tác dụng với nông dân, chế tác, xây dựng, nghiên cứu và chiến binh; vũ khí mất theo thương vong, rìu mòn; giữ ô biển nông cần `đi-nước`; kỷ nguyên không lùi; nghiên cứu tự bắt đầu chỉ khi đủ điều kiện vật chất; hai đơn cùng tên duyệt cùng lượt được gộp; chặn giả mạo mệnh lệnh trong đơn phát minh và thỉnh nguyện; đồng minh chia sẻ tầm nhìn; uy tín công khai; tuyên chiến không chính nghĩa −5 uy tín; quyết định duyệt tay của Watcher không mất khi khởi động lại; `move` chỉ nhận biển nông và núi; chỗ chế tác của công trình mở tính điểm.
+- Xếp hạng tính ở Engine theo độ sâu phát minh (src/ranking.ts).
+- Sử gia AI, gián điệp ra tay (phá hoại, đánh cắp công nghệ, kích động), đổi tên sau khi sang kỷ nguyên.
+
 ## v0.2 — 19/10/2026
 
 Commit `1aa9f78` (phát minh mở, ngoại giao, chiến tranh), `f34c5a1` (nhà cung cấp Ollama/custom, sửa lỗi), sau đó Sử gia AI, hoạt động gián điệp và đổi tên quốc gia.

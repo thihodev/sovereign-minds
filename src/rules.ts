@@ -106,7 +106,7 @@ export const TRADE = { offerTicks: 2, maxQty: 500, nearDistance: 3, caravanSpeed
 export const WAR = {
   reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.2,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
-  weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10,
+  weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10, unprovokedPenalty: 5,
 };
 
 // §2.3 Settlements
