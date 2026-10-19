@@ -223,6 +223,7 @@
     $("#nation-detail").innerHTML = `
       <div class="row"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(n.model)}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       ${n.manifesto ? `<p><i>“${esc(n.manifesto)}”</i></p>` : ""}
+      ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
       ${n.statusNote ? `<p class="note">Ghi chú: ${esc(n.statusNote)}</p>` : ""}
       <h3>Suy nghĩ lượt này</h3><p>${esc(n.thought || "—")}</p>
       <h3>Bản ghi nhớ (AI tự viết)</h3><pre>${esc(n.memory || "—")}</pre>

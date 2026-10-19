@@ -7,13 +7,13 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BRONZE_CAPS, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH_RATE, GROWTH_SURPLUS, HIDDEN_ORES, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, REGEN, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, START, TILE_LIMIT_BASE, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, REGEN, RENAME, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILE_LIMIT_BASE, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx } from "./diplomacy.ts";
 import { generateWorld } from "./worldgen.ts";
-import { ROLES, type ChronicleEntry, type Nation, type ResKey, type Role, type Ruling, type Tile, type TurnInput, type World } from "./types.ts";
+import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
 // ---------------------------------------------------------------- ledger
 
@@ -93,6 +93,7 @@ function newNation(id: number, spec: NationSpec, capital: number): Nation {
     capital, alive: true, population: START.population, labor, crafts: {}, stock: { ...START.stock },
     stability: START.stability, reputation: START.reputation, inventions: [...START.inventions], research: null,
     buildings: [], seen: [], met: [], memory: "", lastThought: "", toolWear: 0, silentStreak: 0, riot: false, era: ERAS.paleo,
+    eraTick: null, renameTick: null, formerNames: [], stolenTech: [],
     status: "active", sleepUntil: 0, sleepBackoffMin: 0, statusNote: "",
     stats: { calls: 0, ok: 0, invalid: 0, asleepTicks: 0, silentTicks: 0 },
     lastRejected: [], lastEvents: [], eventTimers: {}, intel: {}, casusBelli: {},
@@ -153,9 +154,13 @@ function ownsWonder(world: World, n: Nation, key: string): boolean {
   const w = world.wonders.find(x => x.key === key);
   return !!w && world.tiles[w.i].owner === n.id;
 }
+/** A finished building that is not disabled by sabotage (§7.8) gives its effect. */
+export function buildingWorks(world: World, b: Building): boolean {
+  return b.done && world.tick >= (b.disabledUntil ?? 0);
+}
 function doneEffect(world: World, n: Nation, key: "housing" | "stability" | "spoilage" | "craftSlots"): number {
   let sum = 0;
-  for (const b of n.buildings) if (b.done) sum += buildingOf(world, b.type)?.effect[key] || 0;
+  for (const b of n.buildings) if (buildingWorks(world, b)) sum += buildingOf(world, b.type)?.effect[key] || 0;
   return sum;
 }
 export function workers(n: Nation): number { return Math.floor(n.population * WORKER_SHARE); }
@@ -170,7 +175,8 @@ export function canSeeRes(world: World, n: Nation, key: string): boolean {
   return !(HIDDEN_ORES as string[]).includes(key) || mods(world, n).reveal.has(key);
 }
 
-/** §7.5 diffusion: knowing someone who has it makes it cheaper (best discount only). */
+/** §7.5 diffusion: knowing someone who has it makes it cheaper; a stolen secret
+ *  (§7.8) gives 50%. Only the best discount counts, they never stack. */
 export function inventionCost(world: World, n: Nation, id: string): number {
   const v = inv(world, id); if (!v) return Infinity;
   let discount = 0;
@@ -183,6 +189,7 @@ export function inventionCost(world: World, n: Nation, id: string): number {
     discount = Math.max(discount, d);
   }
   if (v.custom?.by === n.id) discount = Math.max(discount, 0.2);
+  if (n.stolenTech.includes(id)) discount = Math.max(discount, SPY_OPS.stealDiscount);
   return Math.ceil(v.rp * (1 - discount));
 }
 
@@ -217,20 +224,32 @@ export function normName(s: string): string {
 }
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
+function validateName(label: string, v: string): string | null {
+  if (v.length < 2 || v.length > 30) return `${label} phải dài 2–30 ký tự`;
+  const nv = normName(v);
+  if (FORBIDDEN_NAME_WORDS.some(w => nv.includes(w))) return `${label} không được dùng tên model hay nhà cung cấp`;
+  return null;
+}
+function nameTaken(world: World, n: Nation, name: string): string | null {
+  for (const o of world.nations) if (o.id !== n.id && o.founded && normName(o.name) === normName(name)) return `Tên "${name}" đã có quốc gia khác dùng`;
+  return null;
+}
+
 function validateFounding(world: World, n: Nation, a: Record<string, unknown>): string | null {
   const name = String(a.name ?? "").trim(), cap = String(a.capital ?? "").trim(), people = String(a.people ?? "").trim();
-  const flag = (a.flag ?? {}) as Record<string, unknown>;
   for (const [label, v] of [["Tên quốc gia", name], ["Tên thủ đô", cap], ["Tên dân tộc", people]] as const) {
-    if (v.length < 2 || v.length > 30) return `${label} phải dài 2–30 ký tự`;
-    const nv = normName(v);
-    if (FORBIDDEN_NAME_WORDS.some(w => nv.includes(w))) return `${label} không được dùng tên model hay nhà cung cấp`;
+    const err = validateName(label, v); if (err) return err;
   }
+  const taken = nameTaken(world, n, name); if (taken) return taken;
   for (const o of world.nations) {
     if (o.id === n.id || !o.founded) continue;
-    if (normName(o.name) === normName(name)) return `Tên "${name}" đã có quốc gia khác dùng`;
     if (normName(o.capitalName) === normName(cap)) return `Tên thủ đô "${cap}" đã bị dùng`;
     if (normName(o.people) === normName(people)) return `Tên dân tộc "${people}" đã bị dùng`;
   }
+  return validateFlag(world, n, a.flag);
+}
+function validateFlag(world: World, n: Nation, raw: unknown): string | null {
+  const flag = (raw ?? {}) as Record<string, unknown>;
   const colors = Array.isArray(flag.colors) ? flag.colors.map(String) : [];
   if (!FLAG_LAYOUTS.includes(String(flag.layout))) return `Bố cục cờ phải là một trong: ${FLAG_LAYOUTS.join(", ")}`;
   if (colors.length < 2 || colors.length > 3 || !colors.every(c => HEX.test(c))) return "Cờ cần 2–3 màu dạng #rrggbb";
@@ -240,6 +259,12 @@ function validateFounding(world: World, n: Nation, a: Record<string, unknown>): 
     if (deltaE(colors[0], o.flag.colors[0]) < FLAG_MIN_DELTA_E) return `Màu chủ đạo ${colors[0]} quá giống màu cờ của ${o.name}`;
   }
   return null;
+}
+
+/** §2.2: a nation may rename once within RENAME.windowTicks ticks after it entered a new era. */
+export function renameOpen(world: World, n: Nation): boolean {
+  if (n.eraTick === null || world.tick - n.eraTick > RENAME.windowTicks) return false;
+  return n.renameTick === null || n.renameTick <= n.eraTick;
 }
 
 const SYL = ["ka", "ru", "mi", "to", "la", "an", "ve", "so", "ha", "ni", "ra", "el", "ta", "mo", "ku", "shi", "or", "ba", "di", "yu"];
@@ -252,10 +277,13 @@ function autoFound(world: World, n: Nation, rand: Rand): void {
     if (!validateFounding(world, n, a)) { applyFounding(n, a, ""); return; }
   }
 }
+function toFlag(raw: unknown): Flag {
+  const flag = raw as Record<string, unknown>;
+  return { layout: String(flag.layout), colors: (flag.colors as unknown[]).map(c => String(c).toLowerCase()), symbol: String(flag.symbol) };
+}
 function applyFounding(n: Nation, a: Record<string, unknown>, manifesto: string): void {
-  const flag = a.flag as Record<string, unknown>;
   n.name = String(a.name).trim(); n.capitalName = String(a.capital).trim(); n.people = String(a.people).trim();
-  n.flag = { layout: String(flag.layout), colors: (flag.colors as unknown[]).map(c => String(c).toLowerCase()), symbol: String(flag.symbol) };
+  n.flag = toFlag(a.flag);
   n.manifesto = manifesto.slice(0, 280);
   n.founded = true;
 }
@@ -431,7 +459,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     n.seen = [...sight].sort((a, b) => a - b);
   }
   updateMeetings(world, say);
-  updateIntel(world, tick);
+  updateIntel(world, tick, say);
 
   // 8. Tiles cut off from every centre go wild after 5 ticks (§2.3)
   for (const n of alive) {
@@ -476,7 +504,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (caps.has("mài") && (caps.has("trồng-trọt") || caps.has("thuần-dưỡng")) && n.population >= 50) era = ERAS.neo;
     if (BRONZE_CAPS.every(c => caps.has(c)) && owned.some(t => (t.cap.copper || 0) > 0)) era = ERAS.bronze;
     if (era !== n.era) {
-      n.era = era;
+      n.era = era; n.eraTick = tick;
       say(n.id, "era", `${n.name} bước vào thời ${era}.`);
       if (world.eraGates[era] === undefined) {
         world.eraGates[era] = tick;
@@ -551,7 +579,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   let farmers = labor.farm;
   const volcano = world.wonders.find(w => w.key === "volcano");
   for (const b of n.buildings) {
-    const e = buildingOf(world, b.type)?.effect; if (!b.done || !e?.farmSlots || farmers <= 0) continue;
+    const e = buildingOf(world, b.type)?.effect; if (!buildingWorks(world, b) || !e?.farmSlots || farmers <= 0) continue;
     const k = Math.min(farmers, e.farmSlots); farmers -= k;
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
     const x = k * (e.farmFood || 0) * fertile * (b.type === "field" ? drought : 1) * stabMult;
@@ -560,7 +588,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
 
   // Crafting: workshop-like buildings give slots; a recipe needs its building
   let craftWork = Math.min(labor.craft, doneEffect(world, n, "craftSlots")) * stabMult;
-  const doneTypes = new Set(n.buildings.filter(b => b.done).map(b => b.type));
+  const doneTypes = new Set(n.buildings.filter(b => buildingWorks(world, b)).map(b => b.type));
   for (const [rid, want] of Object.entries(n.crafts)) {
     const rec = recipeOf(world, rid); if (!rec) continue;
     if (!n.inventions.includes(rec.needs) && !m.unlocked.has(rid)) continue;
@@ -680,7 +708,10 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
 // ---------------------------------------------------------------- actions
 
 type Say = (nation: number | null, kind: string, text: string) => void;
-const ENGINE_ACTIONS = new Set(["research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement"]);
+const ENGINE_ACTIONS = new Set([
+  "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
+  "rename_nation", "sabotage", "steal_tech", "incite",
+]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
 /** §7.6: an expedition walks up to 16 tiles out and back within one turn (10 years). */
@@ -822,9 +853,76 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (n.population < 10) return "Dân số quá ít để cử người đi";
       n.population -= 1;
       if (rngFor(world.seed, world.tick, "spy", n.id, target.id)() < SPY.successChance) {
-        world.spies.push({ id: world.nextSpyId++, owner: n.id, target: target.id, since: world.tick, active: true });
+        world.spies.push({ id: world.nextSpyId++, owner: n.id, target: target.id, since: world.tick, active: true, acted: "" });
         n.lastEvents.push(`Gián điệp đã trà trộn vào ${target.name}.`);
       } else n.lastEvents.push(`Người được cử đến ${target.name} đã mất tích.`);
+      return null;
+    }
+    case "sabotage": {
+      const op = spyFor(world, n, m, a); if (typeof op === "string") return op;
+      const { spy, target } = op, want = a.building == null ? null : String(a.building);
+      const pool = target.buildings.filter(b => want === null || b.type === want || String(b.id) === want);
+      if (want !== null && !pool.length) return `${target.name} không có công trình "${want}"`;
+      // An unfinished building with the most work done loses it all; otherwise the oldest working one stops for a while
+      const b = pool.filter(x => !x.done && x.progress > 0).sort((x, y) => y.progress - x.progress || x.id - y.id)[0]
+        ?? pool.filter(x => buildingWorks(world, x)).sort((x, y) => x.id - y.id)[0];
+      if (!b) return `${target.name} không có công trình nào để phá hoại`;
+      const bname = buildingOf(world, b.type)?.name ?? b.type;
+      if (!b.done) {
+        b.progress = 0;
+        spy.acted = `phá hỏng ${bname} đang xây`;
+        target.lastEvents.push(`${bname} đang xây bị phá hỏng, mất hết tiến độ. Không rõ thủ phạm.`);
+      } else {
+        b.disabledUntil = world.tick + SPY_OPS.disableTicks;
+        spy.acted = `phá hoại ${bname} (mất tác dụng ${SPY_OPS.disableTicks} lượt)`;
+        target.lastEvents.push(`${bname} bị phá hoại, mất tác dụng ${SPY_OPS.disableTicks} lượt. Không rõ thủ phạm.`);
+      }
+      say(target.id, "spy", `${bname} của ${target.name} bị kẻ lạ mặt phá hoại.`);
+      n.lastEvents.push(`Gián điệp ở ${target.name} đã ${spy.acted}.`);
+      return null;
+    }
+    case "steal_tech": {
+      const op = spyFor(world, n, m, a); if (typeof op === "string") return op;
+      const { spy, target } = op, raw = String(a.invention ?? a.id ?? "");
+      const id = target.inventions.find(x => x === raw || normName(invName(world, x)) === normName(raw));
+      if (!id) return `${target.name} không có phát minh "${raw}"`;
+      const name = invName(world, id);
+      if (n.inventions.includes(id)) return `Đã có ${name}`;
+      if (n.stolenTech.includes(id)) return `Đã đánh cắp bí mật ${name} rồi`;
+      n.stolenTech.push(id);
+      spy.acted = `đánh cắp bí mật ${name}`;
+      say(target.id, "spy", `Bí mật ${name} của ${target.name} bị đánh cắp.`);
+      n.lastEvents.push(`Gián điệp ở ${target.name} đã ${spy.acted}: nghiên cứu ${id} rẻ hơn ${SPY_OPS.stealDiscount * 100}% RP.`);
+      return null;
+    }
+    case "incite": {
+      const op = spyFor(world, n, m, a); if (typeof op === "string") return op;
+      const { spy, target } = op;
+      target.stability = Math.max(0, target.stability - SPY_OPS.incite);
+      spy.acted = `kích động dân chúng (−${SPY_OPS.incite} ổn định)`;
+      target.lastEvents.push(`Có kẻ kích động dân chúng: ổn định −${SPY_OPS.incite}. Không rõ thủ phạm.`);
+      say(target.id, "spy", `Dân chúng ${target.name} bị kẻ lạ mặt kích động.`);
+      n.lastEvents.push(`Gián điệp ở ${target.name} đã ${spy.acted}.`);
+      return null;
+    }
+    case "rename_nation": {
+      if (!renameOpen(world, n)) {
+        return n.eraTick !== null && world.tick - n.eraTick <= RENAME.windowTicks ? "Đã đổi tên hay đổi cờ một lần từ khi vào kỷ nguyên này"
+          : `Chỉ được đổi tên hay đổi cờ trong ${RENAME.windowTicks} lượt sau khi bước vào kỷ nguyên mới`;
+      }
+      const name = a.name == null ? null : String(a.name).trim(), flag = a.flag ?? null;
+      if (name === null && flag === null) return "Cần name hoặc flag mới";
+      if (name !== null) {
+        const err = validateName("Tên quốc gia", name) ?? nameTaken(world, n, name); if (err) return err;
+        if (normName(name) === normName(n.name)) return "Tên mới trùng tên hiện tại";
+      }
+      if (flag !== null) { const err = validateFlag(world, n, flag); if (err) return err; }
+      const old = n.name;
+      n.stability = Math.max(0, n.stability - RENAME.stability);
+      n.renameTick = world.tick;
+      if (name !== null) { n.formerNames.push(old); n.name = name; }
+      if (flag !== null) n.flag = toFlag(flag);
+      say(n.id, "rename", name !== null ? `${old} đổi tên thành ${n.name}${flag !== null ? " và đổi cờ" : ""}.` : `${n.name} đổi cờ mới.`);
       return null;
     }
     case "petition": {
@@ -850,6 +948,17 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
   return "Không có hành động này";
 }
 
+/** §7.8: a spy operation needs writing and an active spy in the target that has not acted yet this tick. */
+function spyFor(world: World, n: Nation, m: Mods, a: Record<string, unknown>): { spy: Spy; target: Nation } | string {
+  if (!m.caps.has(SPY_OPS.needsCap)) return "Cần năng lực ghi-chép (phát minh Ký hiệu)";
+  const target = findNation(world, a.target);
+  if (!target || target.id === n.id || !target.alive) return "Không tìm thấy quốc gia mục tiêu";
+  const spy = world.spies.find(s => s.active && s.owner === n.id && s.target === target.id);
+  if (!spy) return `Không có gián điệp đang hoạt động ở ${target.name}`;
+  if (spy.acted) return `Gián điệp ở ${target.name} đã ra tay lượt này`;
+  return { spy, target };
+}
+
 // ---------------------------------------------------------------- meetings & intel (§7.8)
 
 function updateMeetings(world: World, say: Say): void {
@@ -867,22 +976,32 @@ function updateMeetings(world: World, say: Say): void {
 
 function sizeWord(pop: number): string { return pop < 30 ? "nhỏ" : pop < 80 ? "vừa" : "lớn"; }
 
-function updateIntel(world: World, tick: number): void {
+/** Detection chance of a spy this tick: doubled if it acted (§7.8). */
+export function spyDetectChance(world: World, s: Spy): number {
+  const target = world.nations[s.target];
+  const base = Math.min(SPY.maxDetect, SPY.baseDetect + SPY.perFiveWarriors * Math.floor(target.labor.warrior / 5));
+  return s.acted ? base * SPY_OPS.detectMult : base;
+}
+
+function updateIntel(world: World, tick: number, say: Say): void {
   for (const s of world.spies) {
     if (!s.active) continue;
     const owner = world.nations[s.owner], target = world.nations[s.target];
+    const deed = s.acted, chance = spyDetectChance(world, s);
+    s.acted = ""; // the per-tick flag is spent on this roll
     if (!owner.alive || !target.alive) { s.active = false; continue; }
     const r = rngFor(world.seed, tick, "spycatch", s.id);
-    const chance = Math.min(SPY.maxDetect, SPY.baseDetect + SPY.perFiveWarriors * Math.floor(target.labor.warrior / 5));
     if (r() < chance) {
       s.active = false;
+      const what = deed ? ` Kẻ đó đã ${deed}.` : "";
       if (r() < 0.5) {
         owner.reputation = Math.max(0, owner.reputation - SPY.reputationLoss);
         target.casusBelli[String(owner.id)] = tick + SPY.casusBelliTicks;
-        target.lastEvents.push(`Bắt được gián điệp của ${owner.name}. Có thể tuyên chiến với họ có chính nghĩa trong ${SPY.casusBelliTicks} lượt.`);
+        target.lastEvents.push(`Bắt được gián điệp của ${owner.name}.${what} Có thể tuyên chiến với họ có chính nghĩa trong ${SPY.casusBelliTicks} lượt.`);
         owner.lastEvents.push(`Gián điệp ở ${target.name} bị bắt và khai ra nguồn gốc. Uy tín −${SPY.reputationLoss}.`);
+        if (deed) say(owner.id, "spy", `${target.name} bắt được gián điệp của ${owner.name}, kẻ đã ${deed}.`);
       } else {
-        target.lastEvents.push("Bắt được một gián điệp, không rõ của nước nào.");
+        target.lastEvents.push(`Bắt được một gián điệp, không rõ của nước nào.${what}`);
         owner.lastEvents.push(`Mất liên lạc với gián điệp ở ${target.name}.`);
       }
     }
@@ -923,6 +1042,7 @@ function updateIntel(world: World, tick: number): void {
       if (level >= 4) {
         report.population = b.population;
         report.warriors = b.labor.warrior;
+        report.buildings = b.buildings.map(x => ({ type: x.type, done: x.done }));
         report.stock = Object.fromEntries(Object.entries(b.stock).filter(([, v]) => v >= 1).map(([k, v]) => [k, Math.floor(v)]));
         report.inventions = b.inventions.map(id => invName(world, id));
         report.researching = b.research ? invName(world, b.research.id) : null;
