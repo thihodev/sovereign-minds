@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Lãnh thổ liên thông (§2.7):** hàng chỉ về được kho theo một lối: đi bộ qua đất của mình tối đa 6 ô, đường sá, hoặc đường thủy giữa hai bến thuyền.
+  - Điểm định cư không có lối về thủ đô bị cô lập (sau 10 lượt ân hạn): đất của nó chỉ nộp 70%, bất mãn +2 mỗi lượt.
+  - Đất xa trung tâm, không có đường, chỉ nộp 90%. Dân làm ô gần nhà trước.
+  - AI thấy lối về thủ đô của từng điểm định cư; cố vấn chỉ đường cần làm. Hồ sơ quốc gia ghi 🛤 / ⛵ / 🚶 / ✗ cô lập.
+  - **Lập điểm định cư là mở đường về:** `found_settlement` tự đặt và trả gỗ cho một đường mòn từ mạng đường tới điểm mới (1 gỗ mỗi ô). Thiếu gỗ thì không lập được.
 - **Biên giới sống (§7.9):** láng giềng có đất giáp nhau giờ luôn tương tác.
   - Mỗi cặp có mức căng thẳng tăng theo độ dài đường biên, giảm nhờ hiệp ước, buôn bán và chung ngôn ngữ.
   - Sự cố biên giới (săn trộm, đốn gỗ lấn đất, xô xát làm chết người, dân vượt biên) cho bên bị hại chính nghĩa để tuyên chiến. Căng thẳng từ 70 thành tranh chấp: cả hai bên có chính nghĩa và mất ổn định.

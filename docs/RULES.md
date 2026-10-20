@@ -137,6 +137,25 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
 - **Bão** trên biển sâu xảy ra nhiều gấp đôi biển nông.
 - **Đánh chiếm ô biển** cần `đi-nước` và 1 thuyền rảnh cho mỗi 5 chiến binh.
 
+### 2.7 Lãnh thổ liên thông
+
+Kho là chung cho cả nước, nhưng hàng chỉ về được kho theo một lối đi.
+
+- **Hai trung tâm nối nhau** khi có một trong ba lối:
+  - đi bộ qua đất của mình tối đa 6 ô
+  - mạng đường sá (mục 2.5)
+  - đường nước giữa hai Bến thuyền, mỗi bến cách trung tâm tối đa 3 ô, không đi qua lãnh hải của kẻ thù
+- **Lối về thủ đô:** một trung tâm nối về thủ đô qua một chuỗi các trung tâm nối nhau. Gói trạng thái ghi `way_to_capital` cho mỗi điểm định cư.
+- **Điểm định cư cô lập** (không có lối nào về thủ đô):
+  - đất của nó (các ô gần nó hơn mọi trung tâm khác) chỉ nộp **70%** sản lượng về kho
+  - bất mãn +2 mỗi lượt cho mỗi điểm cô lập
+  - điểm định cư mới có 10 lượt ân hạn để làm đường trước khi bị tính là cô lập
+- **Đất xa:** ô cách mọi trung tâm hơn 4 ô, không có đường trên ô hay ở ô kề, chỉ nộp **90%**.
+- **Lập điểm định cư là mở đường về:** `found_settlement` tự đặt một đường mòn từ mạng đường của quốc gia tới điểm mới, trả ngay 1 gỗ mỗi ô (sau giá định cư); thợ xây làm trong các lượt sau. Thiếu gỗ thì lệnh bị từ chối. Không có lối đất thì điểm định cư chỉ nối được bằng đường thủy.
+- **Thứ tự làm việc:** người dân làm ô có tỷ lệ nộp cao nhất trước, rồi mới tới ô giàu nhất.
+- Phần hao hụt không vào kho; tài nguyên trên ô vẫn bị lấy đủ.
+- Watcher chỉnh được tỷ lệ nộp của điểm cô lập và độ dài lối đi bộ bằng sắc lệnh luật.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.

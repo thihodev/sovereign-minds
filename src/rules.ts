@@ -107,6 +107,11 @@ export const SCHISM = {
   /** The old nation once they are gone: stability +calmAfter; the new one starts at `startStability`. */
   calmAfter: 15, startStability: 70,
 };
+/** §2.7 A connected realm: goods reach the stores along a way (a walk of at most `walk` tiles over one's own land,
+ *  a road, or water between piers). A centre cut off from the capital yields `isolatedYield` and adds
+ *  `isolatedDiscontent` a turn, once `grace` turns have passed since it was founded (time to build its road);
+ *  land more than `reach` tiles from any centre with no road on or beside it yields `farYield`. */
+export const CONNECT = { walk: 6, reach: 4, isolatedYield: 0.7, farYield: 0.9, isolatedDiscontent: 2, grace: 10 };
 /** §7.9 Living borders between nations whose lands touch (or lie within `near` tiles). */
 export const BORDER = {
   near: 3,

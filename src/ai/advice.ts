@@ -3,11 +3,12 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { BORDER, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
+import { BORDER, CONNECT, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, tileLimit, workers } from "../engine.ts";
+import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { borderOf, neighbours } from "../border.ts";
+import { isolated } from "../connect.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -72,6 +73,13 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Discontent
   if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, không vượt giới hạn đất, có nghi lễ/công trình ổn định) để nó nguội đi.`);
+
+  // A connected realm (§2.7): settlements with no way home
+  for (const c of isolated(world, n)) {
+    const st = n.settlements.find(x => x.tile === c); if (!st) continue;
+    const path = roadPlan(world, n, c, 1);
+    say(2, `Điểm định cư ${st.name} bị cô lập (không đường bộ, đường thủy hay lối đi bộ ≤ ${CONNECT.walk} ô về thủ đô): đất quanh đó chỉ nộp ${CONNECT.isolatedYield * 100}% về kho và bất mãn +${CONNECT.isolatedDiscontent} mỗi lượt. ${path.length ? `Làm đường: build_road ${path.length} ô, bắt đầu ${path.slice(0, 4).map(xy).join(" ")}` : "Không tìm được lối đất để làm đường: dùng Bến thuyền ở cả hai nơi, hoặc chiếm đất nối liền"}.`);
+  }
 
   // Neighbours (§7.9): the borders that need a decision
   for (const { o, border } of neighbours(world, n)) {

@@ -16,6 +16,7 @@ import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
 import { borderOf } from "../border.ts";
+import { yieldShares } from "../connect.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
@@ -94,12 +95,12 @@ function bonus(m: Mods, r: string): number {
   return Math.min(MAX_ROLE_BONUS, (m.role[r] || 0) + extract);
 }
 /** What a tile yields each turn without being worn down, plus a little of what is stored. */
-function sustain(world: World, n: Nation, tiles: Tile[], key: ResKey): number {
+function sustain(world: World, n: Nation, tiles: Tile[], key: ResKey, share: (i: number) => number = () => 1): number {
   let s = 0;
   if (!canSeeRes(world, n, key)) return 0;
   for (const t of tiles) {
     const cap = t.cap[key] || 0, cur = t.res[key] || 0, regen = cap * (REGEN[key] || 0);
-    s += Math.min(cur, regen + Math.max(0, cur - regen) * 0.25);
+    s += Math.min(cur, regen + Math.max(0, cur - regen) * 0.25) * share(t.i); // §2.7 what reaches the stores
   }
   return s;
 }
@@ -113,7 +114,7 @@ function tileWorth(v: View, t: Tile): number {
 }
 
 function look(world: World, n: Nation): View {
-  const m = mods(world, n), owned = ownedTiles(world, n.id);
+  const m = mods(world, n), owned = ownedTiles(world, n.id), share = n.founded ? yieldShares(world, n) : () => 1;
   const stabMult = n.stability < 30 ? 0.75 : 1, drought = (n.eventTimers.drought || 0) > 0 ? 0.5 : 1;
   let farmSlots = 0, farmFood = 0;
   const volcano = world.wonders.find(w => w.key === "volcano");
@@ -140,7 +141,7 @@ function look(world: World, n: Nation): View {
     world, n, m, owned, mine: new Set(owned.map(t => t.i)), centres: [n.capital, ...n.settlements.map(s => s.tile)],
     pop: n.population, workers: workers(n), need: mouths(n) * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
     has: id => n.inventions.includes(id), stock: k => n.stock[k] || 0,
-    wild: { hunt: sustain(world, n, owned, "game"), gather: sustain(world, n, owned, "plants") * drought, fish: sustain(world, n, owned, "fish") },
+    wild: { hunt: sustain(world, n, owned, "game", share), gather: sustain(world, n, owned, "plants", share) * drought, fish: sustain(world, n, owned, "fish", share) },
     farmSlots, farmPerWorker: farmSlots ? farmFood / farmSlots * stabMult : 0, stabMult, drought,
     wars, activeWars: wars.filter(w => w.start <= world.tick),
     near, gap: id => gaps.get(id) ?? Infinity,
@@ -185,8 +186,10 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const sett = wantSettle ? settlementSite(v) : null;
   const ring = sett === null ? 0 : [sett, ...NEIGHBORS[sett]].filter(j => world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean").length;
   const payment = sett !== null ? settlementPayment(n) : null;
+  // §2.7 the road home is paid with wood when the settlement is founded: about one tile of track per tile of gap
+  const trackWood = sett === null ? 0 : Math.max(0, Math.min(...v.owned.map(t => dist(t.i, sett))) - 1) * 1.5;
   const settleNow = payment !== null && ap >= (AP_COST.found_settlement ?? 3) + 1
-    && capFood > (v.pop + SETTLEMENT.housing * 0.5) * v.m.foodPerPerson;
+    && capFood > (v.pop + SETTLEMENT.housing * 0.5) * v.m.foodPerPerson && v.stock("wood") - (payment.wood || 0) >= trackWood;
   if (settleNow) for (const [k, q] of Object.entries(payment)) reserved[k] = (reserved[k] || 0) + q;
 
   // A much weaker neighbour close by that nothing protects: a possible war of conquest (§7.4)

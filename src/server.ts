@@ -17,6 +17,7 @@ import { layer, nationResources, nationThreats, tileThreats, workSites } from ".
 import { systemPrompt } from "./ai/prompt.ts";
 import { advice } from "./ai/advice.ts";
 import { applyLaws, lawTable } from "./laws.ts";
+import { links } from "./connect.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
@@ -74,6 +75,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
         roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n), works: (n.roadWorks ?? []).length } : null,
+        links: n.alive && n.founded ? Object.fromEntries(links(w, n)) : {},
         stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, Math.round(v * 10) / 10])),
         labor: n.labor, crafts: n.crafts,
         inventions: n.inventions.map(id => ({ id, name: invName(w, id), custom: !!inv(w, id)?.custom })),

@@ -1091,7 +1091,7 @@
           <h3>Kho</h3>${chipsOf(stock)}
           <h3>Tài nguyên</h3>${resTable(n)}
           <h3>Công trình</h3>${chipsOf(n.buildings.map(b => `${b.name}${b.done ? "" : " (đang xây)"}`))}
-          <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => `${x.name}${x.road ? " 🛤" : ""}`))}
+          <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => { const l = n.links?.[x.tile]; return `${x.name} ${({ road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" })[l] ?? "✗ cô lập"}`; }))}
           ${n.roadNet ? `<h3>Đường sá & lãnh hải</h3><p class="note">${n.roadNet.tiles} ô đường nối các trung tâm (+${Math.min(10, Math.floor(n.roadNet.tiles / 4))} giới hạn ô) · ${n.roadNet.linked.length}/${(n.settlements || []).length} điểm định cư đã nối thủ đô (🛤) · cấp tối đa: ${esc(S.roadLevels[n.roadNet.level - 1].name)} / ${esc(S.roadLevels[n.roadNet.level - 1].lane)}${n.roadNet.works ? ` · ${n.roadNet.works} ô đang làm` : ""}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}</p>` : ""}
           <h3>Phát minh (${n.inventions.length})</h3>${chipsOf(n.inventions.map(v => v.name))}
         </section>

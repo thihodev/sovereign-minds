@@ -2,7 +2,7 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
@@ -15,6 +15,7 @@ import { demo, fighters, households, mouths } from "../people.ts";
 import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
 import { borderOf, neighbours } from "../border.ts";
+import { links } from "../connect.ts";
 import { freshWater, governed, maxOfficials, nextEraNeeds, roadLevelMax, roadNet, roadPlan } from "../engine.ts";
 import type { Nation, Tile, World } from "../types.ts";
 import { applyLaws, lawsKey } from "../laws.ts";
@@ -61,6 +62,8 @@ PEOPLE AND FAMILIES: your people are counted by age and sex ("population.groups"
 DISCONTENT AND SCHISM: "nation.discontent" (0–100) rises each turn your stability is below ${SCHISM.threshold} (by (${SCHISM.threshold} − stability)/${SCHISM.divisor}), by ${SCHISM.famine} in a famine, ${SCHISM.riot} in a riot and ${SCHISM.overreach} per tile governed over the limit; it falls by ${SCHISM.fade} a turn while stability ≥ ${SCHISM.calm}. At 100, with ${SCHISM.minPop}+ people, a faction of ${SCHISM.share[0] * 100}–${SCHISM.share[1] * 100}% of your people asks the gods to let it leave and found its own nation on free land ${SCHISM.near}–${SCHISM.far} tiles away. If the gods agree, it goes with its families, its share of every good and all your knowledge, and becomes a new nation with its own mind; you keep the rest and +${SCHISM.calmAfter} stability. If the gods refuse (or do not answer in ${SCHISM.waitTicks} turns), the faction asks the calmest, roomiest nation your people knows to take it in; that nation has ${SCHISM.askTicks} turns to accept (accept_migrants), or the faction goes home bitter (−${SCHISM.giveUp} stability). Govern well and it never comes to that.
 When a faction of another people asks to settle with you ("migrants_asking"), you may take them in: more people and workers, more mouths to feed and house.
 If "nation.origin" is set, YOUR people is such a faction: you left the nation named there; you know what it knew; found your nation (found_nation) on your first turn.
+
+A CONNECTED REALM: your stores are one, but goods reach them only along a way. A settlement is joined to your capital by a short walk over your own land (≤ ${CONNECT.walk} tiles), by a road, or by water between your piers (a Bến thuyền within ${RIVER.pierReach} tiles of each); "nation.settlements[].way_to_capital" says which. A settlement with no way is cut off: what its land yields reaches your stores only ${CONNECT.isolatedYield * 100}%, and it adds ${CONNECT.isolatedDiscontent} discontent a turn. Land more than ${CONNECT.reach} tiles from any centre with no road on or beside it yields ${CONNECT.farYield * 100}%. Your people work the land nearest home first. So found settlements where a road or water can reach, and build that road (see "roads.suggested").
 
 NEIGHBOURS AND BORDERS: peoples whose lands touch do not live side by side in silence. "neighbours" lists every nation within ${BORDER.near} tiles. Each border carries a tension (0–100): +${BORDER.friction} per border tile a turn (at most +${BORDER.frictionMax}), −${BORDER.fade} a turn, less with each treaty (non-aggression −${BORDER.treatyCalm.non_aggression}, peace −${BORDER.treatyCalm.peace}, alliance −${BORDER.treatyCalm.alliance}), each trade you agree (−${BORDER.tradeCalm}; the border market −${BORDER.marketCalm}) and a shared language (−${BORDER.languageCalm}). Tension brings border incidents (poaching, felling, brawls that kill, families crossing to the calmer side); the victim of poaching or a brawl gets a just cause for war for ${BORDER.causeTicks} turns. At ${BORDER.dispute}+ both sides have a just cause and both lose ${BORDER.disputeStability} stability a turn. While tension is below ${BORDER.marketBelow} a small border market swaps, each turn and on its own, a good one side has to spare for one the other lacks (up to ${BORDER.marketValue} worth): it counts as a trade (toward a shared language and cheaper learning). A neighbour is a chance and a danger: trade with it, sign treaties, send gifts (trade_offer with "give" only and an empty "get"), or, with a just cause and the stronger army, take its land.
 
@@ -155,7 +158,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     ap: actionPoints(world, n),
     nation: n.founded
       ? {
-        name: n.name, capital: n.capitalName, capital_tile: xy(n.capital), people: n.people, stability: n.stability, discontent: Math.round(n.discontent ?? 0), origin: n.origin ? { left: world.nations[n.origin.from]?.name, tick: n.origin.tick, leader: n.origin.leader } : undefined, reputation: n.reputation, settlements: n.settlements.map(s => ({ name: s.name, tile: xy(s.tile) })),
+        name: n.name, capital: n.capitalName, capital_tile: xy(n.capital), people: n.people, stability: n.stability, discontent: Math.round(n.discontent ?? 0), origin: n.origin ? { left: world.nations[n.origin.from]?.name, tick: n.origin.tick, leader: n.origin.leader } : undefined, reputation: n.reputation, settlements: (() => { const ls = links(world, n); return n.settlements.map(s => ({ name: s.name, tile: xy(s.tile), way_to_capital: ({ road: "road", water: "water", walk: "walk", capital: "capital" } as Record<string, string>)[ls.get(s.tile) ?? ""] ?? `CUT OFF: its land yields ${CONNECT.isolatedYield * 100}%` })); })(),
         former_names: n.formerNames.length ? n.formerNames : undefined,
         rename_until: renameOpen(world, n) ? n.eraTick! + RENAME.windowTicks : undefined,
       }

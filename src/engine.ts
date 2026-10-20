@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, CONNECT, DEMO, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -16,6 +16,7 @@ import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
+import { isolated, links, yieldShares } from "./connect.ts";
 import { borderPhase, pairKey } from "./border.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
@@ -747,11 +748,16 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   const mult = (r: Role) => (1 + Math.min(m.roleCap, roleBonus(m, r) + (toolBonus[r] || 0))) * stabMult;
 
+  // §2.7 what a tile yields reaches the stores only in part when it lies cut off or far from any road
+  const share = yieldShares(world, n);
+  let taken = 0; // what the last take() worked from the land, before the losses on the way
   const take = (key: ResKey, want: number, reason: string): number => {
-    let got = 0;
-    const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (b.res[key]! - a.res[key]!) || a.i - b.i);
-    for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; }
-    return got;
+    let got = 0, home = 0;
+    // the land whose yield reaches home first (§2.7), then the richest
+    const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (share(b.i) - share(a.i)) || (b.res[key]! - a.res[key]!) || a.i - b.i);
+    for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; home += x * share(t.i); }
+    taken = got;
+    return home;
   };
   const drought = (n.eventTimers.drought || 0) > 0 ? 0.5 : 1;
   let foodMade = 0;
@@ -790,7 +796,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const visible = ["copper", "tin", "iron", ...DEEP_RES].filter(k => m.reveal.has(k));
     const order = [n.mineTarget, ...visible, "salt", "reeds"].filter((k, i, a) => k && a.indexOf(k) === i && (["salt", "reeds"].includes(k) || m.reveal.has(k))) as ResKey[];
     let want = labor.mine * YIELD.extract * mult("mine");
-    for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= got; }
+    for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= taken; }
   }
   // Farming buildings grow food from soil and labour
   let farmers = labor.farm;
@@ -801,7 +807,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
     const silt = (n.eventTimers.fertile || 0) > 0 ? 1 + FLOOD.fertile : 1; // §9.4 a flood leaves rich mud
     const bed = world.tiles[b.tile], alluvium = bed.delta ? 1 + RIVER.deltaBonus : bed.river ? 1 + RIVER.fieldBonus : 1; // §2.1
-    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? alluvium * drought : 1) * mult("farm");
+    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? alluvium * drought : 1) * mult("farm") * share(b.tile);
     L.stock(n, "food", x, "growth"); foodMade += x;
   }
 
@@ -1003,6 +1009,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (shortage > 1e-9) dis += SCHISM.famine;
   if (n.riot) dis += SCHISM.riot;
   if (over > 0) dis += over * SCHISM.overreach;
+  const cutOff = isolated(world, n).length; // §2.7 settlements with no way to the capital
+  if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
   if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
@@ -1565,8 +1573,21 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (n.population < SETTLEMENT.minPopulation) return `Cần ít nhất ${SETTLEMENT.minPopulation} dân`;
       const pay = settlementPayment(n);
       if (!pay) return `Cần ${SETTLEMENT.materials} ${SETTLEMENT.goods.map(g => goodName(world, g)).join(" và/hoặc ")} (trộn tùy ý)`;
+      // §2.7 a new settlement opens its road home: a track from the road network, paid now, laid by the builders
+      const ring = [tile, ...NEIGHBORS[tile]].filter(j => world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean");
+      for (const j of ring) world.tiles[j].owner = n.id;
+      const track = roadPlan(world, n, tile, 1).filter(i => i !== tile && !(n.roadWorks ?? []).some(w => w.tile === i));
+      const trackWood = track.length * (ROADS.levels[0].cost.wood ?? 0), woodLeft = (n.stock.wood || 0) - (pay.wood || 0);
+      if (track.length && woodLeft < trackWood) {
+        for (const j of ring) world.tiles[j].owner = -1;
+        return `Điểm định cư phải có đường nối về: cần thêm ${Math.ceil(trackWood - woodLeft)} gỗ để mở ${track.length} ô đường mòn tới đó (hoặc chọn nơi gần mạng đường hơn)`;
+      }
       for (const [k, q] of Object.entries(pay)) L.stock(n, k, -q, "settle");
-      for (const j of [tile, ...NEIGHBORS[tile]]) if (world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean") world.tiles[j].owner = n.id;
+      if (track.length) {
+        L.stock(n, "wood", -trackWood, "road");
+        for (const i of track) (n.roadWorks ??= []).push({ tile: i, level: 1, progress: 0 });
+        n.lastEvents.push(`Mở đường mòn ${track.length} ô nối ${name} về mạng đường (${trackWood} gỗ); thợ xây làm trong các lượt tới, ${CONNECT.grace} lượt đầu điểm định cư chưa bị tính là cô lập.`);
+      } else if (!links(world, n).get(tile)) n.lastEvents.push(`Không có lối đất để mở đường tới ${name}: nó sẽ cô lập sau ${CONNECT.grace} lượt nếu không nối bằng đường thủy (Bến thuyền ở cả hai nơi).`);
       n.settlements.push({ tile, name, tick: world.tick });
       fx({ kind: "settle", tile, nation: n.id, from: n.capital, text: name });
       // The settlers stay citizens; leaving home unsettles the people (§2.3)

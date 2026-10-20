@@ -100,9 +100,9 @@ test("a road to the capital: the settlement is no sprawl, and roads raise the ti
   assert.ok(n.settlements[0].road, "the settlement is marked as joined");
 });
 /** Is there a way over free flat land between two tiles (for picking a test site)? */
-function roadPlanFree(w: World, from: number, to: number): boolean {
+function roadPlanFree(w: World, from: number, to: number, reach = 5): boolean {
   const seen = new Set([from]), queue = [from];
-  while (queue.length) { const k = queue.shift()!; if (k === to) return true; for (const j of NEIGHBORS[k]) if (!seen.has(j) && flat(w, j) && dist(j, from) <= 5) { seen.add(j); queue.push(j); } }
+  while (queue.length) { const k = queue.shift()!; if (k === to) return true; for (const j of NEIGHBORS[k]) if (!seen.has(j) && flat(w, j) && dist(j, from) <= reach) { seen.add(j); queue.push(j); } }
   return false;
 }
 
@@ -156,4 +156,21 @@ test("an attack on a water tile is fought from boats", () => {
   a.labor = { ...builders(0), gather: 0, warrior: 10 };
   turn(w, { 0: { labor: a.labor, actions: [{ type: "attack", tile: xy(water.i), warriors: 10 }] } });
   assert.match(a.lastRejected[0].reason, /2 thuyền/);
+});
+
+test("a connected realm: a settlement with no way home yields less; a road joins it", async () => {
+  const { links, yieldShares } = await import("../src/connect.ts");
+  const { CONNECT } = await import("../src/rules.ts");
+  const w = founded(1, "connect");
+  const n = w.nations[0];
+  // a settlement eight tiles out, on its own patch of land
+  const site = w.tiles.find(t => flat(w, t.i) && t.owner === -1 && dist(t.i, n.capital) === 8 && roadPlanFree(w, n.capital, t.i, 9))!;
+  assert.ok(site, "a site");
+  for (const i of within(site.i, 1)) if (w.tiles[i].owner === -1 && w.tiles[i].land) w.tiles[i].owner = n.id;
+  n.settlements.push({ tile: site.i, name: "Xa", tick: -100 }); // past its grace turns
+  assert.equal(links(w, n).get(site.i), null, "cut off");
+  assert.equal(yieldShares(w, n)(site.i), CONNECT.isolatedYield);
+  for (const i of roadPlan(w, n, site.i)) w.tiles[i].road = 1;
+  assert.equal(links(w, n).get(site.i), "road");
+  assert.equal(yieldShares(w, n)(site.i), 1);
 });

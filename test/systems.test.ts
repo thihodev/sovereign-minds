@@ -1,7 +1,7 @@
 // Scenario tests for open inventions (§5), relations (§7) and settlements (§2.3).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorld, step, ownedTiles, mods, baseCost, inventionCost, type NationSpec } from "../src/engine.ts";
+import { settlementPayment, createWorld, step, ownedTiles, mods, baseCost, inventionCost, type NationSpec } from "../src/engine.ts";
 import { inv, costFor } from "../src/catalog.ts";
 import { activeWar, treatiesBetween } from "../src/diplomacy.ts";
 import { col, row, NEIGHBORS, dist } from "../src/hex.ts";
@@ -201,14 +201,16 @@ test("settlements: found one, tiles cut off go wild", () => {
   n.stock.wood = 4; n.stock.stone = 10;
   go(far.i);
   assert.match(n.lastRejected[0].reason, /Cần 25 gỗ và\/hoặc đá/);
-  // 25 units of wood and stone, always from the larger pile: 30 wood + 9 stone leaves 7 + 7
-  n.stock.wood = 30; n.stock.stone = 9;
+  // 25 units of wood and stone, always from the larger pile: 30 wood + 9 stone pays 23 + 2, leaving 7 + 7
+  assert.deepEqual(Object.fromEntries(Object.entries(settlementPayment({ ...n, stock: { wood: 30, stone: 9 } } as never)!).map(([k, q]) => [k, Math.round(q)])), { wood: 23, stone: 2 });
+  n.stock.wood = 30 + 40; n.stock.stone = 9; // 40 more wood for the road home (§2.7)
   go(far.i);
   assert.equal(n.settlements.length, 1);
   assert.equal(w.tiles[far.i].owner, n.id);
   assert.ok(n.population - (n.demo!.born ?? 0) + (n.demo!.aged ?? 0) >= 60, "the settlers stay citizens (only the old and the worn died)");
-  assert.equal(Math.round(n.stock.wood), 7);
-  assert.equal(Math.round(n.stock.stone), 7);
+  const track = Number(n.lastEvents.map(e => /Mở đường mòn (\d+) ô/.exec(e)?.[1]).find(Boolean) ?? 0);
+  assert.ok(track > 0, "the road home is ordered");
+  assert.ok((n.stock.wood || 0) + (n.stock.stone || 0) <= 70 + 9 - 25 - track, "the settlement and a wood a tile of track are paid");
   assert.ok(n.lastEvents.some(e => /ổn định −5/.test(e)), "the move unsettles the people");
   // an isolated tile far away is lost after 5 ticks
   const lonely = w.tiles.find(t => t.land && t.owner === -1 && dist(t.i, n.capital) > 15)!;
