@@ -128,6 +128,16 @@
   }
 
   const nationColor = id => S.nations[id]?.founded ? S.nations[id].flag.colors[0] : "#cccccc";
+  /** White for a dark colour, near-black for a light one: the halo that keeps a border visible on any land. */
+  const contrastMemo = new Map();
+  function contrastOf(hex) {
+    if (!contrastMemo.has(hex)) {
+      const v = parseInt(String(hex).slice(1), 16), lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      const L = 0.2126 * lin((v >> 16) & 255) + 0.7152 * lin((v >> 8) & 255) + 0.0722 * lin(v & 255);
+      contrastMemo.set(hex, L < 0.3 ? "#ffffff" : "#0b1a22");
+    }
+    return contrastMemo.get(hex);
+  }
   const nationName = n => n.founded ? n.name : `Bộ lạc ${n.id + 1}`;
 
   // ------------------------------------------------ map layers: threats and resources (§9.4)
@@ -397,25 +407,42 @@
     }
     g.restore();
 
-    // territory tint
+    // territory: a tint, a hatch and a two-layer border, so a flag colour that matches the land
+    // (dark green on forest, sand on desert) still reads: the hatch and the outer edge use a contrast colour
+    const owned = []; S.owners.forEach((o, i) => { if (o >= 0 && vis(i)) owned.push(i); });
     g.globalAlpha = .42;
-    S.owners.forEach((o, i) => { if (o < 0 || !vis(i)) return; const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = nationColor(o); g.fill(); });
+    for (const i of owned) { const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = nationColor(S.owners[i]); g.fill(); }
     g.globalAlpha = 1;
+    if (s * z >= 5) {
+      g.save(); g.lineWidth = Math.max(px, s * .07); g.globalAlpha = .28;
+      for (const i of owned) {
+        const [x, y] = center(i), o = S.owners[i];
+        g.save(); hexPath(g, x, y, s); g.clip();
+        g.strokeStyle = contrastOf(nationColor(o)); g.beginPath();
+        for (let d = -s * 1.4; d <= s * 1.4; d += s * .55) { g.moveTo(x + d - s, y + s); g.lineTo(x + d + s, y - s); }
+        g.stroke(); g.restore();
+      }
+      g.restore();
+    }
     drawLayer(g, vis, s);
-    // borders
-    g.lineWidth = clamp(s * .22 * z, 1.5, 5) * px;
-    S.owners.forEach((o, i) => {
-      if (o < 0 || !vis(i)) return;
+    // borders: a contrast halo under the flag colour
+    const bw = clamp(s * .22 * z, 1.5, 5) * px;
+    const edges = (i, o) => {
       const [x, y] = center(i), nb = NB(i);
-      g.strokeStyle = nationColor(o); g.beginPath();
       for (let k = 0; k < 6; k++) {
         if (nb[k] >= 0 && S.owners[nb[k]] === o) continue;
         // edge k faces neighbour direction k: E, NE, NW, W, SW, SE
         const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
         g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
       }
-      g.stroke();
-    });
+    };
+    const byNation = new Map(); for (const i of owned) { const o = S.owners[i]; if (!byNation.has(o)) byNation.set(o, []); byNation.get(o).push(i); }
+    g.lineCap = "round";
+    for (const [o, tiles] of byNation) {
+      const c = nationColor(o);
+      g.beginPath(); for (const i of tiles) edges(i, o); g.lineWidth = bw * 2.1; g.strokeStyle = contrastOf(c); g.globalAlpha = .9; g.stroke();
+      g.globalAlpha = 1; g.lineWidth = bw; g.strokeStyle = c; g.stroke();
+    }
     // names of the quiet places, once there is room to read them
     const small = clamp(s * .95 * z, 9, 13) * px;
     if (s * z >= 5) {

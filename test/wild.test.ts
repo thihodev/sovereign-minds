@@ -16,7 +16,7 @@ const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "su
 function founded(nations = 2, seed = "wild"): World {
   const w = createWorld(seed, bots(nations));
   const inputs: Record<number, TurnInput> = {};
-  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABCDE"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(["#c0392b", "#2471a3", "#1e8449"][k]) }] } }; });
+  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABCDE"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(["#c0392b", "#3355ff", "#00e676"][k]) }] } }; });
   step(w, inputs);
   for (const n of w.nations) { n.stock.food = 300; n.population = 60; }
   return w;
@@ -177,4 +177,16 @@ test("step() reports where things happened, for the map's animations, without ch
   const a = founded(1, "fx2"), b = founded(1, "fx2");
   step(a, { 0: { kind: "ok", response: {} } }); step(b, { 0: { kind: "ok", response: {} } });
   assert.deepEqual(JSON.stringify(a), JSON.stringify(b));
+});
+
+test("a flag's main colour must not vanish into the land on the map", () => {
+  const w = createWorld("colours", bots(1));
+  const found = (c: string) => step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Lam Son", capital: "Do", people: "Dan", flag: { layout: "h2", colors: [c, "#ffffff"], symbol: "sun" } }] } } });
+  w.tick = 0;
+  found("#4e7f46"); // forest green
+  assert.equal(w.nations[0].founded, false);
+  assert.match(w.nations[0].lastRejected[0].reason, /quá giống màu rừng/);
+  w.tick = 0;
+  found("#c0392b");
+  assert.equal(w.nations[0].founded, true);
 });

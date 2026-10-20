@@ -9,7 +9,7 @@ import type { AIResponse, Ruling, TurnInput, World, Nation } from "../src/types.
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
-const COLORS = ["#c0392b", "#2471a3", "#1e8449", "#7d3c98", "#b7950b"];
+const COLORS = ["#c0392b", "#3355ff", "#00e676", "#7d3c98", "#b7950b"];
 
 /** A world where every nation is founded and nobody does anything unless told. */
 function founded(nations = 2, seed = "sys"): World {

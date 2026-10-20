@@ -292,6 +292,12 @@ export const FORBIDDEN_NAME_WORDS = [
   "anthropic", "jev", "grok", "phi", "kimi",
 ];
 export const FLAG_MIN_DELTA_E = 25;
+/** The land the map is painted with (web/app.js TERRAIN): a flag's main colour must stand apart from it to be seen. */
+export const LAND_COLORS: Record<string, string> = {
+  "biển sâu": "#1d4a66", "biển nông": "#2d6c8c", "đồng cỏ": "#9dbb68", "rừng": "#4e7d45", "rừng lá kim": "#3d6450", "rừng rậm": "#2c6a3a",
+  "đồi": "#b39a63", "núi": "#8b8179", "ven biển": "#d3cb9b", "sa mạc": "#dcc48a", "lãnh nguyên": "#b7c2b4", "băng": "#eef7fc",
+};
+export const FLAG_LAND_DELTA_E = 15;
 /** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
 export const RENAME = { windowTicks: 5, stability: 10 };
 

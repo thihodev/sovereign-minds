@@ -11,7 +11,7 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
-import { AP_COST, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
@@ -24,7 +24,7 @@ import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile,
 
 const SYL = ["ar", "ve", "lo", "mi", "ta", "ru", "en", "so", "ka", "di", "on", "ha", "li", "mu", "re", "za"];
 /** Primary colours far apart from each other (ΔE ≥ 25), so bots never clash. */
-const PALETTE = ["#c0392b", "#2471a3", "#1e8449", "#7d3c98", "#d68910", "#00c2d1", "#f4d03f", "#6e2c00", "#f5a3c7", "#1b2631", "#85c1e9", "#a9dfbf"];
+const PALETTE = ["#c0392b", "#3355ff", "#00e676", "#7d3c98", "#d68910", "#00c2d1", "#f4d03f", "#6e2c00", "#f5a3c7", "#1b2631", "#85c1e9", "#a9dfbf"];
 
 function founding(world: World, n: Nation, rand: Rand): Record<string, unknown> {
   const word = () => { let s = ""; for (let i = 0; i < 2 + Math.floor(rand() * 2); i++) s += pickOne(SYL, rand); return s[0].toUpperCase() + s.slice(1); };
@@ -33,7 +33,7 @@ function founding(world: World, n: Nation, rand: Rand): Record<string, unknown> 
   let color = PALETTE[n.id % PALETTE.length];
   for (let k = 0; k < PALETTE.length; k++) {
     const c = PALETTE[(n.id + k) % PALETTE.length];
-    if (taken.every(t => deltaE(c, t) >= FLAG_MIN_DELTA_E)) { color = c; break; }
+    if (taken.every(t => deltaE(c, t) >= FLAG_MIN_DELTA_E) && Object.values(LAND_COLORS).every(l => deltaE(c, l) >= FLAG_LAND_DELTA_E)) { color = c; break; }
   }
   return {
     type: "found_nation", name, capital: word(), people: `người ${name}`,

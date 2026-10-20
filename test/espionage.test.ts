@@ -10,7 +10,7 @@ import type { AIResponse, Nation, Spy, TurnInput, World } from "../src/types.ts"
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
-const COLORS = ["#c0392b", "#2471a3", "#1e8449"];
+const COLORS = ["#c0392b", "#3355ff", "#00e676"];
 
 function founded(nations = 2, seed = "spy"): World {
   const w = createWorld(seed, bots(nations));
@@ -163,7 +163,7 @@ test("rename_nation: only in the window after a new era, once, with founding rul
   assert.match(a.lastRejected[0].reason, /đã có quốc gia khác dùng/);
   turn(w, { 0: act({ type: "rename_nation", name: "Llama Land" }) });
   assert.match(a.lastRejected[0].reason, /tên model/);
-  turn(w, { 0: act({ type: "rename_nation", flag: flag("#2572a4") }) });
+  turn(w, { 0: act({ type: "rename_nation", flag: flag("#3456fe") }) });
   assert.match(a.lastRejected[0].reason, /quá giống màu cờ/);
   const old = a.name, idle = structuredClone(w);
   turn(idle);

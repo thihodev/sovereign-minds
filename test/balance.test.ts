@@ -9,7 +9,7 @@ import type { AIResponse, TurnInput, World } from "../src/types.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
-const COLORS = ["#c0392b", "#2471a3", "#1e8449"];
+const COLORS = ["#c0392b", "#3355ff", "#00e676"];
 const xy = (i: number) => [col(i), row(i)];
 
 function founded(nations = 1, seed = "balance"): World {

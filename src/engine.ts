@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, BRONZE_CAPS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -300,6 +300,8 @@ function validateFlag(world: World, n: Nation, raw: unknown): string | null {
   if (!FLAG_LAYOUTS.includes(String(flag.layout))) return `Bố cục cờ phải là một trong: ${FLAG_LAYOUTS.join(", ")}`;
   if (colors.length < 2 || colors.length > 3 || !colors.every(c => HEX.test(c))) return "Cờ cần 2–3 màu dạng #rrggbb";
   if (!FLAG_SYMBOLS.includes(String(flag.symbol))) return `Biểu tượng phải là một trong: ${FLAG_SYMBOLS.join(", ")}`;
+  // The main colour paints your land on the map: it must not vanish into forest, grass or sea
+  for (const [land, c] of Object.entries(LAND_COLORS)) if (deltaE(colors[0], c) < FLAG_LAND_DELTA_E) return `Màu chủ đạo ${colors[0]} quá giống màu ${land} trên bản đồ (${c}); chọn màu khác hẳn`;
   for (const o of world.nations) {
     if (o.id === n.id || !o.founded) continue;
     if (deltaE(colors[0], o.flag.colors[0]) < FLAG_MIN_DELTA_E) return `Màu chủ đạo ${colors[0]} quá giống màu cờ của ${o.name}`;
