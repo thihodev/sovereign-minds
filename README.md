@@ -34,13 +34,12 @@ Chưa có key nào cũng chạy được: quốc gia thiếu key sẽ do một b
 | Quốc gia 1 | Google Gemini (project **không** gắn thanh toán) | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
 | Quốc gia 2 | Z.ai (GLM Flash, Trung Quốc) | https://z.ai/manage-apikey/apikey-list | `ZAI_API_KEY` |
 | Quốc gia 3 | OpenRouter (model `:free`, ví dụ `dots-studio/dots-3-note-preview:free` của rednote) | https://openrouter.ai/settings/keys | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |
-| Quốc gia 4 | SambaNova (bỏ qua bước thanh toán) | https://cloud.sambanova.ai/apis | `SAMBANOVA_API_KEY` |
 | Quốc gia 5 | Cohere (Trial key) | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
 | Quốc gia 6 | Cloudflare Workers AI (token mẫu "Workers AI") | https://dash.cloudflare.com/profile/api-tokens | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
 | Trọng tài | **Claude Sonnet 5.5** qua tài khoản Claude bạn đăng nhập (tab Chat Claude); Groq và các nhà cung cấp miễn phí khác làm dự phòng | — | `JUDGE_PROVIDERS=claude,groq,…` |
 | Sử gia | Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
 
-Không dùng: Mistral (gói miễn phí không bật được API key, đòi nâng cấp), NVIDIA NIM (bắt xác minh số điện thoại, có nơi không nhận được OTP).
+Không dùng: Mistral (gói miễn phí không bật được API key, đòi nâng cấp), NVIDIA NIM (bắt xác minh số điện thoại, có nơi không nhận được OTP), SambaNova (mọi model đòi phương thức thanh toán sau lần dùng thử). Groq vừa làm một quốc gia vừa làm Sử gia.
 
 Danh sách quốc gia đặt bằng `NATIONS` trong `.env`, mỗi nhà cung cấp là một quốc gia. Tên model đổi thường xuyên; nếu nhà cung cấp báo sai model, đặt lại bằng biến `*_MODEL` (xem `.env.example`).
 

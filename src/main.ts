@@ -36,7 +36,7 @@ const env = process.env;
 const store = new Store(env.DB_PATH || "data/world.db");
 const runner = new Runner(store, {
   seed: env.WORLD_SEED || "nguyen-dia-1",
-  nations: (env.NATIONS || "gemini,zai,openrouter,sambanova,cohere,cloudflare").split(",").map(s => s.trim()).filter(Boolean),
+  nations: (env.NATIONS || "openrouter,cohere,cloudflare,groq,gemini,zai").split(",").map(s => s.trim()).filter(Boolean),
   fillWithBots: (env.FILL_WITH_BOTS || "true") !== "false",
   tickSeconds: Number(env.TICK_SECONDS) || 600,
   aiTimeoutSec: Number(env.AI_TIMEOUT_SEC) || 90,

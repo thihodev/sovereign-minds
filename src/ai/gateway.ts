@@ -25,7 +25,8 @@ export const PROVIDERS: Record<string, ProviderDef> = {
   zai: { id: "zai", label: "Z.ai", base: "https://api.z.ai/api/paas/v4", keyEnv: "ZAI_API_KEY", modelEnv: "ZAI_MODEL", defaultModel: "glm-4.7-flash", json: true },
   openrouter: { id: "openrouter", label: "OpenRouter", base: "https://openrouter.ai/api/v1", keyEnv: "OPENROUTER_API_KEY", modelEnv: "OPENROUTER_MODEL", defaultModel: "nvidia/nemotron-3-super-120b-a12b:free", json: true, extraHeaders: { "HTTP-Referer": "https://github.com/thihodev/sovereign-minds", "X-Title": "Sovereign Minds" } },
   groq: { id: "groq", label: "Groq", base: "https://api.groq.com/openai/v1", keyEnv: "GROQ_API_KEY", modelEnv: "GROQ_MODEL", defaultModel: "qwen/qwen3.8-27b", json: true },
-  sambanova: { id: "sambanova", label: "SambaNova", base: "https://api.sambanova.ai/v1", keyEnv: "SAMBANOVA_API_KEY", modelEnv: "SAMBANOVA_MODEL", defaultModel: "DeepSeek-V3.2", json: false },
+  // Without a payment method only MiniMax-M3 (a Chinese model) answers on the free tier (checked 2026-10-20).
+  sambanova: { id: "sambanova", label: "SambaNova", base: "https://api.sambanova.ai/v1", keyEnv: "SAMBANOVA_API_KEY", modelEnv: "SAMBANOVA_MODEL", defaultModel: "MiniMax-M3", json: false },
   cohere: { id: "cohere", label: "Cohere", base: "https://api.cohere.ai/compatibility/v1", keyEnv: "COHERE_API_KEY", modelEnv: "COHERE_MODEL", defaultModel: "command-a-03-2025", json: true },
   // Local models on your own machine: free and without quota (§3.4).
   get ollama(): ProviderDef {
@@ -77,6 +78,7 @@ export function parseRetryAfter(headers: Record<string, string>, body: string, n
   return hints.length ? Math.max(...hints) : null;
 }
 
+const BILLING_WORDS = /payment.?method|billing|prepay|credits? (are )?depleted|insufficient.?(balance|credit)|add (a )?card/i;
 const QUOTA_WORDS = /quota|rate.?limit|too many requests|resource_exhausted|exceeded|insufficient_quota|limit reached|tokens per (day|minute)|requests per (day|minute)/i;
 
 export async function callModel(p: ProviderDef, system: string, user: string, opts: { timeoutMs: number; maxTokens?: number; model?: string; temperature?: number }): Promise<CallResult> {
@@ -87,7 +89,7 @@ export async function callModel(p: ProviderDef, system: string, user: string, op
     model: opts.model || providerModel(p),
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
     temperature: opts.temperature ?? 0.7,
-    max_tokens: opts.maxTokens ?? 2000,
+    max_tokens: opts.maxTokens ?? 4000, // reasoning models think before they answer
   };
   if (p.json) body.response_format = { type: "json_object" };
   try {
@@ -101,6 +103,10 @@ export async function callModel(p: ProviderDef, system: string, user: string, op
     res.headers.forEach((v, k) => { if (/ratelimit|retry-after|x-request-id/i.test(k)) headers[k] = v; });
     const text = await res.text();
     const latencyMs = Date.now() - started;
+    // A key that needs a card or prepaid credit is not free: report it, don't treat it as quota.
+    if ((res.status === 402 || res.status === 403) && BILLING_WORDS.test(text)) {
+      return { ok: false, kind: "auth", message: `Cần thanh toán (không phải gói miễn phí): HTTP ${res.status}: ${text.slice(0, 220)}`, retryAfterSec: null, latencyMs, headers };
+    }
     if (res.status === 429 || ((res.status === 403 || res.status === 402 || res.status === 400) && QUOTA_WORDS.test(text))) {
       return { ok: false, kind: "ratelimit", message: `HTTP ${res.status}: ${text.slice(0, 300)}`, retryAfterSec: parseRetryAfter(headers, text), latencyMs, headers };
     }
