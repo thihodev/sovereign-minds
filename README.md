@@ -47,6 +47,15 @@ docker compose exec sovereign-minds npm run check-providers
 
 Tab **Chat Claude** dùng cùng tài khoản. Claude đọc một bản tóm tắt thế giới ở mỗi tin nhắn; nó chỉ tư vấn, không tự thay đổi được thế giới.
 
+## Deploy lại sau khi có code mới
+
+```bash
+./deploy.sh        # lấy code mới, chạy bằng Docker; engine nạp code mới sau lượt hiện tại
+./deploy.sh now    # như trên nhưng khởi động lại engine ngay (lượt đang dở bị bỏ)
+```
+
+Script cũng tắt engine đang chạy ngoài Docker (`npm start`) trên cùng thế giới, để không bao giờ có hai engine cùng ghi `data/world.db`.
+
 ## Tự cập nhật khi có code mới
 
 Code được gắn thẳng vào container (`./:/app`), và một supervisor theo dõi file:

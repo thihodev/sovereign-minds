@@ -11,6 +11,7 @@
     "start": "node --disable-warning=ExperimentalWarning src/supervisor.ts",
     "engine": "node --disable-warning=ExperimentalWarning src/main.ts",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.ts",
-    "check-providers": "node --disable-warning=ExperimentalWarning tools/check-providers.ts"
+    "check-providers": "node --disable-warning=ExperimentalWarning tools/check-providers.ts",
+    "deploy": "./deploy.sh"
   }
 }
