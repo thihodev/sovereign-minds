@@ -3,7 +3,7 @@
 // numbers in its rules). The values live in the world (its decrees), so a replay or a restart gives the
 // same world; applyLaws() writes them into the rule tables before anything reads them.
 
-import { DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
+import { BORDER, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
 import type { World } from "./types.ts";
 
 export interface LawDef {
@@ -43,6 +43,10 @@ export const LAWS: LawDef[] = [
   { key: "trade.toll", group: "Giao thương", label: "Phí qua đất", desc: "Phần mỗi món hàng nộp cho nước có đất mà đoàn buôn đi qua.", unit: "", min: 0, max: 0.5, step: 0.01, ...field(TRADE, "toll") },
   { key: "trade.porterLoad", group: "Giao thương", label: "Một người khuân vác chở", desc: "", unit: "đơn vị", min: 1, max: 30, step: 1, ...field(TRADE, "porterLoad") },
   { key: "trade.boatLoad", group: "Giao thương", label: "Một thuyền chở", desc: "", unit: "đơn vị", min: 5, max: 100, step: 5, ...field(TRADE, "boatLoad") },
+  { key: "border.friction", group: "Chiến tranh và trật tự", label: "Căng thẳng mỗi ô biên giới mỗi lượt", desc: "Hai nước giáp nhau càng dài thì càng căng thẳng.", unit: "", min: 0, max: 3, step: 0.05, ...field(BORDER, "friction") },
+  { key: "border.dispute", group: "Chiến tranh và trật tự", label: "Căng thẳng biên giới thành tranh chấp", desc: "Từ mức này hai bên đều có chính nghĩa để tuyên chiến.", unit: "", min: 20, max: 100, step: 5, ...field(BORDER, "dispute") },
+  { key: "border.marketBelow", group: "Giao thương", label: "Chợ biên giới họp khi căng thẳng dưới", desc: "", unit: "", min: 0, max: 100, step: 5, ...field(BORDER, "marketBelow") },
+  { key: "border.marketValue", group: "Giao thương", label: "Giá trị hàng mỗi phiên chợ biên giới", desc: "", unit: "", min: 0, max: 100, step: 2, ...field(BORDER, "marketValue") },
   { key: "war.reach", group: "Chiến tranh và trật tự", label: "Tầm đánh (không thuyền)", desc: "Ô địch tấn công được phải cách đất mình tối đa chừng này ô.", unit: "ô", min: 1, max: 8, step: 1, ...field(WAR, "reach") },
   { key: "hordes.minPop", group: "Chiến tranh và trật tự", label: "Man di chỉ cướp nước từ", desc: "Nước ít dân hơn số này không bị man di nhắm tới.", unit: "người", min: 10, max: 300, step: 5, ...field(HORDES, "minPop") },
   { key: "hordes.growth", group: "Chiến tranh và trật tự", label: "Man di mạnh lên mỗi lượt", desc: "", unit: "", min: 0, max: 3, step: 0.1, ...field(HORDES, "growth") },

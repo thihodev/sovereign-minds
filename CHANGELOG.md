@@ -4,6 +4,12 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Biên giới sống (§7.9):** láng giềng có đất giáp nhau giờ luôn tương tác.
+  - Mỗi cặp có mức căng thẳng tăng theo độ dài đường biên, giảm nhờ hiệp ước, buôn bán và chung ngôn ngữ.
+  - Sự cố biên giới (săn trộm, đốn gỗ lấn đất, xô xát làm chết người, dân vượt biên) cho bên bị hại chính nghĩa để tuyên chiến. Căng thẳng từ 70 thành tranh chấp: cả hai bên có chính nghĩa và mất ổn định.
+  - Chợ biên giới tự đổi hàng dư lấy hàng thiếu mỗi lượt, tính là một lần buôn.
+  - AI thấy láng giềng, căng thẳng, sự cố trong gói trạng thái, và cố vấn gợi ý cách xử lý. Bot ưu tiên ký bất tương xâm với biên giới căng.
+  - Thẻ quan hệ trong mục Ngoại giao hiện ⚡ căng thẳng.
 - **Khung bám theo tiến trình thật:**
   - Tiên quyết của khung giờ là **năng lực**, có được từ bất kỳ phát minh nào. Nước đã tự phát minh ra luyện đồng thì học Rèn sắt ngay, không phải học lại khung.
   - Khung mà một nước đã có đủ năng lực thì ẩn với nước đó.

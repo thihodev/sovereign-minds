@@ -104,6 +104,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       wars: w.wars.filter(x => x.end === null).map(x => ({ ...x, aName: w.nations[x.a]?.name, bName: w.nations[x.b]?.name })),
       battles: w.battles.slice(-20),
       caravans: w.caravans,
+      borders: w.borders ?? {},
       eraGates: w.eraGates,
       ranking: ranking(w),
     };

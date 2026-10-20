@@ -663,6 +663,31 @@ Mỗi quốc gia có một **mức hiểu biết** (1–4) về từng quốc gi
   - Lượt ra tay, cơ hội bị lộ của gián điệp đó nhân đôi (tính sau giới hạn 40%, nên tối đa 80%). Nước bị hại biết chuyện xảy ra (công trình hỏng, dân bị kích động) nhưng không biết thủ phạm; đánh cắp phát minh thì không ai hay. Biên niên sử cũng không ghi tên thủ phạm. Nếu gián điệp bị bắt ngay lượt đó, nước bị hại được biết nó đã làm gì; nếu nó khai ra nguồn gốc thì Biên niên sử ghi tên kẻ chủ mưu.
 - **Phản gián:** chiến binh canh gác làm tăng cơ hội bắt gián điệp như trên. Quốc gia không biết mình đang bị do thám cho tới khi bắt được gián điệp.
 
+### 7.9 Biên giới sống
+
+Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
+
+- **Quen biết:** hai nước có đất giáp nhau luôn biết nhau.
+- **Căng thẳng biên giới (0–100)** của mỗi cặp láng giềng, mỗi lượt:
+  - tăng 0,5 cho mỗi ô biên giới (tối đa +5)
+  - giảm 1
+  - giảm theo hiệp ước đang có: bất tương xâm −3, hòa bình −4, thông hành −1,5, liên minh −6, chư hầu −5
+  - giảm 3 cho mỗi lượt có trao đổi thật giữa hai nước, 1 cho mỗi phiên chợ biên giới
+  - giảm 1 nếu hai nước có chung ngôn ngữ
+
+  Đang chiến tranh thì căng thẳng là 100.
+- **Sự cố biên giới:** mỗi lượt có khả năng = căng thẳng / 250 (tối đa 30%):
+  - săn trộm hoặc đốn gỗ lấn đất: bên kia lấy tới 30 đơn vị từ ô biên giới; căng thẳng +8
+  - xô xát: vài người hai bên chết; căng thẳng +15
+  - dân vượt biên: vài gia đình từ nước kém ổn định sang nước ổn định hơn; căng thẳng +5
+
+  Bên bị săn trộm hoặc bị xô xát có **chính nghĩa** (tuyên chiến không mất uy tín) trong 6 lượt.
+- **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt.
+- **Chợ biên giới:** khi căng thẳng dưới 60, mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
+- **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
+- **Quà tặng:** `trade_offer` chỉ có "give" và "get" rỗng là một món quà.
+- Watcher chỉnh được độ căng thẳng mỗi ô, ngưỡng tranh chấp và chợ biên giới bằng sắc lệnh luật.
+
 ## 8. Giao thức AI
 
 Mỗi lượt AI nhận một gói JSON trạng thái và trả về một gói JSON hành động. Engine không bao giờ thực thi điều gì đọc được từ văn bản tự do. Vì API miễn phí không nhớ hội thoại, Engine cấp cho mỗi AI một **bản ghi nhớ** do chính nó viết và đọc lại mỗi lượt.

@@ -3,10 +3,12 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
+import { BORDER, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, tileLimit, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
+import { borderOf, neighbours } from "../border.ts";
+import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import type { Nation, World } from "../types.ts";
 
 const xy = (i: number) => `(${col(i)}, ${row(i)})`;
@@ -70,6 +72,18 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Discontent
   if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, không vượt giới hạn đất, có nghi lễ/công trình ổn định) để nó nguội đi.`);
+
+  // Neighbours (§7.9): the borders that need a decision
+  for (const { o, border } of neighbours(world, n)) {
+    if (!border) continue;
+    const st = borderOf(world, n.id, o.id), t = Math.round(st.tension), treaty = treatiesBetween(world, n.id, o.id).map(x => x.type);
+    const cause = (n.casusBelli[String(o.id)] ?? -1) >= world.tick;
+    if (activeWar(world, n.id, o.id)) continue;
+    if (t >= BORDER.dispute) say(3, `Biên giới với ${o.name} rất căng (${t}/100, ${border} ô giáp nhau): mỗi lượt −${BORDER.disputeStability} ổn định và hai bên đều có chính nghĩa để tuyên chiến. Hoặc hạ nhiệt (treaty non_aggression/peace, trade_offer, quà tặng), hoặc chuẩn bị chiến binh.`);
+    else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}`);
+    else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
+    if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
+  }
 
   // Customs
   if ((n.family?.births ?? "neutral") === "limit" && n.population < 40) say(2, `Bạn đang hạn chế sinh khi chỉ có ${n.population} dân: dân sẽ co dần. Đổi về "neutral" (family_policy) trừ khi đang đói.`);

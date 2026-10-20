@@ -16,6 +16,7 @@ import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
+import { borderPhase, pairKey } from "./border.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -627,8 +628,14 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   }
 
   // 5. Treaties, trade, caravans, then battles (§3.1 order)
+  const tradesBefore = new Map(world.nations.map(n => [n.id, { ...n.trades }]));
   resolveRelations(ctx);
   resolveBattles(ctx);
+
+  // 5a. Living borders: tension, incidents and the border market (§7.9)
+  const traded = new Set<string>();
+  for (const n of world.nations) for (const [o, k] of Object.entries(n.trades)) if (k > (tradesBefore.get(n.id)?.[o] ?? 0)) traded.add(pairKey(n.id, Number(o)));
+  borderPhase(world, L, say, traded);
 
   // 5b. The wild: hordes grow, raid and come back (§9.4)
   wildPhase(world, L, say);

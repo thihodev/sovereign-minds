@@ -107,6 +107,23 @@ export const SCHISM = {
   /** The old nation once they are gone: stability +calmAfter; the new one starts at `startStability`. */
   calmAfter: 15, startStability: 70,
 };
+/** §7.9 Living borders between nations whose lands touch (or lie within `near` tiles). */
+export const BORDER = {
+  near: 3,
+  /** Tension (0–100) a turn: + friction per border tile (at most frictionMax), − fade, − calm for each treaty,
+   *  each trade (tradeCalm; the border market only marketCalm) and a shared language. */
+  friction: 0.5, frictionMax: 5, fade: 1,
+  treatyCalm: { non_aggression: 3, peace: 4, passage: 1.5, alliance: 6, vassal: 5 } as Record<string, number>,
+  tradeCalm: 3, marketCalm: 1, languageCalm: 1,
+  /** Incidents: chance a turn = tension / incidentDiv (at most incidentMax); each raises the tension and may give the victim a just cause for `causeTicks` turns. */
+  incidentDiv: 250, incidentMax: 0.3, causeTicks: 6, poach: 30, crossers: 4,
+  rise: { poach: 8, brawl: 15, crossing: 5 } as Record<string, number>,
+  /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn. */
+  dispute: 70, disputeStability: 1,
+  /** The border market: while tension < marketBelow, up to `marketValue` worth of goods a side, from a good one has
+   *  beyond what it keeps (food: two turns of eating; others: marketKeep) to a nation holding less than marketLack of it. */
+  marketBelow: 60, marketValue: 12, marketKeep: 20, marketLack: 5,
+};
 /** §3.2 Every turn a ruler gives at least one order: from the `after`-th idle turn in a row, stability −`stability` a turn. */
 export const IDLE = { after: 2, stability: 2 };
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses

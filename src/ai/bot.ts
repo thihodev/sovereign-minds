@@ -15,6 +15,7 @@ import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E,
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
+import { borderOf } from "../border.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
@@ -356,7 +357,10 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const near = others.filter(o => !pendingOrActiveWar(world, n.id, o.id) && v.gap(o.id) <= 8);
     const unsigned = near.filter(o => !treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace"]).length
       && !world.treatyOffers.some(x => (x.from === n.id && x.to === o.id) || (x.from === o.id && x.to === n.id)) && !weakNeighbour(v, o));
-    if (unsigned.length && tick % 3 === n.id % 3) spend("treaty", { to: pickOne(unsigned, rand).name, kind: "non_aggression", duration: 60 });
+    // §7.9 a tense border first: a treaty calms it every turn
+    const tense = unsigned.filter(o => borderOf(world, n.id, o.id).tension >= 40).sort((a, b) => borderOf(world, n.id, b.id).tension - borderOf(world, n.id, a.id).tension)[0];
+    if (tense) spend("treaty", { to: tense.name, kind: "non_aggression", duration: 60 });
+    else if (unsigned.length && tick % 3 === n.id % 3) spend("treaty", { to: pickOne(unsigned, rand).name, kind: "non_aggression", duration: 60 });
     // Goods travel by caravan, so any partner at peace will do: first those whose land we have seen holds
     // what we lack, then neighbours
     const deal = tradeIdea(v);
