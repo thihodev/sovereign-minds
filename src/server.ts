@@ -10,7 +10,7 @@ import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } fro
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
-import { DEMO, OFFICIAL_DOMAINS, ROADS } from "./rules.ts";
+import { DEMO, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
@@ -63,6 +63,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         controller: n.controller, provider: n.provider, model: n.model, effort: n.effort ?? "", alive: n.alive, capital: n.capital,
         trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
+        discontent: Math.round(n.discontent ?? 0), origin: n.origin ? { ...n.origin, fromName: w.nations[n.origin.from]?.name } : null,
         population: n.population, workers: workers(n),
         demo: n.alive ? (() => { const d = demo(n); return { m: d.m, f: d.f, born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, households: households(n), fighters: fighters(n), mouths: mouths(n) }; })() : null,
         family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
@@ -87,6 +88,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       lastFx: runner.lastFx,
       spies: w.spies,
       petitions: w.petitions,
+      schisms: (w.schisms ?? []).map(x => ({ ...x, fromName: w.nations[x.from]?.name, nationName: x.nation !== undefined ? w.nations[x.nation]?.name : undefined, toName: x.to !== undefined ? w.nations[x.to]?.name : undefined, waitLeft: x.status === "pending" ? Math.max(0, SCHISM.waitTicks - (w.tick - x.tick)) : 0 })),
+      claudeModels: CLAUDE_MODELS, claudeEfforts: CLAUDE_EFFORTS,
       decrees: w.decrees,
       registry: w.registry,
       proposals: w.proposals.slice(-60),
@@ -189,6 +192,12 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (petM && method === "POST") {
         const b = await readBody(req);
         const err = runner.decidePetition(Number(petM[1]), String(b.status), String(b.verdict ?? ""), b.mergedInto ? Number(b.mergedInto) : null);
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      const schM = path.match(/^\/api\/schisms\/(\d+)$/);
+      if (schM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.decideSchism(Number(schM[1]), String(b.status), String(b.model ?? ""), String(b.effort ?? ""), String(b.verdict ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
       const propM = path.match(/^\/api\/proposals\/(\d+)$/);

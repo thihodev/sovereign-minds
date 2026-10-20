@@ -86,6 +86,26 @@ export const DEMO = {
   marriageCap: "hôn-nhân", marriage: 1.1, marriageStability: 0.5,
 };
 
+/** §4.5 Discontent and schism: bad government breeds a faction that leaves to found its own nation,
+ *  once the Watcher grants it a mind (an AI model) of its own. */
+export const SCHISM = {
+  /** Discontent (0–100) grows each turn by (threshold − stability) / divisor while stability is below threshold,
+   *  and by `famine` in a famine, `riot` in a riot, `overreach` per tile over the limit; it fades by `fade` at stability ≥ calm. */
+  threshold: 35, divisor: 3, famine: 10, riot: 25, overreach: 2, calm: 60, fade: 10,
+  /** A faction forms at 100, in a people of at least `minPop`, `cooldown` turns after the last one. */
+  minPop: 60, cooldown: 30,
+  /** The share of the people that goes: from share[0] to share[1] as discontent ran higher. */
+  share: [0.2, 0.35] as [number, number],
+  /** The Watcher answers within `waitTicks` turns, or the faction gives up (stability −giveUp, discontent halved). */
+  waitTicks: 10, giveUp: 5,
+  /** Where they go: free land at least `clearOfAll` tiles from every nation, `near`–`far` tiles from the old land. */
+  clearOfAll: 3, near: 5, far: 16,
+  /** Not let go (or no answer): they ask a nation the old one knows, with room, to take them in; it has
+   *  `askTicks` turns to accept (accept_migrants), or they go home bitter. */
+  askTicks: 2,
+  /** The old nation once they are gone: stability +calmAfter; the new one starts at `startStability`. */
+  calmAfter: 15, startStability: 70,
+};
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses
  *  this many people by terrain; at most `max` + `perEra` × era in all. Water houses no one. */
 export const HAMLET = {
@@ -119,7 +139,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,

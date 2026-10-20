@@ -390,6 +390,12 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (births !== fam.births || fight !== fam.fighters) spend("family_policy", { births, fighters: fight });
   }
 
+  // 5a'. Take in a faction that asks, while there is room and food for them (§4.5)
+  for (const x of world.schisms ?? []) {
+    if (x.status !== "asking" || x.to !== n.id) continue;
+    if (v.house - v.pop >= x.people * 0.5 && v.food >= v.need && !atWar) spend("accept_migrants", { faction: x.id });
+  }
+
   // 5b. The court (§4.6): fill the slots in a fixed order; keep the officials paid and loyal
   if (n.founded && tick > 0) {
     const court = n.officials ?? [], has = (d: string) => court.some(o => o.domain === d);

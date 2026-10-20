@@ -289,6 +289,29 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - **Dưới 15:** mỗi lượt 5% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang.
 - **Bằng 0:** nội loạn. AI mất quyền ra lệnh ở lượt kế tiếp (giữ phân công cũ), ổn định đặt lại 20.
 
+### 4.5 Bất mãn và ly khai
+
+- **Bất mãn (0–100):** mỗi lượt tăng khi quốc gia bị cai trị kém:
+  - ổn định dưới 35: thêm (35 − ổn định) / 3
+  - nạn đói: thêm 10
+  - nội loạn: thêm 25
+  - mỗi ô vượt giới hạn quản lý: thêm 2
+
+  Khi ổn định ≥ 60, bất mãn giảm 10 mỗi lượt. AI thấy mức bất mãn trong gói trạng thái, và nhận cảnh báo từ mức 40.
+- **Một phái đòi ra đi:** khi bất mãn đạt 100, dân từ 60 người trở lên, và lần ly khai trước cách ít nhất 30 lượt:
+  - 20–35% dân (bất mãn càng nặng càng đông) theo một thủ lĩnh, xin bỏ đi lập quốc riêng
+  - nơi họ nhắm là đất trống cách đất cũ 5–16 ô và cách mọi quốc gia ≥ 3 ô
+  - yêu cầu hiện trong mục **Thỉnh nguyện** của Watcher
+- **Watcher cho phép:** Watcher chọn trí tuệ cho quốc gia mới (Claude Haiku/Sonnet với một mức effort, hoặc bot). Lượt sau phái đó ra đi:
+  - cả gia đình theo họ, phần kho theo tỷ lệ người đi, và mọi phát minh của nước cũ
+  - nước mới nhận kỷ nguyên, đặc thù và phong tục của nước cũ
+  - họ nhận ô đích cùng các ô kề, và quen biết nước cũ cùng các nước mà nước cũ đã gặp
+  - lượt đầu tiên họ tự đặt tên, thủ đô, dân tộc và cờ (`found_nation`), bắt đầu với ổn định 70
+  - nước cũ +15 ổn định, bất mãn về 0
+- **Không cho phép, hoặc không trả lời trong 10 lượt:** phái đó xin sang định cư ở nước yên ổn nhất (ổn định ≥ 35) và nhiều chỗ ở nhất mà nước cũ quen biết, nếu không đang chiến tranh với nước cũ.
+  - Nước được xin có 2 lượt để nhận, bằng hành động `accept_migrants` (1 AP). Nếu nhận, cả gia đình sang ngay; nước cũ +7 ổn định, bất mãn về 0.
+  - Nếu không ai nhận, họ quay về nước cũ trong uất ức: −5 ổn định, bất mãn còn một nửa.
+
 ### 4.6 Triều đình: phân quyền cho quan chức
 
 Một quốc gia giao một lĩnh vực cho một người. Người đó **tự làm việc mỗi lượt, không tốn AP của nhà vua**:

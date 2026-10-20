@@ -415,3 +415,8 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13
 .pyr-m i { background: #5aa9e6; }
 .pyr-f i { background: #e67aa8; }
 .pyr b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* §4.5 discontent and schism */
+.bar.discontent { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar.discontent i { display: block; height: 100%; background: linear-gradient(90deg, var(--warn), var(--bad)); }
+.petition.schism { border-left: 3px solid var(--warn); }

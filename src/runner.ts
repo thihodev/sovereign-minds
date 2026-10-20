@@ -421,6 +421,26 @@ export class Runner {
     return null;
   }
 
+  /** §4.5 Let a faction go and give its nation a mind (a Claude model and effort, or a bot), or refuse it. */
+  decideSchism(id: number, status: string, model: string, effort: string, verdict: string): string | null {
+    const x = (this.world.schisms ?? []).find(s => s.id === id);
+    if (!x) return "Không có phái ly khai này";
+    if (x.status !== "pending") return "Phái này đã được quyết định";
+    if (status === "approved") {
+      if (model === "bot") { x.controller = "bot"; x.provider = "bot"; x.model = "bot"; x.effort = undefined; }
+      else {
+        if (!CLAUDE_MODELS.some(m => m.id === model)) return "Model không hợp lệ";
+        if (!CLAUDE_EFFORTS.includes(effort)) return "Effort không hợp lệ";
+        x.controller = "ai"; x.provider = "claude"; x.model = model; x.effort = effort;
+      }
+    } else if (status !== "refused") return "Kết quả không hợp lệ";
+    x.status = status as typeof x.status; x.verdict = verdict.slice(0, 500); x.decidedTick = this.world.tick;
+    this.store.logWatcher(this.world.tick, "schism", { id, status, model, effort, verdict });
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
+  }
+
   addDecree(kind: string, text: string, fromPetition: number | null): string | null {
     text = text.trim();
     if (text.length < 5) return "Sắc lệnh quá ngắn";

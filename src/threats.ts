@@ -6,6 +6,7 @@ import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
 import { mouths } from "./people.ts";
 import { canSeeRes, freshWater, governed, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { SCHISM } from "./rules.ts";
 import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
@@ -102,6 +103,10 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   // Governance
   const limit = tileLimit(world, n), held = governed(world, n);
   if (held > limit) add("overreach", 2, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10). Đường nối các trung tâm nâng giới hạn.`);
+  // §4.5 a faction may leave
+  const faction = (world.schisms ?? []).find(x => x.from === n.id && (x.status === "pending" || x.status === "approved" || x.status === "asking"));
+  if (faction) add("schism", 3, "Ly khai", `${faction.people} người theo ${faction.leader} muốn bỏ đi lập quốc riêng vì ${faction.grievance}; nếu các vị thần cho phép, họ mang theo ~${Math.round(faction.share * 100)}% dân và kho.`);
+  else if ((n.discontent ?? 0) >= 40) add("discontent", (n.discontent ?? 0) >= 75 ? 3 : 2, "Bất mãn", `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 (với ${SCHISM.minPop}+ dân) một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} để nó nguội đi; tránh nạn đói, nội loạn và đất quá rộng.`);
   if (n.stability < 30) add("unrest", n.stability < 15 ? 3 : 2, "Bất ổn", `Ổn định ${n.stability}: dưới 30 sản xuất −25%, dưới 15 dân bỏ đi, về 0 thì nội loạn.`);
   const roof = housing(world, n);
   if (n.population >= roof) add("housing", 1, "Hết chỗ ở", `Dân ${n.population}/${roof} chỗ ở: dân không tăng nữa cho đến khi có thêm lều, điểm định cư, hay đất mới cho thôn xóm.`);

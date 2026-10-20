@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Bất mãn và ly khai (§4.5).**
+  - Cai trị kém (ổn định thấp, nạn đói, nội loạn, đất quá rộng) làm bất mãn tăng dần. Tới 100, một phái 20–35% dân xin bỏ đi lập quốc riêng trên đất trống.
+  - **Watcher duyệt trong mục Thỉnh nguyện** và chọn model, effort (hoặc bot) cho quốc gia mới. Nước mới kế thừa người, kho, phát minh, kỷ nguyên, đặc thù và phong tục, rồi tự đặt tên và cờ ở lượt đầu.
+  - Nếu không được duyệt, phái đó xin sang định cư ở một nước quen biết; nước đó nhận bằng `accept_migrants`. Không ai nhận thì họ quay về trong uất ức.
+  - Hồ sơ quốc gia có thanh bất mãn và nguồn gốc ly khai.
 - **Thôn xóm (§4.2):** dân sống rải rác trên đất. Mỗi ô đất cho thêm 1–3 chỗ ở tùy địa hình (thêm 1 nếu có sông), tối đa 40 + 20 mỗi kỷ nguyên. Mở rộng đất giờ nâng trần dân số, phá vòng kẹt "trần 40 dân, cần 50 để định cư". Hồ sơ quốc gia chia chỗ ở theo nguồn.
 - **Dân cư theo tuổi và giới, gia đình (§4.2).**
   - Dân được đếm theo 4 nhóm tuổi × 2 giới. Mỗi lượt cả nhóm lên một bậc tuổi; người già qua đời vì tuổi già.

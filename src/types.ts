@@ -140,6 +140,38 @@ export interface Nation {
   demo?: Demography;
   /** §4.2 family customs chosen by the nation's AI */
   family?: { births: string; fighters: string };
+  /** §4.5 discontent 0–100: at 100 a faction wants to leave */
+  discontent?: number;
+  /** §4.5 a nation founded by a faction that left another */
+  origin?: { from: number; tick: number; leader: string };
+}
+
+/** §4.5 A faction that wants to leave its nation and found its own, waiting for the Watcher. */
+export interface Schism {
+  id: number;
+  from: number;
+  tick: number;
+  /** Share of the people that goes, and how many that was when it formed. */
+  share: number;
+  people: number;
+  /** Where they mean to settle. */
+  site: number;
+  leader: string;
+  grievance: string;
+  /** pending → approved → done (a new nation); or refused/expired → asking another nation → emigrated, or returned home */
+  status: "pending" | "approved" | "refused" | "expired" | "done" | "asking" | "emigrated" | "returned";
+  /** The nation they ask to take them in, and until when. */
+  to?: number;
+  askUntil?: number;
+  /** The Watcher's answer: the mind the new nation gets. */
+  controller?: "ai" | "bot";
+  provider?: string;
+  model?: string;
+  effort?: string;
+  verdict?: string;
+  decidedTick?: number;
+  /** The nation it became. */
+  nation?: number;
 }
 
 export interface Demography {
@@ -255,6 +287,8 @@ export interface World {
   tick: number;
   tiles: Tile[];
   nations: Nation[];
+  /** §4.5 factions that want to leave, and those that did (worlds before v0.6 have none) */
+  schisms?: Schism[];
   wonders: Wonder[];
   rivers: number[][];
   herd: [number, number] | null;

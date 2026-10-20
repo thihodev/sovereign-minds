@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -17,7 +17,7 @@ import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
-import { ROLES, type Building, type RoadWork, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
+import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
 // ---------------------------------------------------------------- ledger
 
@@ -650,6 +650,9 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
 
+  // 9b. Factions that want to leave, and those the Watcher let go (§4.5)
+  schismPhase(world, L, say);
+
   // 10. Death, lost knowledge, eras
   for (const n of alive) {
     if (!n.alive) continue;
@@ -959,6 +962,117 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
   }
   if (n.stability === 0) { n.riot = true; n.stability = 20; fx({ kind: "riot", tile: n.capital, nation: n.id }); say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+  // §4.5 Discontent: a people badly governed grows tired of its rulers
+  let dis = n.discontent ?? 0;
+  if (n.stability < SCHISM.threshold) dis += (SCHISM.threshold - n.stability) / SCHISM.divisor;
+  if (shortage > 1e-9) dis += SCHISM.famine;
+  if (n.riot) dis += SCHISM.riot;
+  if (over > 0) dis += over * SCHISM.overreach;
+  if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
+  n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
+}
+
+// ---------------------------------------------------------------- discontent and schism (§4.5)
+
+/** Free land a faction could settle: clear of every nation, near enough to the old one; the richest ring first. */
+export function schismSite(world: World, n: Nation): number {
+  const mine = ownedTiles(world, n.id).map(t => t.i), taken = world.tiles.filter(t => t.owner >= 0).map(t => t.i);
+  let best = -1, bestV = -Infinity;
+  for (const t of world.tiles) {
+    if (!t.land || t.owner !== -1 || ["mountain", "icewall", "glacier"].includes(t.terrain)) continue;
+    let near = Infinity; for (const i of mine) { const d = dist(i, t.i); if (d < near) near = d; }
+    if (near < SCHISM.near || near > SCHISM.far) continue;
+    if (taken.some(i => dist(i, t.i) < SCHISM.clearOfAll)) continue;
+    const v = within(t.i, 1).reduce((s, j) => s + (world.tiles[j].land ? tileValue(world.tiles[j]) : 0), 0) - near * 0.5;
+    if (v > bestV || (v === bestV && t.i < best)) { best = t.i; bestV = v; }
+  }
+  return best;
+}
+/** Why the people is unhappy, in words, for the faction's petition. */
+function grievance(world: World, n: Nation): string {
+  const why: string[] = [];
+  if (n.stability < SCHISM.threshold) why.push(`ổn định chỉ còn ${n.stability}`);
+  if (n.lastEvents.some(e => /chết đói|Thiếu .* lương thực/.test(e))) why.push("nạn đói");
+  if (governed(world, n) > tileLimit(world, n)) why.push("đất đai quá rộng, cai quản không xuể");
+  if (world.wars.some(w => w.end === null && (w.a === n.id || w.b === n.id))) why.push("chiến tranh kéo dài");
+  if (n.population >= housing(world, n)) why.push("không còn chỗ ở");
+  return why.join(", ") || "bất mãn với triều đình";
+}
+
+function schismPhase(world: World, L: Ledger, say: Say): void {
+  const list = (world.schisms ??= []), tick = world.tick;
+  for (const n of world.nations) {
+    if (!n.alive || !n.founded) continue;
+    const mine = list.filter(x => x.from === n.id);
+    const open = mine.find(x => x.status === "pending" || x.status === "approved");
+    // A faction forms
+    if (!open && (n.discontent ?? 0) >= 100 && n.population >= SCHISM.minPop && !mine.some(x => tick - x.tick < SCHISM.cooldown)) {
+      const site = schismSite(world, n);
+      if (site < 0) continue;
+      const r = rngFor(world.seed, tick, "schism", n.id);
+      const leader = `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
+      const share = SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
+      const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: Math.round(n.population * share), site, leader, grievance: grievance(world, n), status: "pending" };
+      list.push(x);
+      n.lastEvents.push(`Một phái bất mãn (${x.people} người, thủ lĩnh ${leader}) muốn bỏ đi lập quốc riêng ở (${col(site)}, ${row(site)}) vì ${x.grievance}. Họ đang chờ các vị thần cho phép.`);
+      say(n.id, "schism", `Ở ${n.name}, ${x.people} người theo ${leader} muốn ra đi lập quốc riêng vì ${x.grievance}.`);
+      continue;
+    }
+    // Not let go, or no answer in time: they look for a nation that will take them in
+    for (const x of mine) {
+      if (x.status === "pending" && tick - x.tick >= SCHISM.waitTicks) { x.status = "expired"; x.decidedTick = tick; }
+      if (x.status === "refused" || x.status === "expired") seekRefuge(world, n, x, say);
+      else if (x.status === "asking" && tick >= (x.askUntil ?? tick)) goHome(n, x, `${world.nations[x.to!]?.name ?? "nước kia"} không nhận họ`);
+    }
+    if (open?.status === "approved") secede(world, n, open, L, say);
+  }
+}
+
+/** A faction that may not found its own nation asks the calmest, roomiest nation its people knows to take it in. */
+function seekRefuge(world: World, n: Nation, x: Schism, say: Say): void {
+  const why = x.status === "refused" ? "các vị thần không cho lập quốc" : "các vị thần không đáp lời";
+  const hosts = n.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded && !activeWar(world, n.id, o.id) && o.stability >= SCHISM.threshold)
+    .sort((a, b) => (housing(world, b) - b.population) - (housing(world, a) - a.population) || a.id - b.id);
+  const host = hosts[0];
+  if (!host) { goHome(n, x, `${why} và không có nước quen biết nào yên ổn để xin sang`); return; }
+  x.status = "asking"; x.to = host.id; x.askUntil = world.tick + SCHISM.askTicks;
+  n.lastEvents.push(`Vì ${why}, phái của ${x.leader} (${x.people} người) đang xin sang định cư ở ${host.name}.`);
+  host.lastEvents.push(`${x.people} người của ${n.name} theo ${x.leader} xin sang định cư ở nước ta (accept_migrants với faction ${x.id}, trong ${SCHISM.askTicks} lượt).`);
+  say(n.id, "schism", `Phái của ${x.leader} rời ${n.name}, xin sang định cư ở ${host.name}.`);
+}
+/** Nobody took them: they go home, bitter. */
+function goHome(n: Nation, x: Schism, why: string): void {
+  x.status = "returned";
+  n.stability = Math.max(0, n.stability - SCHISM.giveUp); n.discontent = (n.discontent ?? 0) / 2;
+  n.lastEvents.push(`Phái của ${x.leader} đành quay về vì ${why}; lòng còn uất ức (−${SCHISM.giveUp} ổn định).`);
+}
+
+/** The faction leaves with its families, its share of the stores and all the knowledge it had. */
+function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): void {
+  if (world.tiles[x.site].owner !== -1) x.site = schismSite(world, parent);
+  if (x.site < 0 || parent.population < 20) { x.status = "refused"; x.verdict = (x.verdict ? x.verdict + " " : "") + "(không còn đất trống để đi)"; return; }
+  const share = x.share, k = Math.max(10, Math.min(parent.population - 10, Math.round(parent.population * share)));
+  const gone = takePeople(parent, k, "migrate");
+  const child = newNation(world.nations.length, { controller: x.controller ?? "bot", provider: x.provider ?? "bot", model: x.model ?? "bot", effort: x.effort, trait: parent.trait }, x.site);
+  world.nations.push(child);
+  child.demo = { m: gone.m, f: gone.f }; child.population = gone.m.reduce((a, b) => a + b, 0) + gone.f.reduce((a, b) => a + b, 0);
+  child.stock = {};
+  for (const [g, q] of Object.entries(parent.stock)) { const part = q * k / (k + parent.population); if (part > 1e-6) { L.stock(parent, g, -part, "schism"); L.stock(child, g, part, "schism"); } }
+  child.inventions = [...parent.inventions]; child.era = parent.era; child.eraTick = parent.eraTick;
+  child.family = parent.family ? { ...parent.family } : undefined;
+  child.stability = SCHISM.startStability; child.reputation = parent.reputation;
+  child.origin = { from: parent.id, tick: world.tick, leader: x.leader };
+  child.met = [...new Set([parent.id, ...parent.met])].filter(id => world.nations[id]?.alive);
+  for (const id of child.met) if (!world.nations[id].met.includes(child.id)) world.nations[id].met.push(child.id);
+  for (const j of within(x.site, 1)) if (world.tiles[j].owner === -1 && world.tiles[j].land && world.tiles[j].terrain !== "icewall") world.tiles[j].owner = child.id;
+  child.seen = [...new Set([...parent.seen, ...within(x.site, START.sightRadius)])].sort((a, b) => a - b);
+  child.memory = `Chúng tôi là ${k} người đã rời bỏ ${parent.name} ở lượt ${world.tick}, theo thủ lĩnh ${x.leader}, vì ${x.grievance}. Chúng tôi mang theo mọi điều đã biết và một phần kho của họ, tới vùng đất mới quanh (${col(x.site)}, ${row(x.site)}). Lượt đầu: đặt tên, cờ và tuyên ngôn cho quốc gia mới (found_nation).`;
+  x.status = "done"; x.nation = child.id;
+  parent.stability = Math.min(100, parent.stability + SCHISM.calmAfter); parent.discontent = 0;
+  parent.lastEvents.push(`${k} người theo ${x.leader} đã bỏ đi lập quốc riêng, mang theo ${Math.round(share * 100)}% kho; những người ở lại nhẹ nhõm hơn (+${SCHISM.calmAfter} ổn định).`);
+  fx({ kind: "migrate", tile: parent.capital, nation: parent.id, n: k, to: x.site });
+  fx({ kind: "settle", tile: x.site, nation: child.id, text: `phái ${x.leader}` });
+  say(parent.id, "schism", `${k} người của ${parent.name} theo ${x.leader} ra đi, lập một quốc gia mới ở (${col(x.site)}, ${row(x.site)}).`);
 }
 
 // ---------------------------------------------------------------- roads and sea lanes (§2.5)
@@ -1161,7 +1275,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -1238,6 +1352,23 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
       claims.push({ n, tile });
+      return null;
+    }
+    case "accept_migrants": {
+      // §4.5 take in a faction that left its nation
+      const x = (world.schisms ?? []).find(s => s.id === Math.floor(num(a.faction)));
+      if (!x || x.status !== "asking" || x.to !== n.id) return "Không có nhóm nào đang xin sang nước bạn với số này";
+      const from = world.nations[x.from];
+      const k = Math.min(x.people, Math.max(0, from.population - 10));
+      if (k <= 0) { x.status = "returned"; return "Nhóm này không còn ai để đi"; }
+      const gone = takePeople(from, k, "migrate");
+      addPeople(n, gone);
+      x.status = "emigrated";
+      from.discontent = 0; from.stability = Math.min(100, from.stability + Math.round(SCHISM.calmAfter / 2));
+      from.lastEvents.push(`${k} người theo ${x.leader} đã bỏ sang ${n.name}.`);
+      n.lastEvents.push(`Đón ${k} người của ${from.name} theo ${x.leader} vào định cư.`);
+      fx({ kind: "migrate", tile: from.capital, nation: from.id, n: k, to: n.capital });
+      say(n.id, "schism", `${n.name} đón ${k} người của ${from.name} theo ${x.leader} sang định cư.`);
       return null;
     }
     case "family_policy": {

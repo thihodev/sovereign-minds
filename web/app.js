@@ -1072,6 +1072,8 @@
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
           <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
+          ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
           ${pyramid(n)}
           ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)} <span class="muted">${esc(n.trait.lines.join(" · "))}</span></p>` : ""}
           ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
@@ -1298,11 +1300,42 @@
 
   // ---------------------------------------------------------------- petitions & decrees
   const PSTATUS = { pending: ["Đang chờ", "warn"], accepted: ["Chấp thuận", "ok"], partial: ["Một phần", "ok"], rejected: ["Bác bỏ", "bad"], merged: ["Đã gộp", ""] };
+  // §4.5 factions that want to leave: the Watcher lets them go and gives the new nation a mind
+  const SSTATUS = { pending: ["Xin ra đi", "warn"], approved: ["Đã cho phép, đi ở lượt sau", "ok"], done: ["Đã lập quốc", "ok"], refused: ["Không cho đi", "bad"], expired: ["Hết hạn", ""], asking: ["Đang xin định cư nước khác", "warn"], emigrated: ["Đã sang nước khác", ""], returned: ["Quay về nước cũ", "bad"] };
+  function renderSchisms() {
+    const box = $("#schisms"), list = (S.schisms || []).slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id);
+    box.innerHTML = "";
+    for (const x of list) {
+      const [st, cls] = SSTATUS[x.status] || [x.status, ""], from = S.nations[x.from];
+      const el = document.createElement("article"); el.className = "petition schism";
+      const models = [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot (không tốn lượt Claude)</option>`].join("");
+      const efforts = (S.claudeEfforts || []).map(e => `<option value="${esc(e)}"${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("");
+      el.innerHTML = `<div class="row"><h3></h3><span style="flex:1"></span><span class="pill ${cls}">${st}</span></div>
+        <div class="meta">Ly khai #${x.id} · từ <b>${esc(from ? nationName(from) : "?")}</b> · lượt ${x.tick} · ${x.people} người (~${Math.round(x.share * 100)}% dân và kho) · đất mới (${x.site % 128}, ${(x.site / 128) | 0}) <button class="link" data-act="site">↗</button>${x.status === "pending" ? ` · còn ${x.waitLeft} lượt để quyết` : ""}</div>
+        <div class="body"></div>
+        ${x.status === "pending" ? `<p class="note">Nếu cho phép, họ mang theo gia đình, phần kho tương ứng và mọi phát minh của nước cũ, rồi tự đặt tên, cờ ở lượt đầu. Nếu không, họ sẽ xin sang định cư ở một nước quen biết, hoặc quay về trong uất ức. Chọn trí tuệ cho quốc gia mới:</p>
+        <div class="row"><label class="sr-only" for="sch-model-${x.id}">Model</label><select id="sch-model-${x.id}">${models}</select><label class="sr-only" for="sch-effort-${x.id}">Effort</label><select id="sch-effort-${x.id}">${efforts}</select></div>
+        <textarea rows="2" placeholder="Lời phán của các vị thần (gửi cho nước cũ)"></textarea>
+        <div class="row"><button data-s="approved" class="primary">Cho lập quốc</button><button data-s="refused">Không cho đi</button></div>`
+        : `<div class="meta">${x.toName ? `${x.status === "emigrated" ? "Đã sang" : x.status === "asking" ? "Đang xin sang" : "Đã xin sang"} <b>${esc(x.toName)}</b> · ` : ""}${x.nationName ? `Thành quốc gia <b>${esc(x.nationName)}</b> · ` : ""}${x.model ? `trí tuệ: ${esc(x.model === "bot" ? "bot" : `Claude ${x.model} · ${x.effort}`)} · ` : ""}Lời phán: ${esc(x.verdict || "—")}</div>`}`;
+      el.querySelector("h3").textContent = `Phái của ${x.leader} xin lập quốc mới`;
+      el.querySelector(".body").textContent = `Họ bất mãn vì ${x.grievance}.`;
+      el.querySelector("[data-act=site]").onclick = () => centerOn(x.site);
+      const model = el.querySelector("select[id^=sch-model]"), effort = el.querySelector("select[id^=sch-effort]");
+      if (model) model.onchange = () => { effort.disabled = model.value === "bot"; };
+      for (const b of el.querySelectorAll("button[data-s]")) b.onclick = async () => {
+        await api(`/api/schisms/${x.id}`, { method: "POST", body: { status: b.dataset.s, model: model.value, effort: effort.value, verdict: el.querySelector("textarea").value } }).catch(e => alertMsg(e.message));
+        refresh();
+      };
+      box.append(el);
+    }
+  }
   function renderPetitions() {
+    renderSchisms();
     const list = S.petitions.slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id);
-    const pending = list.filter(p => p.status === "pending").length, badge = $("#pet-count");
+    const pending = list.filter(p => p.status === "pending").length + (S.schisms || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
     badge.hidden = !pending; badge.textContent = pending;
-    const box = $("#petitions"); box.innerHTML = list.length ? "" : `<p class="note">Chưa có thỉnh nguyện nào.</p>`;
+    const box = $("#petitions"); box.innerHTML = list.length || (S.schisms || []).length ? "" : `<p class="note">Chưa có thỉnh nguyện nào.</p>`;
     for (const p of list) {
       const n = S.nations[p.nation], [st, cls] = PSTATUS[p.status];
       const el = document.createElement("article"); el.className = "petition";
