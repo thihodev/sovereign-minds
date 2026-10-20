@@ -22,6 +22,21 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - **Watcher** xem bản đầy đủ trong khung chi tiết, thẻ quốc gia và hồ sơ quốc gia.
   - **Bản đồ** có lớp phủ cho mối đe dọa (tổng hợp, thú dữ, man di, lũ lụt, giá rét) và cho trữ lượng từng tài nguyên; trại man di được vẽ trên bản đồ và liệt kê ở tab Ngoại giao.
 - Bot giữ đủ chiến binh khi có man di ở gần.
+- **Sông thực tế hơn (§2.1):**
+  - **tài nguyên ven sông:** sậy, cây dại bãi bồi, đá lửa cuội ở thượng nguồn
+  - **phù sa:** ruộng ven sông +25%, ở châu thổ +50%
+  - **nước ngọt:** thủ đô xa sông thì tăng dân chậm và dịch nhiều hơn; công trình **Giếng** mới
+  - **mùa cá:** thỉnh thoảng có thêm cá trên các ô sông
+  - **sông là đường đi:** có thuyền thì thám hiểm dọc sông xa gấp đôi; có **Bến thuyền** thì quân vượt sông (mất lợi thế sông của bên thủ) và với xa thêm 1 ô
+- **Giao thương theo đường thật (§7.3, `src/routes.ts`):**
+  - **đường bộ:** đi chậm theo độ khó địa hình, cần người khuân vác (5 đơn vị/người, họ không làm việc ở nhà)
+  - **đường thủy:** theo sông và biển nông, cần Bến thuyền và hàng **thuyền** mới (15 đơn vị/thuyền), nhanh hơn và lương thực ít hư hơn
+  - **phí qua đất người khác:** nước thứ ba không có hiệp ước đi lại thì thu 10%; đất của kẻ thù thì đường không đi qua
+  - **rủi ro dọc đường:** man di chặn cướp, bão biển, bị tịch thu khi chiến tranh nổ ra
+  - **AI thấy trước** từng con đường (`trade_road`) và các đoàn buôn đang đi; **bản đồ** vẽ đoàn buôn ⛵/🐂 trượt dọc con đường thật
+- **Phát minh trên giao diện:** đơn đã quyết thu gọn còn một dòng; hiệu ứng, câu trả lời của AI và tin tình báo hiện bằng chữ thay vì JSON (nguyên văn vẫn xem được).
+- **Một engine cho mỗi thế giới** (`data/world.db.lock`) và **Ctrl+C tắt ngay** (giải phóng cổng tức thì); trước đây hai engine có thể cùng ghi một `world.db` và làm hỏng nó.
+- Điểm khai sinh phải có đủ thức ăn trên chính 7 ô khởi đầu.
 - **Hoạt ảnh trên bản đồ:**
   - **người tí hon** màu cờ đi lại giữa làng và nơi làm việc (bãi săn, rừng, mỏ, bến cá, ruộng, công trường, biên giới), có biểu tượng nghề trên ô
   - **sự kiện của lượt vừa rồi** được phát lại ngay chỗ nó xảy ra: người chết (kèm nguyên nhân), sinh thêm, xây xong, phát minh, khai hoang, đường đoàn thám hiểm, man di kéo tới cướp hoặc bị đẩy lui, trận đánh, lũ, động đất, mùa đông, dịch, di cư…

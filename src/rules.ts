@@ -34,7 +34,7 @@ export const ORE_SENSE_CAP = "nhận-biết-khoáng";
 
 export const RES_NAME: Record<string, string> = {
   game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét",
-  salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", herbs: "thảo dược",
+  salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", herbs: "thảo dược", boat: "thuyền",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
   bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
@@ -106,7 +106,39 @@ export const TREATY_NAME: Record<string, string> = { non_aggression: "bất tư�
 export const TREATY = { offerTicks: 2, minDuration: 5, maxDuration: 200, maxTributePerGood: 50, maxCede: 3, keepBonus: 5, breakPenalty: 20, violationPenalty: 10, injectionPenalty: 15 };
 
 // §7.3 Trade
-export const TRADE = { offerTicks: 2, maxQty: 500, nearDistance: 3, caravanSpeed: 8 };
+/** §7.3 Trade travels a real road: overland with porters, or by water with boats (rivers and shallow sea). */
+export const TRADE = {
+  offerTicks: 2, maxQty: 500,
+  /** Lands this close trade over the border at once. */
+  nearDistance: 3,
+  /** Road cost per turn (terrain move cost: grass 1, forest 2, jungle 3…), and water tiles per turn. */
+  landSpeed: 6, waterSpeed: 14,
+  /** What one porter or one boat carries; porters come from the workers, at most `porterShare` of them. */
+  porterLoad: 5, boatLoad: 15, porterShare: 0.25,
+  /** Food lost per turn on the way. */
+  landSpoil: 0.3, waterSpoil: 0.15,
+  /** Crossing a third nation's land without a passage or alliance treaty: it takes this share of every good. */
+  toll: 0.1,
+  /** A caravan within `hordeReach` of a barbarian camp: hordeChance × strength/40 (at most 0.5) a turn to lose `hordeLoss`. */
+  hordeReach: 8, hordeChance: 0.12, hordeLoss: 0.5,
+  /** Boats at sea (shallow water): a storm sinks one boat and `stormLoss` of the goods. */
+  stormChance: 0.04, stormLoss: 0.3,
+};
+/** §2.1 Rivers: reserves on their banks, silt, fresh water, salmon runs; and with boats, a road. */
+export const RIVER = {
+  /** Extra reserves on river tiles; flint gravel only within `flintNear` tiles of hills or mountains (the upper course). */
+  reeds: 40, plants: 20, flint: 25, flintNear: 3,
+  /** Fields on a river tile give +25%, on a delta +50%. */
+  fieldBonus: 0.25, deltaBonus: 0.5,
+  /** A capital with no river, swamp, spring or well within `waterReach` tiles grows ×dryGrowth and catches plague ×dryPlague. */
+  waterReach: 2, dryGrowth: 0.75, dryPlague: 1.5,
+  /** Fish run: chance a turn with river land; up to `runTiles` river tiles get `runFish` fish. */
+  runChance: 0.05, runFish: 80, runTiles: 3,
+  /** Explorers with boats spend half a step on a river tile. */
+  exploreStep: 0.5,
+  /** A pier within this many tiles lets your attacks cross the river (the defender loses the river bonus) and reach one tile further over water. */
+  pierReach: 3,
+};
 
 // §7.4 War
 export const WAR = {
@@ -202,7 +234,7 @@ export const INVENTIONS: Invention[] = [
 export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INVENTIONS.map(v => [v.id, v]));
 
 // §6.1 Buildings
-export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number }
+export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number; water?: number; port?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -216,6 +248,8 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%.", effect: { defense: 0.4 } },
   { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
   { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực.", effect: { farmSlots: 2, farmFood: 2 } },
+  { type: "well", name: "Giếng", needs: "stone_tools", cost: { stone: 10, wood: 4 }, work: 5, desc: "Nước ngọt cho thủ đô xa sông (trong vòng 2 ô).", effect: { water: 1 } },
+  { type: "pier", name: "Bến thuyền", needs: "P16", cost: { wood: 12, rope: 2 }, work: 5, perTile: true, terrains: ["coast"], river: true, desc: "Thuyền ra vào: buôn bằng đường thủy; quân có thuyền vượt sông.", effect: { port: 1 } },
   { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác.", effect: { craftSlots: 4 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
@@ -229,6 +263,7 @@ export const RECIPES: Recipe[] = [
   { id: "blade", name: "Lưỡi đá", needs: "P1", input: { flint: 2 }, output: { blade: 1 }, work: 1, building: "workshop" },
   { id: "rope", name: "Dây thừng", needs: "P3", input: { fiber: 3 }, output: { rope: 2 }, work: 1, building: "workshop" },
   { id: "hide_coat", name: "Áo da", needs: "P7", input: { hide: 3, bone: 1 }, output: { hide_coat: 1 }, work: 1, building: "workshop" },
+  { id: "boat", name: "Thuyền độc mộc", needs: "P16", input: { wood: 6, rope: 1 }, output: { boat: 1 }, work: 3, building: "workshop" },
   { id: "spear", name: "Giáo", needs: "P6", input: { wood: 1, blade: 1, rope: 1 }, output: { spear: 1 }, work: 1, building: "workshop" },
   { id: "bow", name: "Cung tên", needs: "P11", input: { wood: 2, rope: 1, flint: 2 }, output: { bow: 1 }, work: 2, building: "workshop" },
   { id: "axe", name: "Rìu đá mài", needs: "P10", input: { stone: 2, wood: 1, rope: 1 }, output: { axe: 1 }, work: 2, building: "workshop" },
@@ -241,7 +276,7 @@ export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
 /** Standard value of each good (§6.2): an open recipe's output is worth what went in plus labour. */
 export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
-  copper: 3, tin: 4, iron: 4, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
+  copper: 3, tin: 4, iron: 4, boat: 8, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
 

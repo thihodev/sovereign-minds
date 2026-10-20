@@ -5,7 +5,7 @@
 import { NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./hex.ts";
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
-  AP_COST, BEASTS, BRONZE_CAPS, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
+  AP_COST, BEASTS, BRONZE_CAPS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
@@ -14,6 +14,7 @@ import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, de
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
+import { busy } from "./routes.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
@@ -196,6 +197,11 @@ export function housing(world: World, n: Nation): number {
   const roofs = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
     .sort((a, b) => b - a).slice(0, housingSlots(n)).reduce((s, h) => s + h, 0);
   return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + roofs + (ownsWonder(world, n, "cave") ? 50 : 0);
+}
+/** §2.1 Fresh water near the capital: a river, a swamp, the hot spring or a well within RIVER.waterReach tiles. */
+export function freshWater(world: World, n: Nation): boolean {
+  if (within(n.capital, RIVER.waterReach).some(i => { const t = world.tiles[i]; return t.river || t.terrain === "swamp" || t.wonder === "spring"; })) return true;
+  return n.buildings.some(b => buildingWorks(world, b) && (buildingOf(world, b.type)?.effect.water || 0) > 0 && dist(b.tile, n.capital) <= RIVER.waterReach);
 }
 export function tileLimit(world: World, n: Nation): number {
   return TILES.base + Math.floor(TILES.perSqrt * Math.sqrt(Math.max(0, n.population))) + mods(world, n).tiles + n.settlements.length * TILES.perSettlement;
@@ -494,7 +500,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   // 6. Economy
   for (const n of alive) {
     if (!n.alive) continue;
-    economy(world, n, L, say, explorers.get(n.id) || 0);
+    economy(world, n, L, say, (explorers.get(n.id) || 0) + busy(world, n).porters); // §7.3 porters on the road do not work at home
   }
 
   // 7. Sight, meetings, intel. Allies share sight (§7.8 level 4).
@@ -579,7 +585,10 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const owned = ownedTiles(world, n.id);
   const stabMult = n.stability < 30 ? 0.75 : 1;
   const labor = { ...n.labor };
+  // People away (explorers, porters) come from the gatherers first, then from the other trades
+  let short = Math.max(0, away - labor.gather);
   labor.gather = Math.max(0, labor.gather - away);
+  for (const r of ROLES) { if (short <= 0) break; if (r === "warrior" || r === "gather") continue; const k = Math.min(short, labor[r]); labor[r] -= k; short -= k; }
   const assigned = ROLES.reduce((s, r) => s + labor[r], 0);
   labor.gather += Math.max(0, workers(n) - away - assigned); // idle hands forage (§4.2)
 
@@ -644,7 +653,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const k = Math.min(farmers, e.farmSlots); farmers -= k;
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
     const silt = (n.eventTimers.fertile || 0) > 0 ? 1 + FLOOD.fertile : 1; // §9.4 a flood leaves rich mud
-    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? drought : 1) * mult("farm");
+    const bed = world.tiles[b.tile], alluvium = bed.delta ? 1 + RIVER.deltaBonus : bed.river ? 1 + RIVER.fieldBonus : 1; // §2.1
+    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? alluvium * drought : 1) * mult("farm");
     L.stock(n, "food", x, "growth"); foodMade += x;
   }
 
@@ -686,7 +696,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     say(n.id, "event", `Mùa đông khắc nghiệt ở ${n.name}: ${dead} người chết rét.`);
   }
   if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; fx({ kind: "drought", tile: n.capital, nation: n.id }); n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
-  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1);
+  const dry = !freshWater(world, n);
+  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1) * (dry ? RIVER.dryPlague : 1);
   if (erand() < plagueChance) {
     let dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)));
     // §9.4 one herb per HERBS.perPeople people halves the deaths
@@ -697,6 +708,13 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); fx({ kind: "bounty", tile: n.capital, nation: n.id }); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
   const grassTile = owned.find(t => t.terrain === "grass");
   if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); fx({ kind: "herd", tile: grassTile.i, nation: n.id }); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
+  const riverTiles = owned.filter(t => t.river);
+  if (riverTiles.length && erand() < RIVER.runChance) {
+    // §2.1 the fish run up the river
+    for (const t of riverTiles.slice(0, RIVER.runTiles)) L.tile(t, "fish", RIVER.runFish, "fishrun");
+    fx({ kind: "fishrun", tile: riverTiles[0].i, nation: n.id });
+    n.lastEvents.push(`Mùa cá về: thêm ${RIVER.runFish} cá trên ${Math.min(RIVER.runTiles, riverTiles.length)} ô sông.`);
+  }
   const forestTile = owned.find(t => t.terrain === "forest" && (t.res.wood || 0) > 0);
   if (forestTile && erand() < EVENTS.wildfire.chance) { L.tile(forestTile, "wood", -(forestTile.res.wood || 0) * 0.5, "fire"); fx({ kind: "fire", tile: forestTile.i, nation: n.id }); n.lastEvents.push("Cháy rừng: một khu rừng mất nửa số gỗ."); }
   const landTile = owned.find(t => t.land);
@@ -757,7 +775,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const surplus = (n.stock.food || 0) / Math.max(1, need);
     if (surplus > 0) n.stability += 1;
     const roof = housing(world, n);
-    if (surplus >= GROWTH.surplus && n.population < roof) { const born = growthFor(n.population, roof); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
+    if (surplus >= GROWTH.surplus && n.population < roof) { const born = dry ? Math.max(GROWTH.min, Math.floor(growthFor(n.population, roof) * RIVER.dryGrowth)) : growthFor(n.population, roof); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
   }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
@@ -1021,13 +1039,15 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         return !(t.terrain === "mountain" && !m.move.has("mountain"));
       };
       const DIRS = ["E", "NE", "NW", "W", "SW", "SE"], k0 = DIRS.indexOf(dir);
-      for (let s = 0; s < EXPLORE_RANGE; s++) {
+      // §2.1 with boats a river tile costs half a step, so expeditions go further along rivers
+      for (let budget = EXPLORE_RANGE, steps = 0; budget > 0 && steps < EXPLORE_RANGE * 2; steps++) {
         // Walk the chosen way; skirt around water and mountains to either side
         const tries = [0, 1, -1].map(o => stepDir(cur, DIRS[(k0 + o + 6) % 6])).filter(passable);
         if (!tries.length) break;
         const nx = tries[0];
         const t = world.tiles[nx];
         cur = nx; walked.push(nx);
+        budget -= canSail && t.river ? RIVER.exploreStep : 1;
         danger = Math.max(danger, tileDanger(world, t));
         for (const j of within(cur, canSail ? 3 : 2)) seen.add(j);
         if (t.owner !== -1 && t.owner !== n.id) {

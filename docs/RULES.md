@@ -39,7 +39,11 @@ Thế giới là lưới ô lục giác 64 × 64. Mỗi quốc gia bắt đầu 
 | Biển sâu | — | không đi được | — |
 | Tường Băng (viền thế giới) | — | không ai đi qua, đứng trên hay khai hoang được | — |
 
-- **Sông** không phải một địa hình mà là một dấu trên ô: ô có sông được thêm cá và đất sét. Ô có sông được +25% phòng thủ khi bị tấn công.
+- **Sông** không phải một địa hình mà là một dấu trên ô. Ô có sông được thêm cá (60), đất sét (150), sậy (40) và cây dại bãi bồi (20); ô sông trong vòng 3 ô của đồi hay núi (thượng nguồn) có thêm đá lửa cuội (25). Ô có sông được +25% phòng thủ khi bị tấn công, trừ khi bên công có Bến thuyền trong vòng 3 ô.
+- **Phù sa:** ruộng trên ô có sông cho +25% lương thực, trên châu thổ +50%.
+- **Nước ngọt:** thủ đô không có sông, đầm lầy, Suối Nước Nóng hay Giếng (công trình `well`, cần Công cụ đá thô, 10 đá + 4 gỗ) trong vòng 2 ô thì dân tăng chậm hơn (×0,75) và dịch bệnh ×1,5.
+- **Mùa cá:** mỗi lượt, nước có ô sông có 5% cơ hội cá về: tối đa 3 ô sông được thêm 80 cá (một lần).
+- **Sông là đường đi:** khi có năng lực `đi-nước`, đoàn thám hiểm đi một ô sông chỉ tốn nửa bước, nên đi dọc sông được xa gấp đôi. Có Bến thuyền trong vòng 3 ô thì quân tấn công với tới thêm 1 ô khi mục tiêu là ô sông hoặc ô ven biển nông, và bên thủ mất +25% của sông.
 - **Di chuyển:** cột "lượt/ô" là thiết kế cho đoàn người đi trên bản đồ (mục 7.6) (chưa có trong engine). Engine hiện chỉ dùng địa hình để quyết định ô nào đi qua được: biển nông cần `đi-nước` (hoặc hiệu ứng `move` biển nông), núi cần hiệu ứng `move` núi, biển sâu không bao giờ đi được. Sa mạc thiếu nước (chưa có trong engine).
 - Mỗi ô có trữ lượng hữu hạn. Tài nguyên tái tạo hồi phục mỗi lượt theo % của trần ban đầu: thú săn 10%, cá 8%, gỗ 5%, cây dại 15%, sậy 10%, thảo dược 8%, không vượt trần ban đầu. Đá, đá lửa, đất sét, muối và quặng không tái tạo.
 - **Tài nguyên ẩn:** quặng đồng, thiếc, sắt không hiện trên bản đồ của AI và không khai thác được cho đến khi thành phố sở hữu phát minh có năng lực `nhận-biết-khoáng` (thấy cả ba) hoặc phát minh mở có hiệu ứng `reveal` cho từng loại quặng. Than (chưa có trong engine).
@@ -391,8 +395,12 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 ### 7.3 Giao thương
 
 - **Đề nghị trao đổi** (`trade_offer`, 1 AP): "đưa X, nhận Y", mỗi loại hàng 1–500, bên đề nghị phải có đủ hàng X lúc gửi. Không đề nghị được khi đang hoặc sắp chiến tranh với bên kia. Bên kia gửi `accept_trade` (1 AP) chậm nhất 2 lượt sau. Không trả lời thì đề nghị hết hạn. Lúc giao, cả hai bên phải còn đủ hàng, nếu không trao đổi thất bại.
-- **Vận chuyển:** nếu hai lãnh thổ cách nhau ≤ 3 ô, hàng được giao ngay. Xa hơn thì hàng đi bằng đoàn buôn, tới nơi sau ceil(khoảng cách / 8) lượt; hàng đã rời kho bên gửi ngay khi trao đổi xảy ra. Sức mang 5 đơn vị mỗi người, thuyền 15 đơn vị, và đoàn buôn là một đơn vị trên bản đồ có thể bị cướp (chưa có trong engine).
-- **Hư hỏng trên đường:** lương thực trong đoàn buôn mất 30% mỗi lượt còn trên đường. Hàng khác không hư.
+- **Vận chuyển:** nếu hai lãnh thổ cách nhau ≤ 3 ô, hàng được giao ngay qua biên giới. Xa hơn thì mỗi chiều hàng đi bằng một **đoàn buôn theo con đường thật trên bản đồ** (`src/routes.ts`), chọn cách nào tới sớm hơn:
+  - **Đường bộ:** chi phí mỗi ô là độ khó địa hình (đồng cỏ 1, rừng 2, rừng rậm 3…), đi 6 mỗi lượt; không qua núi khi chưa đi được núi. Cần **người khuân vác**: 1 người cho mỗi 5 đơn vị hàng, tối đa 25% số lao động (kể cả những người đang đi). Họ không làm việc ở nhà cho tới khi hàng tới nơi; Engine lấy họ từ nhóm hái lượm trước, thiếu thì từ nghề khác.
+  - **Đường thủy:** cần một **Bến thuyền** (`pier`, cần Thuyền độc mộc, 12 gỗ + 2 dây, trên ô ven biển hoặc ô có sông) và **thuyền** (hàng `boat`, chế tác 6 gỗ + 1 dây tại Bãi chế tác): 1 thuyền cho mỗi 15 đơn vị. Thuyền đi trên sông và biển nông, 14 ô mỗi lượt, cập bờ ở bất kỳ ô có sông hay ô ven biển nông nào của bên nhận.
+  - Không có đường nào thì không đề nghị hay nhận trao đổi được (bị từ chối, nêu lý do).
+- **Đất người khác:** đường không bao giờ đi qua đất của nước đang chiến tranh với bên gửi, và chỉ đi qua đất nước thứ ba khi phải. Qua đất nước thứ ba không có hiệp ước đi lại hoặc liên minh với bên gửi thì nộp **phí 10%** mỗi loại hàng cho nước đó.
+- **Hư hỏng và rủi ro trên đường:** lương thực mất 30% mỗi lượt trên đường bộ, 15% trên đường thủy. Đi trong vòng 8 ô quanh trại man di: mỗi lượt 12% × sức mạnh/40 (tối đa 50%) bị cướp mất 50% hàng (và 1 người khuân vác). Thuyền trên biển nông gặp bão 4% mỗi lượt: chìm 1 thuyền và mất 30% hàng. Đoàn buôn đang ở trên đất của một nước vừa tuyên chiến với bên gửi thì bị tịch thu toàn bộ.
 - Mỗi trao đổi thành công tính 1 lần giao thương cho cả hai bên; số lần này quyết định ngôn ngữ chung (10), tình báo (1 và 5) và lan truyền tri thức (5).
 - **Chưa có tiền tệ:** thời đồ đá chỉ có hàng đổi hàng. Tiền xuất hiện khi có phát minh mang năng lực `trao-đổi-giá-trị` (chưa có trong engine).
 - **Chợ biên giới:** hai bên hòa ước cùng dựng một chợ trên ô biên giới để giao ngay (chưa có trong engine).

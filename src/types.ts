@@ -149,7 +149,17 @@ export interface Treaty {
 }
 export interface TreatyOffer { id: number; from: number; to: number; type: TreatyType; duration: number | null; tribute: Record<string, number>; cede: number[]; payer: number; tick: number }
 export interface TradeOffer { id: number; from: number; to: number; give: Record<string, number>; get: Record<string, number>; tick: number; status: "open" | "done" | "expired" | "failed" }
-export interface Caravan { id: number; from: number; to: number; goods: Record<string, number>; arrive: number; offer: number }
+export interface Caravan {
+  id: number; from: number; to: number; goods: Record<string, number>; arrive: number; offer: number;
+  /** §7.3 How it travels (worlds before v0.4 have none of these). */
+  mode?: "land" | "water";
+  /** The road, first tile at the sender; `depart` is the tick it left. */
+  path?: number[];
+  depart?: number;
+  /** Porters (land) or boats (water) away with it until it arrives. */
+  porters?: number;
+  boats?: number;
+}
 export interface War { id: number; a: number; b: number; declared: number; start: number; end: number | null; reason: string }
 export interface Battle { tick: number; attacker: number; defender: number; tile: number; kind: "attack" | "raid"; a: number; d: number; won: boolean; lossA: number; lossD: number; note: string }
 

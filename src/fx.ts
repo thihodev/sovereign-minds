@@ -6,7 +6,8 @@
 export type FxKind =
   | "death" | "birth" | "build" | "invention" | "claim" | "lost_tile" | "explore" | "settle" | "era" | "migrate"
   | "raid" | "repelled" | "clear" | "battle" | "beasts" | "flood" | "quake" | "winter" | "plague" | "famine"
-  | "drought" | "bounty" | "herd" | "fire" | "meteor" | "eruption" | "riot" | "horde_back";
+  | "drought" | "bounty" | "herd" | "fire" | "meteor" | "eruption" | "riot" | "horde_back"
+  | "fishrun" | "caravan" | "toll" | "robbed" | "storm" | "seized";
 
 export interface MapFx {
   kind: FxKind;

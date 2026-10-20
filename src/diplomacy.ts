@@ -5,12 +5,15 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
-  GESTURES, INJECTION, MESSAGE_MAX, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
+  GESTURES, INJECTION, MESSAGE_MAX, RIVER, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
+import { piers, planRoute } from "./routes.ts";
+import { liveHordes } from "./wild.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
 import { buildingWorks, mods, ownedTiles, parseTile } from "./engine.ts";
-import type { Battle, Nation, Treaty, TreatyType, War, World } from "./types.ts";
+import type { Battle, Caravan, Nation, Treaty, TreatyType, War, World } from "./types.ts";
+import type { Route } from "./routes.ts";
 
 export type Say = (nation: number | null, kind: string, text: string) => void;
 /** kind "wild" (§9.4 clear_wild) only reserves the men for the turn; it is never fought here. */
@@ -113,6 +116,8 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const give = goods(world, a.give, TRADE.maxQty); if (typeof give === "string") return `give: ${give}`;
       const get = goods(world, a.get, TRADE.maxQty); if (typeof get === "string") return `get: ${get}`;
       if (!has(n, give)) return "Kho không đủ hàng để đưa";
+      const road = planRoute(world, n, o, give);
+      if (typeof road === "string") return `Hàng không tới được ${o.name}: ${road}`;
       const id = world.nextId++;
       world.tradeOffers.push({ id, from: n.id, to: o.id, give, get, tick, status: "open" });
       o.lastEvents.push(`${n.name} đề nghị trao đổi #${id}: đưa ${fmtGoods(world, give)} để lấy ${fmtGoods(world, get)}.`);
@@ -123,6 +128,8 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const off = world.tradeOffers.find(x => x.id === id);
       if (!off || off.to !== n.id) return `Không có đề nghị trao đổi #${id} gửi cho bạn`;
       if (off.status !== "open" || tick - off.tick > TRADE.offerTicks) return "Đề nghị đã hết hạn";
+      const back = planRoute(world, n, world.nations[off.from], off.get);
+      if (typeof back === "string") return `Hàng của bạn không tới được ${world.nations[off.from].name}: ${back}`;
       ctx.accepts.push({ n, offer: id });
       return null;
     }
@@ -208,8 +215,10 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const committed = ctx.strikes.filter(s => s.n === n).reduce((s, x) => s + x.warriors, 0);
       if (!(warriors >= 1) || warriors + committed > n.labor.warrior) return `Chỉ có ${n.labor.warrior - committed} chiến binh rảnh`;
       const reach = mods(world, n).caps.has("đi-nước") ? WAR.reachSail : WAR.reach;
-      const near = ownedTiles(world, n.id).some(t => dist(t.i, tile) <= reach);
-      if (kind === "attack" && !near) return `Ô mục tiêu cách lãnh thổ bạn quá ${reach} ô`;
+      // §2.1 boats from a pier carry the attack one tile further, to a target on a river or the shore
+      const byWater = kind === "attack" && crossesWater(world, n, tile);
+      const near = ownedTiles(world, n.id).some(t => dist(t.i, tile) <= reach + (byWater ? 1 : 0));
+      if (kind === "attack" && !near) return `Ô mục tiêu cách lãnh thổ bạn quá ${reach} ô${byWater ? " (kể cả thêm 1 ô nhờ thuyền)" : ""}`;
       if (kind === "raid" && landGap(world, n.id, target.id) > reach + 3) return "Quá xa để đột kích";
       if (kind === "attack" && world.tiles[tile].terrain === "mountain" && !mods(world, n).move.has("mountain")) return "Không vượt núi được";
       if (kind === "attack") {
@@ -307,27 +316,104 @@ export function resolveRelations(ctx: DiploCtx): void {
     const A = world.nations[off.from], B = n;
     if (!A.alive || pendingOrActiveWar(world, A.id, B.id)) { off.status = "failed"; continue; }
     if (!has(A, off.give) || !has(B, off.get)) { off.status = "failed"; A.lastEvents.push(`Trao đổi #${off.id} thất bại: một bên không đủ hàng.`); B.lastEvents.push(`Trao đổi #${off.id} thất bại: một bên không đủ hàng.`); continue; }
+    // §7.3 both ways need a road now (piers, boats and porters may have changed since the offer)
+    const legs = ([[A, B, off.give], [B, A, off.get]] as Array<[Nation, Nation, Record<string, number>]>).map(([from, to, g]) => ({ from, to, g, road: planRoute(world, from, to, g) }));
+    const blocked = legs.find(l => typeof l.road === "string");
+    if (blocked) {
+      off.status = "failed";
+      const why = `Trao đổi #${off.id} thất bại: hàng của ${blocked.from.name} không tới được ${blocked.to.name} (${blocked.road}).`;
+      A.lastEvents.push(why); B.lastEvents.push(why);
+      continue;
+    }
     off.status = "done";
-    const gap = landGap(world, A.id, B.id), arrive = gap <= TRADE.nearDistance ? tick : tick + Math.ceil(gap / TRADE.caravanSpeed);
-    for (const [from, to, g] of [[A, B, off.give], [B, A, off.get]] as Array<[Nation, Nation, Record<string, number>]>) {
+    const eta: string[] = [];
+    for (const { from, to, g, road: r } of legs) {
+      const road = r as Route;
       for (const [k, q] of Object.entries(g)) L.stock(from, k, -q, "trade");
-      if (arrive === tick) for (const [k, q] of Object.entries(g)) L.stock(to, k, q, "trade");
-      else { world.caravans.push({ id: world.nextId++, from: from.id, to: to.id, goods: { ...g }, arrive, offer: off.id }); L.toCaravan(g); }
+      if (road.mode === "near") { for (const [k, q] of Object.entries(g)) L.stock(to, k, q, "trade"); continue; }
+      const load = { ...g };
+      // Tolls to every third nation crossed without a passage or alliance treaty
+      for (const o of road.tolls) {
+        const toller = world.nations[o], cut: Record<string, number> = {};
+        // the sender already gave the whole load (−q above); the toller gets its cut and the caravan carries the rest
+        for (const [k, q] of Object.entries(load)) { const x = Math.floor(q * TRADE.toll * 10) / 10; if (x > 0) { cut[k] = x; load[k] = q - x; L.stock(toller, k, x, "toll"); } }
+        if (Object.keys(cut).length) {
+          toller.lastEvents.push(`Đoàn buôn của ${from.name} đi qua đất mình nộp phí: ${fmtGoods(world, cut)}.`);
+          from.lastEvents.push(`Đoàn buôn tới ${to.name} nộp phí qua đất ${toller.name}: ${fmtGoods(world, cut)}.`);
+          fx({ kind: "toll", tile: road.path.find(i => world.tiles[i].owner === o) ?? road.path[0], nation: o, from: from.id });
+        }
+      }
+      world.caravans.push({ id: world.nextId++, from: from.id, to: to.id, goods: load, arrive: tick + road.ticks, offer: off.id, mode: road.mode, path: road.path, depart: tick, porters: road.porters, boats: road.boats });
+      L.toCaravan(load);
+      fx({ kind: "caravan", tile: road.path[0], nation: from.id, to: road.path[road.path.length - 1], path: road.path, text: road.mode, n: road.ticks });
+      eta.push(`${from.name} → ${to.name} ${road.mode === "water" ? `bằng ${road.boats} thuyền` : `với ${road.porters} người khuân vác`}, ${road.ticks} lượt`);
     }
     A.trades[String(B.id)] = (A.trades[String(B.id)] || 0) + 1; B.trades[String(A.id)] = (B.trades[String(A.id)] || 0) + 1;
-    say(B.id, "trade", `${A.name} và ${B.name} trao đổi: ${fmtGoods(world, off.give)} ⇄ ${fmtGoods(world, off.get)}${arrive > tick ? ` (đoàn buôn tới sau ${arrive - tick} lượt)` : ""}.`);
+    say(B.id, "trade", `${A.name} và ${B.name} trao đổi: ${fmtGoods(world, off.give)} ⇄ ${fmtGoods(world, off.get)}${eta.length ? ` (đoàn buôn: ${eta.join("; ")})` : ""}.`);
   }
   for (const o of world.tradeOffers) if (o.status === "open" && tick - o.tick > TRADE.offerTicks) o.status = "expired";
   world.tradeOffers = world.tradeOffers.filter(o => tick - o.tick <= 20);
 
-  // Caravans arrive; food spoils on the road
+  // Caravans on the road (§7.3): seizure by an enemy, barbarians, storms at sea, food spoiling; then arrival
   for (const c of world.caravans) {
-    const to = world.nations[c.to];
-    if (c.arrive > tick) { if (c.goods.food) { const lost = c.goods.food * 0.3; c.goods.food -= lost; L.caravanLoss("food", lost); } continue; }
+    const to = world.nations[c.to], from = world.nations[c.from];
+    if (c.arrive > tick) { onTheRoad(ctx, c, from); continue; }
     for (const [k, q] of Object.entries(c.goods)) { L.caravanLoss(k, q); if (to.alive) L.stock(to, k, q, "caravan"); }
     if (to.alive) to.lastEvents.push(`Đoàn buôn từ ${world.nations[c.from].name} tới nơi: ${fmtGoods(world, c.goods)}.`);
   }
   world.caravans = world.caravans.filter(c => c.arrive > tick);
+}
+
+/** §2.1 Can this nation bring boats to a tile: a pier within RIVER.pierReach, and the tile on a river or by shallow water? */
+export function crossesWater(world: World, n: Nation, tile: number): boolean {
+  const t = world.tiles[tile];
+  if (!t.river && !NEIGHBORS[tile].some(j => world.tiles[j].terrain === "shallow")) return false;
+  return piers(world, n).some(p => dist(p, tile) <= RIVER.pierReach);
+}
+
+/** Where a caravan is this tick on its road. */
+export function caravanAt(c: Caravan, tick: number): number {
+  if (!c.path?.length) return -1;
+  const span = Math.max(1, c.arrive - (c.depart ?? c.arrive - 1));
+  return c.path[Math.min(c.path.length - 1, Math.floor(Math.max(0, tick - (c.depart ?? tick)) / span * (c.path.length - 1)))];
+}
+
+/** One turn of a caravan still travelling (§7.3). */
+function onTheRoad(ctx: DiploCtx, c: Caravan, from: Nation): void {
+  const { world, tick, L } = ctx, at = caravanAt(c, tick), r = rngFor(world.seed, tick, "caravan", c.id);
+  const share = (part: number, reason: string, to?: Nation) => {
+    const out: Record<string, number> = {};
+    for (const [k, q] of Object.entries(c.goods)) { const x = q * part; if (x <= 0) continue; c.goods[k] = q - x; out[k] = x; L.caravanLoss(k, x); if (to) L.stock(to, k, x, reason); }
+    return out;
+  };
+  if (at >= 0) {
+    // On the land of a nation now at war with the sender: everything is seized
+    const owner = world.tiles[at].owner, enemy = owner >= 0 && owner !== from.id ? world.nations[owner] : null;
+    if (enemy && activeWar(world, from.id, enemy.id)) {
+      const got = share(1, "seized", enemy);
+      c.arrive = tick; // the road ends here; nothing is delivered
+      fx({ kind: "seized", tile: at, nation: enemy.id, from: from.id });
+      enemy.lastEvents.push(`Bắt được đoàn buôn của ${from.name}: ${fmtGoods(world, got)}.`);
+      from.lastEvents.push(`Đoàn buôn tới ${world.nations[c.to].name} bị ${enemy.name} tịch thu.`);
+      return;
+    }
+    // Barbarians near the road
+    const horde = liveHordes(world).filter(h => dist(h.tile, at) <= TRADE.hordeReach).sort((a, b) => b.strength - a.strength)[0];
+    if (horde && r() < Math.min(0.5, TRADE.hordeChance * horde.strength / 40)) {
+      const lost = share(TRADE.hordeLoss, "barbarians");
+      const dead = Math.min(from.population, c.porters ? 1 : 0); from.population -= dead;
+      fx({ kind: "robbed", tile: at, nation: from.id, from: horde.tile, text: horde.name }); fxDeath(at, from.id, dead, "raid");
+      from.lastEvents.push(`${horde.name} chặn cướp đoàn buôn tới ${world.nations[c.to].name}: mất ${fmtGoods(world, lost)}${dead ? `, ${dead} người khuân vác chết` : ""}.`);
+    }
+    // A storm at sea
+    if (c.mode === "water" && world.tiles[at].terrain === "shallow" && r() < TRADE.stormChance) {
+      const lost = share(TRADE.stormLoss, "storm");
+      if ((c.boats || 0) > 0 && (from.stock.boat || 0) >= 1) { L.stock(from, "boat", -1, "storm"); c.boats! -= 1; }
+      fx({ kind: "storm", tile: at, nation: from.id });
+      from.lastEvents.push(`Bão biển: đoàn thuyền tới ${world.nations[c.to].name} mất một thuyền và ${fmtGoods(world, lost)}.`);
+    }
+  }
+  if (c.goods.food) { const lost = c.goods.food * (c.mode === "water" ? TRADE.waterSpoil : TRADE.landSpoil); c.goods.food -= lost; L.caravanLoss("food", lost); }
 }
 
 /** Battles (§7.4). Defenders split their warriors over all attacks they face this tick. */
@@ -357,7 +443,7 @@ export function resolveBattles(ctx: DiploCtx): void {
       if (defending) {
         const t = world.tiles[s.tile];
         const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
-        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river ? 0.25 : 0);
+        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river && !crossesWater(world, A, s.tile) ? 0.25 : 0); // a river guards, unless they come with boats
       }
       return v;
     };

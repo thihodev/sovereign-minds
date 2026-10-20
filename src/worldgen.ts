@@ -5,7 +5,7 @@
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
 import { xmur3, mulberry32, fbm, shuffle, type Rand } from "./rng.ts";
-import { WONDER_DEFS } from "./rules.ts";
+import { RIVER, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
 const AX = Math.sqrt(3) / 1.5;
@@ -189,7 +189,12 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
       // Reindeer and mammoth graze below the ice; frost-split rock is everywhere
       case "glacier": R.game = jit(45); R.stone = jit(250); if (rand() < 0.15) R.flint = jit(30); break;
     }
-    if (t.river) { R.fish = (R.fish || 0) + jit(60); R.clay = (R.clay || 0) + jit(150); }
+    if (t.river) {
+      // §2.1 banks: fish, clay, reeds and floodplain plants; flint gravel in the upper course, near the hills
+      R.fish = (R.fish || 0) + jit(60); R.clay = (R.clay || 0) + jit(150);
+      R.reeds = (R.reeds || 0) + jit(RIVER.reeds); R.plants = (R.plants || 0) + jit(RIVER.plants);
+      if (within(t.i, RIVER.flintNear).some(j => tiles[j].terrain === "hill" || tiles[j].terrain === "mountain")) R.flint = (R.flint || 0) + jit(RIVER.flint);
+    }
     if (t.region === "isl" && ["hill", "coast", "grass"].includes(t.terrain) && rand() < 0.6) R.flint = jit(40);
   }
 
@@ -222,11 +227,13 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     const t = tiles[i], c = i % N, r = (i / N) | 0;
     return t.region !== "isl" && okTerr.includes(t.terrain) && !t.wonder && wallDist[i] > WALL.reach && r >= 3 && r <= N - 4 && c >= 3 && c <= N - 4 && wonders.every(w => dist(w.i, i) > 3);
   }).map(i => ({ i, v: areaVal(i), zone: tiles[i].zone }));
-  // Every people needs the basics within reach: wood, stone, meat or fish, and wild plants for fibre and rope (§2.1).
+  // Every people needs the basics within reach: wood, stone, meat or fish, and wild plants for fibre and rope (§2.1),
+  // and food on the seven tiles it starts with, so it can eat before it claims more.
   const basics = (i: number) => {
-    let wood = 0, stone = 0, meat = 0, plants = 0;
+    let wood = 0, stone = 0, meat = 0, plants = 0, home = 0;
     for (const j of within(i, 2)) { const R = tiles[j].res; wood += R.wood || 0; stone += R.stone || 0; meat += (R.game || 0) + (R.fish || 0); plants += R.plants || 0; }
-    return wood >= 150 && stone >= 150 && meat >= 80 && plants >= 60;
+    for (const j of within(i, 1)) { const R = tiles[j].res; home += (R.game || 0) + (R.plants || 0) + (R.fish || 0); }
+    return wood >= 150 && stone >= 150 && meat >= 80 && plants >= 60 && home >= 150;
   };
   const withBasics = cands.filter(c => basics(c.i));
   if (withBasics.length >= nNations) cands.splice(0, cands.length, ...withBasics);

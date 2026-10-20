@@ -4,8 +4,8 @@
 
 import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
-import { canSeeRes, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
+import { canSeeRes, freshWater, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
 import { RESOURCE_KEYS } from "./worldgen.ts";
@@ -42,6 +42,9 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   const herbsNeed = Math.ceil(n.population / HERBS.perPeople), herbs = Math.floor(n.stock.herbs || 0);
   add("plague", n.population > EVENTS.plague.bigPop && herbs < herbsNeed ? 2 : herbs < herbsNeed ? 1 : 0, "Dịch bệnh",
     `${pct(plague)} mỗi lượt${n.population > EVENTS.plague.bigPop ? ` (×2 vì trên ${EVENTS.plague.bigPop} dân)` : ""}; chết ${pct(EVENTS.plague.min)}–${pct(EVENTS.plague.max)} dân. Thảo dược ${herbs}/${herbsNeed} cần để giảm một nửa số chết${herbs >= herbsNeed ? " (đủ)" : ""}.`);
+
+  // Fresh water (§2.1)
+  if (!freshWater(world, n)) add("water", 1, "Thiếu nước ngọt", `Thủ đô không có sông, đầm, suối hay giếng trong vòng ${RIVER.waterReach} ô: dân tăng chậm hơn (×${RIVER.dryGrowth}) và dịch bệnh ×${RIVER.dryPlague}. Xây Giếng (well) gần thủ đô.`);
 
   // Drought
   if ((n.eventTimers.drought || 0) > 0) add("drought", 2, "Hạn hán", `Còn ${n.eventTimers.drought} lượt: hái lượm và ruộng −50%.`);

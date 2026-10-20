@@ -15,7 +15,7 @@ import { AP_COST, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, GOOD
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, homeDefence, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, deltaE, freshWater, homeDefence, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -287,6 +287,13 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       if (spot) queue("kiln", spot.i);
     }
     if (can("palisade") && !built("palisade") && (atWar || hostileBorder(v)) && avail("wood") >= 20) queue("palisade");
+    // §2.1 a well when the capital has no fresh water, early (before the tents)
+    if (can("well") && !freshWater(world, n) && !pendingType("well")) queue("well");
+    // §7.3 a pier on a river or the shore once boats are known, to trade by water
+    if (can("pier") && !built("pier") && !pendingType("pier") && avail("rope") >= 2) {
+      const spot = v.owned.find(t => t.land && (t.river || t.terrain === "coast") && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
+      if (spot) queue("pier", spot.i);
+    }
     for (const b of builds) spend("build", { building: b.type, ...(b.tile !== undefined ? { tile: xy(b.tile) } : {}) });
   }
 
@@ -651,6 +658,7 @@ function planLabor(v: View, c: LaborCtx): { labor: Record<Role, number>; crafts:
   const toolsWanted = Math.ceil(L.hunt / 4) + 2, toolGap = Math.max(0, toolsWanted - Math.floor(tools));
   if (can("stone_tool") && toolGap > 0 && stock("stone") >= 2) crafts.stone_tool = Math.min(8, toolGap, Math.floor(stock("stone") / 2));
   if (can("rope") && stock("rope") < (v.has("P15") ? 10 : 6) && stock("fiber") >= 3) crafts.rope = Math.min(3, Math.floor(stock("fiber") / 3));
+  if (can("boat") && n.buildings.some(b => b.type === "pier" && b.done) && v.stock("boat") < 2 && stock("wood") >= 8 && stock("rope") >= 2) crafts.boat = 1;
   if (can("spear") && c.war && v.stock("spear") < L.warrior) crafts.spear = 2;
   if (can("blade") && stock("flint") >= 2 && (v.stock("blade") < 2 || (c.war && v.stock("blade") < 4))) crafts.blade = 1;
   if (can("hide_coat") && world.tiles[n.capital].zone !== "trop" && v.stock("hide_coat") < v.pop / 2 && stock("hide") >= 3 + (v.has("P8") ? 4 : 0) && stock("bone") >= 1) crafts.hide_coat = 1;

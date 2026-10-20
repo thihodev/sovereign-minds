@@ -114,7 +114,9 @@ test("war: the defender's home advantage, and spoils for the victor", () => {
   const { w, a, b } = atWar("home");
   const target = w.tiles.find(t => t.owner === b.id && t.i !== b.capital && t.terrain !== "mountain" && t.land && !t.river && (t.terrain === "grass" || t.terrain === "coast" || t.terrain === "desert" || t.terrain === "tundra"))
     ?? w.tiles.find(t => t.owner === b.id && t.i !== b.capital && t.terrain !== "mountain")!;
-  const bridge = NEIGHBORS[target.i].find(j => w.tiles[j].owner === -1 && w.tiles[j].land)!;
+  // A bridge that touches only the target, so the defender's front is that one tile (§7.4 spreads defenders over the front)
+  const touches = (j: number) => NEIGHBORS[j].filter(k => w.tiles[k].owner === b.id).length;
+  const bridge = NEIGHBORS[target.i].filter(j => w.tiles[j].owner === -1 && w.tiles[j].land).sort((x, y) => touches(x) - touches(y))[0];
   w.tiles[bridge].owner = a.id;
   // Even numbers: ten against ten on their own ground, the defender holds
   b.labor = army(10);

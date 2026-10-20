@@ -131,7 +131,7 @@ test("herbs halve plague deaths", () => {
   };
   const sick = deaths(0), healed = deaths(20);
   assert.ok(healed.lost < sick.lost, `${healed.lost} < ${sick.lost}`);
-  assert.equal(Math.round(healed.n.stock.herbs || 0) <= 10, true, "herbs are used up");
+  assert.ok(healed.n.lastEvents.some(e => /dùng 10\)/.test(e)), "one herb per 10 people is used up");
 });
 
 test("threat and resource reports: the AI sees what it can see, the Watcher sees everything", () => {
