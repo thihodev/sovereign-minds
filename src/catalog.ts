@@ -3,10 +3,11 @@
 // Also: the open-invention rules — effect catalogue, power budget, depth, cost.
 
 import {
-  BUILDINGS, BUILDING_BY_TYPE, GOOD_VALUE, INVENTIONS, INVENTION_BY_ID, RECIPES, RECIPE_BY_ID, RES_NAME, TERRAIN,
+  BUILDINGS, BUILDING_BY_TYPE, DEEP_RES, EFFECT_ERA, ERA_INDEX, ERA_TABLE, GOOD_VALUE, INVENTIONS, INVENTION_BY_ID, RECIPES, RECIPE_BY_ID, RES_NAME, TERRAIN,
   type BuildingDef, type Invention, type Recipe,
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
+import { seedDeepResources } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
 
@@ -31,7 +32,9 @@ export function migrate(world: World): World {
   world.nextSpyId ??= 1;
   world.treaties ??= []; world.treatyOffers ??= []; world.tradeOffers ??= []; world.caravans ??= [];
   world.wars ??= []; world.battles ??= []; world.nextId ??= 1; world.cutoff ??= {}; world.eraGates ??= {};
+  if (!world.tiles.some(t => DEEP_RES.some(k => (t.cap[k] || 0) > 0) || (t.cap.horse || 0) > 0)) seedDeepResources(world.seed, world.tiles); // v0.5 resources
   for (const n of world.nations) {
+    n.officials ??= [];
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];
     n.labor.mine ??= 0;
     n.eraTick ??= null; n.renameTick ??= null; n.formerNames ??= []; n.stolenTech ??= [];
@@ -50,9 +53,11 @@ export function depthOf(world: World, id: string): number {
   memo.set(id, d); return d;
 }
 
-/** §5.3: RP = 15 × 1.4^d × (1 + power/10), rounded up to a multiple of 5. */
+/** §5.3: RP = 15 × g(d) × (1 + power/10), rounded up to a multiple of 5, where g(d) = 1.4^d up to depth 8
+ *  and then grows by 15% of 1.4^8 per level: an open world stays reachable, deep ideas stay dear. */
 export function costFor(depth: number, power: number): number {
-  return Math.ceil(15 * Math.pow(1.4, depth) * (1 + power / 10) / 5) * 5;
+  const g = depth <= 8 ? Math.pow(1.4, depth) : Math.pow(1.4, 8) * (1 + 0.15 * (depth - 8));
+  return Math.ceil(15 * g * (1 + power / 10) / 5) * 5;
 }
 export const budgetFor = (depth: number) => 4 + 2 * depth;
 
@@ -62,13 +67,20 @@ export const EFFECT_KINDS: Record<string, string> = {
   role_bonus: '{"kind":"role_bonus","role":"hunt|gather|fish|farm|wood|stone|flint|clay|mine|craft|build|research|warrior|extract","percent":10|20|30} — 2 points per 10%',
   spoilage: '{"kind":"spoilage","percent":10|20|30} — food spoils that much less; 1 point per 10%',
   recipe: '{"kind":"recipe","id":"slug","name":"…","input":{"good":qty},"output_qty":1-3,"work":1-3,"at":"workshop|kiln|<your building id>","tool":{"role":"…","percent":10-30,"per":1-4}?} — a NEW good made from goods that exist; 3 points (+2 per 10% if it is a tool)',
-  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3, craft slots 1/2',
+  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} (caps grow with your era: housing +5, craft_slots +1, defense +10, farm_slots +1 per era, farm_food +1 every 3 eras) — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3, craft slots 1/2',
   stability: '{"kind":"stability","per_tick":1|2} — 4 points each',
   ap: '{"kind":"ap","amount":1} — 5 points',
   combat: '{"kind":"combat","percent":10|20|30} — 3 points per 10%',
   move: '{"kind":"move","terrain":"shallow|mountain"} — explorers and armies can cross it; shallow also lets you hold sea tiles; 4 points',
   reveal: '{"kind":"reveal","resource":"copper|tin|iron"} — that hidden ore becomes visible; 4 points',
   research: '{"kind":"research","percent":10|20} — RP +; 3 points per 10%',
+  growth: '{"kind":"growth","percent":10|20|30} — population grows that much faster; 2 points per 10% (from Đồ Đá Mới)',
+  transport: '{"kind":"transport","percent":20|40} — caravans carry that much more and go that much faster (wheels, roads, sails); 2 points per 20% (from Đồ Đồng)',
+  explore: '{"kind":"explore","tiles":4|8} — expeditions walk that much further; 2 points per 4 tiles (from Đồ Đồng)',
+  range: '{"kind":"range","tiles":1} — attacks reach 1 tile further (bows of range, siege engines, artillery); 5 points (from Cổ Đại)',
+  medicine: '{"kind":"medicine","percent":20|40} — plague strikes and kills that much less; 2 points per 20% (from Cổ Đại)',
+  officials: '{"kind":"officials","amount":1} — one more official (administration, bureaucracy); 4 points (from Cổ Đại)',
+  housing_slots: '{"kind":"housing_slots","amount":1} — one more housing building per centre (cities, apartments); 6 points (from Trung Đại)',
   tile_limit: '{"kind":"tile_limit","amount":1|2} — 2 points each',
 };
 const SLUG = /^[a-z][a-z0-9_]{1,23}$/;
@@ -78,8 +90,15 @@ const pct = (v: unknown, allowed: number[]) => { const x = Math.round(Number(v))
 export interface ParsedEffects { effects: Invention["effects"]; recipes: Recipe[]; buildings: BuildingDef[]; goods: Record<string, { name: string; value: number }>; power: number; errors: string[] }
 
 /** Turn the AI's effect list into engine effects, pricing each one. */
-export function parseEffects(world: World, raw: Array<Record<string, unknown>>, ownedRecipesAt: (at: string) => boolean): ParsedEffects {
+export function parseEffects(world: World, raw: Array<Record<string, unknown>>, ownedRecipesAt: (at: string) => boolean, era = ERA_TABLE.length - 1): ParsedEffects {
   const out: ParsedEffects = { effects: {}, recipes: [], buildings: [], goods: {}, power: 0, errors: [] };
+  /** §5.3 effect kinds open with the eras: false (and an error) when the proposer's era is too early */
+  const opened = (key: string, at: string) => {
+    const need = EFFECT_ERA[key];
+    if (need === undefined || era >= need) return true;
+    out.errors.push(`${at}: cần tới kỷ nguyên ${ERA_TABLE[need].name} (hiện ở ${ERA_TABLE[era].name})`);
+    return false;
+  };
   const E = out.effects, err = (s: string) => out.errors.push(s);
   const newBuildingIds = new Set<string>();
   for (const e of raw) if (e?.kind === "building" && typeof e.id === "string") newBuildingIds.add(e.id);
@@ -138,7 +157,8 @@ export function parseEffects(world: World, raw: Array<Record<string, unknown>>, 
         }
         const work = Math.max(3, Math.min(12, Math.round(Number(e.work ?? 6))));
         const f = (e.effect ?? {}) as Record<string, unknown>, n = (k: string, max: number) => Math.max(0, Math.min(max, Math.round(Number(f[k] ?? 0))));
-        const effect = { housing: n("housing", 15), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4), defense: n("defense", 40) / 100, farmSlots: n("farm_slots", 6), farmFood: n("farm_food", 2) };
+        // §5.3 later eras build bigger: homes, workshops, farms and walls grow with the era
+        const effect = { housing: n("housing", 15 + 5 * era), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4 + era), defense: n("defense", 40 + 10 * era) / 100, farmSlots: n("farm_slots", 6 + era), farmFood: n("farm_food", 2 + Math.floor(era / 3)) };
         if (effect.farmSlots && !effect.farmFood) effect.farmSlots = 0;
         out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0) + Math.ceil(effect.craftSlots / 2);
         if (!Object.keys(cost).length && !effect.farmSlots) { err(`${at}: công trình phải tốn ít nhất một vật liệu`); break; }
@@ -147,8 +167,25 @@ export function parseEffects(world: World, raw: Array<Record<string, unknown>>, 
       case "stability": { const k = pct(e.per_tick, [1, 2]); if (Number.isNaN(k)) { err(`${at}: per_tick 1 hoặc 2`); break; } E.stabilityPerTick = (E.stabilityPerTick || 0) + k; out.power += 4 * k; break; }
       case "ap": { E.ap = 1; out.power += 5; break; }
       case "combat": { const p = pct(e.percent, [10, 20, 30]); if (Number.isNaN(p)) { err(`${at}: percent 10/20/30`); break; } E.combat = (E.combat || 0) + p / 100; out.power += 3 * p / 10; break; }
-      case "move": { const t = String(e.terrain); if (!["shallow", "mountain"].includes(t)) { err(`${at}: terrain phải là shallow hoặc mountain (đầm lầy và rừng rậm vốn đi được)`); break; } E.move = [...(E.move || []), t]; out.power += 4; break; }
-      case "reveal": { const r = String(e.resource); if (!["copper", "tin", "iron"].includes(r)) { err(`${at}: resource phải là copper, tin hoặc iron`); break; } E.reveal = [...(E.reveal || []), r]; out.power += 4; break; }
+      case "move": {
+        const t = String(e.terrain);
+        if (!["shallow", "mountain", "ocean"].includes(t)) { err(`${at}: terrain phải là shallow, mountain hoặc ocean (đầm lầy và rừng rậm vốn đi được)`); break; }
+        if (!opened(`move:${t}`, at)) break;
+        E.move = [...(E.move || []), t]; out.power += t === "ocean" ? 6 : 4; break;
+      }
+      case "reveal": {
+        const r = String(e.resource);
+        if (!["copper", "tin", "iron", ...DEEP_RES].includes(r)) { err(`${at}: resource phải là copper, tin, iron, coal, sulfur hoặc oil`); break; }
+        if (!opened(`reveal:${r}`, at)) break;
+        E.reveal = [...(E.reveal || []), r]; out.power += 4; break;
+      }
+      case "growth": { if (!opened(kind, at)) break; const p = pct(e.percent, [10, 20, 30]); if (Number.isNaN(p)) { err(`${at}: percent 10/20/30`); break; } E.growth = (E.growth || 0) + p / 100; out.power += 2 * p / 10; break; }
+      case "transport": { if (!opened(kind, at)) break; const p = pct(e.percent, [20, 40]); if (Number.isNaN(p)) { err(`${at}: percent 20 hoặc 40`); break; } E.transport = (E.transport || 0) + p / 100; out.power += p / 10; break; }
+      case "explore": { if (!opened(kind, at)) break; const k = pct(e.tiles, [4, 8]); if (Number.isNaN(k)) { err(`${at}: tiles 4 hoặc 8`); break; } E.explore = (E.explore || 0) + k; out.power += k / 2; break; }
+      case "range": { if (!opened(kind, at)) break; E.range = (E.range || 0) + 1; out.power += 5; break; }
+      case "medicine": { if (!opened(kind, at)) break; const p = pct(e.percent, [20, 40]); if (Number.isNaN(p)) { err(`${at}: percent 20 hoặc 40`); break; } E.medicine = (E.medicine || 0) + p / 100; out.power += p / 10; break; }
+      case "officials": { if (!opened(kind, at)) break; E.officials = (E.officials || 0) + 1; out.power += 4; break; }
+      case "housing_slots": { if (!opened(kind, at)) break; E.housingSlots = (E.housingSlots || 0) + 1; out.power += 6; break; }
       case "research": { const p = pct(e.percent, [10, 20]); if (Number.isNaN(p)) { err(`${at}: percent 10 hoặc 20`); break; } E.rp = (E.rp || 0) + p / 100; out.power += 3 * p / 10; break; }
       case "tile_limit": { const k = pct(e.amount, [1, 2]); if (Number.isNaN(k)) { err(`${at}: amount 1 hoặc 2`); break; } E.tiles = (E.tiles || 0) + k; out.power += 2 * k; break; }
       default: err(`${at}: loại hiệu ứng không có. Có: ${Object.keys(EFFECT_KINDS).join(", ")}`);
@@ -170,6 +207,9 @@ export function describeBuilding(e: BuildingDef["effect"]): string {
   return p.join(", ") || "không có tác dụng";
 }
 
+/** A nation's era as an index into ERA_TABLE (0 for unknown names). */
+export function eraIndex(n: Nation | undefined): number { return n ? ERA_INDEX[n.era] ?? 0 : 0; }
+
 export function describeEffects(world: World, e: Invention["effects"]): string {
   const p: string[] = [];
   for (const [r, v] of Object.entries(e.role || {})) p.push(`${r} +${Math.round((v || 0) * 100)}%`);
@@ -181,6 +221,13 @@ export function describeEffects(world: World, e: Invention["effects"]): string {
   if (e.reveal?.length) p.push(`thấy: ${e.reveal.map(r => RES_NAME[r] ?? r).join(", ")}`);
   if (e.rp) p.push(`RP +${Math.round(e.rp * 100)}%`);
   if (e.tiles) p.push(`+${e.tiles} ô quản lý`);
+  if (e.growth) p.push(`tăng dân +${Math.round(e.growth * 100)}%`);
+  if (e.transport) p.push(`vận tải +${Math.round(e.transport * 100)}%`);
+  if (e.explore) p.push(`thám hiểm xa thêm ${e.explore} ô`);
+  if (e.range) p.push(`tầm đánh +${e.range} ô`);
+  if (e.medicine) p.push(`dịch bệnh −${Math.round(e.medicine * 100)}%`);
+  if (e.officials) p.push(`+${e.officials} quan chức`);
+  if (e.housingSlots) p.push(`+${e.housingSlots} công trình nhà ở mỗi trung tâm`);
   for (const u of e.unlocks || []) { const r = recipeOf(world, u), b = buildingOf(world, u); if (r) p.push(`công thức ${r.name}`); if (b) p.push(`công trình ${b.name}`); }
   return p.join("; ");
 }
@@ -227,7 +274,7 @@ export function checkProposal(world: World, n: Nation, a: Record<string, unknown
   }
   const effects = Array.isArray(a.effects) ? a.effects.filter(e => e && typeof e === "object").slice(0, 6) as Array<Record<string, unknown>> : [];
   const ownBuildings = new Set(n.buildings.map(b => b.type));
-  const parsed = parseEffects(world, effects, at => ownBuildings.has(at));
+  const parsed = parseEffects(world, effects, at => ownBuildings.has(at), eraIndex(n));
   if (parsed.errors.length) return { ok: false, error: parsed.errors.slice(0, 3).join("; ") };
   const power = parsed.power + caps.length * 3;
   if (power <= 0) return { ok: false, error: "Phát minh phải có ít nhất một hiệu ứng hoặc một năng lực mới" };
@@ -249,7 +296,7 @@ export function applyRuling(world: World, p: Proposal, r: Ruling): string | null
   const caps = p.caps.filter(c => !(r.remove_capabilities || []).includes(c));
   const score = r.causality + r.material + r.physics;
   if (score < 4 || r.physics === 0) { p.status = "rejected"; return null; }
-  const parsed = parseEffects(world, effects, () => true);
+  const parsed = parseEffects(world, effects, () => true, eraIndex(world.nations[p.nation]));
   if (parsed.errors.length) { p.status = "rejected"; p.ruling = { ...r, reason: `${r.reason} (sau sửa đổi không hợp lệ: ${parsed.errors[0]})` }; return null; }
   const prereqs = [...p.prereqs, ...extra];
   const depth = 1 + Math.max(...prereqs.map(x => depthOf(world, x)));

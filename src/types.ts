@@ -14,7 +14,8 @@ export type Region = "west" | "east" | "isl" | null;
 /** Natural reserves that live on tiles. Ores are hidden from AIs. */
 export type ResKey =
   | "game" | "plants" | "fish" | "wood" | "stone" | "flint" | "clay"
-  | "salt" | "reeds" | "copper" | "tin" | "iron" | "herbs";
+  | "salt" | "reeds" | "copper" | "tin" | "iron" | "herbs"
+  | "coal" | "oil" | "sulfur" | "horse";
 
 export type Role =
   | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay" | "mine"
@@ -129,6 +130,22 @@ export interface Nation {
   /** Largest population ever, for the lost-knowledge rule (§5.5). */
   peakPopulation: number;
   inbox: Message[];
+  /** §4.6 the people the ruler handed a field to (worlds before v0.5 have none). */
+  officials?: Official[];
+}
+
+/** §4.6 An official: works a field every turn on the ruler's behalf. */
+export interface Official {
+  id: number;
+  name: string;
+  domain: string;
+  /** A governor's centre (capital or settlement tile); null for the others. */
+  seat: number | null;
+  skill: number;
+  loyalty: number;
+  since: number;
+  /** What they did last turn, in words. */
+  lastAct: string;
 }
 
 export interface Message { from: number; tick: number; text: string; gesture: boolean }

@@ -5,7 +5,7 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
-  GESTURES, INJECTION, MESSAGE_MAX, RIVER, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
+  GESTURES, INJECTION, MESSAGE_MAX, OFFICIALS, RIVER, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
 import { piers, planRoute } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
@@ -214,7 +214,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const warriors = Math.floor(Number(a.warriors ?? n.labor.warrior));
       const committed = ctx.strikes.filter(s => s.n === n).reduce((s, x) => s + x.warriors, 0);
       if (!(warriors >= 1) || warriors + committed > n.labor.warrior) return `Chỉ có ${n.labor.warrior - committed} chiến binh rảnh`;
-      const reach = mods(world, n).caps.has("đi-nước") ? WAR.reachSail : WAR.reach;
+      const reach = (mods(world, n).caps.has("đi-nước") ? WAR.reachSail : WAR.reach) + mods(world, n).range; // §5.3 range effects
       // §2.1 boats from a pier carry the attack one tile further, to a target on a river or the shore
       const byWater = kind === "attack" && crossesWater(world, n, tile);
       const near = ownedTiles(world, n.id).some(t => dist(t.i, tile) <= reach + (byWater ? 1 : 0));
@@ -336,7 +336,8 @@ export function resolveRelations(ctx: DiploCtx): void {
       for (const o of road.tolls) {
         const toller = world.nations[o], cut: Record<string, number> = {};
         // the sender already gave the whole load (−q above); the toller gets its cut and the caravan carries the rest
-        for (const [k, q] of Object.entries(load)) { const x = Math.floor(q * TRADE.toll * 10) / 10; if (x > 0) { cut[k] = x; load[k] = q - x; L.stock(toller, k, x, "toll"); } }
+        const rate = TRADE.toll * ((from.officials ?? []).some(x => x.domain === "merchant" && x.loyalty >= OFFICIALS.idle) ? 0.5 : 1); // §4.6 a merchant halves tolls
+        for (const [k, q] of Object.entries(load)) { const x = Math.floor(q * rate * 10) / 10; if (x > 0) { cut[k] = x; load[k] = q - x; L.stock(toller, k, x, "toll"); } }
         if (Object.keys(cut).length) {
           toller.lastEvents.push(`Đoàn buôn của ${from.name} đi qua đất mình nộp phí: ${fmtGoods(world, cut)}.`);
           from.lastEvents.push(`Đoàn buôn tới ${to.name} nộp phí qua đất ${toller.name}: ${fmtGoods(world, cut)}.`);

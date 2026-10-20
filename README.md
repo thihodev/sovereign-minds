@@ -87,6 +87,8 @@ Tạo thế giới mới: `docker compose down`, xóa (hoặc đổi tên) `data
 | Kinh tế | Lao động, săn bắt hái lượm, khai thác, khai mỏ, trữ lượng ô tái sinh, công cụ hao mòn, chế tác, công trình, ruộng, chuồng |
 | Dân số | Ăn, đói, hư hỏng, tăng dân, ổn định, nội loạn, di cư, sự kiện thế giới |
 | Phát minh | Cây gốc 18 phát minh + **phát minh mở**: AI tự đề xuất (11 loại hiệu ứng, ngân sách 4 + 2d), Engine kiểm tra cứng, **Trọng tài AI** chấm điểm, phát minh được duyệt vào Sổ chung; thất truyền; cổng kỷ nguyên Đồ Đá Mới và Đồ Đồng |
+| Kỷ nguyên | 10 kỷ nguyên từ đồ đá tới tên lửa, mở bằng năng lực do chính các nước phát minh; thêm tài nguyên than, dầu, lưu huỳnh, ngựa |
+| Triều đình | Bổ nhiệm quan chức (bá tước, đại tướng, đại học sĩ…) tự làm việc mỗi lượt, có tay nghề và lòng trung thành |
 | Lãnh thổ | Khai hoang, bỏ ô, định cư mới, ô bị cắt rời thì hoang hóa |
 | Ngoại giao | Thám hiểm, gặp gỡ, cử chỉ trước khi có ngôn ngữ chung, tin nhắn (chặn giả mạo mệnh lệnh), hiệp ước bất tương xâm / đi lại / liên minh / hòa bình / cống nạp / chư hầu, phá ước, uy tín |
 | Giao thương | Đề nghị và nhận trao đổi, đoàn buôn đi đường xa, hàng hư trên đường |

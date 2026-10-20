@@ -4,7 +4,7 @@
 // coordinates from 0 to 1, so they scale with N; counts and distances use SCALE.
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
-import { xmur3, mulberry32, fbm, shuffle, type Rand } from "./rng.ts";
+import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
 import { RIVER, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
@@ -219,6 +219,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     if (w.key === "meteor") t.res.iron = 20;
   }
   for (const t of tiles) t.cap = { ...t.res };
+  seedDeepResources(seedStr, tiles);
 
   // Spawns: same value band (±5%), ≥ SPAWN.min apart, spread over climate zones, away from the ice
   const areaVal = (i: number) => Math.round(within(i, 3).reduce((s, j) => s + tileValue(tiles[j]), 0));
@@ -283,4 +284,27 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
 
-export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "copper", "tin", "iron"];
+export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "horse", "copper", "tin", "iron", "coal", "sulfur", "oil"];
+
+/** §2.1 Coal, oil, sulfur (hidden) and wild horses, laid with their own random stream so the rest of the
+ *  map is unchanged; also run once on worlds made before they existed. Sets reserves and caps. */
+export function seedDeepResources(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "deep-resources"), jit = (v: number) => Math.round(v * (0.7 + rand() * 0.6));
+  const volcano = tiles.find(t => t.wonder === "volcano");
+  const put = (t: Tile, k: ResKey, v: number) => { t.res[k] = (t.res[k] || 0) + v; t.cap[k] = (t.cap[k] || 0) + v; };
+  for (const t of tiles) {
+    const r = rand();
+    switch (t.terrain) {
+      case "hill": case "mountain":
+        if (r < 0.12) put(t, "coal", jit(150));
+        else if (r < (volcano && dist(volcano.i, t.i) <= 4 ? 0.5 : 0.16)) put(t, "sulfur", jit(60));
+        break;
+      case "forest": case "taiga": if (r < 0.04) put(t, "coal", jit(120)); break;
+      case "swamp": if (r < 0.06) put(t, "coal", jit(120)); else if (r < 0.12) put(t, "oil", jit(180)); break;
+      case "desert": if (r < 0.08) put(t, "oil", jit(250)); break;
+      case "coast": if (r < 0.04) put(t, "oil", jit(180)); break;
+      case "shallow": if (r < 0.015) put(t, "oil", jit(200)); break;
+      case "grass": case "tundra": if (r < 0.12) put(t, "horse", jit(30)); break;
+    }
+  }
+}

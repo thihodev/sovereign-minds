@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.4";
+export const RULES_VERSION = "0.5";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -27,7 +27,7 @@ export const ZONE_NAME = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhi�
 export const REGION_NAME = { west: "Lục địa Tây", east: "Lục địa Đông", isl: "Quần đảo Đá Lửa" } as const;
 
 /** Renewable reserves regrow by this share of their cap each tick (§2.1). */
-export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08 };
+export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08, horse: 0.06 };
 /** Ores are invisible to AIs until they own the capability below (§2.1). */
 export const HIDDEN_ORES: ResKey[] = ["copper", "tin", "iron"];
 export const ORE_SENSE_CAP = "nhận-biết-khoáng";
@@ -35,6 +35,7 @@ export const ORE_SENSE_CAP = "nhận-biết-khoáng";
 export const RES_NAME: Record<string, string> = {
   game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét",
   salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", herbs: "thảo dược", boat: "thuyền",
+  coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
   bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
@@ -79,6 +80,7 @@ export function apFor(population: number, bonus: number): number {
   return Math.min(12, 3 + Math.floor(population / 50) + bonus);
 }
 export const AP_COST: Record<string, number> = {
+  appoint_official: 1, dismiss_official: 0, reward_official: 0,
   found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
@@ -201,6 +203,14 @@ export interface Invention {
     move?: string[]; // terrains that become passable
     reveal?: string[]; // hidden resources that become visible
     unlocks?: string[]; // buildings or recipes
+    // §5.3 open with the eras (EFFECT_ERA)
+    range?: number; // attack reach +tiles
+    transport?: number; // caravans carry and travel +share
+    growth?: number; // population growth +share
+    medicine?: number; // plague chance and deaths −share
+    housingSlots?: number; // housing buildings per centre +n
+    explore?: number; // expedition range +tiles
+    officials?: number; // official slots +n
   };
   desc: string;
   /** Open inventions only (§5): who proposed it, when, depth and power points. */
@@ -276,7 +286,7 @@ export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
 /** Standard value of each good (§6.2): an open recipe's output is worth what went in plus labour. */
 export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
-  copper: 3, tin: 4, iron: 4, boat: 8, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
+  copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
 
@@ -372,6 +382,68 @@ export const INTEL_DECAY_TICKS = 10;
 export const SPY_OPS = { needsCap: "ghi-chép", detectMult: 2, disableTicks: 3, stealDiscount: 0.5, incite: 5 };
 
 export const ERAS = { paleo: "Đồ Đá Cũ", neo: "Đồ Đá Mới", bronze: "Đồ Đồng" };
+
+// §5.6 An open world: ten eras. A nation crosses a gate (one per turn, never back) when it holds the
+// capabilities (from inventions, mostly its own open ones), the people, and the resource (owned land
+// that holds it, or that much in store). Capabilities named here are the shared words of the world:
+// a nation proposing an invention may claim one (the judge decides whether its prerequisites justify it).
+export interface EraDef { id: string; name: string; caps: string[]; anyCap?: string[]; pop: number; res?: string; settlements?: number; desc: string }
+export const ERA_TABLE: EraDef[] = [
+  { id: "paleo", name: "Đồ Đá Cũ", caps: [], pop: 0, desc: "Săn bắt, hái lượm, lửa." },
+  { id: "neo", name: "Đồ Đá Mới", caps: ["mài"], anyCap: ["trồng-trọt", "thuần-dưỡng"], pop: 50, desc: "Đá mài, trồng trọt hoặc chăn nuôi." },
+  { id: "bronze", name: "Đồ Đồng", caps: ["nhiệt-cao", "nhận-biết-khoáng", "chứa", "luyện-đồng"], pop: 0, res: "copper", desc: "Lò nhiệt cao, luyện đồng." },
+  { id: "iron", name: "Đồ Sắt", caps: ["luyện-sắt"], pop: 100, res: "iron", desc: "Lò rèn sắt." },
+  { id: "classical", name: "Cổ Đại", caps: ["chữ-viết", "tiền-tệ", "luật-pháp"], pop: 150, settlements: 1, desc: "Chữ viết, tiền, luật thành văn." },
+  { id: "medieval", name: "Trung Đại", caps: ["thép", "cối-xay", "thành-lũy"], pop: 250, settlements: 2, desc: "Thép, cối xay nước/gió, thành lũy đá." },
+  { id: "renaissance", name: "Cận Đại", caps: ["in-ấn", "thuốc-súng", "hàng-hải-viễn-dương"], pop: 400, res: "sulfur", desc: "In ấn, thuốc súng, tàu vượt đại dương." },
+  { id: "industrial", name: "Công Nghiệp", caps: ["máy-hơi-nước", "luyện-cốc", "đường-sắt"], pop: 600, res: "coal", desc: "Máy hơi nước, than cốc, đường sắt." },
+  { id: "modern", name: "Hiện Đại", caps: ["điện", "động-cơ-đốt-trong", "lọc-dầu"], pop: 900, res: "oil", desc: "Điện, động cơ đốt trong, dầu mỏ." },
+  { id: "atomic", name: "Nguyên Tử", caps: ["hàng-không", "vô-tuyến", "tên-lửa"], pop: 1200, desc: "Máy bay, vô tuyến, tên lửa." },
+];
+export const ERA_INDEX: Record<string, number> = Object.fromEntries(ERA_TABLE.flatMap((e, i) => [[e.name, i], [e.id, i]]));
+/** A resource counts for a gate when owned land holds it, or this much is in store (bought or carried). */
+export const ERA_RES_STOCK = 20;
+/** What each era brings everyone in it: a higher ceiling on trade bonuses, more land to govern,
+ *  more homes per centre and, every third era, one more action point. */
+export function eraPerks(i: number): { roleCap: number; tiles: number; housingSlots: number; ap: number; officials: number } {
+  return { roleCap: 1.5 + 0.5 * i, tiles: 2 * i, housingSlots: Math.floor(i / 2), ap: Math.floor(i / 3), officials: Math.floor(i / 2) };
+}
+
+// §2.1 Deep resources: coal, oil and sulfur are hidden until an invention reveals them; wild horses graze open land.
+export const DEEP_RES = ["coal", "oil", "sulfur"] as const;
+export const HORSES = { regen: 0.06, cap: "thuần-ngựa", huntShare: 0.15 };
+
+// §5.3 Effect kinds that open with the eras (index into ERA_TABLE): a stone-age people cannot propose a railway's effects.
+export const EFFECT_ERA: Record<string, number> = {
+  growth: 1, transport: 2, explore: 2, range: 4, medicine: 4, officials: 4, housing_slots: 5,
+  "move:ocean": 6, "reveal:coal": 3, "reveal:sulfur": 3, "reveal:oil": 7,
+};
+
+// §4.6 Officials: a nation hands a field to a person who works it every turn without the ruler's AP.
+export interface OfficialDomain { title: string; desc: string; unique: boolean }
+export const OFFICIAL_DOMAINS: Record<string, OfficialDomain> = {
+  governor: { title: "Bá tước", desc: "giữ một trung tâm (thủ đô hoặc điểm định cư): mỗi lượt tự khai hoang ô tốt nhất quanh đó (2 ô từ tay nghề 3), +1 ô quản lý", unique: false },
+  general: { title: "Đại tướng", desc: "chiến đấu và sức thủ tại nhà +4% mỗi bậc tay nghề", unique: true },
+  agriculture: { title: "Thượng thư Nông", desc: "hái lượm, săn, đánh cá, nông +5% mỗi bậc; tự xây ruộng khi thiếu ăn", unique: true },
+  scholar: { title: "Đại học sĩ", desc: "nghiên cứu +5% mỗi bậc; tự chọn nghiên cứu rẻ nhất khi đang bỏ trống", unique: true },
+  merchant: { title: "Tổng quản Thương", desc: "đoàn buôn chở nhiều hơn và đi nhanh hơn 10% mỗi bậc; phí qua đất giảm một nửa", unique: true },
+  builder: { title: "Tổng công trình", desc: "xây dựng +8% mỗi bậc; tự dựng lều khi hết chỗ ở và giếng khi thiếu nước", unique: true },
+  explorer: { title: "Trưởng đoàn thám hiểm", desc: "mỗi lượt tự đưa 2 người đi thám hiểm theo vòng các hướng; tầm xa +2 ô mỗi bậc", unique: true },
+};
+export const OFFICIALS = {
+  /** Slots: 1 + 1 per 60 people + era perks + invention effects, at most `max`. */
+  perPop: 60, max: 10,
+  /** Upkeep in food each turn: base + skill. */
+  upkeepBase: 1,
+  /** Skill 1–5, +1 every `skillEvery` turns in office. */
+  skillEvery: 15,
+  /** Loyalty 0–100: starts at `start`; below `idle` they do nothing; at 0 they desert (stability −desert). */
+  start: 70, idle: 30, desert: 8, dismissStability: 2,
+  /** A gift of goods worth this much buys one point of loyalty (reward_official). */
+  giftPerPoint: 2,
+  /** A governor whose seat lies farther than this from the capital grows restless (−1 loyalty a turn). */
+  farSeat: 10,
+};
 
 // §2.4 National traits: each nation is born with one character, chosen before the game.
 // A strength and a weakness in the same terms as invention effects (added in mods()),

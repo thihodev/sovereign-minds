@@ -959,6 +959,7 @@
       const pct = n.research ? Math.min(100, n.research.progress / n.research.cost * 100) : 0;
       el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><div class="name">${esc(nationName(n))}</div><div class="model">${esc(modelLabel(n))} · ${esc(n.era)}</div></div>${statusPill(n)}</div>
         ${traitTag(n)}
+        ${(n.officials || []).length ? `<div class="trait">👑 ${(n.officials || []).map(o => `${DOMAIN_ICON[o.domain] || ""} ${esc(o.name)}`).join(" · ")}</div>` : ""}
         <div class="kv"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div></div>
         ${n.research ? `<div class="muted" style="font-size:12px">Nghiên cứu ${esc(n.research.name)} · ${n.research.progress}/${n.research.cost} RP</div><div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
         ${(() => { const top = (n.threats || []).find(t => t.level >= 2); return top && n.alive ? `<div class="threat-tag lv${top.level}" title="${esc(top.detail)}">⚠ ${esc(top.title)}</div>` : ""; })()}
@@ -984,6 +985,8 @@
     $("#nation-detail").innerHTML = `
       <div class="row"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       ${n.manifesto ? `<p><i>“${esc(n.manifesto)}”</i></p>` : ""}
+      <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
+      <h3>Triều đình (${(n.officials || []).length}/${n.courtSlots ?? 0})</h3>${courtList(n)}
       ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)}</p><p class="muted">${esc(n.trait.lines.join(" · "))}</p>` : ""}
       ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
       ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
@@ -1018,6 +1021,16 @@
       };
     }
     d.showModal();
+  }
+
+  // ---------------------------------------------------------------- the court (§4.6)
+  const DOMAIN_ICON = { governor: "🏰", general: "⚔", agriculture: "🌾", scholar: "📜", merchant: "🪙", builder: "🔨", explorer: "🧭" };
+  function courtList(n) {
+    const c = n.officials || [];
+    if (!c.length) return `<p class="note">Chưa bổ nhiệm ai.</p>`;
+    return `<ul class="court">${c.map(o => `<li><span class="i">${DOMAIN_ICON[o.domain] || "👤"}</span><div><b>${esc(o.title)} ${esc(o.name)}</b>${o.seat !== null && o.seat !== undefined ? ` <span class="muted">giữ (${o.seat % ST.n}, ${(o.seat / ST.n) | 0})</span>` : ""}
+      <div class="meta">tay nghề ${"★".repeat(o.skill)}${"☆".repeat(5 - o.skill)} · trung thành <span class="${o.loyalty < 30 ? "bad" : o.loyalty < 50 ? "warn" : ""}">${o.loyalty}</span> · từ lượt ${o.since}</div>
+      <div class="meta">Lượt trước: ${esc(o.lastAct)}</div></div></li>`).join("")}</ul>`;
   }
 
   // ---------------------------------------------------------------- threats and resources (§9.4)
@@ -1297,10 +1310,17 @@
       case "stability": return ["🔥", `+${e.per_tick} ổn định mỗi lượt`];
       case "ap": return ["⚡", `+${e.amount || 1} điểm hành động (AP)`];
       case "combat": return ["⚔", `chiến đấu +${e.percent}%`];
-      case "move": return ["🧭", `đi được ${e.terrain === "shallow" ? "biển nông" : e.terrain === "mountain" ? "núi" : esc(e.terrain)}`];
+      case "move": return ["🧭", `đi được ${e.terrain === "shallow" ? "biển nông" : e.terrain === "mountain" ? "núi" : e.terrain === "ocean" ? "biển sâu (vượt đại dương)" : esc(e.terrain)}`];
       case "reveal": return ["⛏", `nhìn thấy ${esc(RES[e.resource] ?? e.resource)}`];
       case "research": return ["📜", `nghiên cứu (RP) +${e.percent}%`];
       case "tile_limit": return ["🚩", `+${e.amount} ô quản lý`];
+      case "growth": return ["👶", `dân tăng nhanh hơn ${e.percent}%`];
+      case "transport": return ["🛞", `đoàn buôn chở nhiều và đi nhanh hơn ${e.percent}%`];
+      case "explore": return ["🧭", `thám hiểm xa thêm ${e.tiles} ô`];
+      case "range": return ["🏹", "tầm đánh +1 ô"];
+      case "medicine": return ["⚕", `dịch bệnh ít và nhẹ hơn ${e.percent}%`];
+      case "officials": return ["👑", "+1 quan chức"];
+      case "housing_slots": return ["🏘", "+1 công trình nhà ở mỗi trung tâm"];
       default: return ["•", esc(JSON.stringify(e))];
     }
   }

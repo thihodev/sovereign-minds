@@ -9,7 +9,8 @@ import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
-import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { housing, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { OFFICIAL_DOMAINS } from "./rules.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
 import type { Runner } from "./runner.ts";
@@ -71,7 +72,9 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
         formerNames: n.formerNames,
-        threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null, work: n.alive && n.founded ? workSites(w, n) : [],
+        threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null,
+        nextEra: n.alive ? nextEraNeeds(w, n) : null, courtSlots: n.alive ? maxOfficials(w, n) : 0,
+        officials: (n.officials ?? []).map(o => ({ ...o, title: OFFICIAL_DOMAINS[o.domain]?.title ?? o.domain })), work: n.alive && n.founded ? workSites(w, n) : [],
       })),
       hordes: (w.hordes ?? []).map(h => ({ ...h, strength: Math.round(h.strength) })),
       lastFx: runner.lastFx,

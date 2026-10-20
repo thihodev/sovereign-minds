@@ -49,6 +49,8 @@ Thế giới là lưới ô lục giác 64 × 64. Mỗi quốc gia bắt đầu 
 - **Tài nguyên ẩn:** quặng đồng, thiếc, sắt không hiện trên bản đồ của AI và không khai thác được cho đến khi thành phố sở hữu phát minh có năng lực `nhận-biết-khoáng` (thấy cả ba) hoặc phát minh mở có hiệu ứng `reveal` cho từng loại quặng. Than (chưa có trong engine).
 - Điểm khai sinh cách nhau ≥ 17 ô (láng giềng gần nhất lý tưởng ≤ 25 ô), không ở quần đảo, không trong vòng 3 ô quanh kỳ quan, không trong vòng 8 ô của Tường Băng, và có đủ gỗ, đá, thịt hoặc cá, cây dại trong bán kính 2. Tổng giá trị tài nguyên trong bán kính 3 của mỗi điểm khai sinh nằm trong ±5% quanh cùng một mức chuẩn, nên chênh nhau tối đa khoảng 10%. Nếu không tìm đủ chỗ thì Engine nới khoảng cách xuống ≥ 13 ô và bỏ kiểm tra giá trị.
 
+**Tài nguyên sâu:** than đá (đồi, núi, ít ở rừng và đầm), dầu mỏ (sa mạc, đầm, ven biển, biển nông), lưu huỳnh (núi, nhiều quanh Núi lửa Tro Đen) bị ẩn với AI cho tới khi có phát minh hiệu ứng `reveal` cho từng loại; khai bằng vai `mine`. **Ngựa hoang** (đồng cỏ, lãnh nguyên, tái tạo 6%) thì thấy được; thợ săn mang ngựa về khi nước có năng lực `thuần-ngựa`. Thế giới tạo trước v0.5 được rải thêm các tài nguyên này khi tải lại.
+
 Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây dại 20–80, cá 60 (ô có sông thêm 60), gỗ 150–200, đá 300–500, đá lửa 40, đất sét 150, sậy 60, muối 30, quặng đồng 80, thiếc 60, sắt 100. Tài nguyên tái tạo hồi theo % của trần, nên 7 ô khởi đầu chỉ nuôi bền vững khoảng 40–50 người bằng săn hái. Muốn đông dân hơn thì phải mở rộng lãnh thổ hoặc phát minh trồng trọt.
 
 ### 2.2 Lập quốc: tên, cờ, bản sắc
@@ -190,6 +192,30 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - **Dưới 15:** mỗi lượt 5% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang.
 - **Bằng 0:** nội loạn. AI mất quyền ra lệnh ở lượt kế tiếp (giữ phân công cũ), ổn định đặt lại 20.
 
+### 4.6 Triều đình: phân quyền cho quan chức
+
+Một quốc gia giao một lĩnh vực cho một người. Người đó **tự làm việc mỗi lượt, không tốn AP của nhà vua**:
+
+| Lĩnh vực (`domain`) | Chức danh | Việc làm và thưởng |
+| --- | --- | --- |
+| `governor` | Bá tước | giữ một trung tâm (thủ đô hoặc điểm định cư); mỗi lượt tự khai hoang ô tốt nhất trong vòng 3 ô quanh đó (2 ô khi tay nghề ≥ 3), nếu còn giới hạn quản lý và đủ lương thực; +1 ô quản lý |
+| `general` | Đại tướng | chiến đấu và sức thủ tại nhà +4% mỗi bậc tay nghề |
+| `agriculture` | Thượng thư Nông | hái lượm, săn, đánh cá, nông +5% mỗi bậc; khi lương thực dưới 1,5 lượt ăn thì tự khởi công ruộng trên ô tốt nhất (châu thổ, ven sông trước) |
+| `scholar` | Đại học sĩ | nghiên cứu +5% mỗi bậc; khi đang bỏ trống thì tự chọn nghiên cứu rẻ nhất |
+| `merchant` | Tổng quản Thương | vận tải +10% mỗi bậc; phí qua đất giảm một nửa |
+| `builder` | Tổng công trình | xây dựng +8% mỗi bậc; tự đào giếng khi thiếu nước ngọt, dựng lều khi sắp hết chỗ ở |
+| `explorer` | Trưởng đoàn thám hiểm | mỗi lượt tự đưa 2 người đi thám hiểm, xoay vòng 6 hướng; tầm xa +2 ô mỗi bậc |
+
+- **Số chỗ:** 1 + 1 cho mỗi 60 dân + thưởng kỷ nguyên và phát minh (`officials`), tối đa 10. Mỗi lĩnh vực một người, riêng bá tước được một người cho mỗi trung tâm.
+- **Tay nghề** 1–5, tăng 1 bậc sau mỗi 15 lượt tại chức. **Lương:** 1 + tay nghề lương thực mỗi lượt.
+- **Lòng trung thành** 0–100, khởi đầu 70:
+  - +1 mỗi lượt khi ổn định ≥ 60; −1 khi ổn định dưới 40; −5 khi không được trả lương; bá tước giữ trung tâm cách thủ đô quá 10 ô thì −1 mỗi lượt.
+  - Dưới 30: bất mãn, không làm gì và không cho thưởng. Về 0: bỏ triều đình, ổn định −8.
+- **Hành động:**
+  - `appoint_official` (1 AP): `{"domain","name","seat"}`
+  - `dismiss_official` (0 AP): ổn định −2, các quan khác −5 trung thành
+  - `reward_official` (0 AP): `{"official","goods"}`, mỗi 2 giá trị hàng tặng = +1 trung thành; hàng tặng bị tiêu đi
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.
@@ -257,6 +283,8 @@ Chi phí nghiên cứu do Engine tính: **RP gốc = 15 × 1,4^d × (1 + điểm
 - **Công cụ mở:** mỗi món trang bị cho `per` người của vai đó, cho họ thêm `percent`% năng suất. Mỗi lượt, mỗi món đang được dùng hao 1/10 (dùng được 10 lượt). Thưởng công cụ chỉ có tác dụng với hái lượm, săn bắt, đánh cá, khai thác và khai mỏ; công cụ cho vai khác vẫn hao mòn nhưng không có tác dụng (chưa có trong engine).
 - **Công trình mở:** không giới hạn số lượng, không cần địa hình riêng, không tính là công trình sản xuất của ô. Tác dụng cộng dồn như công trình gốc (mục 6.1).
 
+**Hiệu ứng mở theo kỷ nguyên:** tăng dân (`growth`, từ Đồ Đá Mới), vận tải (`transport`, từ Đồ Đồng: đoàn buôn chở nhiều và đi nhanh hơn), thám hiểm xa (`explore`, từ Đồ Đồng), tầm đánh +1 ô (`range`, từ Cổ Đại), y học (`medicine`, từ Cổ Đại: dịch ít và nhẹ hơn), thêm quan chức (`officials`, từ Cổ Đại), thêm nhà ở mỗi trung tâm (`housing_slots`, từ Trung Đại), vượt đại dương (`move ocean`, từ Cận Đại), nhìn thấy than và lưu huỳnh (từ Đồ Sắt) và dầu mỏ (từ Công Nghiệp). Đề xuất một loại hiệu ứng khi chưa tới kỷ nguyên của nó thì bị Engine từ chối ngay.
+
 ### 5.4 Quy trình duyệt một đơn phát minh
 
 ```mermaid
@@ -293,17 +321,35 @@ Trọng tài duyệt theo nhân quả và vật lý, không theo lịch sử Tr�
 - **Thất truyền:** nếu dân số cuối lượt còn dưới 50% so với đầu lượt mà quốc gia chưa có `ghi-chép`, thì mất phát minh có được gần nhất không phải là phát minh khởi đầu và không phải là tiên quyết của phát minh nào khác đang có.
 - Lan truyền tri thức giữa các quốc gia: xem mục 7.5.
 
-### 5.6 Cổng kỷ nguyên
+### 5.6 Cổng kỷ nguyên: một thế giới mở
 
-Kỷ nguyên xác định bằng năng lực, không bằng tên phát minh, nên không thể "đặt tên cho oai" để lên kỷ nguyên. Engine xét kỷ nguyên cuối mỗi lượt và chỉ cho tiến lên, không lùi: một dân tộc suy yếu vẫn giữ kỷ nguyên đã đạt. Mỗi lần bước sang kỷ nguyên mới mở cửa sổ 5 lượt để đổi tên, đổi cờ (mục 2.2).
+Thế giới có 10 kỷ nguyên, từ đồ đá tới tên lửa. Kỷ nguyên xác định bằng **năng lực**, không bằng tên phát minh, nên không thể "đặt tên cho oai" để lên kỷ nguyên. Năng lực đến từ phát minh, phần lớn là phát minh mở do chính các nước đề xuất: nước nào muốn qua cổng thì đề xuất phát minh nhận năng lực đó (trường `capabilities`), và trọng tài chỉ cho khi tiên quyết thật sự dẫn tới. Cuối mỗi lượt, Engine cho quốc gia qua mọi cổng đã đủ điều kiện, theo thứ tự, và không bao giờ lùi.
 
-| Kỷ nguyên | Điều kiện để một quốc gia bước vào |
-| --- | --- |
-| Đồ Đá Cũ | Khởi đầu |
-| Đồ Đá Mới | `mài` + (`trồng-trọt` hoặc `thuần-dưỡng`) + dân số ≥ 50 |
-| Đồ Đồng | `nhiệt-cao` + `nhận-biết-khoáng` + `chứa` + `luyện-đồng` + có ô từng có quặng đồng trong lãnh thổ. Không cần qua Đồ Đá Mới trước. Điều kiện "đã sản xuất được ≥ 1 đơn vị đồng" (chưa có trong engine; được thay bằng năng lực `luyện-đồng`). |
+| # | Kỷ nguyên | Điều kiện | Nội dung |
+| --- | --- | --- | --- |
+| 0 | Đồ Đá Cũ | khởi đầu | Săn bắt, hái lượm, lửa. |
+| 1 | Đồ Đá Mới | `mài`, một trong `trồng-trọt` / `thuần-dưỡng`, 50 dân | Đá mài, trồng trọt hoặc chăn nuôi. |
+| 2 | Đồ Đồng | `nhiệt-cao` + `nhận-biết-khoáng` + `chứa` + `luyện-đồng`, tài nguyên copper | Lò nhiệt cao, luyện đồng. |
+| 3 | Đồ Sắt | `luyện-sắt`, 100 dân, tài nguyên iron | Lò rèn sắt. |
+| 4 | Cổ Đại | `chữ-viết` + `tiền-tệ` + `luật-pháp`, 150 dân, 1 điểm định cư | Chữ viết, tiền, luật thành văn. |
+| 5 | Trung Đại | `thép` + `cối-xay` + `thành-lũy`, 250 dân, 2 điểm định cư | Thép, cối xay nước/gió, thành lũy đá. |
+| 6 | Cận Đại | `in-ấn` + `thuốc-súng` + `hàng-hải-viễn-dương`, 400 dân, tài nguyên sulfur | In ấn, thuốc súng, tàu vượt đại dương. |
+| 7 | Công Nghiệp | `máy-hơi-nước` + `luyện-cốc` + `đường-sắt`, 600 dân, tài nguyên coal | Máy hơi nước, than cốc, đường sắt. |
+| 8 | Hiện Đại | `điện` + `động-cơ-đốt-trong` + `lọc-dầu`, 900 dân, tài nguyên oil | Điện, động cơ đốt trong, dầu mỏ. |
+| 9 | Nguyên Tử | `hàng-không` + `vô-tuyến` + `tên-lửa`, 1200 dân | Máy bay, vô tuyến, tên lửa. |
 
-Luật cho kỷ nguyên Đồ Đồng trở đi sẽ được Watcher ban hành khi có quốc gia đầu tiên chạm cổng. Engine ghi vào Biên niên sử khi điều đó xảy ra.
+"Tài nguyên" nghĩa là lãnh thổ có ô chứa tài nguyên đó, hoặc trong kho có ít nhất 20 đơn vị (mua hay cướp được cũng tính). Gói trạng thái có trường `era` cho biết cổng kế tiếp còn thiếu gì.
+
+**Mỗi kỷ nguyên i mang lại:**
+- trần thưởng nghề 150% + 50% × i
+- +2 × i ô quản lý
+- RP +25% × i
+- mỗi 2 kỷ nguyên: thêm 1 công trình nhà ở mỗi trung tâm và 1 chỗ quan chức
+- mỗi 3 kỷ nguyên: +1 AP
+
+**Công trình do các nước tự phát minh lớn dần theo kỷ nguyên:** nhà ở tối đa 15 + 5i chỗ, chỗ chế tác 4 + i, phòng thủ 40 + 10i %, chỗ nông dân 6 + i, lương thực mỗi nông dân 2 + ⌊i/3⌋.
+
+**Giá phát minh mở** (mục 5.3): 15 × g(d) × (1 + sức mạnh/10), với g(d) = 1,4^d tới độ sâu 8, sau đó tăng tuyến tính 15% của 1,4^8 mỗi bậc. Nhờ vậy ý tưởng sâu vẫn đắt nhưng còn với tới được.
 
 ### 5.7 Chống lách luật phát minh
 

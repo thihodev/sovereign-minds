@@ -5,18 +5,18 @@
 import { NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./hex.ts";
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
-  AP_COST, BEASTS, BRONZE_CAPS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
+  AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
-import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
+import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
-import { generateWorld } from "./worldgen.ts";
+import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy } from "./routes.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
-import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
+import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
 // ---------------------------------------------------------------- ledger
 
@@ -122,10 +122,20 @@ export interface Mods {
   unlocked: Set<string>;
   move: Set<string>;
   reveal: Set<string>;
+  // §5.3 open-world effects, §5.6 era perks, §4.6 officials
+  range: number; transport: number; growth: number; medicine: number; housingSlots: number; explore: number; officials: number;
+  /** Ceiling on trade bonuses (MAX_ROLE_BONUS in the stone age, higher in later eras). */
+  roleCap: number;
+  era: number;
 }
 
 export function mods(world: World, n: Nation): Mods {
-  const m: Mods = { role: {}, foodPerPerson: FOOD_PER_PERSON, ap: 0, tiles: 0, rp: 0, spoilage: SPOILAGE.food, spoilageCut: 0, stabilityPerTick: 0, combat: 0, winter: 1, caps: new Set(), unlocked: new Set(), move: new Set(), reveal: new Set() };
+  const era = eraIndex(n), perks = eraPerks(era);
+  const m: Mods = {
+    role: {}, foodPerPerson: FOOD_PER_PERSON, ap: perks.ap, tiles: perks.tiles, rp: 0.25 * era, spoilage: SPOILAGE.food, spoilageCut: 0, stabilityPerTick: 0, combat: 0, winter: 1,
+    caps: new Set(), unlocked: new Set(), move: new Set(), reveal: new Set(),
+    range: 0, transport: 0, growth: 0, medicine: 0, housingSlots: perks.housingSlots, explore: 0, officials: perks.officials, roleCap: Math.max(MAX_ROLE_BONUS, perks.roleCap), era,
+  };
   // §2.4 the nation's trait counts like one more invention
   const effects = n.inventions.map(id => inv(world, id)).filter(v => !!v).map(v => ({ caps: v.caps, e: v.effects }));
   const trait = TRAIT_BY_ID[n.trait ?? ""];
@@ -141,7 +151,22 @@ export function mods(world: World, n: Nation): Mods {
     for (const u of e.unlocks || []) m.unlocked.add(u);
     for (const t of e.move || []) m.move.add(t);
     for (const r of e.reveal || []) m.reveal.add(r);
+    m.range += e.range || 0; m.transport += e.transport || 0; m.growth += e.growth || 0; m.medicine += e.medicine || 0;
+    m.housingSlots += e.housingSlots || 0; m.explore += e.explore || 0; m.officials += e.officials || 0;
   }
+  // §4.6 officials who are loyal enough work their field
+  for (const o of n.officials ?? []) {
+    if (o.loyalty < OFFICIALS.idle) continue;
+    const k = o.skill;
+    if (o.domain === "general") m.combat += 0.04 * k;
+    else if (o.domain === "agriculture") for (const r of ["gather", "hunt", "fish", "farm"]) m.role[r] = (m.role[r] || 0) + 0.05 * k;
+    else if (o.domain === "scholar") m.rp += 0.05 * k;
+    else if (o.domain === "builder") m.role.build = (m.role.build || 0) + 0.08 * k;
+    else if (o.domain === "merchant") m.transport += 0.1 * k;
+    else if (o.domain === "explorer") m.explore += 2 * k;
+    else if (o.domain === "governor") m.tiles += 1;
+  }
+  m.medicine = Math.min(0.8, m.medicine);
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
   if (ownsWonder(world, n, "falls")) m.rp += 0.2;
@@ -190,12 +215,13 @@ export function growthFor(pop: number, roof: number): number {
   return Math.min(roof - pop, Math.max(GROWTH.min, Math.floor(pop * GROWTH.rate * (1 - pop / roof))));
 }
 /** §4.2: how many housing buildings a nation may have, HOUSING.perCentre for the capital and each settlement. */
-export function housingSlots(n: Nation): number { return HOUSING.perCentre * (1 + n.settlements.length); }
+/** §4.2 housing buildings allowed: HOUSING.perCentre per centre, plus what eras and inventions add per centre. */
+export function housingSlots(n: Nation, world?: World): number { return (HOUSING.perCentre + (world ? mods(world, n).housingSlots : 0)) * (1 + n.settlements.length); }
 export function isHousing(world: World, type: string): boolean { return (buildingOf(world, type)?.effect.housing || 0) > 0; }
 export function housing(world: World, n: Nation): number {
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
   const roofs = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
-    .sort((a, b) => b - a).slice(0, housingSlots(n)).reduce((s, h) => s + h, 0);
+    .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
   return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + roofs + (ownsWonder(world, n, "cave") ? 50 : 0);
 }
 /** §2.1 Fresh water near the capital: a river, a swamp, the hot spring or a well within RIVER.waterReach tiles. */
@@ -208,7 +234,7 @@ export function tileLimit(world: World, n: Nation): number {
 }
 export function actionPoints(world: World, n: Nation): number { return apFor(n.population, mods(world, n).ap); }
 export function canSeeRes(world: World, n: Nation, key: string): boolean {
-  return !(HIDDEN_ORES as string[]).includes(key) || mods(world, n).reveal.has(key);
+  return !([...HIDDEN_ORES, ...DEEP_RES] as string[]).includes(key) || mods(world, n).reveal.has(key);
 }
 
 /** §7.5 diffusion: knowing someone who has it makes it cheaper; a stolen secret
@@ -477,6 +503,9 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
 
+  // 3b. The court at work (§4.6): officials act on their own, without the ruler's AP
+  for (const n of alive) if (n.alive && n.founded && tick > 0) officialsAct(world, n, L, claims, explorers, ctx.strikes, say);
+
   // 4. Claims resolve together; ties broken by the seed (§7.6)
   const byTile = new Map<number, Nation[]>();
   for (const c of claims) byTile.set(c.tile, [...(byTile.get(c.tile) || []), c.n]);
@@ -560,18 +589,16 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     n.peakPopulation = Math.max(n.peakPopulation, n.population);
     const owned = ownedTiles(world, n.id);
     // Eras only move forward (§5.6): a shrinking people keeps its era.
-    const ERA_ORDER = [ERAS.paleo, ERAS.neo, ERAS.bronze];
     let era = n.era;
-    const up = (e: string) => { if (ERA_ORDER.indexOf(e) > ERA_ORDER.indexOf(era)) era = e; };
-    if (caps.has("mài") && (caps.has("trồng-trọt") || caps.has("thuần-dưỡng")) && n.population >= 50) up(ERAS.neo);
-    if (BRONZE_CAPS.every(c => caps.has(c)) && owned.some(t => (t.cap.copper || 0) > 0)) up(ERAS.bronze);
+    // §5.6 cross every gate whose conditions hold, in order (ERA_TABLE)
+    for (let k = eraIndex(n) + 1; k < ERA_TABLE.length && eraReady(n, ERA_TABLE[k], caps, owned); k++) era = ERA_TABLE[k].name;
     if (era !== n.era) {
       n.era = era; n.eraTick = tick;
       fx({ kind: "era", tile: n.capital, nation: n.id, text: era });
       say(n.id, "era", `${n.name} bước vào thời ${era}.`);
       if (world.eraGates[era] === undefined) {
         world.eraGates[era] = tick;
-        if (era === ERAS.bronze) say(null, "gate", `${n.name} là quốc gia đầu tiên chạm Cổng Đồ Đồng. Theo luật §5.6, Watcher sẽ ban luật cho kỷ nguyên mới.`);
+        say(null, "gate", `${n.name} là quốc gia đầu tiên bước vào thời ${era}.`);
       }
     }
   }
@@ -602,7 +629,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     toolBonus[use.role] = (toolBonus[use.role] || 0) + use.bonus * equipped / labor[use.role as Role];
     L.stock(n, good, -Math.min(q, equipped / use.per / TOOL_LIFE), "wear");
   }
-  const mult = (r: Role) => (1 + Math.min(MAX_ROLE_BONUS, roleBonus(m, r) + (toolBonus[r] || 0))) * stabMult;
+  const mult = (r: Role) => (1 + Math.min(m.roleCap, roleBonus(m, r) + (toolBonus[r] || 0))) * stabMult;
 
   const take = (key: ResKey, want: number, reason: string): number => {
     let got = 0;
@@ -621,6 +648,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const equipped = Math.min(labor.hunt, Math.floor(tools) * 4);
   const h = take("game", (equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt"), "hunt");
   L.stock(n, "food", h, "hunt"); L.stock(n, "hide", h * YIELD.huntHide, "hunt"); L.stock(n, "bone", h * YIELD.huntBone, "hunt"); foodMade += h;
+  // §2.1 a people that can tame horses brings some back alive
+  if (m.caps.has(HORSES.cap) && labor.hunt) L.stock(n, "horse", take("horse", labor.hunt * HORSES.huntShare * mult("hunt"), "hunt"), "hunt");
   n.toolWear += Math.ceil(equipped / 4) / TOOL_LIFE;
   while (n.toolWear >= 1) {
     n.toolWear -= 1;
@@ -642,7 +671,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   // Mining: visible ores first (the nation's choice), then salt and reeds
   if (labor.mine) {
-    const visible = ["copper", "tin", "iron"].filter(k => m.reveal.has(k));
+    const visible = ["copper", "tin", "iron", ...DEEP_RES].filter(k => m.reveal.has(k));
     const order = [n.mineTarget, ...visible, "salt", "reeds"].filter((k, i, a) => k && a.indexOf(k) === i && (["salt", "reeds"].includes(k) || m.reveal.has(k))) as ResKey[];
     let want = labor.mine * YIELD.extract * mult("mine");
     for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= got; }
@@ -699,9 +728,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; fx({ kind: "drought", tile: n.capital, nation: n.id }); n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
   const dry = !freshWater(world, n);
-  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1) * (dry ? RIVER.dryPlague : 1);
+  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1) * (dry ? RIVER.dryPlague : 1) * (1 - m.medicine);
   if (erand() < plagueChance) {
-    let dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)));
+    let dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)) * (1 - m.medicine));
     // §9.4 one herb per HERBS.perPeople people halves the deaths
     const herbsNeed = Math.ceil(n.population / HERBS.perPeople), healed = (n.stock.herbs || 0) >= herbsNeed;
     if (healed) { dead = Math.floor(dead * HERBS.plagueCut); L.stock(n, "herbs", -herbsNeed, "plague"); }
@@ -777,7 +806,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const surplus = (n.stock.food || 0) / Math.max(1, need);
     if (surplus > 0) n.stability += 1;
     const roof = housing(world, n);
-    if (surplus >= GROWTH.surplus && n.population < roof) { const born = dry ? Math.max(GROWTH.min, Math.floor(growthFor(n.population, roof) * RIVER.dryGrowth)) : growthFor(n.population, roof); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
+    if (surplus >= GROWTH.surplus && n.population < roof) { const base = Math.floor(growthFor(n.population, roof) * (1 + m.growth)), born = Math.min(roof - n.population, dry ? Math.max(GROWTH.min, Math.floor(base * RIVER.dryGrowth)) : base); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
   }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
@@ -826,6 +855,112 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
   }
   if (n.stability === 0) { n.riot = true; n.stability = 20; fx({ kind: "riot", tile: n.capital, nation: n.id }); say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+}
+
+// ---------------------------------------------------------------- the court (§4.6)
+
+export function maxOfficials(world: World, n: Nation): number {
+  return Math.min(OFFICIALS.max, 1 + Math.floor(n.population / OFFICIALS.perPop) + mods(world, n).officials);
+}
+
+/** Each official ages in office, pays and is paid, grows or loses loyalty, and does their work. */
+function officialsAct(world: World, n: Nation, L: Ledger, claims: Array<{ n: Nation; tile: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): void {
+  const court = n.officials ?? []; if (!court.length) return;
+  const tick = world.tick, done: string[] = [];
+  const act = (type: string, a: Record<string, unknown>) => doAction(world, n, type, a, L, claims, explorers, strikes, say);
+  for (const o of [...court]) {
+    const def = OFFICIAL_DOMAINS[o.domain]; if (!def) continue;
+    o.skill = Math.min(5, 1 + Math.floor((tick - o.since) / OFFICIALS.skillEvery));
+    // Upkeep, then loyalty
+    const upkeep = OFFICIALS.upkeepBase + o.skill;
+    if ((n.stock.food || 0) >= upkeep) L.stock(n, "food", -upkeep, "officials"); else o.loyalty -= 5;
+    o.loyalty += n.stability >= 60 ? 1 : n.stability < 40 ? -1 : 0;
+    if (o.seat !== null && dist(o.seat, n.capital) > OFFICIALS.farSeat) o.loyalty -= 1;
+    o.loyalty = Math.max(0, Math.min(100, o.loyalty));
+    if (o.loyalty <= 0) {
+      n.officials = (n.officials ?? []).filter(x => x !== o);
+      n.stability -= OFFICIALS.desert;
+      say(n.id, "court", `${def.title} ${o.name} bỏ triều đình ${n.name}; lòng dân xao động.`);
+      n.lastEvents.push(`${def.title} ${o.name} bỏ đi vì mất lòng trung thành: ổn định −${OFFICIALS.desert}.`);
+      continue;
+    }
+    if (o.loyalty < OFFICIALS.idle) { o.lastAct = "bất mãn, không làm gì (trung thành thấp)"; done.push(`${o.name}: bất mãn`); continue; }
+    o.lastAct = workFor(world, n, o, act);
+    done.push(`${def.title} ${o.name}: ${o.lastAct}`);
+  }
+  if (done.length) n.lastEvents.push(`Triều đình: ${done.join("; ")}.`);
+}
+
+/** One official's own work this turn; returns what they did, in words. */
+function workFor(world: World, n: Nation, o: Official, act: (type: string, a: Record<string, unknown>) => string | null): string {
+  const m = mods(world, n);
+  switch (o.domain) {
+    case "governor": {
+      if (o.seat === null || world.tiles[o.seat].owner !== n.id) return "mất lãnh địa";
+      const want = o.skill >= 3 ? 2 : 1, got: string[] = [];
+      const room = tileLimit(world, n) - ownedTiles(world, n.id).length;
+      const need = n.population * m.foodPerPerson;
+      const options = within(o.seat, 3).map(i => world.tiles[i])
+        .filter(t => t.owner === -1 && (t.land || (t.terrain === "shallow" && m.move.has("shallow"))) && t.terrain !== "icewall" && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id))
+        .sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i);
+      for (const t of options) {
+        if (got.length >= Math.min(want, room)) break;
+        if ((n.stock.food || 0) < CLAIM_FOOD * (got.length + 1) + need * 0.5) break;
+        if (!act("claim_tile", { tile: [col(t.i), row(t.i)] })) got.push(`(${col(t.i)}, ${row(t.i)})`);
+      }
+      return got.length ? `khai hoang ${got.join(", ")}` : room <= 0 ? "giữ đất (đã đủ giới hạn quản lý)" : "giữ đất (không đủ lương thực hay không còn ô tốt)";
+    }
+    case "agriculture": {
+      const need = n.population * m.foodPerPerson, pending = n.buildings.some(b => !b.done && (buildingOf(world, b.type)?.effect.farmSlots || 0) > 0);
+      if ((n.stock.food || 0) >= need * 1.5 || pending || !(n.inventions.includes("P14") || m.unlocked.has("field"))) return "đôn đốc mùa màng";
+      const def = buildingOf(world, "field")!;
+      const spot = ownedTiles(world, n.id).filter(t => t.land && (def.terrains!.includes(t.terrain) || t.river) && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile))
+        .sort((a, b) => Number(b.delta) - Number(a.delta) || Number(b.river) - Number(a.river) || a.i - b.i)[0];
+      return spot && !act("build", { building: "field", tile: [col(spot.i), row(spot.i)] }) ? `khởi công ruộng ở (${col(spot.i)}, ${row(spot.i)})` : "đôn đốc mùa màng";
+    }
+    case "builder": {
+      if (!freshWater(world, n) && !n.buildings.some(b => b.type === "well") && !act("build", { building: "well" })) return "đào giếng";
+      const roofs = n.buildings.filter(b => isHousing(world, b.type)).length;
+      if (n.population >= housing(world, n) - 2 && roofs < housingSlots(n, world) && !n.buildings.some(b => !b.done && isHousing(world, b.type)) && (n.inventions.includes("P8") || m.unlocked.has("tent")) && !act("build", { building: "tent" })) return "dựng lều";
+      return "trông coi công trình";
+    }
+    case "scholar": {
+      if (n.research) return `đốc thúc nghiên cứu ${invName(world, n.research.id)}`;
+      const pick = researchOptions(world, n).sort((a, b) => inventionCost(world, n, a) - inventionCost(world, n, b) || a.localeCompare(b))[0];
+      if (!pick) return "chép sách";
+      n.research = { id: pick, progress: 0 };
+      return `bắt đầu nghiên cứu ${invName(world, pick)}`;
+    }
+    case "explorer": {
+      const dir = ["E", "NE", "NW", "W", "SW", "SE"][(world.tick + o.id) % 6];
+      return act("explore", { direction: dir, people: 2 }) ? "chưa có người để đi" : `dẫn đoàn thám hiểm hướng ${dir}`;
+    }
+    case "general": return "luyện quân, giữ biên giới";
+    case "merchant": return "trông coi các đoàn buôn";
+  }
+  return "làm việc";
+}
+
+// ---------------------------------------------------------------- eras (§5.6)
+
+/** Does this nation meet an era's gate: its capabilities (all of `caps`, one of `anyCap`), people, settlements and resource? */
+export function eraReady(n: Nation, def: (typeof ERA_TABLE)[number], caps: Set<string>, owned: Tile[]): boolean {
+  if (!def.caps.every(c => caps.has(c))) return false;
+  if (def.anyCap && !def.anyCap.some(c => caps.has(c))) return false;
+  if (n.population < def.pop || n.settlements.length < (def.settlements ?? 0)) return false;
+  if (def.res && !owned.some(t => (t.cap[def.res as ResKey] || 0) > 0) && (n.stock[def.res] || 0) < ERA_RES_STOCK) return false;
+  return true;
+}
+/** What the next era still needs, in words (for the nation's observation and the Watcher). */
+export function nextEraNeeds(world: World, n: Nation): { era: string; missing: string[] } | null {
+  const k = eraIndex(n) + 1; if (k >= ERA_TABLE.length) return null;
+  const def = ERA_TABLE[k], caps = mods(world, n).caps, owned = ownedTiles(world, n.id), missing: string[] = [];
+  for (const c of def.caps) if (!caps.has(c)) missing.push(`năng lực ${c}`);
+  if (def.anyCap && !def.anyCap.some(c => caps.has(c))) missing.push(`một trong: ${def.anyCap.join(" / ")}`);
+  if (n.population < def.pop) missing.push(`${def.pop} dân (có ${n.population})`);
+  if (n.settlements.length < (def.settlements ?? 0)) missing.push(`${def.settlements} điểm định cư`);
+  if (def.res && !owned.some(t => (t.cap[def.res as ResKey] || 0) > 0) && (n.stock[def.res] || 0) < ERA_RES_STOCK) missing.push(`đất có ${goodName(world, def.res)} hoặc ${ERA_RES_STOCK} trong kho`);
+  return { era: def.name, missing };
 }
 
 // ---------------------------------------------------------------- the wild (§9.4)
@@ -887,7 +1022,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -933,7 +1068,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!n.inventions.includes(def.needs) && !m.unlocked.has(def.type)) return `Cần phát minh ${invName(world, def.needs)}`;
       if (def.max && n.buildings.filter(b => b.type === def.type).length >= def.max) return `Tối đa ${def.max} ${def.name}`;
       if ((def.effect.housing || 0) > 0) {
-        const have = n.buildings.filter(b => isHousing(world, b.type)).length, slots = housingSlots(n);
+        const have = n.buildings.filter(b => isHousing(world, b.type)).length, slots = housingSlots(n, world);
         if (have >= slots) return `Mỗi trung tâm (thủ đô, điểm định cư) chỉ chứa ${HOUSING.perCentre} công trình có chỗ ở: đã có ${have}/${slots}. Lập điểm định cư mới để dựng thêm`;
       }
       const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
@@ -970,6 +1105,53 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       world.tiles[tile].owner = -1;
       n.buildings = n.buildings.filter(b => b.tile !== tile);
       n.lastEvents.push(`Bỏ ô (${col(tile)}, ${row(tile)}).`);
+      return null;
+    }
+    case "appoint_official": {
+      const domain = String(a.domain ?? ""), def = OFFICIAL_DOMAINS[domain];
+      if (!def) return `Lĩnh vực phải là một trong: ${Object.keys(OFFICIAL_DOMAINS).join(", ")}`;
+      const court = (n.officials ??= []);
+      if (court.length >= maxOfficials(world, n)) return `Đã đủ ${maxOfficials(world, n)} quan chức (thêm 1 mỗi ${OFFICIALS.perPop} dân, theo kỷ nguyên và phát minh)`;
+      if (def.unique && court.some(o => o.domain === domain)) return `Đã có ${def.title}; cách chức người cũ trước`;
+      let seat: number | null = null;
+      if (domain === "governor") {
+        seat = a.seat === undefined ? n.capital : parseTile(a.seat);
+        if (!centres(n).includes(seat)) return "Bá tước phải giữ một trung tâm của bạn: thủ đô hoặc một điểm định cư (seat [cột, hàng])";
+        if (court.some(o => o.seat === seat)) return "Trung tâm này đã có bá tước";
+      }
+      const r = rngFor(world.seed, world.tick, "official", n.id, court.length);
+      const given = String(a.name ?? "").trim().slice(0, 30);
+      const name = given.length >= 2 && !validateName("Tên quan", given) ? given : `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
+      const o = { id: world.nextId++, name, domain, seat, skill: 1, loyalty: OFFICIALS.start, since: world.tick, lastAct: "vừa nhậm chức" };
+      court.push(o);
+      n.lastEvents.push(`Bổ nhiệm ${def.title} ${name}${seat !== null ? ` giữ (${col(seat)}, ${row(seat)})` : ""} (#${o.id}).`);
+      say(n.id, "court", `${n.name} phong ${name} làm ${def.title}.`);
+      return null;
+    }
+    case "dismiss_official": {
+      const court = n.officials ?? [], o = court.find(x => x.id === num(a.official ?? a.id, -1));
+      if (!o) return "Không có quan chức này";
+      n.officials = court.filter(x => x !== o);
+      n.stability -= OFFICIALS.dismissStability;
+      for (const x of n.officials) x.loyalty = Math.max(0, x.loyalty - 5);
+      n.lastEvents.push(`Cách chức ${OFFICIAL_DOMAINS[o.domain]?.title ?? o.domain} ${o.name}: ổn định −${OFFICIALS.dismissStability}, các quan khác bớt trung thành.`);
+      return null;
+    }
+    case "reward_official": {
+      const o = (n.officials ?? []).find(x => x.id === num(a.official ?? a.id, -1));
+      if (!o) return "Không có quan chức này";
+      const g = (a.goods ?? {}) as Record<string, unknown>, paid: Record<string, number> = {};
+      let worth = 0;
+      for (const [k, v] of Object.entries(g)) {
+        const q = Math.floor(num(v)); if (q <= 0) continue;
+        if ((n.stock[k] || 0) < q) return `Không đủ ${goodName(world, k)}`;
+        paid[k] = q; worth += q * (GOOD_VALUE[k] ?? world.custom.goods[k]?.value ?? 1);
+      }
+      if (!worth) return "Cần goods: {hàng: số lượng} để ban thưởng";
+      for (const [k, q] of Object.entries(paid)) L.stock(n, k, -q, "reward"); // the gift is used up: feasts, cloth, honours
+      const gain = Math.min(100 - o.loyalty, Math.floor(worth / OFFICIALS.giftPerPoint));
+      o.loyalty += gain;
+      n.lastEvents.push(`Ban thưởng ${o.name}: trung thành +${gain} (giờ ${o.loyalty}).`);
       return null;
     }
     case "clear_wild": {
@@ -1037,12 +1219,12 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const passable = (i: number) => {
         if (i < 0) return false;
         const t = world.tiles[i];
-        if (!t.land && !(canSail && t.terrain === "shallow")) return false;
+        if (!t.land && !(canSail && t.terrain === "shallow") && !(m.move.has("ocean") && t.terrain === "ocean")) return false; // §5.3 ocean ships cross deep water
         return !(t.terrain === "mountain" && !m.move.has("mountain"));
       };
       const DIRS = ["E", "NE", "NW", "W", "SW", "SE"], k0 = DIRS.indexOf(dir);
       // §2.1 with boats a river tile costs half a step, so expeditions go further along rivers
-      for (let budget = EXPLORE_RANGE, steps = 0; budget > 0 && steps < EXPLORE_RANGE * 2; steps++) {
+      for (let budget = EXPLORE_RANGE + m.explore, steps = 0; budget > 0 && steps < (EXPLORE_RANGE + m.explore) * 2; steps++) {
         // Walk the chosen way; skirt around water and mountains to either side
         const tries = [0, 1, -1].map(o => stepDir(cur, DIRS[(k0 + o + 6) % 6])).filter(passable);
         if (!tries.length) break;

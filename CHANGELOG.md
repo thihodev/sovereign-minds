@@ -2,7 +2,21 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.4 (đang làm)
+## v0.5 (đang làm)
+
+- **Thế giới mở: 10 kỷ nguyên (§5.6).**
+  - Từ Đồ Đá Cũ tới Nguyên Tử. Mỗi cổng đòi các năng lực chung của thế giới (luyện-sắt, chữ-viết, thép, in-ấn, máy-hơi-nước, điện, tên-lửa…), số dân, điểm định cư và tài nguyên.
+  - Các nước tự đề xuất phát minh để nhận các năng lực đó, và trọng tài kiểm tra từng bước.
+  - **Thưởng theo kỷ nguyên:** trần thưởng nghề cao hơn, thêm ô quản lý, RP, nhà ở, chỗ quan chức, AP; công trình do các nước phát minh lớn dần theo kỷ nguyên.
+  - **Giá phát minh** giữ nguyên tới độ sâu 8, rồi tăng tuyến tính, để kỷ nguyên muộn vẫn với tới được.
+- **Hiệu ứng mới mở theo kỷ nguyên:** tăng dân, vận tải, thám hiểm xa, tầm đánh, y học, thêm quan chức, thêm nhà ở, vượt đại dương. Hiệu ứng `reveal` mở rộng sang than, lưu huỳnh, dầu.
+- **Tài nguyên mới:** than đá, dầu mỏ, lưu huỳnh (ẩn) và ngựa hoang. Thế giới cũ được rải thêm khi tải lại.
+- **Triều đình (§4.6):**
+  - Bổ nhiệm bá tước, đại tướng, thượng thư nông, đại học sĩ, tổng quản thương, tổng công trình, trưởng đoàn thám hiểm. Mỗi người tự làm việc mỗi lượt (khai hoang, khởi công ruộng, chọn nghiên cứu, thám hiểm…) và cho thưởng theo lĩnh vực.
+  - Có tay nghề, lương, lòng trung thành, có thể đào ngũ. AI thấy triều đình của mình trong gói trạng thái; Watcher xem trong hồ sơ quốc gia.
+- **Trọng tài** biết về các kỷ nguyên và năng lực chung; **bot** cũng lập triều đình.
+
+## v0.4
 
 - **Mọi quốc gia chơi bằng tài khoản Claude đã đăng nhập** (Claude Code CLI, gói Pro/Max, không cần API key). Mỗi nước chọn model (Haiku, Sonnet) và effort (low … max); đổi được giữa trận trong hồ sơ quốc gia. Trọng tài và Sử gia cũng mặc định dùng Claude (Sử gia: Haiku, effort low). Nhà cung cấp miễn phí vẫn dùng được qua `NATIONS`, `JUDGE_PROVIDERS` và `HISTORIAN_PROVIDER=auto`.
 - **Đặc thù quốc gia (§2.4):** 9 đặc thù, mỗi đặc thù có một lợi thế và một điểm yếu thật trong luật, cộng với tính cách mà AI đọc mỗi lượt (trường `identity`). Đã cân bằng bằng `tools/traits.ts`.

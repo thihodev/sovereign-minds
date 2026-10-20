@@ -15,7 +15,7 @@ import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E,
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, freshWater, homeDefence, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, deltaE, freshWater, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -173,7 +173,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // own ring of tiles, so make room under the limit it raises before founding it.
   const lastSettled = Math.max(-99, ...n.settlements.map(s => s.tick));
   // Tents first: a settlement only once the centres we have are full of them
-  const roofsFull = !v.has("P8") || n.buildings.filter(b => isHousing(world, b.type)).length >= housingSlots(n);
+  const roofsFull = !v.has("P8") || n.buildings.filter(b => isHousing(world, b.type)).length >= housingSlots(n, world);
   const wantSettle = n.founded && v.m.caps.has(SETTLEMENT.cap) && v.pop >= SETTLEMENT.minPopulation && v.house - v.pop <= Math.max(6, v.house * 0.12) && roofsFull && !atWar && tick - lastSettled >= 5
     && (n.settlements.length < SETTLEMENT.freeCentres || n.stability >= 50); // each centre beyond the free ones wears on stability
   const sett = wantSettle ? settlementSite(v) : null;
@@ -267,7 +267,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (count("workshop") < 1 + Math.floor(n.labor.hunt / 48) && !pendingType("workshop")) queue("workshop");
     // Housing: a tent when the people are close to the roof and the land can feed ten more
     const roomy = v.house - v.pop > 3;
-    const roofSlot = n.buildings.filter(b => isHousing(world, b.type)).length < housingSlots(n);
+    const roofSlot = n.buildings.filter(b => isHousing(world, b.type)).length < housingSlots(n, world);
     if (can("tent") && roofSlot && !roomy && !pendingType("tent") && !settling && capFood >= (v.house + 10) * v.m.foodPerPerson * 1.1) queue("tent");
     // Farms: more slots when the wild runs short of what the people need
     if (can("field") && !pendingType("field")) {
@@ -296,6 +296,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     }
     for (const b of builds) spend("build", { building: b.type, ...(b.tile !== undefined ? { tile: xy(b.tile) } : {}) });
   }
+
+
 
   // 6. Land: claim the best free tile next to ours while under the limit
   if (n.founded && !settling && !preparing && war?.bridge === undefined && sett === null && extra <= 0 && v.food >= CLAIM_FOOD + v.need * 0.4) {
@@ -358,6 +360,17 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       const idea = pickOne(ideas, rand);
       spend("propose_invention", { name: idea.name, description: idea.description, prereqs: idea.prereqs, effects: [{ kind: "role_bonus", role: idea.role, percent: 10 }] });
     }
+  }
+  // 5b. The court (§4.6): fill the slots in a fixed order; keep the officials paid and loyal
+  if (n.founded && tick > 0) {
+    const court = n.officials ?? [], has = (d: string) => court.some(o => o.domain === d);
+    const want = ["scholar", "governor", "agriculture", "builder", ...(atWar || liveHordes(world).length ? ["general"] : []), "explorer", "merchant"];
+    const next = want.find(d => d === "governor" ? !court.some(o => o.seat === n.capital) : !has(d));
+    if (next && court.length < maxOfficials(world, n) && v.food >= v.need * 1.2) spend("appoint_official", { domain: next, ...(next === "governor" ? { seat: xy(n.capital) } : {}) });
+    // a second governor for each settlement once the capital has one
+    else if (court.length < maxOfficials(world, n)) { const st = n.settlements.find(x => !court.some(o => o.seat === x.tile)); if (st) spend("appoint_official", { domain: "governor", seat: xy(st.tile) }); }
+    const sulky = court.find(o => o.loyalty < 45);
+    if (sulky && v.food >= v.need * 2 + 20) spend("reward_official", { official: sulky.id, goods: { food: 20 } });
   }
 
   // Labour and crafts

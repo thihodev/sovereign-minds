@@ -100,7 +100,8 @@ export function waterRoute(world: World, from: Nation, to: Nation): { path: numb
   const starts = piers(world, from);
   if (!starts.length) return null;
   const { free, shut } = access(world, from, to);
-  const water = (i: number) => { const t = world.tiles[i]; return t.terrain === "shallow" || t.river; };
+  const ocean = mods(world, from).move.has("ocean"); // §5.3 ocean-going ships also sail deep water
+  const water = (i: number) => { const t = world.tiles[i]; return t.terrain === "shallow" || t.river || (ocean && t.terrain === "ocean"); };
   const landing = (i: number) => { const t = world.tiles[i]; return t.owner === to.id && t.land && (t.river || NEIGHBORS[i].some(j => world.tiles[j].terrain === "shallow")); };
   const found = search(world, starts, landing, (i, j) => {
     const t = world.tiles[j];
@@ -124,12 +125,13 @@ export function planRoute(world: World, from: Nation, to: Nation, goods: Record<
   if (landGap(world, from.id, to.id) <= TRADE.nearDistance) return { mode: "near", path: [], ticks: 0, tolls: [], porters: 0, boats: 0 };
   const land = landRoute(world, from, to);
   const units = Math.max(1, sum(goods)), away = busy(world, from);
-  const boatsNeed = Math.ceil(units / TRADE.boatLoad), boatsFree = Math.floor(from.stock.boat || 0) - away.boats;
+  const lift = 1 + mods(world, from).transport; // §5.3 wheels, roads and sails carry more and go faster
+  const boatsNeed = Math.ceil(units / (TRADE.boatLoad * lift)), boatsFree = Math.floor(from.stock.boat || 0) - away.boats;
   const water = boatsFree >= boatsNeed ? waterRoute(world, from, to) : null;
-  const portersNeed = Math.ceil(units / TRADE.porterLoad);
+  const portersNeed = Math.ceil(units / (TRADE.porterLoad * lift));
   const portersFree = Math.floor(workers(from) * TRADE.porterShare) - away.porters; // anyone may carry; the economy takes them from the gatherers first
-  const byLand = land ? Math.max(1, Math.ceil(land.cost / TRADE.landSpeed)) : Infinity;
-  const byWater = water ? Math.max(1, Math.ceil(water.cost / TRADE.waterSpeed)) : Infinity;
+  const byLand = land ? Math.max(1, Math.ceil(land.cost / (TRADE.landSpeed * lift))) : Infinity;
+  const byWater = water ? Math.max(1, Math.ceil(water.cost / (TRADE.waterSpeed * lift))) : Infinity;
   if (water && byWater <= byLand) return { mode: "water", path: water.path, ticks: byWater, tolls: water.tolls, porters: 0, boats: boatsNeed };
   if (land && portersFree >= portersNeed) return { mode: "land", path: land.path, ticks: byLand, tolls: land.tolls, porters: portersNeed, boats: 0 };
   if (water) return { mode: "water", path: water.path, ticks: byWater, tolls: water.tolls, porters: 0, boats: boatsNeed };
