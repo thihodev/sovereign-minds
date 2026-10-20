@@ -2,7 +2,7 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
@@ -10,7 +10,7 @@ import { tileValue } from "../worldgen.ts";
 import { nationResources, nationThreats } from "../threats.ts";
 import { landDistance, liveHordes } from "../wild.ts";
 import { busy, planRoute } from "../routes.ts";
-import { freshWater, maxOfficials, nextEraNeeds } from "../engine.ts";
+import { freshWater, governed, maxOfficials, nextEraNeeds, roadLevelMax, roadNet, roadPlan } from "../engine.ts";
 import type { Nation, Tile, World } from "../types.ts";
 
 export const SYSTEM_PROMPT = `You are the mind that governs one nation in "Sovereign Minds", a shared world where every nation is led by its own AI. The world starts in the stone age. A neutral World Engine enforces every rule in code: you only PROPOSE actions; illegal actions are rejected and still cost their action points (AP). Nothing appears from nothing; every invention needs its prerequisites.
@@ -44,6 +44,10 @@ RIVERS: river tiles hold fish, clay, reeds and floodplain plants, and flint grav
 
 TRADE ROADS: a caravan goes overland or by water, whichever arrives first. Overland: road cost per tile = terrain move cost (grass 1, forest 2, jungle 3…), ${TRADE.landSpeed} per turn; it needs porters, 1 per ${TRADE.porterLoad} units, at most ${TRADE.porterShare * 100}% of your workers, and they do not work at home until it arrives; food on it spoils ${TRADE.landSpoil * 100}% a turn. By water: needs a finished Bến thuyền (building "pier", on a river or coast tile, needs Thuyền độc mộc) and boats (good "boat": recipe "boat", 6 wood + 1 rope at a workshop), 1 boat per ${TRADE.boatLoad} units; it sails rivers and shallow sea, ${TRADE.waterSpeed} tiles a turn; food spoils ${TRADE.waterSpoil * 100}%. Roads never enter the land of a nation at war with you; crossing a third nation's land without a passage or alliance treaty costs a toll of ${TRADE.toll * 100}% of every good. On the way: a barbarian camp within ${TRADE.hordeReach} tiles may rob it (${TRADE.hordeLoss * 100}%); storms at sea sink a boat and ${TRADE.stormLoss * 100}% of the goods (${TRADE.stormChance * 100}% a turn); if it is on the land of a nation that goes to war with you, everything is seized. "known_nations[].trade_road" shows how 15 units would go now. With a pier within ${RIVER.pierReach} tiles, your attacks reach 1 tile further to a target on a river or shore, and the defender loses the river's +25%.
 
+ROADS AND SEA LANES: build_road lays a road on land or a sea lane on water, tile by tile. Levels open with the eras: ${ROADS.levels.map((l, k) => `${k + 1} = ${l.name} / ${l.lane} (from ${ERA_TABLE[l.era].name}; per tile ${Object.entries(l.cost).map(([g, q]) => `${q} ${g}`).join(" + ")} on land, ${Object.entries(l.laneCost).map(([g, q]) => `${q} ${g}`).join(" + ")} on water; ${l.work} builder work; walking it costs ${l.move * 100}% of the terrain; robbers and storms strike ${l.safety * 100}% less)`).join("; ")}. Materials are paid when you order; your builders lay roads with the work left after buildings. A road over a mountain is a pass (needs move mountain to build; anyone may then walk it). A road belongs to its tile: it stays when the tile changes hands, and every caravan may use it. Why build them: caravans go faster and safer; every ${ROADS.tilesPerLimit} road tiles joined to one of your centres add 1 to tile_limit (max +${ROADS.maxLimit}); a settlement joined to your capital by road (through your own land) costs no sprawl stability. Floods and earthquakes wear roads down a level. "roads" in the observation shows your network and a suggested path to a settlement not yet joined.
+
+TERRITORIAL WATERS: shallow sea (with đi-nước) and deep sea (with move ocean) are held like land: claim_tile them; a water tile counts only ${Math.round(SEA.limitWeight * 100)}% of a tile against tile_limit ("governed" in the observation). Water touching your land can be claimed directly; water further out must lie within ${SEA.pierReach} tiles of one of your piers. Your waters give their fish to your fishers, foreign boats crossing them pay you the toll (unless they hold a passage or alliance treaty), are shut to enemies at war with you, and an enemy caravan caught in them is seized. Storms are ×${SEA.oceanStorm} on deep water. Attacking a water tile needs đi-nước and 1 free boat per ${SEA.warriorsPerBoat} warriors.
+
 ACTIONS (AP cost):
 - found_nation (0, turn 0 only): {"type":"found_nation","name":"…","capital":"…","people":"…","flag":{"layout":one of ${JSON.stringify(FLAG_LAYOUTS)},"colors":["#rrggbb","#rrggbb"],"symbol":one of ${JSON.stringify(FLAG_SYMBOLS)}},"manifesto":"≤280 chars"}. Unique names, never a model/company name; your first colour is your territory colour: it must differ clearly from every other nation's and from the land on the map (forest/grass greens, sea blues, sand, snow), so pick a strong colour.
 - research (1): {"type":"research","invention":"P1"} from research_options (their "rp" is the real cost: deeper inventions cost more). Switching keeps half the progress.
@@ -51,7 +55,8 @@ ACTIONS (AP cost):
 ${Object.values(EFFECT_KINDS).map(s => `  · ${s}`).join("\n")}
   A neutral judge AI scores causality (are the prerequisites really enough?), material (are the materials and tools there?) and physics (0-2 each, needs ≥4/6 and physics>0). It may add prerequisites or cut effects. Stone-age realism wins: no leaps. The engine prices it: RP = 15 × 1.4^d × (1 + power/10), then × (1 + ${RESEARCH.depthStep} × (d − ${RESEARCH.depthFree})) for d > ${RESEARCH.depthFree} like every invention. Approved inventions join the world's book: anyone with the prerequisites may research them; you get 20% off. Capabilities matter: Neolithic needs "mài" + ("trồng-trọt" or "thuần-dưỡng") + 50 people; the BRONZE AGE needs ${BRONZE_CAPS.map(c => `"${c}"`).join(", ")} and a copper tile — nobody owns "nhiệt-cao", "nhận-biết-khoáng" or "luyện-đồng" yet: someone must invent them.
 - build (1): {"type":"build","building":"workshop","tile":[col,row]} — materials paid at once, builders finish it.
-- claim_tile (2): {"type":"claim_tile","tile":[col,row]} — adjacent unclaimed tile, 5 food. tile_limit = ${TILES.base} + √people + invention bonuses + ${TILES.perSettlement} per settlement; more tiles than that costs 2 stability per extra tile per turn (max 10). abandon_tile (0): {"type":"abandon_tile","tile":[col,row]} gives a tile up.
+- claim_tile (2): {"type":"claim_tile","tile":[col,row]} — adjacent unclaimed tile (land, or water: see TERRITORIAL WATERS), 5 food. tile_limit = ${TILES.base} + √people + invention bonuses + ${TILES.perSettlement} per settlement + roads; governing more than that costs 2 stability per extra tile per turn (max 10). abandon_tile (0): {"type":"abandon_tile","tile":[col,row]} gives a tile up.
+- build_road (${AP_COST.build_road}): {"type":"build_road","path":[[col,row],…],"level":n?} — up to ${ROADS.maxPerOrder} tiles of your land or waters (or of a nation with a passage/alliance treaty with you); level defaults to the best your era allows; tiles already at that level are skipped.
 - found_settlement (3): {"type":"found_settlement","tile":[col,row],"name":"…"} — needs capability tổ-chức, ${SETTLEMENT.minPopulation}+ people, ${SETTLEMENT.materials} wood and/or stone (any mix; the larger pile pays first), ≥${SETTLEMENT.minDist} tiles from your other centres, ≤${SETTLEMENT.maxDist} from your land. ${SETTLEMENT.people} settlers move there (they stay your people) and the move costs ${SETTLEMENT.stability} stability. Claims the tile and its neighbours; +${SETTLEMENT.housing} housing and room for ${HOUSING.perCentre} more tents. Tiles cut off from every centre for 5 turns go wild.
 - explore (1): {"type":"explore","direction":"E|NE|NW|W|SW|SE","people":1-5,"from":[col,row]?} — reveals land up to 16 tiles away (start from a border tile with "from" to reach further) (you see 2 tiles around their path); explorers may die. Meeting other nations starts with exploring.
 - message (1): {"type":"message","to":"nation","text":"≤500"} — before you share a language (both own "ghi-chép", or 10 trades together) you can only send a "gesture" from: ${JSON.stringify(GESTURES)}.
@@ -84,7 +89,7 @@ function visibleRes(world: World, n: Nation, t: Tile): Record<string, number> {
 export function buildObservation(world: World, n: Nation): Record<string, unknown> {
   const m = mods(world, n), owned = ownedTiles(world, n.id);
   const frontier = new Map<number, Tile>();
-  for (const t of owned) for (const j of NEIGHBORS[t.i]) { const u = world.tiles[j]; if (u.owner === -1 && u.terrain !== "ocean") frontier.set(j, u); }
+  for (const t of owned) for (const j of NEIGHBORS[t.i]) { const u = world.tiles[j]; if (u.owner === -1 && u.terrain !== "icewall" && (u.land || m.move.has(u.terrain === "ocean" ? "ocean" : "shallow"))) frontier.set(j, u); }
   const known = n.met.map(id => world.nations[id]).filter(o => o?.alive);
   const spies = world.spies.filter(s => s.active && s.owner === n.id);
   const stolen = n.stolenTech.filter(id => !n.inventions.includes(id));
@@ -106,7 +111,8 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     crafts: n.crafts,
     stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, r1(v)])),
     tile_limit: tileLimit(world, n),
-    territory: owned.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, res: visibleRes(world, n, t), building: n.buildings.filter(b => b.tile === t.i).map(b => b.done ? b.type : `${b.type}(đang xây)`).join(",") || undefined })),
+    governed: governed(world, n),
+    territory: owned.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, road: t.road || undefined, res: visibleRes(world, n, t), building: n.buildings.filter(b => b.tile === t.i).map(b => b.done ? b.type : `${b.type}(đang xây)`).join(",") || undefined })),
     claimable: [...frontier.values()].sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i).slice(0, 8)
       .map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, res: visibleRes(world, n, t) })),
     inventions: n.inventions.map(id => ({ id, name: invName(world, id), depth: depthOf(world, id) })),
@@ -129,6 +135,19 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     era: (() => { const next = nextEraNeeds(world, n); return { now: n.era, next: next?.era, still_needed: next?.missing }; })(),
     court: { slots: maxOfficials(world, n), officials: (n.officials ?? []).map(o => ({ id: o.id, title: OFFICIAL_DOMAINS[o.domain]?.title, domain: o.domain, name: o.name, seat: o.seat !== null ? xy(o.seat) : undefined, skill: o.skill, loyalty: o.loyalty, last_turn: o.lastAct })) },
     fresh_water: freshWater(world, n),
+    roads: n.founded ? (() => {
+      const net = roadNet(world, n), level = roadLevelMax(n), apart = n.settlements.filter(st => !net.linked.includes(st.tile));
+      const next = apart.map(st => ({ st, path: roadPlan(world, n, st.tile, 1) })).filter(x => x.path.length).sort((a, b) => a.path.length - b.path.length)[0];
+      return {
+        best_level: `${level} (${ROADS.levels[level - 1].name} / ${ROADS.levels[level - 1].lane})`, network_tiles: net.tiles,
+        tile_limit_bonus: Math.min(ROADS.maxLimit, Math.floor(net.tiles / ROADS.tilesPerLimit)),
+        joined_to_capital: n.settlements.filter(st => net.linked.includes(st.tile)).map(st => st.name),
+        not_joined: apart.map(st => st.name),
+        suggested: next ? { to: next.st.name, path: next.path.slice(0, ROADS.maxPerOrder).map(xy), tiles_left: next.path.length } : undefined,
+        works_in_progress: (n.roadWorks ?? []).length || undefined,
+        waters: owned.filter(t => !t.land).length || undefined,
+      };
+    })() : undefined,
     caravans: (() => {
       const cs = world.caravans.filter(c => c.from === n.id || c.to === n.id).map(c => ({ from: world.nations[c.from].name, to: world.nations[c.to].name, by: c.mode ?? "land", arrives_in: c.arrive - world.tick, goods: Object.fromEntries(Object.entries(c.goods).map(([k, v]) => [k, Math.round(v * 10) / 10])) }));
       return cs.length ? cs : undefined;

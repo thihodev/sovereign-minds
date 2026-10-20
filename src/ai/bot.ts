@@ -11,11 +11,11 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
-import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, freshWater, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -72,6 +72,8 @@ const xy = (i: number) => [col(i), row(i)];
 interface View {
   world: World; n: Nation; m: Mods; owned: Tile[]; mine: Set<number>; centres: number[];
   pop: number; workers: number; need: number; food: number; house: number; limit: number;
+  /** §2.6 land governed against the limit: water weighs a third */
+  held: number;
   has: (id: string) => boolean; stock: (k: string) => number;
   /** Sustainable food per turn from wild reserves on owned land, by role. */
   wild: { hunt: number; gather: number; fish: number };
@@ -132,7 +134,7 @@ function look(world: World, n: Nation): View {
   }
   return {
     world, n, m, owned, mine: new Set(owned.map(t => t.i)), centres: [n.capital, ...n.settlements.map(s => s.tile)],
-    pop: n.population, workers: workers(n), need: n.population * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n),
+    pop: n.population, workers: workers(n), need: n.population * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
     has: id => n.inventions.includes(id), stock: k => n.stock[k] || 0,
     wild: { hunt: sustain(world, n, owned, "game"), gather: sustain(world, n, owned, "plants") * drought, fish: sustain(world, n, owned, "fish") },
     farmSlots, farmPerWorker: farmSlots ? farmFood / farmSlots * stabMult : 0, stabMult, drought,
@@ -189,7 +191,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const prey = canWage ? others.filter(o => weakNeighbour(v, o)).sort((a, b) => a.id - b.id)[0] : undefined;
 
   // 0. Too much land: give up the poorest, far from any centre (free)
-  const extra = Math.max(v.owned.length - v.limit, settleNow ? v.owned.length + ring - (v.limit + 3) : 0);
+  const extra = Math.ceil(Math.max(v.held - v.limit, settleNow ? v.held + ring - (v.limit + 3) : 0));
   if (n.founded && extra > 0) {
     const centreSet = new Set(v.centres);
     const far = (t: Tile) => Math.min(...v.centres.map(c => dist(c, t.i)));
@@ -256,6 +258,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     settling = spend("found_settlement", { tile: xy(sett), name: `${names[n.settlements.length % names.length]} ${pickOne(SYL, rand).toUpperCase()[0]}${pickOne(SYL, rand)}${n.settlements.length + 1}` });
   }
 
+  let roadWork = 0; // §2.5 work for a road ordered this turn
   // 5. Buildings
   const builds: Array<{ type: string; tile?: number }> = [];
   if (n.founded) {
@@ -295,6 +298,20 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       if (spot) queue("pier", spot.i);
     }
     for (const b of builds) spend("build", { building: b.type, ...(b.tile !== undefined ? { tile: xy(b.tile) } : {}) });
+    // §2.5 a road to every settlement, one stretch at a time, once the buildings are under way
+    if (!n.roadWorks?.length && !atWar && n.settlements.length && v.food >= v.need) {
+      const linked = roadNet(world, n).linked, level = roadLevelMax(n);
+      const shortest = (lv: number, sts: typeof n.settlements) => sts.map(st => roadPlan(world, n, st.tile, lv)).filter(p => p.length).sort((a, b) => a.length - b.length)[0];
+      // join the settlements first with a track, then raise the roads to the best level of the era
+      const join = shortest(1, n.settlements.filter(st => !linked.includes(st.tile)));
+      const lvl = join ? 1 : level, path = join ?? shortest(level, n.settlements);
+      const stretch = path?.slice(0, ROADS.maxPerOrder) ?? [], def = ROADS.levels[lvl - 1];
+      const cost = Object.entries(def.cost).map(([k, q]) => [k, q * stretch.length] as const);
+      if (stretch.length && cost.every(([k, q]) => avail(k) >= q + 10) && spend("build_road", { path: stretch.map(xy), level: lvl })) {
+        for (const [k, q] of cost) reserved[k] = (reserved[k] || 0) + q;
+        roadWork = stretch.length * def.work;
+      }
+    }
   }
 
 
@@ -302,7 +319,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 6. Land: claim the best free tile next to ours while under the limit
   if (n.founded && !settling && !preparing && war?.bridge === undefined && sett === null && extra <= 0 && v.food >= CLAIM_FOOD + v.need * 0.4) {
     const best = claimTile(v);
-    if (best.tile >= 0 && v.owned.length < v.limit) spend("claim_tile", { tile: xy(best.tile) });
+    if (best.tile >= 0 && v.held + (world.tiles[best.tile].land ? 1 : SEA.limitWeight) <= v.limit) spend("claim_tile", { tile: xy(best.tile) });
     else if (best.tile >= 0 && best.fills && ap >= (AP_COST.claim_tile ?? 2)) {
       // At the limit but missing stone, wood, flint or farmland: swap our poorest tile for it
       const centreSet = new Set(v.centres);
@@ -375,7 +392,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
 
   // Labour and crafts
   const pendingWork = pending.reduce((s, b) => s + Math.max(0, (buildingOf(world, b.type)?.work ?? 0) - b.progress), 0)
-    + builds.reduce((s, b) => s + (buildingOf(world, b.type)?.work ?? 0), 0);
+    + builds.reduce((s, b) => s + (buildingOf(world, b.type)?.work ?? 0), 0)
+    + (n.roadWorks ?? []).reduce((s, w) => s + Math.max(0, ROADS.levels[w.level - 1].work - w.progress), 0) + roadWork;
   const researching = !!n.research || actions.some(a => a.type === "research");
   const { labor, crafts, mineTarget } = planLabor(v, { explorers, pendingWork, war, reserved, save: sett !== null && !settling ? { wood: SETTLEMENT.materials * 0.6, stone: SETTLEMENT.materials * 0.4 } : {}, researching });
   // Strikes can only use the warriors the labour plan could spare
@@ -431,7 +449,9 @@ function claimTile(v: View): { tile: number; fills: boolean } {
   for (const t of v.owned) for (const j of NEIGHBORS[t.i]) {
     if (seen.has(j)) continue; seen.add(j);
     const u = world.tiles[j];
-    if (u.owner !== -1 || u.terrain === "ocean") continue;
+    if (u.owner !== -1 || u.terrain === "icewall") continue;
+    // §2.6 waters: only those off our own shore, and only with boats (deep sea with ocean ships)
+    if (!u.land && (!v.m.move.has(u.terrain === "ocean" ? "ocean" : "shallow") || !NEIGHBORS[j].some(k => v.mine.has(k) && world.tiles[k].land))) continue;
     let s = tileWorth(v, u), fills = false;
     if (wantStone && (u.res.stone || 0) > 20) { s += 12; fills = true; }
     if (wantWood && (u.res.wood || 0) > 20) { s += 8; fills = true; }

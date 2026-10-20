@@ -67,8 +67,8 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 ### 2.3 Lãnh thổ
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
-- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc biển nông nếu đã đi được biển nông nhờ `đi-nước`; không bao giờ là biển sâu). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
-- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư. Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
+- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
+- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
@@ -94,6 +94,48 @@ Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng
 | 🔥 Thầy tế | Đoàn kết quanh lửa thiêng và nghi lễ; ổn định cao, săn bắt kém. | săn bắt −8%; +1 ổn định/lượt; ổn định khởi đầu +10 |
 
 Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay vòng qua mọi điểm khai sinh, mỗi seed 300 lượt. Trên bản đồ 128 × 128 có đủ mối đe dọa (mục 9.4), với 3 seed, điểm xếp hạng trung bình của từng đặc thù nằm trong khoảng −10% đến +13% so với mức trung bình, và không nước nào diệt vong. Bot không biết khai thác chiến tranh và giao thương, nên con số này đánh giá thấp Chiến binh và Thương nhân.
+
+### 2.5 Đường sá và hải đạo
+
+- **Hành động `build_road`** (1 AP): `{"type":"build_road","path":[[cột,hàng],…],"level":n}` cho tối đa 12 ô. Trên đất liền là đường, trên mặt nước là hải đạo. Không ghi `level` thì Engine chọn cấp cao nhất mà kỷ nguyên cho phép. Ô đã có đường cấp đó (hoặc đang làm) được bỏ qua.
+- **Ba cấp, mở theo kỷ nguyên** (giá cho mỗi ô; công là công của thợ xây):
+
+| Cấp | Đường | Hải đạo | Từ thời | Giá trên đất | Giá trên nước | Công | Chi phí đi | An toàn |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Đường mòn | Luồng lạch cắm sào | Đồ Đá Cũ | 1 gỗ | 2 gỗ | 2 | 60% | −15% |
+| 2 | Đường đất nện | Hải đạo có phao tiêu | Đồ Đồng | 1 gỗ + 2 đá | 3 gỗ + 1 dây | 4 | 40% | −30% |
+| 3 | Đường lát đá | Hải đạo có hải đăng | Cổ Đại | 5 đá | 6 đá + 2 gỗ | 8 | 25% | −50% |
+
+- **Làm đường:** vật liệu trả ngay khi ra lệnh. Thợ xây làm các công trình trước, công còn thừa thì làm đường theo thứ tự đã ra lệnh.
+- **Làm ở đâu:**
+  - trên lãnh thổ hay lãnh hải của mình
+  - trên đất của nước có hiệp ước thông hành hay liên minh với mình
+  - trên vùng hoang (đất hay biển vô chủ) cách lãnh thổ không quá 4 ô
+- **Điều kiện riêng:**
+  - Đường qua núi là đèo: muốn mở phải có năng lực vượt núi, nhưng mở xong thì ai cũng đi được.
+  - Hải đạo trên biển nông cần `đi-nước`; trên biển sâu cần `move ocean`.
+- **Đường thuộc về ô:** ô đổi chủ thì đường vẫn còn, và đoàn buôn của mọi nước đều đi được.
+- **Lợi ích:**
+  - Đoàn buôn đi trên đường hay hải đạo nhanh hơn: chi phí mỗi ô bằng chi phí địa hình (tối đa 4 với đèo) nhân tỷ lệ "Chi phí đi" trong bảng.
+  - Man di cướp đoàn buôn và bão đánh chìm thuyền ít hơn theo cột "An toàn".
+  - Cứ 4 ô đường thuộc lãnh thổ mình, nối với một trung tâm, được thêm 1 ô vào giới hạn quản lý (tối đa +10).
+  - Điểm định cư nối với thủ đô bằng đường thì không bị tính vào phạt ổn định vì quá nhiều điểm định cư (mục 4.4). Đường nối có thể đi qua đất mình, vùng hoang hay đất nước có hiệp ước.
+- **Hư hại:** lũ lụt làm tối đa 3 ô đường trên đất ngập mất một cấp. Động đất làm mọi đường trong bán kính tâm chấn mất một cấp.
+- **Quan sát:** gói trạng thái có trường `roads`, gồm số ô đường, các điểm định cư đã nối hay chưa nối, và một đường gợi ý tới điểm định cư gần nhất chưa nối. Các ô lãnh thổ có trường `road`.
+
+### 2.6 Lãnh hải
+
+- **Biển được giữ như đất:** `claim_tile` cho ô biển nông (cần `đi-nước`) và biển sâu (cần `move ocean`).
+  - Ô biển giáp đất liền của mình thì chiếm thẳng.
+  - Ô biển xa bờ phải kề lãnh thổ và nằm trong 4 ô quanh một Bến thuyền của mình.
+- **Quản lý:** mỗi ô biển tính 1/3 ô vào giới hạn quản lý. Trường `governed` cho biết tổng đang giữ.
+- **Quyền của chủ:**
+  - cá trên vùng biển của mình thuộc về ngư dân nước mình
+  - thuyền nước khác đi qua phải nộp phí qua đất (mục 7.3), trừ khi có hiệp ước thông hành hay liên minh
+  - nước đang chiến tranh với mình không được đi qua
+  - đoàn buôn của kẻ thù bị bắt trong vùng biển của mình thì bị tịch thu
+- **Bão** trên biển sâu xảy ra nhiều gấp đôi biển nông.
+- **Đánh chiếm ô biển** cần `đi-nước` và 1 thuyền rảnh cho mỗi 5 chiến binh.
 
 ## 3. Thời gian và vòng lượt
 

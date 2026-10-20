@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.5";
+export const RULES_VERSION = "0.6";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -81,7 +81,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, plant_spy: 2, petition: 1,
+  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, build_road: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -143,6 +143,52 @@ export const RIVER = {
 };
 
 // §7.4 War
+// §2.5 Roads on land, sea lanes on water. A level opens with its era; the materials are paid when the
+// road is ordered and the builders' spare work lays it, tile by tile. A road belongs to its tile:
+// it stays when the tile changes hands, and anyone's caravans may use it.
+export interface RoadLevel {
+  name: string; lane: string;
+  /** Index into ERA_TABLE. */
+  era: number;
+  /** Builder work per tile. */
+  work: number;
+  cost: Record<string, number>; laneCost: Record<string, number>;
+  /** What a step on it costs, as a share of the terrain's own cost. */
+  move: number;
+  /** Robbers and storms strike this much less often on it. */
+  safety: number;
+}
+export const ROADS = {
+  levels: [
+    { name: "Đường mòn", lane: "Luồng lạch cắm sào", era: 0, work: 2, cost: { wood: 1 }, laneCost: { wood: 2 }, move: 0.6, safety: 0.15 },
+    { name: "Đường đất nện", lane: "Hải đạo có phao tiêu", era: 2, work: 4, cost: { wood: 1, stone: 2 }, laneCost: { wood: 3, rope: 1 }, move: 0.4, safety: 0.3 },
+    { name: "Đường lát đá", lane: "Hải đạo có hải đăng", era: 4, work: 8, cost: { stone: 5 }, laneCost: { stone: 6, wood: 2 }, move: 0.25, safety: 0.5 },
+  ] as RoadLevel[],
+  /** Tiles one build_road order may lay. */
+  maxPerOrder: 12,
+  /** A road through the wilds (unclaimed land or sea) must stay within this many tiles of your territory. */
+  wildReach: 4,
+  /** A road over a mountain is a pass: walking it costs this, before the level's share. */
+  passMove: 4,
+  /** Every `tilesPerLimit` road tiles joined to a centre add one tile to govern (at most `maxLimit`);
+   *  a settlement joined to the capital by road (through your land, the wilds or a treaty partner's) is not sprawl (§4.4). */
+  tilesPerLimit: 4, maxLimit: 10,
+  /** A flood takes one level off at most `floodTiles` roads on the wet tiles; an earthquake off every road within its radius. */
+  floodTiles: 3,
+};
+
+// §2.6 Territorial waters: shallow and deep sea are held like land.
+export const SEA = {
+  /** A water tile counts this much against the tile limit (§2.3). */
+  limitWeight: 1 / 3,
+  /** Water that does not touch your land must lie within this many tiles of one of your piers. */
+  pierReach: 4,
+  /** Storms on deep water are this much more likely than on shallow water. */
+  oceanStorm: 2,
+  /** An attack on a water tile needs one boat per this many warriors. */
+  warriorsPerBoat: 5,
+};
+
 export const WAR = {
   reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.5,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],

@@ -4,7 +4,7 @@
 
 import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
-import { canSeeRes, freshWater, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
+import { canSeeRes, freshWater, governed, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
 import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
@@ -99,8 +99,8 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
     add("war", theirs !== null && theirs > n.labor.warrior * 1.5 ? 3 : 2, `Chiến tranh với ${o.name}`, `Từ lượt ${w.start}. Chiến binh của bạn ${n.labor.warrior}${theirs !== null ? `, của họ khoảng ${Math.round(theirs as number)}` : ""}.`);
   }
   // Governance
-  const limit = tileLimit(world, n);
-  if (owned.length > limit) add("overreach", 2, "Quá nhiều đất", `${owned.length}/${limit} ô: mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10).`);
+  const limit = tileLimit(world, n), held = governed(world, n);
+  if (held > limit) add("overreach", 2, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10). Đường nối các trung tâm nâng giới hạn.`);
   if (n.stability < 30) add("unrest", n.stability < 15 ? 3 : 2, "Bất ổn", `Ổn định ${n.stability}: dưới 30 sản xuất −25%, dưới 15 dân bỏ đi, về 0 thì nội loạn.`);
   const roof = housing(world, n);
   if (n.population >= roof) add("housing", 1, "Hết chỗ ở", `Dân ${n.population}/${roof} chỗ ở: dân không tăng nữa cho đến khi có thêm lều hay điểm định cư.`);
@@ -184,7 +184,7 @@ export function workSites(world: World, n: Nation): Array<{ role: Role; tile: nu
   spread("mine", ores, n.labor.mine);
   const doneWith = (key: "farmSlots" | "craftSlots") => n.buildings.filter(b => b.done && (buildingOf(world, b.type)?.effect[key] || 0) > 0).map(b => b.tile);
   spread("farm", doneWith("farmSlots"), n.labor.farm);
-  spread("build", n.buildings.filter(b => !b.done).map(b => b.tile), n.labor.build);
+  spread("build", [...n.buildings.filter(b => !b.done).map(b => b.tile), ...(n.roadWorks ?? []).map(w => w.tile)], n.labor.build);
   spread("craft", doneWith("craftSlots"), n.labor.craft);
   spread("research", [n.capital], n.labor.research);
   // Warriors stand on the border nearest a war or a horde, else at home

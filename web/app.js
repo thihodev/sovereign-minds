@@ -211,10 +211,10 @@
     raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔ đánh man di thất bại", battle: f => String(f.text).startsWith("won") ? "⚔ thắng trận" : "⚔ thua trận",
     beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
     fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
-    robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
+    road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
     drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
   };
-  const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun"]);
+  const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun", "road"]);
   function showTicker(list) {
     const box = $("#fx-ticker"); if (!box) return;
     const items = list.filter(f => !QUIET_FX.has(f.kind)).slice(0, 14);
@@ -408,6 +408,46 @@
     }
   }
 
+  // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
+  const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
+  const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
+  function drawRoads(g, vis, s, z, px) {
+    if (!S.roads || s * z < 3) return;
+    const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
+    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [];
+    S.roads.forEach((lv, i) => {
+      if (!lv || !vis(i)) return;
+      const water = isWater(i); let linked = false;
+      for (const j of NB(i)) {
+        if (j < 0) continue;
+        const lj = S.roads[j] || 0, hub = !water && hubs.has(j) && !isWater(j);
+        if (isWater(j) !== water || (!lj && !hub)) continue;
+        linked = true;
+        if (lj && j < i) continue; // each pair once
+        segs[water ? "sea" : "land"][lj ? Math.min(lv, lj) : lv].push([i, j]);
+      }
+      if (!linked) dots.push([i, lv, water]);
+    });
+    const line = (list, width, color, dash) => {
+      if (!list.length) return;
+      g.beginPath();
+      for (const [a, b] of list) { const [x1, y1] = center(a), [x2, y2] = center(b); g.moveTo(x1, y1); g.lineTo(x2, y2); }
+      g.setLineDash(dash ? dash.map(d => d * s) : []); g.lineWidth = width; g.strokeStyle = color; g.stroke();
+    };
+    g.save(); g.lineCap = "round";
+    for (let lv = 1; lv <= 3; lv++) {
+      const st = ROAD_STYLE[lv], w = Math.max(1.2 * px, s * st.w);
+      line(segs.land[lv], w + 2.2 * px, "rgba(30,20,10,.55)");
+      line(segs.land[lv], w, st.c, st.dash);
+      line(segs.sea[lv], Math.max(1 * px, s * .07) + 2 * px, "rgba(10,40,70,.5)");
+      line(segs.sea[lv], Math.max(1 * px, s * .07), lv >= 2 ? "#ffffff" : "#cfeeff", [.35, .25]);
+    }
+    for (const [i, lv, water] of dots) { const [x, y] = center(i); g.beginPath(); g.arc(x, y, s * (.12 + lv * .03), 0, 7); g.fillStyle = water ? "#cfeeff" : ROAD_STYLE[lv].c; g.fill(); g.lineWidth = px; g.strokeStyle = "rgba(30,20,10,.6)"; g.stroke(); }
+    // beacons on the best sea lanes
+    if (s * z >= 6) S.roads.forEach((lv, i) => { if (lv === 3 && isWater(i) && vis(i) && i % 4 === 0) { const [x, y] = center(i); g.beginPath(); g.arc(x, y, s * .14, 0, 7); g.fillStyle = "#ffd84a"; g.fill(); } });
+    g.restore();
+  }
+
   function render() {
     if (!geo || !S) return;
     const g = ctx, s = geo.s, z = view.z, px = 1 / z, dpr = geo.dpr;
@@ -468,6 +508,7 @@
       g.beginPath(); for (const i of tiles) edges(i, o); g.lineWidth = bw * 2.1; g.strokeStyle = contrastOf(c); g.globalAlpha = .9; g.stroke();
       g.globalAlpha = 1; g.lineWidth = bw; g.strokeStyle = c; g.stroke();
     }
+    drawRoads(g, vis, s, z, px);
     // names of the quiet places, once there is room to read them
     const small = clamp(s * .95 * z, 9, 13) * px;
     if (s * z >= 5) {
@@ -644,7 +685,8 @@
     const o = S.owners[i], owner = o >= 0 ? S.nations[o] : null, w = ST.wonders.find(x => x.i === i);
     box.innerHTML = `<b>${esc(TERRAIN[ST.terrain[i]][0])}</b>${ST.river[i] ? " · sông" : ""}${ST.delta[i] ? " · châu thổ" : ""}
       <span class="muted">· ô ${i % geo.N}, ${(i / geo.N) | 0}</span>
-      ${owner ? `<br>Thuộc <b>${esc(nationName(owner))}</b>` : ""}${w ? `<br>Kỳ quan: <b>${esc(w.name)}</b>` : ""}${inWild(i) ? `<br><span class="muted">Vùng hoang</span>` : ""}`;
+      ${S.roads?.[i] ? `<br>🛤 ${esc(isWater(i) ? S.roadLevels[S.roads[i] - 1].lane : S.roadLevels[S.roads[i] - 1].name)}` : ""}
+      ${owner ? `<br>${isWater(i) ? "Lãnh hải của" : "Thuộc"} <b>${esc(nationName(owner))}</b>` : ""}${w ? `<br>Kỳ quan: <b>${esc(w.name)}</b>` : ""}${inWild(i) ? `<br><span class="muted">Vùng hoang</span>` : ""}`;
     box.hidden = false;
     const bw = box.offsetWidth, bh = box.offsetHeight;
     let x = ev.clientX + 16, y = ev.clientY + 16;
@@ -916,7 +958,7 @@
     const blds = tile === null ? n.buildings : n.buildings.filter(b => b.tile === tile);
     const wars = (S.wars || []).filter(w => w.a === n.id || w.b === n.id);
     el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><h3 class="nname"></h3><div class="meta nmeta"></div></div>${statusPill(n)}</div>
-      <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
+      <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
       <div class="meta">Kỷ nguyên <b>${esc(n.era)}</b>${n.research ? ` · nghiên cứu ${esc(n.research.name)} ${n.research.progress}/${n.research.cost} RP` : ""}</div>
       ${n.research ? `<div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
       ${n.thought ? `<div class="thought"></div>` : ""}
@@ -953,7 +995,7 @@
     el.innerHTML = `<div class="head"><span class="swatch" style="background:${TERRAIN[t.terrain][1]}"></span><div class="grow"><h3>${esc(TERRAIN[t.terrain][0])}</h3>
         <div class="meta">ô ${i % geo.N}, ${(i / geo.N) | 0} · ${ZONE[t.zone]} · ${esc(REGION[t.region] || "ngoài khơi")}${typeof t.elev === "number" ? ` · độ cao ${t.elev.toFixed(2)}` : ""}</div></div>
         <button type="button" class="icon" data-act="unpin" aria-label="Bỏ chọn ô" title="Bỏ chọn (Esc)">×</button></div>
-      <div class="chips">${t.river ? "<span>Sông</span>" : ""}${t.delta ? "<span>Châu thổ</span>" : ""}${t.land ? "" : "<span>Biển</span>"}${capOf ? `<span>Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>` : ""}${stl ? `<span>Điểm định cư ${esc(stl.name)}</span>` : ""}${inWild(i) ? "<span>Vùng hoang</span>" : ""}${ST.herd?.includes(i) ? "<span>Điểm dừng đàn bò rừng</span>" : ""}${w ? `<span class="wonder">Kỳ quan: ${esc(w.name)}</span>` : ""}</div>
+      <div class="chips">${t.river ? "<span>Sông</span>" : ""}${t.delta ? "<span>Châu thổ</span>" : ""}${t.land ? "" : "<span>Biển</span>"}${t.road ? `<span>🛤 ${esc(t.land ? S.roadLevels[t.road - 1].name : S.roadLevels[t.road - 1].lane)}</span>` : ""}${capOf ? `<span>Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>` : ""}${stl ? `<span>Điểm định cư ${esc(stl.name)}</span>` : ""}${inWild(i) ? "<span>Vùng hoang</span>" : ""}${ST.herd?.includes(i) ? "<span>Điểm dừng đàn bò rừng</span>" : ""}${w ? `<span class="wonder">Kỳ quan: ${esc(w.name)}</span>` : ""}</div>
       <h4>Trữ lượng</h4>
       ${keys.length ? `<table class="res"><tr><th>Tài nguyên</th><th>Hiện có</th><th>Tối đa</th></tr>${keys.map(k => `<tr><td>${esc(RES[k] ?? k)}${HIDDEN_RES.has(k) ? ` <span class="pill">ẩn với AI</span>` : ""}</td><td class="mono">${Math.round(t.res?.[k] || 0)}</td><td class="mono">${Math.round(t.cap?.[k] || 0)}</td></tr>`).join("")}</table>` : `<p class="note">Không có trữ lượng.</p>`}
       <h4>Mối đe dọa ở ô này</h4>${threatList(t.threats || [], "Không có gì đáng ngại.")}
@@ -985,7 +1027,7 @@
       el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><div class="name">${esc(nationName(n))}</div><div class="model">${esc(modelLabel(n))} · ${esc(n.era)}</div></div>${statusPill(n)}</div>
         ${traitTag(n)}
         ${(n.officials || []).length ? `<div class="trait">👑 ${(n.officials || []).map(o => `${DOMAIN_ICON[o.domain] || ""} ${esc(o.name)}`).join(" · ")}</div>` : ""}
-        <div class="kv"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div></div>
+        <div class="kv"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div></div>
         ${n.research ? `<div class="muted" style="font-size:12px">Nghiên cứu ${esc(n.research.name)} · ${n.research.progress}/${n.research.cost} RP</div><div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
         ${(() => { const top = (n.threats || []).find(t => t.level >= 2); return top && n.alive ? `<div class="threat-tag lv${top.level}" title="${esc(top.detail)}">⚠ ${esc(top.title)}</div>` : ""; })()}
         ${n.thought ? `<div class="thought">“${esc(n.thought)}”</div>` : ""}
@@ -1016,7 +1058,7 @@
         <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
         <section data-sub="overview">
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
-          <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
+          <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
           <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
           ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)} <span class="muted">${esc(n.trait.lines.join(" · "))}</span></p>` : ""}
           ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
@@ -1032,7 +1074,8 @@
           <h3>Kho</h3>${chipsOf(stock)}
           <h3>Tài nguyên</h3>${resTable(n)}
           <h3>Công trình</h3>${chipsOf(n.buildings.map(b => `${b.name}${b.done ? "" : " (đang xây)"}`))}
-          <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => x.name))}
+          <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => `${x.name}${x.road ? " 🛤" : ""}`))}
+          ${n.roadNet ? `<h3>Đường sá & lãnh hải</h3><p class="note">${n.roadNet.tiles} ô đường nối các trung tâm (+${Math.min(10, Math.floor(n.roadNet.tiles / 4))} giới hạn ô) · ${n.roadNet.linked.length}/${(n.settlements || []).length} điểm định cư đã nối thủ đô (🛤) · cấp tối đa: ${esc(S.roadLevels[n.roadNet.level - 1].name)} / ${esc(S.roadLevels[n.roadNet.level - 1].lane)}${n.roadNet.works ? ` · ${n.roadNet.works} ô đang làm` : ""}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}</p>` : ""}
           <h3>Phát minh (${n.inventions.length})</h3>${chipsOf(n.inventions.map(v => v.name))}
         </section>
         <section data-sub="threats">${threatList(n.threats || [], "Không có mối đe dọa nào.")}</section>
@@ -1211,7 +1254,7 @@
     war: "war", battle: "war", fall: "war", raid: "war", horde: "war", spy: "war", deceit: "war",
     invention: "invent", proposal: "invent", lost: "invent", era: "invent", gate: "invent",
     event: "disaster", famine: "disaster", beasts: "disaster",
-    treaty: "diplo", trade: "diplo", contact: "diplo", petition: "diplo", decree: "diplo",
+    road: "nation", treaty: "diplo", trade: "diplo", contact: "diplo", petition: "diplo", decree: "diplo",
   };
   function addChronicle(items, prepend = true) {
     for (const c of items) {

@@ -5,9 +5,9 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
-  GESTURES, INJECTION, MESSAGE_MAX, OFFICIALS, RIVER, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
+  GESTURES, INJECTION, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
-import { piers, planRoute } from "./routes.ts";
+import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
@@ -220,7 +220,14 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const near = ownedTiles(world, n.id).some(t => dist(t.i, tile) <= reach + (byWater ? 1 : 0));
       if (kind === "attack" && !near) return `Ô mục tiêu cách lãnh thổ bạn quá ${reach} ô${byWater ? " (kể cả thêm 1 ô nhờ thuyền)" : ""}`;
       if (kind === "raid" && landGap(world, n.id, target.id) > reach + 3) return "Quá xa để đột kích";
-      if (kind === "attack" && world.tiles[tile].terrain === "mountain" && !mods(world, n).move.has("mountain")) return "Không vượt núi được";
+      if (kind === "attack" && world.tiles[tile].terrain === "mountain" && !mods(world, n).move.has("mountain") && !roadOf(world.tiles[tile])) return "Không vượt núi được";
+      if (kind === "attack" && !world.tiles[tile].land) {
+        // §2.6 a fight for the sea is fought from boats
+        if (!mods(world, n).move.has("shallow")) return "Đánh ô biển cần năng lực đi-nước (thuyền)";
+        const atSea = ctx.strikes.filter(s => s.n === n && !world.tiles[s.tile].land).reduce((s, x) => s + x.warriors, 0) + warriors;
+        const need = Math.ceil(atSea / SEA.warriorsPerBoat), free = Math.floor(n.stock.boat || 0) - busy(world, n).boats;
+        if (free < need) return `Đánh ô biển cần ${need} thuyền rảnh (mỗi thuyền chở ${SEA.warriorsPerBoat} chiến binh), có ${Math.max(0, free)}`;
+      }
       if (kind === "attack") {
         const cap = frontCap(world, n.id, tile), sent = ctx.strikes.filter(s => s.n === n && s.tile === tile).reduce((s, x) => s + x.warriors, 0);
         if (warriors + sent > cap) return `Mặt trận ở ô này chỉ chứa ${cap} chiến binh của bạn (${WAR.frontBase} + ${WAR.frontPerTile} × số ô của bạn kề ô đó)${sent ? `, đã gửi ${sent}` : ""}`;
@@ -400,14 +407,16 @@ function onTheRoad(ctx: DiploCtx, c: Caravan, from: Nation): void {
     }
     // Barbarians near the road
     const horde = liveHordes(world).filter(h => dist(h.tile, at) <= TRADE.hordeReach).sort((a, b) => b.strength - a.strength)[0];
-    if (horde && r() < Math.min(0.5, TRADE.hordeChance * horde.strength / 40)) {
+    const safety = 1 - (roadOf(world.tiles[at])?.safety ?? 0); // §2.5 a kept road or lane is safer
+    if (horde && r() < Math.min(0.5, TRADE.hordeChance * horde.strength / 40) * safety) {
       const lost = share(TRADE.hordeLoss, "barbarians");
       const dead = Math.min(from.population, c.porters ? 1 : 0); from.population -= dead;
       fx({ kind: "robbed", tile: at, nation: from.id, from: horde.tile, text: horde.name }); fxDeath(at, from.id, dead, "raid");
       from.lastEvents.push(`${horde.name} chặn cướp đoàn buôn tới ${world.nations[c.to].name}: mất ${fmtGoods(world, lost)}${dead ? `, ${dead} người khuân vác chết` : ""}.`);
     }
     // A storm at sea
-    if (c.mode === "water" && world.tiles[at].terrain === "shallow" && r() < TRADE.stormChance) {
+    const sea = world.tiles[at].terrain;
+    if (c.mode === "water" && (sea === "shallow" || sea === "ocean") && r() < TRADE.stormChance * (sea === "ocean" ? SEA.oceanStorm : 1) * safety) {
       const lost = share(TRADE.stormLoss, "storm");
       if ((c.boats || 0) > 0 && (from.stock.boat || 0) >= 1) { L.stock(from, "boat", -1, "storm"); c.boats! -= 1; }
       fx({ kind: "storm", tile: at, nation: from.id });

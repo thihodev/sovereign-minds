@@ -7,16 +7,16 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROLE_RESOURCE, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
-import { busy } from "./routes.ts";
+import { busy, piers } from "./routes.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
-import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
+import { ROLES, type Building, type RoadWork, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
 // ---------------------------------------------------------------- ledger
 
@@ -230,7 +230,70 @@ export function freshWater(world: World, n: Nation): boolean {
   return n.buildings.some(b => buildingWorks(world, b) && (buildingOf(world, b.type)?.effect.water || 0) > 0 && dist(b.tile, n.capital) <= RIVER.waterReach);
 }
 export function tileLimit(world: World, n: Nation): number {
-  return TILES.base + Math.floor(TILES.perSqrt * Math.sqrt(Math.max(0, n.population))) + mods(world, n).tiles + n.settlements.length * TILES.perSettlement;
+  return TILES.base + Math.floor(TILES.perSqrt * Math.sqrt(Math.max(0, n.population))) + mods(world, n).tiles + n.settlements.length * TILES.perSettlement + roadLimit(world, n);
+}
+/** §2.6 How much a nation governs, against its tile limit: a water tile weighs SEA.limitWeight. */
+export function governed(world: World, n: Nation): number {
+  let k = 0;
+  for (const t of world.tiles) if (t.owner === n.id) k += t.land ? 1 : SEA.limitWeight;
+  return Math.round(k * 100) / 100;
+}
+/** §2.5 May this nation's people walk a road on this tile: its own land, the wilds, or a treaty partner's land. */
+function roadOpen(world: World, n: Nation, t: Tile): boolean {
+  return t.owner === n.id || t.owner === -1 || treatiesBetween(world, n.id, t.owner, ["passage", "alliance"]).length > 0;
+}
+/** §2.5 Tiles reached from `starts` along roads open to the nation (its centres count as junctions). */
+function roadWalk(world: World, n: Nation, starts: number[]): Set<number> {
+  const hubs = new Set(centres(n)), seen = new Set(starts.filter(i => world.tiles[i]?.owner === n.id)), stack = [...seen];
+  while (stack.length) {
+    const k = stack.pop()!;
+    for (const j of NEIGHBORS[k]) {
+      const t = world.tiles[j];
+      if (!seen.has(j) && t.land && (hubs.has(j) ? t.owner === n.id : (t.road || 0) > 0 && roadOpen(world, n, t))) { seen.add(j); stack.push(j); }
+    }
+  }
+  return seen;
+}
+/** §2.5 The road network: the nation's road tiles joined to one of its centres, and the settlements joined to the capital. */
+export function roadNet(world: World, n: Nation): { tiles: number; linked: number[] } {
+  let tiles = 0;
+  for (const i of roadWalk(world, n, centres(n))) if ((world.tiles[i].road || 0) > 0 && world.tiles[i].owner === n.id) tiles++;
+  const fromCapital = roadWalk(world, n, [n.capital]);
+  return { tiles, linked: n.settlements.map(s => s.tile).filter(i => fromCapital.has(i)) };
+}
+function roadLimit(world: World, n: Nation): number {
+  return Math.min(ROADS.maxLimit, Math.floor(roadNet(world, n).tiles / ROADS.tilesPerLimit));
+}
+/** §2.5 The best road level this nation may lay now (its era). */
+export function roadLevelMax(n: Nation): number {
+  const era = eraIndex(n);
+  return ROADS.levels.filter(l => l.era <= era).length;
+}
+/** §2.5 Why this nation cannot lay a road (on land) or a sea lane (on water) on this tile, or null. */
+export function roadError(world: World, n: Nation, i: number, m: Mods = mods(world, n)): string | null {
+  const t = world.tiles[i];
+  if (t.terrain === "icewall") return "không ai làm đường trên Tường Băng";
+  if (!roadOpen(world, n, t)) return "thuộc nước khác (cần hiệp ước thông hành hay liên minh với họ)";
+  if (t.owner === -1 && !within(i, ROADS.wildReach).some(j => world.tiles[j].owner === n.id)) return `đất vô chủ quá xa lãnh thổ của bạn (tối đa ${ROADS.wildReach} ô)`;
+  if (t.land) return t.terrain === "mountain" && !m.move.has("mountain") ? "mở đèo qua núi cần năng lực vượt núi" : null;
+  if (t.terrain === "ocean" && !m.move.has("ocean")) return "hải đạo trên biển sâu cần tàu viễn dương (move ocean)";
+  return m.move.has("shallow") ? null : "hải đạo cần năng lực đi-nước (thuyền)";
+}
+/** §2.5 Tiles still to lay for a road from the network (or the capital) to `to`, through the nation's own land; [] when none is needed or there is no way. */
+export function roadPlan(world: World, n: Nation, to: number, level = roadLevelMax(n)): number[] {
+  const m = mods(world, n), ok = (i: number) => world.tiles[i].land && (world.tiles[i].owner === n.id || world.tiles[i].owner === -1) && !roadError(world, n, i, m);
+  const hubs = new Set(centres(n)), prev = new Map<number, number>(), starts = [...roadWalk(world, n, [n.capital])];
+  const queue = [...starts]; for (const i of starts) prev.set(i, -1);
+  while (queue.length) {
+    const k = queue.shift()!;
+    if (k === to) break;
+    for (const j of NEIGHBORS[k]) if (!prev.has(j) && ok(j)) { prev.set(j, k); queue.push(j); }
+  }
+  if (!prev.has(to)) return [];
+  const path: number[] = [];
+  for (let k = to; k >= 0; k = prev.get(k)!) path.push(k);
+  path.reverse();
+  return path.filter(i => (world.tiles[i].road || 0) < level && !hubs.has(i));
 }
 export function actionPoints(world: World, n: Nation): number { return apFor(n.population, mods(world, n).ap); }
 export function canSeeRes(world: World, n: Nation, key: string): boolean {
@@ -714,6 +777,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     b.progress += x; buildWork -= x;
     if (b.progress >= def.work - 1e-9) { b.done = true; fx({ kind: "build", tile: b.tile, nation: n.id, text: def.name }); n.lastEvents.push(`Hoàn thành ${def.name}.`); say(n.id, "build", `${n.name} xây xong ${def.name}.`); }
   }
+  // §2.5 Roads and sea lanes: the builders' spare work lays them, in the order given
+  layRoads(world, n, m, buildWork, say);
 
   // World events (§9.2)
   for (const k of Object.keys(n.eventTimers)) if (n.eventTimers[k] > 0) n.eventTimers[k]--;
@@ -756,9 +821,10 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const lostFood = (n.stock.food || 0) * FLOOD.foodLoss; L.stock(n, "food", -lostFood, "flood");
     const wetSet = new Set(wet.map(t => t.i)), hit = n.buildings.find(b => wetSet.has(b.tile));
     if (hit) n.buildings = n.buildings.filter(b => b !== hit);
+    const washed = breakRoads(world, wet.filter(t => t.land && (t.road || 0) > 0).slice(0, ROADS.floodTiles).map(t => t.i));
     n.eventTimers.fertile = FLOOD.fertileTicks;
     fx({ kind: "flood", tile: hit?.tile ?? wet[0].i, nation: n.id });
-    n.lastEvents.push(`Lũ lụt: nước cuốn ${fmt(lostFood)} lương thực${hit ? ` và ${buildingOf(world, hit.type)?.name ?? hit.type}` : ""}; phù sa làm ruộng +${FLOOD.fertile * 100}% trong ${FLOOD.fertileTicks} lượt.`);
+    n.lastEvents.push(`Lũ lụt: nước cuốn ${fmt(lostFood)} lương thực${hit ? ` và ${buildingOf(world, hit.type)?.name ?? hit.type}` : ""}; phù sa làm ruộng +${FLOOD.fertile * 100}% trong ${FLOOD.fertileTicks} lượt.${washed ? ` Nước xói ${washed} ô đường.` : ""}`);
     say(n.id, "event", `Lũ lụt ở ${n.name}${hit ? `, cuốn trôi ${buildingOf(world, hit.type)?.name ?? hit.type}` : ""}.`);
   }
   // §9.4 Earthquakes on hills and mountains
@@ -768,6 +834,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const fallen = n.buildings.filter(b => dist(b.tile, epi.i) <= QUAKE.radius);
     n.buildings = n.buildings.filter(b => dist(b.tile, epi.i) > QUAKE.radius);
     const dead = Math.floor(n.population * QUAKE.deaths); n.population -= dead;
+    breakRoads(world, owned.filter(t => t.land && dist(t.i, epi.i) <= QUAKE.radius).map(t => t.i));
     fx({ kind: "quake", tile: epi.i, nation: n.id, n: fallen.length }); fxDeath(epi.i, n.id, dead, "quake");
     let ore = "";
     if (erand() < QUAKE.oreChance) { L.tile(epi, "copper", QUAKE.ore, "quake"); epi.cap.copper = (epi.cap.copper || 0) + QUAKE.ore; ore = " Đá nứt lộ ra một vỉa quặng."; }
@@ -839,11 +906,11 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Stability (§4.4)
   n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
   if (ownsWonder(world, n, "spring")) n.stability += 2;
-  const over = owned.length - tileLimit(world, n);
+  const over = Math.ceil(governed(world, n) - tileLimit(world, n) - 1e-9);
   if (over > 0) { const pen = Math.min(OVER_LIMIT_MAX, 2 * over); n.stability -= pen; n.lastEvents.push(`Vượt giới hạn quản lý ${over} ô: −${pen} ổn định (bỏ bớt ô bằng abandon_tile).`); }
   if (n.silentStreak >= 3) n.stability -= 5;
   // Too many centres to govern from one hearth (§4.4)
-  const sprawl = n.settlements.length - SETTLEMENT.freeCentres;
+  const sprawl = n.settlements.length - roadNet(world, n).linked.length - SETTLEMENT.freeCentres; // §2.5 a road to the capital holds a settlement close
   if (sprawl > 0) n.stability -= sprawl * SETTLEMENT.sprawlStability;
   n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
   if (n.stability < 15 && n.population > 0) {
@@ -855,6 +922,41 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
   }
   if (n.stability === 0) { n.riot = true; n.stability = 20; fx({ kind: "riot", tile: n.capital, nation: n.id }); say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+}
+
+// ---------------------------------------------------------------- roads and sea lanes (§2.5)
+
+function layRoads(world: World, n: Nation, m: Mods, work: number, say: Say): void {
+  const left: RoadWork[] = [], done: Record<string, number> = {};
+  for (const w of n.roadWorks ?? []) {
+    const def = ROADS.levels[w.level - 1], t = world.tiles[w.tile];
+    if (!def || roadError(world, n, w.tile, m)) { n.lastEvents.push(`Bỏ dở đường ở (${col(w.tile)}, ${row(w.tile)}): ô không còn trong tay.`); continue; }
+    if ((t.road || 0) >= w.level) continue;
+    const x = Math.min(def.work - w.progress, work);
+    w.progress += x; work -= x;
+    if (w.progress < def.work - 1e-9) { left.push(w); continue; }
+    t.road = w.level;
+    fx({ kind: "road", tile: w.tile, nation: n.id, n: w.level, text: t.land ? def.name : def.lane });
+    const name = t.land ? def.name : def.lane;
+    done[name] = (done[name] || 0) + 1;
+  }
+  n.roadWorks = left;
+  const parts = Object.entries(done).map(([k, q]) => `${q} ô ${k.toLowerCase()}`);
+  if (parts.length) n.lastEvents.push(`Làm xong ${parts.join(", ")}${left.length ? `; còn ${left.length} ô đang làm` : ""}.`);
+  // A settlement joined to the capital for the first time is news
+  const linked = roadNet(world, n).linked;
+  for (const tile of linked) {
+    const st = n.settlements.find(x => x.tile === tile);
+    if (st && !st.road) { st.road = true; say(n.id, "road", `${n.name} mở đường nối thủ đô với ${st.name}.`); }
+  }
+  for (const st of n.settlements) if (st.road && !linked.includes(st.tile)) st.road = false;
+}
+
+/** §2.5 Floods and earthquakes take one level off the roads on these tiles. */
+function breakRoads(world: World, tiles: number[]): number {
+  let k = 0;
+  for (const i of tiles) { const t = world.tiles[i]; if ((t.road || 0) > 0) { t.road = t.road! - 1 || undefined; k++; } }
+  return k;
 }
 
 // ---------------------------------------------------------------- the court (§4.6)
@@ -898,7 +1000,7 @@ function workFor(world: World, n: Nation, o: Official, act: (type: string, a: Re
     case "governor": {
       if (o.seat === null || world.tiles[o.seat].owner !== n.id) return "mất lãnh địa";
       const want = o.skill >= 3 ? 2 : 1, got: string[] = [];
-      const room = tileLimit(world, n) - ownedTiles(world, n.id).length;
+      const room = Math.floor(tileLimit(world, n) - governed(world, n));
       const need = n.population * m.foodPerPerson;
       const options = within(o.seat, 3).map(i => world.tiles[i])
         .filter(t => t.owner === -1 && (t.land || (t.terrain === "shallow" && m.move.has("shallow"))) && t.terrain !== "icewall" && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id))
@@ -1022,7 +1124,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -1089,13 +1191,42 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (tile < 0) return "Ô không hợp lệ; dùng [cột, hàng]";
       const t = world.tiles[tile];
       if (t.owner !== -1) return "Ô đã có chủ";
-      if (t.terrain === "ocean") return "Không khai hoang được biển sâu";
       if (t.terrain === "icewall") return "Không ai khai hoang được Tường Băng";
+      if (t.terrain === "ocean" && !m.move.has("ocean")) return "Cần tàu viễn dương (move ocean) để giữ biển sâu";
       if (!t.land && !m.move.has("shallow")) return "Cần năng lực đi-nước (thuyền) để giữ ô biển nông";
       if (!NEIGHBORS[tile].some(j => world.tiles[j].owner === n.id)) return "Ô phải kề lãnh thổ";
+      // §2.6 waters off your own shore are yours to hold; further out, only within reach of your piers
+      if (!t.land && !NEIGHBORS[tile].some(j => world.tiles[j].owner === n.id && world.tiles[j].land) && !piers(world, n).some(p => dist(p, tile) <= SEA.pierReach))
+        return `Vùng biển không giáp bờ của bạn phải nằm trong ${SEA.pierReach} ô quanh một Bến thuyền của bạn`;
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
       claims.push({ n, tile });
+      return null;
+    }
+    case "build_road": {
+      // §2.5 one order lays up to ROADS.maxPerOrder tiles of road (land) or sea lane (water), paid now, built by the builders
+      const raw = Array.isArray(a.path) && a.path.length && typeof a.path[0] !== "number" ? a.path : a.tile !== undefined ? [a.tile] : Array.isArray(a.path) ? [a.path] : [];
+      const tiles = raw.map(parseTile);
+      if (!tiles.length || tiles.some(i => i < 0)) return "Cần path: danh sách ô [[cột, hàng], ...]";
+      if (tiles.length > ROADS.maxPerOrder) return `Mỗi lệnh làm tối đa ${ROADS.maxPerOrder} ô`;
+      const top = roadLevelMax(n), level = a.level === undefined ? top : Math.floor(Number(a.level));
+      if (!(level >= 1 && level <= ROADS.levels.length)) return `level phải từ 1 tới ${ROADS.levels.length}`;
+      const def = ROADS.levels[level - 1];
+      if (level > top) return `${def.name} / ${def.lane} cần thời ${ERA_TABLE[def.era].name}`;
+      const works = (n.roadWorks ??= []), queued = new Set(works.map(w => w.tile)), todo: number[] = [], cost: Record<string, number> = {};
+      for (const i of tiles) {
+        const err = roadError(world, n, i, m);
+        if (err) return `(${col(i)}, ${row(i)}): ${err}`;
+        if ((world.tiles[i].road || 0) >= level || queued.has(i) || todo.includes(i)) continue;
+        todo.push(i);
+        for (const [k, q] of Object.entries(world.tiles[i].land ? def.cost : def.laneCost)) cost[k] = (cost[k] || 0) + q;
+      }
+      if (!todo.length) return "Các ô này đã có đường cấp đó hoặc đang làm";
+      for (const [k, q] of Object.entries(cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)} (${todo.length} ô cần ${Object.entries(cost).map(([g, x]) => `${x} ${goodName(world, g)}`).join(", ")})`;
+      for (const [k, q] of Object.entries(cost)) L.stock(n, k, -q, "road");
+      for (const i of todo) works.push({ tile: i, level, progress: 0 });
+      const land = todo.filter(i => world.tiles[i].land).length;
+      n.lastEvents.push(`Khởi công ${land ? `${land} ô ${def.name.toLowerCase()}` : ""}${land && land < todo.length ? " và " : ""}${land < todo.length ? `${todo.length - land} ô ${def.lane.toLowerCase()}` : ""}; thợ xây làm sau các công trình.`);
       return null;
     }
     case "abandon_tile": {
@@ -1104,6 +1235,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (centres(n).includes(tile)) return "Không bỏ được thủ đô hay điểm định cư";
       world.tiles[tile].owner = -1;
       n.buildings = n.buildings.filter(b => b.tile !== tile);
+      if (n.roadWorks) n.roadWorks = n.roadWorks.filter(w => w.tile !== tile);
       n.lastEvents.push(`Bỏ ô (${col(tile)}, ${row(tile)}).`);
       return null;
     }

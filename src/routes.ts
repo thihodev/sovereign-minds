@@ -10,7 +10,8 @@ import { buildingOf } from "./catalog.ts";
 import { activeWar, landGap, treatiesBetween } from "./diplomacy.ts";
 import { buildingWorks, mods, workers } from "./engine.ts";
 import type { Nation, World } from "./types.ts";
-import { TERRAIN, TRADE } from "./rules.ts";
+import { ROADS, TERRAIN, TRADE, type RoadLevel } from "./rules.ts";
+import type { Tile } from "./types.ts";
 
 export interface Route {
   mode: "near" | "land" | "water";
@@ -77,6 +78,9 @@ function access(world: World, from: Nation, to: Nation) {
   return { free, shut };
 }
 
+/** §2.5 The road or sea lane on a tile, if any. */
+export const roadOf = (t: Tile): RoadLevel | undefined => ROADS.levels[(t.road || 0) - 1];
+
 const sum = (g: Record<string, number>) => Object.values(g).reduce((s, q) => s + q, 0);
 const tollsOn = (world: World, path: number[], free: (o: number) => boolean) => [...new Set(path.map(i => world.tiles[i].owner).filter(o => o >= 0 && !free(o)))].sort((a, b) => a - b);
 
@@ -84,9 +88,10 @@ export function landRoute(world: World, from: Nation, to: Nation): { path: numbe
   const { free, shut } = access(world, from, to), canClimb = mods(world, from).move.has("mountain");
   const sources = world.tiles.filter(t => t.owner === from.id && t.land).map(t => t.i);
   const found = search(world, sources, i => world.tiles[i].owner === to.id, (_, j) => {
-    const t = world.tiles[j];
-    if (!t.land || shut(t.owner) || (t.terrain === "mountain" && !canClimb)) return Infinity;
-    return TERRAIN[t.terrain].move + (free(t.owner) ? 0 : 3); // go round foreign land when there is a way
+    const t = world.tiles[j], road = roadOf(t);
+    if (!t.land || shut(t.owner) || (t.terrain === "mountain" && !canClimb && !road)) return Infinity; // §2.5 a mountain road is a pass for all
+    const move = road ? Math.min(TERRAIN[t.terrain].move, ROADS.passMove) * road.move : TERRAIN[t.terrain].move;
+    return move + (free(t.owner) ? 0 : 3); // go round foreign land when there is a way
   });
   return found ? { ...found, tolls: tollsOn(world, found.path, free) } : null;
 }
@@ -108,7 +113,7 @@ export function waterRoute(world: World, from: Nation, to: Nation): { path: numb
     if (shut(t.owner)) return Infinity;
     if (landing(j)) return 1;
     if (!water(j) || !(water(i) || starts.includes(i))) return Infinity;
-    return 1 + (free(t.owner) ? 0 : 3);
+    return (roadOf(t)?.move ?? 1) + (free(t.owner) ? 0 : 3); // §2.5 sea lanes and towpaths are faster
   });
   return found ? { ...found, tolls: tollsOn(world, found.path, free) } : null;
 }

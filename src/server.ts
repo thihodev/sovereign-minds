@@ -9,8 +9,8 @@ import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
-import { housing, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { OFFICIAL_DOMAINS } from "./rules.ts";
+import { governed, housing, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
+import { OFFICIAL_DOMAINS, ROADS } from "./rules.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
 import type { Runner } from "./runner.ts";
@@ -55,13 +55,17 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
     return {
       ...statusPayload(),
       owners: w.tiles.map(t => t.owner),
+      roads: w.tiles.map(t => t.road || 0),
+      roadLevels: ROADS.levels.map(l => ({ name: l.name, lane: l.lane })),
       nations: w.nations.map(n => ({
         id: n.id, name: n.name, capitalName: n.capitalName, people: n.people, flag: n.flag, manifesto: n.manifesto, founded: n.founded,
         controller: n.controller, provider: n.provider, model: n.model, effort: n.effort ?? "", alive: n.alive, capital: n.capital,
         trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
         population: n.population, workers: workers(n), housing: housing(w, n), stability: n.stability, reputation: n.reputation, era: n.era,
-        tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n),
+        tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
+        waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
+        roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n), works: (n.roadWorks ?? []).length } : null,
         stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, Math.round(v * 10) / 10])),
         labor: n.labor, crafts: n.crafts,
         inventions: n.inventions.map(id => ({ id, name: invName(w, id), custom: !!inv(w, id)?.custom })),

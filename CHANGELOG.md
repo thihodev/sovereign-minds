@@ -2,7 +2,28 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.5 (đang làm)
+## v0.6 (đang làm)
+
+- **Đường sá và hải đạo (§2.5).**
+  - Hành động mới `build_road`, ba cấp mở theo kỷ nguyên: đường mòn, đường đất nện, đường lát đá. Trên mặt nước tương ứng là luồng lạch, hải đạo có phao tiêu, hải đạo có hải đăng.
+  - Vật liệu trả ngay khi ra lệnh; thợ xây làm bằng công còn thừa sau các công trình.
+  - Đường được làm qua vùng hoang gần nhà và qua đất của nước có hiệp ước. Đường qua núi là đèo.
+  - **Lợi ích:** đoàn buôn đi nhanh và an toàn hơn; đường nối trung tâm nâng giới hạn ô; điểm định cư nối với thủ đô không còn bị tính phạt ổn định.
+  - Lũ lụt và động đất làm đường xuống cấp.
+- **Lãnh hải (§2.6).**
+  - Giữ được cả biển nông lẫn biển sâu. Ô biển xa bờ phải nằm trong tầm 4 ô của một bến thuyền.
+  - Mỗi ô biển tính 1/3 ô vào giới hạn quản lý.
+  - Chủ vùng biển thu phí thuyền đi qua, chặn thuyền của kẻ thù, giữ cá trên vùng biển của mình.
+  - Đánh chiếm ô biển cần thuyền. Bão trên biển sâu nhiều gấp đôi.
+- **AI và bot:**
+  - AI quốc gia thấy mạng đường của mình và một đường gợi ý tới điểm định cư chưa nối.
+  - Bot tự nối các điểm định cư bằng đường và giữ vùng biển ven bờ.
+- **Bản đồ:** vẽ đường (nâu, đậm dần theo cấp) và hải đạo (nét đứt, có hải đăng). Thẻ ô cho biết đường và lãnh hải; hồ sơ quốc gia có mục "Đường sá & lãnh hải".
+- **Giao diện dạng tab:**
+  - Các bảng Ngoại giao, Phát minh, Biên niên, Thống kê và hồ sơ quốc gia chia thành tab con, có số đếm trên tab.
+  - Biên niên có bộ lọc theo loại sự kiện.
+
+## v0.5
 
 - **Thế giới mở: 10 kỷ nguyên (§5.6).**
   - Từ Đồ Đá Cũ tới Nguyên Tử. Mỗi cổng đòi các năng lực chung của thế giới (luyện-sắt, chữ-viết, thép, in-ấn, máy-hơi-nước, điện, tên-lửa…), số dân, điểm định cư và tài nguyên.

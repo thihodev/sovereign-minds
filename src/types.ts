@@ -43,6 +43,8 @@ export interface Tile {
   owner: number; // nation id, -1 = unclaimed
   /** Distance to the ice wall when it is 8 or less (§12.1): its cold wind reaches that far. */
   wall?: number;
+  /** §2.5 A road on land, a sea lane on water: 1–3 (none when absent). It stays when the tile changes hands. */
+  road?: number;
 }
 
 export interface Flag {
@@ -122,7 +124,7 @@ export interface Nation {
   /** Tick until which declaring war on a nation costs no reputation (caught spy). */
   casusBelli: Record<string, number>;
   /** Extra centres founded with found_settlement (§2.3). */
-  settlements: Array<{ tile: number; name: string; tick: number }>;
+  settlements: Array<{ tile: number; name: string; tick: number; /** §2.5 joined to the capital by road */ road?: boolean }>;
   /** Completed trades with each nation (§7.3, §7.8). */
   trades: Record<string, number>;
   /** Ore or salt the miners dig first. */
@@ -132,7 +134,11 @@ export interface Nation {
   inbox: Message[];
   /** §4.6 the people the ruler handed a field to (worlds before v0.5 have none). */
   officials?: Official[];
+  /** §2.5 Roads and sea lanes ordered and paid for, built in order by the builders' spare work. */
+  roadWorks?: RoadWork[];
 }
+
+export interface RoadWork { tile: number; level: number; progress: number }
 
 /** §4.6 An official: works a field every turn on the ruler's behalf. */
 export interface Official {
