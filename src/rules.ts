@@ -168,6 +168,7 @@ export const AP_COST: Record<string, number> = {
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
+  quarantine: 1,
 };
 // §10.5 Petitions
 export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
@@ -533,6 +534,14 @@ export const QUAKE = { chance: 0.006, radius: 3, deaths: 0.02, oreChance: 0.3, o
 export const ICE_WIND = { reach: 4, winterMult: 1.5, deathMult: 1.5, tropicChance: 0.03 };
 /** Herbs: gatherers bring in `gather` herbs per unit of plants where herbs grow; one herb per `perPeople` people halves plague deaths. */
 export const HERBS = { gather: 0.08, perPeople: 10, plagueCut: 0.5 };
+/** §9.5 Contagion and quarantine. An outbreak leaves a people contagious for `sickTurns` turns (the turn it
+ *  strikes and the next), then immune `immuneTurns` more. Each contagious turn it may pass the plague to each
+ *  nation whose land touches its own (`border`), and to each it has a caravan with on the road or a border market
+ *  with this turn (`trade` each); × (1 − the receiver's medicine), and never through a quarantine. A quarantine
+ *  (action, 1–`quarantineMax` turns) shuts the borders: no plague in or out, no border market, no trade or caravans;
+ *  tension +`quarantineTension` a turn with every bordering neighbour, stability −`quarantineStability` a turn;
+ *  a sick people in quarantine earns +`selfQuarantineRep` reputation a contagious turn. */
+export const CONTAGION = { sickTurns: 2, immuneTurns: 3, border: 0.25, trade: 0.15, quarantineMax: 5, quarantineTension: 2, quarantineStability: 1, selfQuarantineRep: 1 };
 
 // §12.3 Wonders
 export const WONDER_DEFS = [

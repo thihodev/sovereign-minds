@@ -9,6 +9,7 @@ import {
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
+import { quarantined } from "./contagion.ts";
 import { add, part, take } from "./people.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
@@ -86,6 +87,13 @@ function findTarget(world: World, n: Nation, v: unknown): Nation | string {
   return o;
 }
 
+/** §9.5 Why no goods may pass between two peoples while one of them is in quarantine, or null. */
+function closedFor(world: World, n: Nation, o: Nation): string | null {
+  if (quarantined(n, world.tick)) return "Đang cách ly: không buôn bán với nước ngoài (quarantine turns 0 để dỡ)";
+  if (quarantined(o, world.tick)) return `${o.name} đang cách ly: không nhận buôn bán`;
+  return null;
+}
+
 // ---------------------------------------------------------------- actions
 
 export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<string, unknown>): string | null {
@@ -114,6 +122,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
     case "trade_offer": {
       const o = findTarget(world, n, a.to); if (typeof o === "string") return o;
       if (pendingOrActiveWar(world, n.id, o.id)) return `Đang chiến tranh với ${o.name}`;
+      const shut = closedFor(world, n, o); if (shut) return shut;
       const give = goods(world, a.give, TRADE.maxQty); if (typeof give === "string") return `give: ${give}`;
       const get = goods(world, a.get, TRADE.maxQty); if (typeof get === "string") return `get: ${get}`;
       if (!has(n, give)) return "Kho không đủ hàng để đưa";
@@ -129,6 +138,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const off = world.tradeOffers.find(x => x.id === id);
       if (!off || off.to !== n.id) return `Không có đề nghị trao đổi #${id} gửi cho bạn`;
       if (off.status !== "open" || tick - off.tick > TRADE.offerTicks) return "Đề nghị đã hết hạn";
+      const shut = closedFor(world, n, world.nations[off.from]); if (shut) return shut;
       const back = planRoute(world, n, world.nations[off.from], off.get);
       if (typeof back === "string") return `Hàng của bạn không tới được ${world.nations[off.from].name}: ${back}`;
       ctx.accepts.push({ n, offer: id });
@@ -323,6 +333,8 @@ export function resolveRelations(ctx: DiploCtx): void {
     const off = world.tradeOffers.find(x => x.id === offer); if (!off || off.status !== "open") continue;
     const A = world.nations[off.from], B = n;
     if (!A.alive || pendingOrActiveWar(world, A.id, B.id)) { off.status = "failed"; continue; }
+    const shut = closedFor(world, A, B);
+    if (shut) { off.status = "failed"; A.lastEvents.push(`Trao đổi #${off.id} thất bại: ${shut}.`); B.lastEvents.push(`Trao đổi #${off.id} thất bại: ${shut}.`); continue; }
     if (!has(A, off.give) || !has(B, off.get)) { off.status = "failed"; A.lastEvents.push(`Trao đổi #${off.id} thất bại: một bên không đủ hàng.`); B.lastEvents.push(`Trao đổi #${off.id} thất bại: một bên không đủ hàng.`); continue; }
     // §7.3 both ways need a road now (piers, boats and porters may have changed since the offer)
     const legs = ([[A, B, off.give], [B, A, off.get]] as Array<[Nation, Nation, Record<string, number>]>).map(([from, to, g]) => ({ from, to, g, road: planRoute(world, from, to, g) }));
@@ -367,6 +379,13 @@ export function resolveRelations(ctx: DiploCtx): void {
   for (const c of world.caravans) {
     const to = world.nations[c.to], from = world.nations[c.from];
     if (c.arrive > tick) { onTheRoad(ctx, c, from); continue; }
+    // §9.5 a people in quarantine lets no caravan in: it waits at the border until the quarantine ends
+    if (to.alive && quarantined(to, tick)) {
+      c.arrive = tick + 1;
+      to.lastEvents.push(`Đoàn buôn từ ${from.name} phải chờ ngoài biên giới vì đang cách ly.`);
+      from.lastEvents.push(`Đoàn buôn tới ${to.name} phải chờ ngoài biên giới: ${to.name} đang cách ly.`);
+      continue;
+    }
     for (const [k, q] of Object.entries(c.goods)) { L.caravanLoss(k, q); if (to.alive) L.stock(to, k, q, "caravan"); }
     if (to.alive) to.lastEvents.push(`Đoàn buôn từ ${world.nations[c.from].name} tới nơi: ${fmtGoods(world, c.goods)}.`);
   }

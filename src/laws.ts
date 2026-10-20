@@ -3,7 +3,7 @@
 // numbers in its rules). The values live in the world (its decrees), so a replay or a restart gives the
 // same world; applyLaws() writes them into the rule tables before anything reads them.
 
-import { BORDER, CONNECT, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
+import { BORDER, CONNECT, CONTAGION, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
 import type { World } from "./types.ts";
 
 export interface LawDef {
@@ -57,6 +57,9 @@ export const LAWS: LawDef[] = [
   { key: "officials.perPop", group: "Chiến tranh và trật tự", label: "Thêm 1 quan chức mỗi", desc: "", unit: "người", min: 10, max: 300, step: 10, ...field(OFFICIALS, "perPop") },
   { key: "events.winter", group: "Thiên tai", label: "Khả năng mùa đông khắc nghiệt", desc: "Mỗi lượt, trước các hệ số vùng lạnh.", unit: "", min: 0, max: 0.3, step: 0.01, ...field(EVENTS.winter, "chance") },
   { key: "events.plague", group: "Thiên tai", label: "Khả năng dịch bệnh", desc: "Mỗi lượt, trước các hệ số đông dân và thiếu nước.", unit: "", min: 0, max: 0.3, step: 0.01, ...field(EVENTS.plague, "chance") },
+  { key: "contagion.border", group: "Thiên tai", label: "Khả năng dịch lây qua biên giới", desc: "Mỗi lượt nước có dịch còn lây, với mỗi láng giềng giáp biên (× (1 − y học của bên nhận)); cách ly chặn hẳn.", unit: "", min: 0, max: 1, step: 0.05, ...field(CONTAGION, "border") },
+  { key: "contagion.trade", group: "Thiên tai", label: "Khả năng dịch lây theo đường buôn", desc: "Mỗi lượt, với mỗi nước có đoàn buôn đi lại hoặc chợ biên giới họp với nước có dịch.", unit: "", min: 0, max: 1, step: 0.05, ...field(CONTAGION, "trade") },
+  { key: "contagion.quarantineTension", group: "Chiến tranh và trật tự", label: "Căng thẳng biên giới mỗi lượt cách ly", desc: "Nước đang cách ly làm căng thẳng với mỗi láng giềng giáp biên tăng chừng này mỗi lượt.", unit: "", min: 0, max: 10, step: 0.5, ...field(CONTAGION, "quarantineTension") },
   { key: "events.drought", group: "Thiên tai", label: "Khả năng hạn hán", desc: "", unit: "", min: 0, max: 0.3, step: 0.01, ...field(EVENTS.drought, "chance") },
   { key: "flood.chance", group: "Thiên tai", label: "Khả năng lũ lụt", desc: "", unit: "", min: 0, max: 0.3, step: 0.01, ...field(FLOOD, "chance") },
   { key: "quake.chance", group: "Thiên tai", label: "Khả năng động đất", desc: "", unit: "", min: 0, max: 0.1, step: 0.002, ...field(QUAKE, "chance") },

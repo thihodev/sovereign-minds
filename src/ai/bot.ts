@@ -16,6 +16,7 @@ import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
 import { borderOf } from "../border.ts";
+import { immune, plagueNearby, quarantined } from "../contagion.ts";
 import { yieldShares } from "../connect.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
@@ -209,6 +210,14 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     for (const t of poor) spend("abandon_tile", { tile: xy(t.i) });
   }
 
+  // 0b. §9.5 A plague next door or on the trade road and little medicine: shut the borders while it lasts (two turns at most)
+  let shut = quarantined(n, tick);
+  if (n.founded && tick > 0 && !shut && !immune(n, tick) && v.m.medicine < 0.4) {
+    const sick = plagueNearby(world, n).filter(x => x.ways.length && !x.quarantined);
+    const turns = Math.min(2, Math.max(0, ...sick.map(x => x.until - tick + 1)));
+    if (turns >= 1 && spend("quarantine", { turns })) shut = true;
+  }
+
   // 1. Research
   if (n.founded && !n.research) {
     const opts = researchOptions(world, n);
@@ -338,7 +347,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
 
   // 7. Answer offers: fair trades, non-aggression
   if (n.founded) {
-    for (const off of world.tradeOffers.filter(o => o.to === n.id && o.status === "open" && tick - o.tick <= 2)) {
+    for (const off of world.tradeOffers.filter(o => o.to === n.id && o.status === "open" && tick - o.tick <= 2 && !shut && !quarantined(world.nations[o.from], tick))) {
       if (fairTrade(v, off.give, off.get)) { spend("accept_trade", { offer: off.id }); break; }
     }
     for (const off of world.treatyOffers.filter(o => o.to === n.id && (o.type === "non_aggression" || o.type === "passage") && !Object.keys(o.tribute).length && !o.cede.length && tick - o.tick <= 2)) {
@@ -371,8 +380,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const rich = new Set<number>();
     if (source !== undefined && tick % 3 === n.id % 3) for (const i of n.seen) { const t = world.tiles[i]; if (t.owner >= 0 && (t.res[source] || 0) > 30) rich.add(t.owner); }
     const holds = (o: Nation) => rich.has(o.id) ? 0 : 1;
-    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id)).sort((a, b) => holds(a) - holds(b) || v.gap(a.id) - v.gap(b.id) || a.id - b.id);
-    if (deal && partners.length && tick % 3 === n.id % 3) spend("trade_offer", { to: partners[Math.floor(rand() * Math.min(3, partners.length))].name, give: deal.give, get: deal.get });
+    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id) && !quarantined(o, tick)).sort((a, b) => holds(a) - holds(b) || v.gap(a.id) - v.gap(b.id) || a.id - b.id);
+    if (deal && partners.length && !shut && tick % 3 === n.id % 3) spend("trade_offer", { to: partners[Math.floor(rand() * Math.min(3, partners.length))].name, give: deal.give, get: deal.get });
     if (tick % 10 === n.id % 10 && ap >= 1) {
       const o = pickOne(others, rand);
       spend("message", { to: o.name, gesture: pickOne(["chào hỏi", "muốn trao đổi", "muốn hòa bình", "cùng đi săn"], rand) });

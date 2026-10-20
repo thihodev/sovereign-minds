@@ -3,12 +3,13 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { BORDER, CONNECT, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
+import { AP_COST, BORDER, CONNECT, CONTAGION, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
+import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -92,6 +93,19 @@ export function advice(world: World, n: Nation): Advice[] {
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
   }
+
+  // Plague next door, or at home (§9.5)
+  const tick = world.tick, cost = `ổn định −${CONTAGION.quarantineStability} và căng thẳng với mỗi láng giềng giáp biên +${CONTAGION.quarantineTension} mỗi lượt, chợ biên giới và buôn bán ngừng`;
+  const sickNear = plagueNearby(world, n).filter(x => x.ways.length && !x.quarantined);
+  if (contagious(n, tick) && !quarantined(n, tick))
+    say(2, `Dân đang có dịch, còn lây được tới hết lượt ${n.outbreakUntil}: láng giềng giáp biên có ${CONTAGION.border * 100}% mỗi lượt bị lây, bạn hàng có đoàn buôn hay chợ biên giới với bạn ${CONTAGION.trade * 100}%. Cách ly (quarantine, ${AP_COST.quarantine} AP, turns 1–2) giữ dịch trong nhà và được +${CONTAGION.selfQuarantineRep} uy tín mỗi lượt có dịch; đổi lại ${cost}.`);
+  else if (!quarantined(n, tick) && !immune(n, tick))
+    for (const x of sickNear) {
+      const p = Math.round(Math.max(...x.ways.map(w => w === "border" ? CONTAGION.border : CONTAGION.trade)) * (1 - m.medicine) * 100);
+      say(2, `${x.o.name} đang có dịch (lây được tới hết lượt ${x.until}), có thể lây sang bạn ${x.ways.map(w => WAY_NAME[w]).join(", ")} (tới ${p}% mỗi đường mỗi lượt). Cách ly 1–2 lượt (quarantine) chặn được, đổi lại ${cost}.${m.medicine ? "" : " Y học (hiệu ứng medicine) cũng giảm khả năng lây."}`);
+    }
+  if (quarantined(n, tick) && !contagious(n, tick) && !sickNear.length)
+    say(1, `Đang cách ly tới hết lượt ${n.quarantineUntil} mà quanh bạn không còn dịch: dỡ cách ly ({"type":"quarantine","turns":0}) để buôn bán và chợ biên giới họp lại.`);
 
   // Customs
   if ((n.family?.births ?? "neutral") === "limit" && n.population < 40) say(2, `Bạn đang hạn chế sinh khi chỉ có ${n.population} dân: dân sẽ co dần. Đổi về "neutral" (family_policy) trừ khi đang đói.`);

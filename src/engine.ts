@@ -18,6 +18,7 @@ import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { borderPhase, pairKey } from "./border.ts";
+import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -630,6 +631,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
 
   // 5. Treaties, trade, caravans, then battles (§3.1 order)
   const tradesBefore = new Map(world.nations.map(n => [n.id, { ...n.trades }]));
+  const linksBefore = tradeLinks(world); // §9.5 the ways a plague may travel this turn
   resolveRelations(ctx);
   resolveBattles(ctx);
 
@@ -646,6 +648,8 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (!n.alive) continue;
     economy(world, n, L, say, (explorers.get(n.id) || 0) + busy(world, n).porters); // §7.3 porters on the road do not work at home
   }
+  // 6b. Plague spreads between peoples; quarantines take their toll (§9.5)
+  contagionPhase(world, L, say, linksBefore);
 
   // 7. Sight, meetings, intel. Allies share sight (§7.8 level 4).
   for (const n of alive) {
@@ -853,13 +857,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; fx({ kind: "drought", tile: n.capital, nation: n.id }); n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
   const dry = !freshWater(world, n);
   const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1) * (dry ? RIVER.dryPlague : 1) * (1 - m.medicine);
-  if (erand() < plagueChance) {
-    let dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)) * (1 - m.medicine));
-    // §9.4 one herb per HERBS.perPeople people halves the deaths
-    const herbsNeed = Math.ceil(n.population / HERBS.perPeople), healed = (n.stock.herbs || 0) >= herbsNeed;
-    if (healed) { dead = Math.floor(dead * HERBS.plagueCut); L.stock(n, "herbs", -herbsNeed, "plague"); }
-    takePeople(n, dead, "plague"); fx({ kind: "plague", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "plague"); n.lastEvents.push(`Dịch bệnh: ${dead} người chết${healed ? ` (thảo dược cứu được một nửa, dùng ${herbsNeed})` : ""}.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
-  }
+  // §9.5 a people just through a plague does not catch it again for a while
+  if (erand() < plagueChance && !immune(n, tick)) plagueStrike(world, n, L, say, erand(), m.medicine);
   if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); fx({ kind: "bounty", tile: n.capital, nation: n.id }); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
   const grassTile = owned.find(t => t.terrain === "grass");
   if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); fx({ kind: "herd", tile: grassTile.i, nation: n.id }); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
@@ -1332,6 +1331,7 @@ type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
   "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants",
+  "quarantine",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -1342,6 +1342,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
   claims: Array<{ n: Nation; tile: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): string | null {
   const m = mods(world, n);
   switch (type) {
+    case "quarantine": return orderQuarantine(world, n, a, say); // §9.5
     case "research": {
       const id = String(a.invention ?? a.id ?? "");
       const v = inv(world, id);

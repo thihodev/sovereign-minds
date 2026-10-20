@@ -2,7 +2,7 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
@@ -15,6 +15,7 @@ import { demo, fighters, households, mouths } from "../people.ts";
 import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
 import { borderOf, neighbours } from "../border.ts";
+import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
 import { freshWater, governed, maxOfficials, nextEraNeeds, roadLevelMax, roadNet, roadPlan } from "../engine.ts";
 import type { Nation, Tile, World } from "../types.ts";
@@ -66,6 +67,8 @@ If "nation.origin" is set, YOUR people is such a faction: you left the nation na
 A CONNECTED REALM: your stores are one, but goods reach them only along a way. A settlement is joined to your capital by a short walk over your own land (≤ ${CONNECT.walk} tiles), by a road, or by water between your piers (a Bến thuyền within ${RIVER.pierReach} tiles of each); "nation.settlements[].way_to_capital" says which. A settlement with no way is cut off: what its land yields reaches your stores only ${CONNECT.isolatedYield * 100}%, and it adds ${CONNECT.isolatedDiscontent} discontent a turn. Land more than ${CONNECT.reach} tiles from any centre with no road on or beside it yields ${CONNECT.farYield * 100}%. Your people work the land nearest home first. So found settlements where a road or water can reach, and build that road (see "roads.suggested").
 
 NEIGHBOURS AND BORDERS: peoples whose lands touch do not live side by side in silence. "neighbours" lists every nation within ${BORDER.near} tiles. Each border carries a tension (0–100): +${BORDER.friction} per border tile a turn (at most +${BORDER.frictionMax}), −${BORDER.fade} a turn, less with each treaty (non-aggression −${BORDER.treatyCalm.non_aggression}, peace −${BORDER.treatyCalm.peace}, alliance −${BORDER.treatyCalm.alliance}), each trade you agree (−${BORDER.tradeCalm}; the border market −${BORDER.marketCalm}) and a shared language (−${BORDER.languageCalm}). Tension brings border incidents (poaching, felling, brawls that kill, families crossing to the calmer side); the victim of poaching or a brawl gets a just cause for war for ${BORDER.causeTicks} turns. At ${BORDER.dispute}+ both sides have a just cause and both lose ${BORDER.disputeStability} stability a turn. While tension is below ${BORDER.marketBelow} a small border market swaps, each turn and on its own, a good one side has to spare for one the other lacks (up to ${BORDER.marketValue} worth): it counts as a trade (toward a shared language and cheaper learning). A neighbour is a chance and a danger: trade with it, sign treaties, send gifts (trade_offer with "give" only and an empty "get"), or, with a just cause and the stronger army, take its land.
+
+PLAGUE SPREADS (§9.5): a people struck by plague is contagious that turn and the next, then immune ${CONTAGION.immuneTurns} more turns. Each contagious turn it may pass the plague to every nation whose land touches its own (${CONTAGION.border * 100}%), and to each it has a caravan with on the road or a border market with that turn (${CONTAGION.trade * 100}% each) — × (1 − the receiver's medicine), so medicine effects also shield you from your neighbours' plagues. "health" shows your own state, "plague_nearby" the sick peoples you know and how they could reach you. quarantine (${AP_COST.quarantine}): {"type":"quarantine","turns":1-${CONTAGION.quarantineMax}} shuts your borders: no plague in or out, but no border market, no trade offers or accepted trades either way, and caravans wait outside; tension +${CONTAGION.quarantineTension} a turn with every bordering neighbour and stability −${CONTAGION.quarantineStability} a turn; a sick people in quarantine earns +${CONTAGION.selfQuarantineRep} reputation a contagious turn. {"type":"quarantine","turns":0} ends it now. Use it for a turn or two while a neighbour or partner is sick, not for long.
 
 ROADS AND SEA LANES: build_road lays a road on land or a sea lane on water, tile by tile. Levels open with the eras: ${ROADS.levels.map((l, k) => `${k + 1} = ${l.name} / ${l.lane} (from ${ERA_TABLE[l.era].name}; per tile ${Object.entries(l.cost).map(([g, q]) => `${q} ${g}`).join(" + ")} on land, ${Object.entries(l.laneCost).map(([g, q]) => `${q} ${g}`).join(" + ")} on water; ${l.work} builder work; walking it costs ${l.move * 100}% of the terrain; robbers and storms strike ${l.safety * 100}% less)`).join("; ")}. Materials are paid when you order; your builders lay roads with the work left after buildings. A road over a mountain is a pass (needs move mountain to build; anyone may then walk it). A road belongs to its tile: it stays when the tile changes hands, and every caravan may use it. Why build them: caravans go faster and safer; every ${ROADS.tilesPerLimit} road tiles joined to one of your centres add 1 to tile_limit (max +${ROADS.maxLimit}); a settlement joined to your capital by road (through your own land) costs no sprawl stability. Floods and earthquakes wear roads down a level. "roads" in the observation shows your network and a suggested path to a settlement not yet joined.
 
@@ -221,6 +224,15 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     era: (() => { const next = nextEraNeeds(world, n); return { now: n.era, next: next?.era, still_needed: next?.missing }; })(),
     court: { slots: maxOfficials(world, n), officials: (n.officials ?? []).map(o => ({ id: o.id, title: OFFICIAL_DOMAINS[o.domain]?.title, domain: o.domain, name: o.name, seat: o.seat !== null ? xy(o.seat) : undefined, skill: o.skill, loyalty: o.loyalty, last_turn: o.lastAct })) },
     fresh_water: freshWater(world, n),
+    health: n.founded && (contagious(n, world.tick) || immune(n, world.tick) || quarantined(n, world.tick)) ? {
+      plague_contagious_until: contagious(n, world.tick) ? n.outbreakUntil : undefined,
+      immune_until: immune(n, world.tick) ? n.immuneUntil : undefined,
+      quarantine_until: quarantined(n, world.tick) ? n.quarantineUntil : undefined,
+    } : undefined,
+    plague_nearby: (() => {
+      const xs = plagueNearby(world, n).map(x => ({ name: x.o.name, contagious_until: x.until, could_reach_you_by: x.ways.length ? x.ways : undefined, in_quarantine: x.quarantined || undefined }));
+      return xs.length ? xs : undefined;
+    })(),
     migrants_asking: (() => {
       const xs = (world.schisms ?? []).filter(x => x.status === "asking" && x.to === n.id).map(x => ({ faction: x.id, from: world.nations[x.from]?.name, people: x.people, leader: x.leader, why_they_left: x.grievance, answer_by_turn: x.askUntil }));
       return xs.length ? xs : undefined;
