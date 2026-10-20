@@ -13,7 +13,7 @@ import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
 import { TRAITS, TRAIT_BY_ID } from "./rules.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
-import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus } from "./claude.ts";
+import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus, killAllClaude } from "./claude.ts";
 import type { Store } from "./db.ts";
 import type { MapFx } from "./fx.ts";
 import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
@@ -149,12 +149,13 @@ export class Runner {
     }
   }
 
-  /** Resolves once the current tick (if any) has finished; used before an update. */
+  /** Stop now: a tick still waiting on its AIs is dropped (Claude runs are killed), so the world
+   *  stays at the last tick played and saved. A tick that reached step() always finishes. */
   async stop(): Promise<void> {
     this.stopping = true;
     if (this.historian) this.historian.stopped = true;
-    while (this.busy) await sleep(200);
-    this.store.saveState(this.world);
+    killAllClaude();
+    for (let k = 0; this.busy && k < 100; k++) await sleep(100);
   }
 
   async runTick(): Promise<void> {
@@ -171,6 +172,7 @@ export class Runner {
         return;
       }
       this.held = null;
+      if (this.stopping) return; // shutting down while the AIs answered: drop this tick, nothing changed yet
 
       const aiAlive = alive.filter(n => n.controller === "ai");
       if (alive.length && alive.every(n => inputs[n.id].kind === "asleep") && aiAlive.length) {
@@ -181,6 +183,7 @@ export class Runner {
         return;
       }
       const rulings = await this.judgePending();
+      if (this.stopping) return;
       const res = step(w, inputs, rulings);
       if (res.audit.length) {
         res.chronicle.push({ tick: w.tick - 1, nation: null, kind: "audit", text: `Lỗi kiểm toán sổ cái, thế giới tạm dừng: ${res.audit.slice(0, 3).join("; ")}` });
@@ -331,11 +334,13 @@ export class Runner {
     const waiting = () => Date.now() < this.claudeWait.until;
     const started = Date.now(), opts = { model: n.model, effort: n.effort, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000, skipIf: waiting };
     let r = await askClaude(SYSTEM_PROMPT, obs, opts);
+    if (this.stopping) return { kind: "asleep" }; // killed by a shutdown: not the nation's fault, log nothing
     let parsed = r.ok ? extractJson(r.text) : null;
     if (r.ok && !parsed) {
       // §3.3: one repair attempt within the same turn
       r = await askClaude(SYSTEM_PROMPT, `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
       parsed = r.ok ? extractJson(r.text) : null;
+      if (this.stopping) return { kind: "asleep" };
     }
     const log = (kind: string, raw: string, error: string) =>
       this.store.logTurn({ tick, nation: n.id, provider: "claude", model: `${n.model}${n.effort ? `/${n.effort}` : ""}`, kind, raw, parsed: parsed ?? undefined, error, latencyMs: Date.now() - started });

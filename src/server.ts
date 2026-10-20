@@ -28,7 +28,8 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   try { return s ? JSON.parse(s) : {}; } catch { return {}; }
 }
 
-export function startServer(runner: Runner, opts: { host: string; port: number; version: string }): void {
+/** Starts the Watcher server; close() frees the port at once (open streams are ended). */
+export function startServer(runner: Runner, opts: { host: string; port: number; version: string; onListen?: (port: number) => void }): { close(): void } {
   const sseClients = new Set<ServerResponse>();
   const push = (event: string, data: unknown) => { const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of sseClients) c.write(msg); };
   runner.on(e => {
@@ -240,7 +241,16 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
     process.exit(1);
   });
   server.listen(port, opts.host, () => {
+    opts.onListen?.(port);
     console.log(`[http] Watcher UI: ${shown()}`);
     if (port !== opts.port) console.log(`[http] (cổng ${opts.port} bận nên dùng cổng ${port}; muốn cố định thì đặt PORT trong .env)`);
   });
+  return {
+    close() {
+      for (const c of sseClients) { try { c.end(); } catch { /* gone */ } }
+      sseClients.clear();
+      server.close();
+      server.closeAllConnections();
+    },
+  };
 }

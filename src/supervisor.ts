@@ -9,6 +9,8 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const POLL_MS = Number(process.env.WATCH_POLL_MS) || 3000;
+/** main.ts exits with this when another engine owns the world database: do not restart it. */
+const EXIT_LOCKED = 3;
 const ENGINE_PATHS = ["src", "tools", "package.json", ".env"];
 const WEB_PATHS = ["web"];
 
@@ -32,6 +34,7 @@ function start(): void {
   child = fork("src/main.ts", [], { execArgv: ["--disable-warning=ExperimentalWarning"], stdio: "inherit" });
   child.on("exit", code => {
     child = null;
+    if (code === EXIT_LOCKED) { console.error("[supervisor] Engine khác đang giữ thế giới này; supervisor dừng."); process.exit(1); }
     if (restarting) { restarting = false; console.log("[supervisor] Khởi động lại với code mới."); start(); return; }
     if (stopping) process.exit(0);
     crashes = Date.now() - startedAt < 15000 ? crashes + 1 : 0;
@@ -43,7 +46,14 @@ function start(): void {
 
 let stopping = false;
 for (const sig of ["SIGTERM", "SIGINT"] as const) {
-  process.on(sig, () => { stopping = true; if (child) child.kill(sig); else process.exit(0); });
+  process.on(sig, () => {
+    if (stopping) { child?.kill("SIGKILL"); process.exit(1); } // second Ctrl+C: now
+    stopping = true;
+    if (!child) process.exit(0);
+    child.kill(sig);
+    // The engine frees its port at once and stops within seconds; never leave it running behind us
+    setTimeout(() => { if (child) { console.error("[supervisor] Engine chưa dừng sau 20 giây: dừng cưỡng bức."); child.kill("SIGKILL"); } process.exit(0); }, 20000).unref();
+  });
 }
 
 setInterval(() => {

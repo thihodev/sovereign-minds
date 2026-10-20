@@ -119,6 +119,18 @@ class LoginSession {
 }
 export const login = new LoginSession();
 
+/** Every `claude` run in flight (chat, nations, judge, Historian), so a shutdown can stop them at once. */
+const procs = new Set<ChildProcessWithoutNullStreams>();
+function track(p: ChildProcessWithoutNullStreams): ChildProcessWithoutNullStreams {
+  procs.add(p); p.on("close", () => procs.delete(p)); p.on("error", () => procs.delete(p));
+  return p;
+}
+/** Stop every Claude run now (their callers see an error); used when the engine shuts down. */
+export function killAllClaude(): void {
+  for (const p of procs) { try { p.kill("SIGTERM"); } catch { /* gone */ } }
+  login.cancel();
+}
+
 export function logout(): void { spawnSync(CLI(), ["auth", "logout"], { env: cliEnv(), timeout: 15000 }); }
 
 // ---------------------------------------------------------------- chat
@@ -144,7 +156,7 @@ export function chat(message: string, context: string, sessionId: string | null,
     "--model", model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", CHAT_SYSTEM, "--tools", "",
   ];
   if (sessionId) args.push("--resume", sessionId);
-  const p = spawn(CLI(), args, { env: cliEnv(), cwd: resolve("data") });
+  const p = track(spawn(CLI(), args, { env: cliEnv(), cwd: resolve("data") }));
   active = p;
   let buf = "", full = "", streamed = false, sid: string | null = sessionId, errText = "", stderr = "";
   p.stdout.on("data", (d: Buffer) => {
@@ -225,7 +237,7 @@ function askOnce(system: string, user: string, opts: { model: string; timeoutMs:
   const args = ["-p", "--output-format", "json", "--model", opts.model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", system, "--tools", ""];
   if (opts.effort && CLAUDE_EFFORTS.includes(opts.effort)) args.push("--effort", opts.effort);
   return new Promise(res => {
-    const p = spawn(CLI(), args, { env: cliEnv(), cwd: tmpdir() });
+    const p = track(spawn(CLI(), args, { env: cliEnv(), cwd: tmpdir() }));
     let out = "", stderr = "", timedOut = false;
     const timer = setTimeout(() => { timedOut = true; p.kill("SIGTERM"); }, opts.timeoutMs);
     p.stdout.on("data", (d: Buffer) => { out += d.toString("utf8"); });
