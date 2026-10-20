@@ -16,7 +16,7 @@
     glacier: ["Băng hà", "#c4d8e2"], icewall: ["Tường Băng", "#eef7fc"],
   };
   const ZONE = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" };
-  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải" };
+  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải", coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa hoang", boat: "thuyền" };
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 
   let ST = null, S = null, geo = null, hoverI = -1;
@@ -1004,34 +1004,50 @@
   async function openNation(id) {
     const n = S.nations[id], d = $("#nation-dialog");
     const turns = await api(`/api/nation/${id}/turns?limit=5`).catch(() => []);
-    const labor = Object.entries(n.labor).filter(([, v]) => v).map(([k, v]) => `${ROLE[k]} ${v}`).join(", ");
-    const stock = Object.entries(n.stock).map(([k, v]) => `${RES[k] ?? k} ${v}`).join(", ");
-    const intel = Object.entries(n.intel || {}).map(([oid, it]) => `<tr><td>${esc(S.nations[oid]?.name)}</td><td>mức ${it.level}</td><td>lượt ${it.asOf}</td><td>${intelText(it.report)}</td></tr>`).join("");
+    const chipsOf = list => list.length ? `<div class="chips">${list.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : `<p class="note">—</p>`;
+    const labor = Object.entries(n.labor).filter(([, v]) => v).map(([k, v]) => `${ROLE[k] ?? k} ${v}`);
+    const stock = Object.entries(n.stock).map(([k, v]) => `${RES[k] ?? k} ${v}`);
+    const intel = Object.entries(n.intel || {}).map(([oid, it]) => `<div class="card2"><div class="row"><b>${esc(S.nations[oid]?.name)}</b><span style="flex:1"></span><span class="meta">mức ${it.level} · tin từ lượt ${it.asOf}</span></div><div class="meta">${intelText(it.report)}</div></div>`).join("");
+    const relations = Object.entries(n.relations || {}).filter(([, r]) => r !== "chưa biết");
+    const threatsN = (n.threats || []).filter(t => t.level >= 2).length;
     $("#nation-detail").innerHTML = `
-      <div class="row"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
-      ${n.manifesto ? `<p><i>“${esc(n.manifesto)}”</i></p>` : ""}
-      <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
-      <h3>Triều đình (${(n.officials || []).length}/${n.courtSlots ?? 0})</h3>${courtList(n)}
-      ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)}</p><p class="muted">${esc(n.trait.lines.join(" · "))}</p>` : ""}
-      ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
-      ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
-      ${n.statusNote ? `<p class="note">Ghi chú: ${esc(n.statusNote)}</p>` : ""}
-      <h3>Mối đe dọa</h3>${threatList(n.threats || [], "Không có.")}
-      <h3>Tài nguyên</h3>${resTable(n)}
-      <h3>Suy nghĩ lượt này</h3><p>${esc(n.thought || "—")}</p>
-      <h3>Bản ghi nhớ (AI tự viết)</h3><pre>${esc(n.memory || "—")}</pre>
-      <h3>Lao động</h3><p>${esc(labor || "—")}</p>
-      <h3>Kho</h3><p>${esc(stock || "—")}</p>
-      <h3>Phát minh</h3><div class="chips">${n.inventions.map(v => `<span>${esc(v.name)}</span>`).join("")}</div>
-      <h3>Công trình</h3><div class="chips">${n.buildings.map(b => `<span>${esc(b.name)}${b.done ? "" : " (đang xây)"}</span>`).join("") || "—"}</div>
-      <h3>Điểm định cư</h3><p>${esc((n.settlements || []).map(x => x.name).join(", ") || "—")}</p>
-      <h3>Quan hệ</h3><p>${esc(Object.entries(n.relations || {}).filter(([, r]) => r !== "chưa biết").map(([id, r]) => `${nm(id)}: ${r}`).join(" · ") || "—")}</p>
-      <h3>Hộp thư lượt này (do nước khác viết)</h3>${(n.inbox || []).map(m => `<pre>${esc(m.fromName)}${m.gesture ? " (cử chỉ)" : ""}: ${esc(m.text)}</pre>`).join("") || "<p>—</p>"}
-      <h3>Tình báo về nước khác</h3>${intel ? `<table><tr><th>Nước</th><th>Mức</th><th>Từ</th><th>Biết gì</th></tr>${intel}</table>` : "<p>Chưa gặp ai.</p>"}
-      <h3>Sự kiện lượt trước</h3><p>${esc((n.events || []).join(" · ") || "—")}</p>
-      <h3>Hành động bị từ chối</h3><p>${esc((n.rejected || []).map(r => `${r.action}: ${r.reason}`).join(" · ") || "—")}</p>
-      <h3>Thống kê gọi AI</h3><p class="mono">gọi ${n.stats.calls} · hợp lệ ${n.stats.ok} · hành động sai ${n.stats.invalid} · lượt ngủ ${n.stats.asleepTicks} · lượt im lặng ${n.stats.silentTicks}</p>
-      <h3>5 lượt gần nhất</h3>${turns.map(turnCard).join("") || "<p>—</p>"}`;
+      <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
+      <div class="subtabs" data-key="nation">
+        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
+        <section data-sub="overview">
+          ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
+          <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
+          <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
+          ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)} <span class="muted">${esc(n.trait.lines.join(" · "))}</span></p>` : ""}
+          ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
+          ${n.statusNote ? `<p class="note">Ghi chú: ${esc(n.statusNote)}</p>` : ""}
+          <h3>Suy nghĩ lượt này</h3><p class="thought">${n.thought ? `“${esc(n.thought)}”` : "—"}</p>
+          <h3>Sự kiện lượt trước</h3>${(n.events || []).length ? `<ul class="plain">${n.events.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : `<p class="note">—</p>`}
+          ${(n.rejected || []).length ? `<h3>Hành động bị từ chối</h3><ul class="plain">${n.rejected.map(r => `<li><b>${esc(ACTION[r.action] ?? r.action)}</b>: ${esc(r.reason)}</li>`).join("")}</ul>` : ""}
+          ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
+        </section>
+        <section data-sub="court"><p class="muted">${(n.officials || []).length}/${n.courtSlots ?? 0} chỗ quan chức.</p>${courtList(n)}</section>
+        <section data-sub="economy">
+          <h3>Lao động</h3>${chipsOf(labor)}
+          <h3>Kho</h3>${chipsOf(stock)}
+          <h3>Tài nguyên</h3>${resTable(n)}
+          <h3>Công trình</h3>${chipsOf(n.buildings.map(b => `${b.name}${b.done ? "" : " (đang xây)"}`))}
+          <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => x.name))}
+          <h3>Phát minh (${n.inventions.length})</h3>${chipsOf(n.inventions.map(v => v.name))}
+        </section>
+        <section data-sub="threats">${threatList(n.threats || [], "Không có mối đe dọa nào.")}</section>
+        <section data-sub="foreign">
+          <h3>Quan hệ</h3>${relations.length ? `<div class="chips">${relations.map(([oid, r]) => `<span class="rel ${relClass(r)}">${esc(nm(oid))} · ${esc(r)}</span>`).join("")}</div>` : `<p class="note">Chưa gặp ai.</p>`}
+          <h3>Hộp thư lượt này (do nước khác viết)</h3>${(n.inbox || []).map(m => `<div class="card2"><b>${esc(m.fromName)}${m.gesture ? " (cử chỉ)" : ""}</b><div>${esc(m.text)}</div></div>`).join("") || `<p class="note">—</p>`}
+          <h3>Tình báo về nước khác</h3>${intel || `<p class="note">Chưa có tin tình báo.</p>`}
+        </section>
+        <section data-sub="log">
+          <p class="mono muted">gọi ${n.stats.calls} · hợp lệ ${n.stats.ok} · hành động sai ${n.stats.invalid} · lượt ngủ ${n.stats.asleepTicks} · lượt im lặng ${n.stats.silentTicks}</p>
+          <h3>Bản ghi nhớ (AI tự viết)</h3><pre>${esc(n.memory || "—")}</pre>
+          <h3>5 lượt gần nhất</h3>${turns.map(turnCard).join("") || "<p>—</p>"}
+        </section>
+      </div>`;
+    initSubtabs($("#nation-detail"));
     $("#nation-detail .flagbig").replaceWith(flagCanvas(n.flag, 72, 48));
     $("#dlg-close").onclick = () => d.close();
     if ($("#dlg-model")) {
@@ -1120,7 +1136,7 @@
         ${r.memory ? `<details><summary class="meta">Bản ghi nhớ AI tự viết</summary><pre>${esc(r.memory)}</pre></details>` : ""}` : ""}
       ${t.raw ? `<details><summary class="meta">Xem nguyên văn</summary><pre>${esc(t.raw.slice(0, 4000))}</pre></details>` : ""}</div>`;
   }
-  const INTEL = { name: "tên", people: "dân tộc", capital: "thủ đô", size: "quy mô", reputation: "uy tín", population: "dân số", population_est: "dân số ước", warriors_est: "chiến binh ước", stability: "ổn định", era: "kỷ nguyên", inventions: "phát minh", visible_inventions: "phát minh thấy được", stock: "kho", food: "lương thực", tiles: "số ô" };
+  const INTEL = { name: "tên", people: "dân tộc", capital: "thủ đô", size: "quy mô", reputation: "uy tín", population: "dân số", population_est: "dân số ước", warriors_est: "chiến binh ước", stability: "ổn định", era: "kỷ nguyên", inventions: "phát minh", visible_inventions: "phát minh thấy được", stock: "kho", food: "lương thực", tiles: "số ô", tiles_count: "số ô", buildings_seen: "công trình thấy được" };
   function intelText(rep) {
     if (!rep) return "—";
     return Object.entries(rep).filter(([k, v]) => v !== undefined && !["flag", "tiles_seen"].includes(k)).map(([k, v]) => `${esc(INTEL[k] ?? k)}: ${esc(Array.isArray(v) ? v.join(", ") : val(v))}`).join("<br>");
@@ -1190,9 +1206,16 @@
 
   // ---------------------------------------------------------------- chronicle
   const chron = $("#chronicle");
+  // §10 chronicle filters: each kind belongs to one group
+  const CHRON_GROUP = {
+    war: "war", battle: "war", fall: "war", raid: "war", horde: "war", spy: "war", deceit: "war",
+    invention: "invent", proposal: "invent", lost: "invent", era: "invent", gate: "invent",
+    event: "disaster", famine: "disaster", beasts: "disaster",
+    treaty: "diplo", trade: "diplo", contact: "diplo", petition: "diplo", decree: "diplo",
+  };
   function addChronicle(items, prepend = true) {
     for (const c of items) {
-      const li = document.createElement("li"); li.className = `k-${c.kind}`;
+      const li = document.createElement("li"); li.className = `k-${c.kind}`; li.dataset.g = CHRON_GROUP[c.kind] || "nation";
       li.innerHTML = `<span class="t">${c.tick}</span><span class="x"></span>`; li.querySelector(".x").textContent = c.text;
       prepend ? chron.prepend(li) : chron.append(li);
     }
@@ -1213,6 +1236,7 @@
       d.open = prepend || !hist.children.length;
       prepend ? hist.prepend(d) : hist.append(d);
     }
+    setCount("chronicle", "history", hist.querySelectorAll("details").length);
   }
   api("/api/history").then(list => addChapters(list, false)).catch(() => {});
 
@@ -1355,9 +1379,12 @@
     const props = (S.proposals || []).slice().reverse();
     const pending = props.filter(p => p.status === "pending").length, badge = $("#prop-count");
     badge.hidden = !pending; badge.textContent = pending;
-    const box = $("#proposals"); box.innerHTML = props.length ? "" : `<p class="note">Chưa có đơn phát minh nào.</p>`;
+    const box = $("#proposals"), pbox = $("#proposals-pending"), decidedN = props.length - pending;
+    box.innerHTML = decidedN ? "" : `<p class="note">Chưa có đơn nào được quyết.</p>`;
+    pbox.innerHTML = pending ? "" : `<p class="note">Không có đơn nào đang chờ.</p>`;
+    setCount("inventions", "pending", pending); setCount("inventions", "decided", decidedN); setCount("inventions", "book", (S.customInventions || []).length);
     const ST2 = { pending: ["Chờ trọng tài", "warn"], approved: ["Được duyệt", "ok"], rejected: ["Bị bác", "bad"], duplicate: ["Trùng", ""] };
-    const open = new Set([...box.querySelectorAll("details[open]")].map(d => d.dataset.id));
+    const open = new Set([...document.querySelectorAll("#proposals details[open]")].map(d => d.dataset.id));
     for (const p of props) {
       const [st, cls] = ST2[p.status], r = p.ruling, decided = p.status !== "pending";
       // Pending ones stay open for a decision; decided ones fold into one line (click to read)
@@ -1375,7 +1402,7 @@
         await api(`/api/proposals/${p.id}`, { method: "POST", body: { approve: b.dataset.a === "1", reason: el.querySelector("input").value } }).catch(e => alert(e.message));
         b.textContent = "Đã ghi, áp dụng lượt sau"; b.disabled = true;
       };
-      box.append(el);
+      (decided ? box : pbox).append(el);
     }
     const cbox = $("#custom-inventions"), list = (S.customInventions || []).slice().reverse();
     cbox.innerHTML = list.length ? "" : `<p class="note">Chưa có phát minh mới nào được công nhận.</p>`;
@@ -1389,15 +1416,49 @@
     }
   }
 
+  // ---------------------------------------------------------------- sub-tabs inside a panel or a dialog
+  // <div class="subtabs" data-key="k"><nav class="seg"><button data-sub="a">…</button></nav><section data-sub="a">…</section></div>
+  // The open sub-tab is remembered per key; counts go in <span class="cnt" data-count="a">.
+  const subOpen = key => { try { return localStorage.getItem(`sm-sub-${key}`); } catch { return null; } };
+  function initSubtabs(root = document, onShow = () => { }) {
+    for (const box of root.querySelectorAll(".subtabs")) {
+      const key = box.dataset.key, buttons = [...box.querySelectorAll(":scope > nav.seg > button[data-sub]")];
+      const show = name => {
+        if (!buttons.some(b => b.dataset.sub === name)) name = buttons[0]?.dataset.sub;
+        for (const b of buttons) { const on = b.dataset.sub === name; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); }
+        for (const sec of box.querySelectorAll(":scope > section[data-sub]")) sec.hidden = sec.dataset.sub !== name;
+        try { localStorage.setItem(`sm-sub-${key}`, name); } catch { }
+        onShow(key, name);
+      };
+      for (const b of buttons) { b.type = "button"; b.setAttribute("role", "tab"); b.onclick = () => show(b.dataset.sub); }
+      show(subOpen(key));
+    }
+  }
+  function setCount(key, name, n) {
+    const el = document.querySelector(`.subtabs[data-key="${key}"] [data-count="${name}"]`);
+    if (el) { el.textContent = n || ""; el.hidden = !n; }
+  }
+
   // ---------------------------------------------------------------- diplomacy
   function relClass(r) { return /chiến/.test(r) ? "war" : /liên minh|tông chủ|chư hầu/.test(r) ? "ally" : /hòa bình|bất tương/.test(r) ? "peace" : ""; }
   function renderDiplomacy() {
-    const alive = S.nations.filter(n => n.founded);
-    $("#relations").innerHTML = `<tr><th></th>${alive.map(n => `<th>${esc(n.name)}</th>`).join("")}</tr>` + alive.map(a => `<tr><th>${esc(a.name)}</th>${alive.map(b => {
-      if (a.id === b.id) return `<td>—</td>`;
-      const r = a.relations?.[b.id] ?? ""; return `<td class="rel ${relClass(r)}">${esc(r)}${a.trades?.[b.id] ? ` · ${a.trades[b.id]} lần buôn` : ""}</td>`;
-    }).join("")}</tr>`).join("");
-    $("#hordes").innerHTML = (S.hordes || []).map(h => `<div class="card2"><b>${esc(h.name)}</b><span class="meta">${h.alive ? `sức mạnh ${h.strength}` : `đã bị đánh tan, trở lại lượt ${h.returns}`} · nơi ở ${h.tile % ST.n}, ${(h.tile / ST.n) | 0}${h.lastRaid ? ` · lần cướp gần nhất lượt ${h.lastRaid.tick} vào ${esc(nm(h.lastRaid.nation))}: ${h.lastRaid.won ? "thắng" : "bị đẩy lui"}` : ""}</span></div>`).join("") || `<p class="note">Thế giới này không có man di.</p>`;
+    const alive = S.nations.filter(n => n.founded && n.alive);
+    // one card per nation: who it knows and how (strangers are only counted)
+    $("#relations").innerHTML = alive.map(a => {
+      const known = alive.filter(b => b.id !== a.id && (a.relations?.[b.id] ?? "chưa biết") !== "chưa biết");
+      const strangers = alive.length - 1 - known.length;
+      return `<div class="card2 rel-card"><div class="row"><i class="sw" style="background:${esc(a.flag.colors[0])}"></i><b>${esc(a.name)}</b><span style="flex:1"></span><span class="meta">${known.length ? `biết ${known.length}${strangers ? `, chưa gặp ${strangers}` : ""}` : "chưa gặp ai"}</span></div>
+        ${known.length ? `<div class="chips">${known.map(b => { const r = a.relations[b.id]; return `<span class="rel ${relClass(r)}" title="${esc(`${a.name} và ${b.name}: ${r}${a.trades?.[b.id] ? `, ${a.trades[b.id]} lần buôn` : ""}`)}"><i class="sw" style="background:${esc(b.flag.colors[0])}"></i>${esc(b.name)} · ${esc(r)}${a.trades?.[b.id] ? ` · 🤝${a.trades[b.id]}` : ""}</span>`; }).join("")}</div>` : ""}</div>`;
+    }).join("") || `<p class="note">Chưa có quốc gia nào lập quốc.</p>`;
+    const maxH = Math.max(1, ...(S.hordes || []).map(h => h.strength));
+    $("#hordes").innerHTML = (S.hordes || []).map(h => `<div class="card2 horde${h.alive ? "" : " gone"}"><div class="row"><b>☠ ${esc(h.name)}</b><span style="flex:1"></span><button type="button" class="link" data-tile="${h.tile}" title="Xem trên bản đồ">(${h.tile % ST.n}, ${(h.tile / ST.n) | 0}) ↗</button></div>
+      ${h.alive ? `<div class="bar" title="sức mạnh ${h.strength}"><i style="width:${Math.round(h.strength / maxH * 100)}%;background:var(--bad)"></i></div><div class="meta">sức mạnh <b>${h.strength}</b>${h.lastRaid ? ` · lượt ${h.lastRaid.tick} cướp ${esc(nm(h.lastRaid.nation))}: ${h.lastRaid.won ? "thắng" : "bị đẩy lui"}` : " · chưa cướp ai"}</div>` : `<div class="meta">đã bị đánh tan, trở lại lượt ${h.returns}</div>`}</div>`).join("") || `<p class="note">Thế giới này không có man di.</p>`;
+    for (const b of document.querySelectorAll("#hordes [data-tile]")) b.onclick = () => centerOn(+b.dataset.tile);
+    const cars = S.caravans || [];
+    $("#caravans").innerHTML = cars.map(c => `<div class="card2"><div class="row"><b>${c.mode === "water" ? "⛵" : "🐂"} ${esc(nm(c.from))} → ${esc(nm(c.to))}</b><span style="flex:1"></span><span class="meta">tới lượt ${c.arrive}</span></div>
+      <div class="meta">${esc(Object.entries(c.goods || {}).map(([k, q]) => `${Math.round(q * 10) / 10} ${RES[k] ?? k}`).join(", "))}${c.porters ? ` · ${c.porters} người khuân vác` : ""}${c.boats ? ` · ${c.boats} thuyền` : ""}</div></div>`).join("") || `<p class="note">Không có đoàn buôn nào trên đường.</p>`;
+    setCount("diplomacy", "war", (S.wars || []).length); setCount("diplomacy", "treaties", (S.treaties || []).length);
+    setCount("diplomacy", "hordes", (S.hordes || []).filter(h => h.alive).length); setCount("diplomacy", "trade", cars.length);
     $("#wars").innerHTML = (S.wars || []).map(w => `<div class="card2"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}</span></div>`).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
     const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
     $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;
@@ -1412,9 +1473,13 @@
     // the Engine scores the world (§9.3); the Watcher only shows it
     const PARTS = [["people", "Dân", "Dân số"], ["land", "Đất", "3 điểm mỗi ô"], ["knowledge", "Tri thức", "Phát minh đã biết, sâu hơn đáng giá hơn"], ["firsts", "Đầu tiên", "Phát minh đầu tiên trên thế giới"], ["inventor", "Sáng tạo", "Phát minh tự đề xuất được công nhận"], ["honour", "Uy tín", "Uy tín"], ["age", "Tuổi", "Số thập kỷ tồn tại"]];
     const rows = S.ranking || [];
-    $("#ranking").innerHTML = `<tr><th>#</th><th>Quốc gia</th><th class="num">Điểm</th>${PARTS.map(([, h, t]) => `<th class="num" title="${esc(t)}">${h}</th>`).join("")}</tr>` +
-      (rows.map((r, k) => `<tr${r.alive ? "" : ` class="gone"`}><td>${k + 1}</td><td><i class="sw" style="background:${esc(S.nations[r.nation]?.flag.colors[0] || "#888")}"></i>${esc(r.name)}${r.alive ? "" : " †"}</td><td class="num"><b>${r.score}</b></td>${PARTS.map(([key]) => `<td class="num">${r.parts?.[key] ?? 0}</td>`).join("")}</tr>`).join("")
-        || `<tr><td colspan="${PARTS.length + 3}" class="note">Chưa có quốc gia nào lập quốc.</td></tr>`);
+    // one row per nation: score, and a bar split by where the points come from (hover a piece for its value)
+    const COL = ["#4cc283", "#c9a227", "#3fb3cf", "#ffd84a", "#c77dff", "#ff8f6b", "#98a7a1"];
+    const top = Math.max(1, ...rows.map(r => r.score));
+    $("#ranking").innerHTML = rows.length ? `<div class="legend-inline">${PARTS.map(([, h, t], i) => `<span title="${esc(t)}"><i style="background:${COL[i]}"></i>${h}</span>`).join("")}</div>
+      <ol class="rank">${rows.map(r => `<li${r.alive ? "" : ` class="gone"`}><div class="row"><i class="sw" style="background:${esc(S.nations[r.nation]?.flag.colors[0] || "#888")}"></i><b>${esc(r.name)}${r.alive ? "" : " †"}</b><span style="flex:1"></span><b class="mono">${r.score}</b></div>
+        <div class="stack" style="width:${Math.max(4, r.score / top * 100)}%">${PARTS.map(([key, h], i) => { const v = r.parts?.[key] ?? 0; return v > 0 ? `<i style="flex:${v};background:${COL[i]}" title="${esc(`${h}: ${v}`)}"></i>` : ""; }).join("")}</div></li>`).join("")}</ol>`
+      : `<p class="note">Chưa có quốc gia nào lập quốc.</p>`;
   }
   function drawChart() {
     const c = $("#chart"), g = c.getContext("2d"), key = $("#stat-key").value, data = statsCache || [];
@@ -1650,6 +1715,11 @@
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
       `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>`;
   }
+  for (const b of document.querySelectorAll("#chron-filter button")) b.onclick = () => {
+    for (const x of document.querySelectorAll("#chron-filter button")) x.classList.toggle("on", x === b);
+    chron.dataset.f = b.dataset.f;
+  };
+  initSubtabs(document, (key, name) => { if (key === "stats" && name === "chart" && statsCache) drawChart(); });
   async function boot() {
     ST = await api("/api/static");
     layout(); drawBase(); legend(); updateZoomUi();

@@ -363,3 +363,42 @@ dialog.wide[open] { display: grid; grid-template-rows: auto 1fr; overflow: hidde
 .court .i { font-size: 18px; line-height: 1.2; }
 .court .bad { color: var(--bad); font-weight: 600; }
 .court .warn { color: var(--warn); font-weight: 600; }
+/* Sub-tabs inside panels and dialogs: one subject at a time instead of one long column */
+.subtabs { display: grid; gap: 10px; align-content: start; }
+.seg { min-height: 36px; flex: none; display: flex; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; scrollbar-width: none; position: sticky; top: -12px; z-index: 2; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { flex: 1 0 auto; border: 0; background: transparent; padding: 5px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap; display: inline-flex; gap: 5px; align-items: center; justify-content: center; }
+.seg button:hover { color: var(--ink); }
+.seg button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.seg .cnt { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.seg .cnt:empty { display: none; }
+.seg .cnt.hot { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+.subtabs > section { display: grid; gap: 8px; align-content: start; }
+.subtabs > section > h3 { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+/* chronicle filters */
+.filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.filters button { font-size: 12px; padding: 2px 9px; border-radius: 99px; }
+.filters button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chronicle[data-f="war"] li:not([data-g="war"]), .chronicle[data-f="invent"] li:not([data-g="invent"]), .chronicle[data-f="disaster"] li:not([data-g="disaster"]),
+.chronicle[data-f="diplo"] li:not([data-g="diplo"]), .chronicle[data-f="nation"] li:not([data-g="nation"]) { display: none; }
+/* relations as cards, hordes, ranking */
+i.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.rel-card .row, .horde .row, .rank .row { gap: 8px; }
+.chips span.rel { display: inline-flex; gap: 5px; align-items: center; }
+.chips span.rel.war { border-color: var(--bad); color: var(--bad); }
+.chips span.rel.ally { border-color: var(--good); color: var(--good); }
+.chips span.rel.peace { border-color: var(--accent); color: var(--accent); }
+.horde.gone { opacity: .55; }
+button.link { border: 0; background: none; padding: 0 2px; color: var(--accent); font-size: 12px; cursor: pointer; }
+button.link:hover { text-decoration: underline; }
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: r; }
+.rank li { counter-increment: r; display: grid; gap: 4px; }
+.rank li .row::before { content: counter(r); width: 1.6em; color: var(--muted); font-weight: 700; font-size: 12px; }
+.rank li.gone { opacity: .5; }
+.stack { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-left: 1.6em; }
+.stack i { display: block; min-width: 2px; }
+/* nation dialog */
+#nation-detail .dlg-top { margin-bottom: 10px; }
+#nation-detail .seg { top: 0; }
+.manifesto { font-style: italic; margin: 0; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13px; }

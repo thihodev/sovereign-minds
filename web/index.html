@@ -136,18 +136,27 @@
 
     <div class="panel" id="tab-nations"><div id="nations"></div></div>
 
-    <div class="panel" id="tab-chronicle" hidden>
-      <h3 class="sub">Sử ký</h3>
-      <div id="history" style="display:grid;gap:6px"><p class="note">Sử gia chưa chép chương nào. Cứ vài lượt, một AI không thuộc quốc gia nào kể lại biên niên thành một chương sử.</p></div>
-      <h3 class="sub">Sự kiện</h3>
-      <ol class="chronicle" id="chronicle"></ol>
+    <div class="panel subtabs" id="tab-chronicle" data-key="chronicle" hidden>
+      <nav class="seg" role="tablist" aria-label="Biên niên"><button data-sub="events">Sự kiện</button><button data-sub="history">Sử ký <span class="cnt" data-count="history"></span></button></nav>
+      <section data-sub="events">
+        <div class="filters" id="chron-filter" role="group" aria-label="Lọc sự kiện">
+          <button data-f="" class="on">Tất cả</button><button data-f="war">⚔ Chiến sự</button><button data-f="invent">💡 Phát minh</button><button data-f="disaster">🌋 Thiên tai</button><button data-f="diplo">🤝 Ngoại giao</button><button data-f="nation">🏛 Quốc gia</button>
+        </div>
+        <ol class="chronicle" id="chronicle"></ol>
+      </section>
+      <section data-sub="history">
+        <div id="history" style="display:grid;gap:6px"><p class="note">Sử gia chưa chép chương nào. Cứ vài lượt, một AI không thuộc quốc gia nào kể lại biên niên thành một chương sử.</p></div>
+      </section>
     </div>
 
-    <div class="panel" id="tab-inventions" hidden>
-      <p class="note">Các nước tự phát minh: đơn qua kiểm tra cứng của Engine rồi tới Trọng tài Claude (tài khoản Claude của bạn). Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
-      <div id="proposals"></div>
-      <h3 class="sub">Sổ phát minh do các nước tạo</h3>
-      <div id="custom-inventions"></div>
+    <div class="panel subtabs" id="tab-inventions" data-key="inventions" hidden>
+      <nav class="seg" role="tablist" aria-label="Phát minh"><button data-sub="pending">Chờ duyệt <span class="cnt" data-count="pending"></span></button><button data-sub="decided">Đã quyết <span class="cnt" data-count="decided"></span></button><button data-sub="book">Sổ phát minh <span class="cnt" data-count="book"></span></button></nav>
+      <section data-sub="pending">
+        <p class="note">Đơn qua kiểm tra cứng của Engine rồi tới Trọng tài Claude. Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
+        <div id="proposals-pending"></div>
+      </section>
+      <section data-sub="decided"><div id="proposals"></div></section>
+      <section data-sub="book"><div id="custom-inventions"></div></section>
     </div>
 
     <div class="panel" id="tab-tree" hidden>
@@ -156,15 +165,18 @@
       <div class="treewrap"><div class="treebox" id="tree"></div><div class="tree-tip" role="tooltip" hidden></div></div>
     </div>
 
-    <div class="panel" id="tab-diplomacy" hidden>
-      <div class="tablewrap"><table id="relations"></table></div>
-      <h3 class="sub">Chiến tranh</h3><div id="wars"></div>
-      <h3 class="sub">Man di ở vùng hoang</h3><div id="hordes"></div>
-      <h3 class="sub">Hiệp ước</h3><div id="treaties"></div>
-      <h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol>
+    <div class="panel subtabs" id="tab-diplomacy" data-key="diplomacy" hidden>
+      <nav class="seg" role="tablist" aria-label="Ngoại giao"><button data-sub="relations">Quan hệ</button><button data-sub="war">Chiến sự <span class="cnt" data-count="war"></span></button><button data-sub="treaties">Hiệp ước <span class="cnt" data-count="treaties"></span></button><button data-sub="hordes">Man di <span class="cnt" data-count="hordes"></span></button><button data-sub="trade">Đoàn buôn <span class="cnt" data-count="trade"></span></button></nav>
+      <section data-sub="relations"><div id="relations"></div></section>
+      <section data-sub="war"><h3 class="sub">Chiến tranh</h3><div id="wars"></div><h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol></section>
+      <section data-sub="treaties"><div id="treaties"></div></section>
+      <section data-sub="hordes"><div id="hordes"></div></section>
+      <section data-sub="trade"><div id="caravans"></div></section>
     </div>
 
-    <div class="panel" id="tab-stats" hidden>
+    <div class="panel subtabs" id="tab-stats" data-key="stats" hidden>
+      <nav class="seg" role="tablist" aria-label="Thống kê"><button data-sub="chart">Biểu đồ</button><button data-sub="ranking">Xếp hạng</button></nav>
+      <section data-sub="chart">
       <label class="note" for="stat-key">Chỉ số</label>
       <select id="stat-key">
         <option value="population">Dân số</option>
@@ -175,8 +187,8 @@
       </select>
       <canvas id="chart" width="800" height="360" aria-label="Biểu đồ theo lượt"></canvas>
       <div class="legend-inline" id="chart-legend"></div>
-      <h3 class="sub">Bảng xếp hạng</h3>
-      <div class="tablewrap"><table id="ranking"></table></div>
+      </section>
+      <section data-sub="ranking"><div id="ranking"></div></section>
     </div>
 
     <div class="panel" id="tab-petitions" hidden>
