@@ -11,7 +11,7 @@ import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
-import { layer, nationResources, nationThreats, tileThreats } from "./threats.ts";
+import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
@@ -32,7 +32,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
   const sseClients = new Set<ServerResponse>();
   const push = (event: string, data: unknown) => { const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`; for (const c of sseClients) c.write(msg); };
   runner.on(e => {
-    if (e.type === "tick") push("tick", { tick: e.tick, chronicle: e.chronicle });
+    if (e.type === "tick") push("tick", { tick: e.tick, chronicle: e.chronicle, fx: e.fx });
     else if (e.type === "turn") push("turn", { nation: e.nation, kind: e.kind });
     else if (e.type === "history") push("history", { chapter: e.chapter, entry: e.entry });
     else if (e.type === "reload") push("reload", {});
@@ -70,9 +70,10 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
         formerNames: n.formerNames,
-        threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null,
+        threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null, work: n.alive && n.founded ? workSites(w, n) : [],
       })),
       hordes: (w.hordes ?? []).map(h => ({ ...h, strength: Math.round(h.strength) })),
+      lastFx: runner.lastFx,
       spies: w.spies,
       petitions: w.petitions,
       decrees: w.decrees,

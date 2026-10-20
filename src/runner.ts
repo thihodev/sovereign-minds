@@ -15,6 +15,7 @@ import { TRAITS, TRAIT_BY_ID } from "./rules.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus } from "./claude.ts";
 import type { Store } from "./db.ts";
+import type { MapFx } from "./fx.ts";
 import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
 
 export interface RunnerConfig {
@@ -28,7 +29,7 @@ export interface RunnerConfig {
 }
 
 export type RunnerEvent =
-  | { type: "tick"; tick: number; chronicle: ChronicleEntry[] }
+  | { type: "tick"; tick: number; chronicle: ChronicleEntry[]; fx: MapFx[] }
   | { type: "status" }
   | { type: "turn"; nation: number; kind: string }
   | { type: "history"; chapter: HistoryChapter; entry: ChronicleEntry }
@@ -93,6 +94,8 @@ export class Runner {
   private judgeSleep = new Map<string, number>();
   /** §3.4 Claude nations share the Watcher's plan: a plan limit or a lost login holds the whole world. */
   claudeWait = { until: 0, reason: "" };
+  /** What happened on the map during the last tick played, so a page opened later can replay it. */
+  lastFx: { tick: number; fx: MapFx[] } = { tick: -1, fx: [] };
   /** Answers already in for a tick that is waiting on Claude, kept so no turn is asked (or paid for) twice. */
   private held: { tick: number; inputs: Record<number, TurnInput> } | null = null;
   /** §10.1: writes a chapter every few ticks, off the tick loop. */
@@ -188,7 +191,8 @@ export class Runner {
       this.store.addChronicle(res.chronicle);
       this.store.addStats(w);
       this.nextTickAt = Date.now() + this.cfg.tickSeconds * 1000;
-      this.emit({ type: "tick", tick: w.tick, chronicle: res.chronicle });
+      this.lastFx = { tick: w.tick - 1, fx: res.fx };
+      this.emit({ type: "tick", tick: w.tick, chronicle: res.chronicle, fx: res.fx });
       void this.historian?.maybeWrite(w); // not awaited: the next tick never waits for the Historian
     } finally { this.busy = false; this.emit({ type: "status" }); }
   }
@@ -371,7 +375,7 @@ export class Runner {
     const backup = this.store.backupAndReset();
     this.world = createWorld(seed, specs);
     this.cfg.seed = seed;
-    this.held = null; this.claudeWait = { until: 0, reason: "" }; this.lastError = "";
+    this.held = null; this.claudeWait = { until: 0, reason: "" }; this.lastError = ""; this.lastFx = { tick: -1, fx: [] };
     this.manualRulings.clear(); this.judgeSleep.clear();
     this.store.saveState(this.world);
     const traits = this.world.nations.map(n => TRAIT_BY_ID[n.trait ?? ""]?.name).filter(Boolean).join(", ");

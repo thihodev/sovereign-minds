@@ -162,6 +162,214 @@
     }
   }
 
+
+  // ------------------------------------------------ animation: people at work, and what just happened (§10)
+  // Two layers drawn over the map. Ambient: small figures in each nation's colour walk between a
+  // centre and the tiles where their trade works (S.nations[].work). Events: the last tick's map
+  // effects (fx from the engine) play one after another: deaths, births, buildings, raids, floods…
+  const ROLE_ICON = { gather: "🌿", hunt: "🏹", fish: "🐟", wood: "🪓", stone: "⛏", flint: "⛏", clay: "🏺", mine: "⛏", farm: "🌾", craft: "🔨", build: "🧱", research: "📜", warrior: "🛡" };
+  const CAUSE_ICON = { famine: "🍂", winter: "❄", plague: "🦠", beasts: "🐺", quake: "💥", raid: "🔥", battle: "⚔", explore: "🧭", horde: "⚔" };
+  // Long enough to follow by eye; the strip above the map can replay any of them
+  const FX_DUR = { death: 4800, birth: 3600, explore: 6500, raid: 6500, repelled: 6500, clear: 6500, battle: 5500, migrate: 6000, settle: 5500, era: 6000, invention: 4800, winter: 5500, meteor: 3600 };
+  const FX_DEFAULT = 4200;
+  const ANIM = {
+    on: (() => { try { const v = localStorage.getItem("sm-anim"); return v === null ? !reduceMotion.matches : v === "1"; } catch { return !reduceMotion.matches; } })(),
+    queue: [], last: 0, raf: 0,
+  };
+  /** Hex radius (CSS px) from which the walking figures are drawn: below it they would be specks, and the loop sleeps. */
+  const AMBIENT_MIN = 6;
+  const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const hash = (...k) => { let h = 2166136261; for (const x of k) { h ^= x; h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; };
+  function centreFor(n, tile) {
+    const cs = [n.capital, ...(n.settlements || []).map(s => s.tile)];
+    return cs.reduce((b, c) => hexDist(c, tile) < hexDist(b, tile) ? c : b, cs[0]);
+  }
+  /** Queue a tick's effects: the dramatic ones last a little longer, everything starts staggered. */
+  function playFx(list) {
+    if (!list?.length) return;
+    const t0 = performance.now(), gap = clamp(14000 / list.length, 150, 1000);
+    ANIM.queue = list.slice(0, 400).map((f, k) => ({ ...f, t0: t0 + k * gap, dur: FX_DUR[f.kind] || FX_DEFAULT }));
+    showTicker(list);
+    ensureAnim();
+  }
+  // The map is wide: a strip of what is playing, each one a button that flies there
+  const FX_WORD = {
+    death: f => `${CAUSE_ICON[f.cause] || "☠"} ${f.n} người chết${{ famine: " đói", winter: " rét", plague: " vì dịch", beasts: " vì thú dữ", quake: " vì động đất", raid: " vì man di", battle: " trận mạc", explore: " khi thám hiểm", horde: " đánh man di" }[f.cause] || ""}`,
+    birth: f => `👶 +${f.n} dân`, build: f => `🔨 xây xong ${f.text || ""}`, invention: f => `💡 ${f.text || "phát minh"}`, claim: () => "🚩 khai hoang", lost_tile: () => "🏚 bỏ hoang một ô",
+    explore: () => "🧭 thám hiểm", settle: f => `🏕 lập ${f.text || "điểm định cư"}`, era: f => `🌟 bước vào ${f.text}`, migrate: f => `🚶 ${f.n} người bỏ đi`,
+    raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔ đánh man di thất bại", battle: f => String(f.text).startsWith("won") ? "⚔ thắng trận" : "⚔ thua trận",
+    beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
+    drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
+  };
+  const QUIET_FX = new Set(["birth", "claim", "herd", "bounty"]);
+  function showTicker(list) {
+    const box = $("#fx-ticker"); if (!box) return;
+    const items = list.filter(f => !QUIET_FX.has(f.kind)).slice(0, 14);
+    box.replaceChildren(...items.map(f => {
+      const b = document.createElement("button"); b.type = "button";
+      const who = f.nation !== undefined && S.nations[f.nation] ? `${nationName(S.nations[f.nation])}: ` : "";
+      b.textContent = who + (FX_WORD[f.kind]?.(f) ?? f.kind);
+      if (f.nation !== undefined && S.nations[f.nation]) b.style.borderLeftColor = nationColor(f.nation);
+      // fly there and play just this one again, leaving the strip as it is
+      const focus = f.path?.length ? f.path[Math.floor(f.path.length / 2)] : f.tile; // a journey: look at its middle
+      b.onclick = () => { centerOn(focus, Math.max(view.z, (f.path?.length > 8 ? 18 : 28) / geo.s)); ANIM.queue.push({ ...f, t0: performance.now() + 350, dur: FX_DUR[f.kind] || FX_DEFAULT }); ensureAnim(); };
+      return b;
+    }));
+    if (items.length) {
+      const x = document.createElement("button"); x.type = "button"; x.className = "close"; x.textContent = "×"; x.title = "Ẩn (hiện lại khi có lượt mới)";
+      x.setAttribute("aria-label", "Ẩn dải tin"); x.onclick = () => { box.hidden = true; };
+      box.append(x);
+    }
+    box.hidden = !items.length; // stays until the next tick or until closed
+  }
+  function ensureAnim() { if (!ANIM.raf) ANIM.raf = requestAnimationFrame(animFrame); }
+  function animFrame(now) {
+    ANIM.raf = 0;
+    if (document.hidden) return;
+    ANIM.queue = ANIM.queue.filter(f => now < f.t0 + f.dur);
+    const ambient = ANIM.on && geo && geo.s * view.z >= AMBIENT_MIN;
+    if (!ambient && !ANIM.queue.length) { scheduleRender(); return; }
+    if (now - ANIM.last >= 40) { ANIM.last = now; render(); } // ~25 fps is plenty for little walking people
+    ANIM.raf = requestAnimationFrame(animFrame);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) ensureAnim(); });
+
+  // A light outline keeps a dark flag colour readable on forest and a light one on snow
+  function figure(g, x, y, r, color, px) {
+    g.lineWidth = 1.4 * px; g.strokeStyle = "rgba(255,255,255,.92)"; g.fillStyle = color;
+    g.beginPath(); g.arc(x, y - r * 1.6, r * .62, 0, 7); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(x - r * .8, y + r * .6); g.lineTo(x, y - r * 1.1); g.lineTo(x + r * .8, y + r * .6); g.closePath(); g.fill(); g.stroke();
+  }
+  /** A route that reads on any terrain: a dark halo under light dashes. */
+  function route(g, points, px) {
+    if (points.length < 2) return;
+    const line = () => { g.beginPath(); points.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y)); };
+    g.lineCap = "round"; g.lineJoin = "round";
+    line(); g.setLineDash([]); g.lineWidth = 5 * px; g.strokeStyle = "rgba(8,20,28,.7)"; g.stroke();
+    line(); g.setLineDash([5 * px, 4 * px]); g.lineWidth = 2.4 * px; g.strokeStyle = "#fff4cf"; g.stroke();
+    g.setLineDash([]);
+  }
+  function icon(g, text, x, y, size) { g.font = `${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, x, y); }
+  function floatText(g, text, x, y, size, color, px) { label(g, text, x, y, size, color, 800, px); }
+
+  function drawAmbient(g, now, s, z, px, vis) {
+    if (!ANIM.on || s * z < AMBIENT_MIN) return;
+    const r = clamp(s * .3 * z, 3, 7) * px, iconSize = clamp(s * .8 * z, 10, 18) * px, still = reduceMotion.matches;
+    for (const n of S.nations) {
+      if (!n.alive || !n.founded) continue;
+      const color = n.flag.colors[0];
+      for (const w of n.work || []) {
+        if (!vis(w.tile)) continue;
+        const home = centreFor(n, w.tile), [hx, hy] = center(home), [wx, wy] = center(w.tile);
+        if (s * z >= 7 && ROLE_ICON[w.role]) { g.globalAlpha = .9; icon(g, ROLE_ICON[w.role], wx + s * .45, wy - s * .45, iconSize); g.globalAlpha = 1; }
+        const people = Math.min(4, Math.ceil(w.n / 3));
+        for (let k = 0; k < people; k++) {
+          const ph = hash(w.tile, k, n.id, w.role.length), period = 7000 + ph * 5000;
+          let x, y;
+          if (home === w.tile || still) {
+            // working on the spot: a slow circle around the tile
+            const a = (still ? ph : (now / period + ph)) * Math.PI * 2;
+            x = wx + Math.cos(a) * s * .45; y = wy + Math.sin(a) * s * .3;
+          } else {
+            // there and back: walk out, work a while, walk home
+            const t = ((now / period) + ph) % 1, leg = t < .4 ? ease(t / .4) : t < .6 ? 1 : 1 - ease((t - .6) / .4);
+            const side = (k - (people - 1) / 2) * s * .22;
+            [x, y] = lerp([hx + side, hy], [wx + side, wy], leg);
+            if (t >= .4 && t < .6) y += Math.sin(now / 180 + k) * s * .06; // busy at the work
+          }
+          figure(g, x, y, r, color, px);
+        }
+      }
+    }
+  }
+
+  function drawEvents(g, now, s, z, px) {
+    if (!ANIM.queue.length) return;
+    const big = clamp(s * 1.2 * z, 12, 26) * px, unit = clamp(s * z, 7, 30) * px;
+    for (const f of ANIM.queue) {
+      const t = (now - f.t0) / f.dur; if (t < 0 || t > 1) continue;
+      const [x, y] = center(f.tile), fade = t < .15 ? t / .15 : t > .75 ? (1 - t) / .25 : 1;
+      const nc = f.nation !== undefined && S.nations[f.nation] ? nationColor(f.nation) : "#ffffff";
+      g.save(); g.globalAlpha = clamp(fade, 0, 1);
+      switch (f.kind) {
+        case "death": {
+          const rise = t * unit * 2.2;
+          icon(g, CAUSE_ICON[f.cause] || "☠", x - big * .9, y - unit - rise, big);
+          floatText(g, `−${f.n}`, x + big * .4, y - unit - rise, big, "#ff6b5e", px);
+          break;
+        }
+        case "birth": floatText(g, `+${f.n} 👶`, x, y - unit - t * unit * 2, big, "#7ee08a", px); break;
+        case "build": case "settle": case "invention": case "era": {
+          const rr = unit * (0.6 + t * (f.kind === "era" ? 3.2 : 1.8));
+          g.beginPath(); g.arc(x, y, rr, 0, 7); g.lineWidth = 3 * px; g.strokeStyle = f.kind === "invention" || f.kind === "era" ? "#ffd84a" : nc; g.stroke();
+          if (f.kind === "settle" && f.from !== undefined) route(g, [center(f.from), [x, y]], px);
+          icon(g, { build: "🔨", settle: "🏕", invention: "💡", era: "🌟" }[f.kind], x, y - unit * 1.2 - t * unit, big * 1.2);
+          if (f.text && s * z >= 3) floatText(g, f.text, x, y + unit * 1.3, big * .8, f.kind === "build" || f.kind === "settle" ? "#ffffff" : "#ffe9a0", px);
+          break;
+        }
+        case "claim": case "lost_tile": {
+          hexPath(g, x, y, s * 1.02); g.fillStyle = f.kind === "claim" ? nc : "#9aa3a0"; g.globalAlpha *= .35 + .45 * Math.sin(t * Math.PI * 3) ** 2; g.fill();
+          g.lineWidth = 2.5 * px; g.strokeStyle = "#fff"; g.stroke();
+          break;
+        }
+        case "explore": {
+          const path = f.path || [f.tile], upto = Math.max(1, Math.floor(path.length * Math.min(1, t * 1.4)));
+          route(g, path.slice(0, upto).map(center), px);
+          const [ex, ey] = center(path[upto - 1]); figure(g, ex, ey, clamp(s * .22 * z, 2.5, 5) * px, nc, px); icon(g, "🧭", ex, ey - unit * 1.3, big * .9);
+          break;
+        }
+        case "raid": case "repelled": case "clear": case "battle": case "migrate": {
+          const from = f.kind === "migrate" ? f.tile : f.from, to = f.kind === "migrate" ? f.to : f.tile;
+          if (from === undefined || to === undefined) break;
+          const a = center(from), b = center(to), walk = Math.min(1, t / .55);
+          const color = f.kind === "raid" || f.kind === "repelled" ? "#ff6b3d" : nc;
+          const men = Math.min(8, Math.max(2, Math.ceil((f.n || 4) / 5)));
+          for (let k = 0; k < men; k++) {
+            const off = (k - (men - 1) / 2) * s * .25, [mx, my] = lerp(a, b, ease(Math.max(0, walk - k * .03)));
+            figure(g, mx + off, my, clamp(s * .22 * z, 2.5, 5) * px, color, px);
+          }
+          if (t > .55 && f.kind !== "migrate") {
+            const k2 = (t - .55) / .45, [bx, by] = b;
+            g.beginPath(); g.arc(bx, by, unit * (0.8 + k2 * 2), 0, 7); g.lineWidth = 3 * px; g.strokeStyle = "#ff4d3d"; g.stroke();
+            const won = String(f.text || "").startsWith("won") || f.kind === "raid";
+            const sym = f.kind === "repelled" ? "🛡" : f.kind === "raid" ? "🔥" : f.kind === "clear" ? (f.text === "won" ? "🏳" : "⚔") : won ? "⚔" : "🛡";
+            icon(g, sym, bx, by - unit * 1.4, big * 1.3);
+          }
+          if (f.kind === "migrate" && f.n) floatText(g, `${f.n} người bỏ đi`, a[0], a[1] - unit * 1.4, big * .8, "#ffd0a0", px);
+          break;
+        }
+        case "beasts": {
+          icon(g, "🐺", x + Math.sin(t * 40) * unit * .2, y - unit * .4, big * 1.4);
+          g.strokeStyle = "#ff4d3d"; g.lineWidth = 2.5 * px;
+          for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * unit * .35 - unit * .3, y - unit * .7); g.lineTo(x + k * unit * .35 + unit * .3, y + unit * .5); g.stroke(); }
+          if (f.text && s * z >= 3) floatText(g, f.text, x, y + unit * 1.3, big * .8, "#ffb59a", px);
+          break;
+        }
+        case "flood": case "quake": case "plague": case "famine": case "drought": case "riot": case "eruption": case "horde_back": {
+          const col = { flood: "#5fb4e6", quake: "#c08a4a", plague: "#9be06b", famine: "#8a5a2b", drought: "#ffb43d", riot: "#ff4d3d", eruption: "#ff5a1f", horde_back: "#2a0d0a" }[f.kind];
+          for (let k = 0; k < 3; k++) { const p = (t * 1.6 + k / 3) % 1; g.beginPath(); g.arc(x + (f.kind === "quake" ? Math.sin(now / 30) * unit * .15 : 0), y, unit * (0.5 + p * 3), 0, 7); g.lineWidth = 3 * px * (1 - p); g.strokeStyle = col; g.stroke(); }
+          icon(g, { flood: "🌊", quake: "💥", plague: "🦠", famine: "🍂", drought: "☀", riot: "✊", eruption: "🌋", horde_back: "☠" }[f.kind], x, y - unit * 1.4, big * 1.2);
+          break;
+        }
+        case "winter": {
+          for (let k = 0; k < 14; k++) { const ph = hash(f.tile, k), sx = x + (ph - .5) * unit * 6, sy = y - unit * 3 + ((t * 1.5 + ph) % 1) * unit * 5; icon(g, "❄", sx, sy, big * .7); }
+          break;
+        }
+        case "bounty": icon(g, "🌾", x, y - unit - t * unit * 1.5, big * 1.3); break;
+        case "herd": icon(g, "🐂", x - unit * 2 + t * unit * 4, y, big * 1.3); break;
+        case "fire": icon(g, "🔥", x, y - Math.sin(now / 90) * unit * .2, big * 1.4); break;
+        case "meteor": {
+          const p = Math.min(1, t / .4), sx = x + unit * 6 * (1 - p), sy = y - unit * 8 * (1 - p);
+          g.beginPath(); g.moveTo(sx + unit * 2, sy - unit * 2.6); g.lineTo(sx, sy); g.strokeStyle = "#ffd84a"; g.lineWidth = 3 * px; g.stroke();
+          if (p >= 1) { g.beginPath(); g.arc(x, y, unit * (1 + (t - .4) * 4), 0, 7); g.strokeStyle = "#ffae3d"; g.stroke(); }
+          break;
+        }
+      }
+      g.restore();
+    }
+  }
+
   function render() {
     if (!geo || !S) return;
     const g = ctx, s = geo.s, z = view.z, px = 1 / z, dpr = geo.dpr;
@@ -260,6 +468,9 @@
       const [x, y] = center(b.tile), r = clamp(s * .8 * z, 5, 12) * px; g.strokeStyle = "#ff4d3d"; g.lineWidth = clamp(s * .25 * z, 2, 4) * px;
       g.beginPath(); g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); g.stroke();
     }
+    const now = performance.now();
+    drawAmbient(g, now, s, z, px, vis);
+    drawEvents(g, now, s, z, px);
     if (hoverI >= 0 && hoverI !== pinnedI) { const [x, y] = center(hoverI); hexPath(g, x, y, s * 1.05); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
     if (pinnedI >= 0) {
       const [x, y] = center(pinnedI); hexPath(g, x, y, s * 1.08);
@@ -338,6 +549,7 @@
     focusFx = { i, t0: performance.now() };
   }
   function updateZoomUi() {
+    if (ANIM.on) ensureAnim();
     if (!geo) return;
     const rel = view.z / fitView().z;
     $("#zoom-in").disabled = view.z >= geo.zmax - 1e-6;
@@ -790,6 +1002,10 @@
       ${near.length ? `<table class="res"><tr><th>Tài nguyên</th><th>Ô vô chủ gần nhất đã thấy</th><th>Cách thủ đô</th><th>Trữ lượng</th></tr>${near.map(([k, v]) => `<tr><td>${esc(RES[k] ?? k)}</td><td class="mono">${v.tile.join(", ")}</td><td class="mono">${v.dist} ô</td><td class="mono">${v.amount}</td></tr>`).join("")}</table>` : ""}`;
   }
   $("#layer-kind").onchange = e => { layerKind = e.target.value; loadLayer(); };
+  const animBox = $("#anim-on");
+  animBox.checked = ANIM.on;
+  animBox.onchange = () => { ANIM.on = animBox.checked; try { localStorage.setItem("sm-anim", ANIM.on ? "1" : "0"); } catch { } ensureAnim(); scheduleRender(); };
+  $("#anim-replay").onclick = () => { const l = S?.lastFx; if (l?.fx?.length) playFx(l.fx); else $("#anim-replay").title = "Chưa có lượt nào để phát lại"; };
 
   // ---------------------------------------------------------------- new world (§2.4)
   let setupCache = null, setupAsked = false;
@@ -1288,9 +1504,10 @@
     layout(); drawBase(); legend(); updateZoomUi();
     await refresh();
     addChronicle(await api("/api/chronicle?limit=200"), false);
+    ensureAnim();
     const es = new EventSource("/api/events");
     es.addEventListener("status", e => applyStatus(JSON.parse(e.data)));
-    es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh(); if (layerKind) loadLayer(); });
+    es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh().then(() => playFx(d.fx)); if (layerKind) loadLayer(); });
     es.addEventListener("reload", () => location.reload());
     es.addEventListener("history", e => { const d = JSON.parse(e.data); addChapters([d.chapter]); addChronicle([d.entry]); });
     let rt, lastW = mapview.clientWidth;

@@ -19,6 +19,7 @@
   <p class="sr-only" id="map-help">Kéo để di chuyển, cuộn chuột hoặc chụm hai ngón để phóng to, nhấp vào một ô để xem chi tiết ở khung bên phải (nhấp lại hoặc Esc để bỏ chọn). Khi bản đồ đang được chọn: phím mũi tên để di chuyển, Enter để chọn ô ở giữa.</p>
 </main>
 <div class="tileinfo" id="tileinfo" hidden></div>
+<div class="fx-ticker" id="fx-ticker" aria-label="Chuyện vừa xảy ra trong lượt (bấm để xem trên bản đồ)" hidden></div>
 
 <header class="topbar" id="topbar">
   <div class="bar-row">
@@ -94,6 +95,8 @@
     </optgroup>
   </select>
   <span class="layer-scale" id="layer-scale" hidden><i></i><span id="layer-scale-text"></span></span>
+  <label class="anim-toggle" title="Người tí hon đi làm việc trên bản đồ (tắt nếu máy chậm)"><input type="checkbox" id="anim-on"> Hoạt ảnh</label>
+  <button type="button" id="anim-replay" title="Phát lại những gì xảy ra trong lượt vừa rồi trên bản đồ">⟲ Phát lại lượt</button>
 </div>
 <details class="legend-box" id="legend-box">
   <summary>Chú giải</summary>

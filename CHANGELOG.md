@@ -22,6 +22,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - **Watcher** xem bản đầy đủ trong khung chi tiết, thẻ quốc gia và hồ sơ quốc gia.
   - **Bản đồ** có lớp phủ cho mối đe dọa (tổng hợp, thú dữ, man di, lũ lụt, giá rét) và cho trữ lượng từng tài nguyên; trại man di được vẽ trên bản đồ và liệt kê ở tab Ngoại giao.
 - Bot giữ đủ chiến binh khi có man di ở gần.
+- **Hoạt ảnh trên bản đồ:**
+  - **người tí hon** màu cờ đi lại giữa làng và nơi làm việc (bãi săn, rừng, mỏ, bến cá, ruộng, công trường, biên giới), có biểu tượng nghề trên ô
+  - **sự kiện của lượt vừa rồi** được phát lại ngay chỗ nó xảy ra: người chết (kèm nguyên nhân), sinh thêm, xây xong, phát minh, khai hoang, đường đoàn thám hiểm, man di kéo tới cướp hoặc bị đẩy lui, trận đánh, lũ, động đất, mùa đông, dịch, di cư…
+  - **dải tin** phía trên bản đồ: bấm một tin để bay tới chỗ đó và xem lại; nút "Phát lại lượt"; ô "Hoạt ảnh" để tắt
+  - Engine ghi vị trí từng sự kiện (`src/fx.ts`) chỉ để vẽ, không ảnh hưởng luật hay tính tất định.
 
 ## v0.3
 

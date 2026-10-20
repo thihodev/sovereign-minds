@@ -5,9 +5,9 @@
 import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
 import { canSeeRes, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, SPOILAGE, TERRAIN } from "./rules.ts";
+import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
-import type { Nation, ResKey, Tile, World } from "./types.ts";
+import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
 import { RESOURCE_KEYS } from "./worldgen.ts";
 
 /** 0 = noted, 1 = watch, 2 = serious, 3 = urgent. */
@@ -164,4 +164,30 @@ export function layer(world: World, kind: string): number[] {
   if (kind === "danger") return world.tiles.map(t => t.terrain === "icewall" ? 0 : Math.min(5, tileDanger(world, t) * 0.6 + hordeHeat(t) * 0.6 + flood(t) * 0.4 + (t.land ? cold(t) * 0.3 : 0)));
   if ((RESOURCE_KEYS as string[]).includes(kind)) return world.tiles.map(t => Math.round(t.res[kind as ResKey] || 0));
   return [];
+}
+
+/** Where each trade works this tick, for the map's walking figures: the richest tiles first, as economy() takes them. */
+export function workSites(world: World, n: Nation): Array<{ role: Role; tile: number; n: number }> {
+  const owned = ownedTiles(world, n.id), out: Array<{ role: Role; tile: number; n: number }> = [];
+  const spread = (role: Role, tiles: number[], people: number) => {
+    if (people <= 0) return;
+    const use = tiles.slice(0, Math.max(1, Math.min(3, Math.ceil(people / 3))));
+    if (!use.length) use.push(n.capital);
+    use.forEach((tile, k) => { const share = Math.floor(people / use.length) + (k < people % use.length ? 1 : 0); if (share > 0) out.push({ role, tile, n: share }); });
+  };
+  const richest = (key: ResKey) => owned.filter(t => (t.res[key] || 0) >= 1).sort((a, b) => (b.res[key]! - a.res[key]!) || a.i - b.i).map(t => t.i);
+  for (const role of ["gather", "hunt", "fish", "wood", "stone", "flint", "clay"] as Role[]) spread(role, richest(ROLE_RESOURCE[role]!), n.labor[role]);
+  const ores = (["copper", "tin", "iron", "salt", "reeds"] as ResKey[]).filter(k => canSeeRes(world, n, k)).flatMap(richest);
+  spread("mine", ores, n.labor.mine);
+  const doneWith = (key: "farmSlots" | "craftSlots") => n.buildings.filter(b => b.done && (buildingOf(world, b.type)?.effect[key] || 0) > 0).map(b => b.tile);
+  spread("farm", doneWith("farmSlots"), n.labor.farm);
+  spread("build", n.buildings.filter(b => !b.done).map(b => b.tile), n.labor.build);
+  spread("craft", doneWith("craftSlots"), n.labor.craft);
+  spread("research", [n.capital], n.labor.research);
+  // Warriors stand on the border nearest a war or a horde, else at home
+  const foes = world.wars.filter(w => w.end === null && (w.a === n.id || w.b === n.id)).flatMap(w => ownedTiles(world, w.a === n.id ? w.b : w.a).map(t => t.i));
+  const threats = [...foes, ...liveHordes(world).map(h => h.tile)];
+  const posts = threats.length ? owned.map(t => ({ i: t.i, d: Math.min(...threats.map(f => dist(f, t.i))) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.i) : [n.capital];
+  spread("warrior", posts, n.labor.warrior);
+  return out;
 }

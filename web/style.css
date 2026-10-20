@@ -337,3 +337,10 @@ dialog.wide[open] { display: grid; grid-template-rows: auto 1fr; overflow: hidde
 .threats .d { color: var(--muted); }
 .threat-tag { font-size: 12px; font-weight: 600; color: var(--warn); }
 .threat-tag.lv3 { color: var(--bad); }
+.anim-toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.layer-box #anim-replay { padding: 3px 8px; font-size: 12px; background: rgba(255,255,255,.94); color: #14201c; border-color: transparent; }
+/* What just happened: a strip over the top of the map (§10) */
+.fx-ticker { position: fixed; z-index: 14; top: calc(var(--top) + 8px); left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: min(760px, calc(100vw - 32px)); pointer-events: none; }
+.fx-ticker button { pointer-events: auto; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: rgba(8,20,28,.78); color: #eef4f2; border: 1px solid rgba(255,255,255,.15); border-left: 4px solid #fff; backdrop-filter: blur(4px); }
+.fx-ticker button:hover { background: rgba(8,20,28,.95); }
+.fx-ticker button.close { border-left-width: 1px; padding: 2px 9px; }

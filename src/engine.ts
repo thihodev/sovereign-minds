@@ -13,6 +13,7 @@ import {
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld } from "./worldgen.ts";
+import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type ChronicleEntry, type Flag, type Nation, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
@@ -370,10 +371,12 @@ function centres(n: Nation): number[] { return [n.capital, ...n.settlements.map(
 
 // ---------------------------------------------------------------- step
 
-export interface StepResult { chronicle: ChronicleEntry[]; audit: string[] }
+/** fx: where things happened this tick, for the map's animations (recording only, §11). */
+export interface StepResult { chronicle: ChronicleEntry[]; audit: string[]; fx: MapFx[] }
 
 export function step(world: World, inputs: Record<number, TurnInput>, rulings: Record<number, Ruling> = {}): StepResult {
   const tick = world.tick, L = new Ledger(world), chronicle: ChronicleEntry[] = [];
+  fxBegin();
   const say = (nation: number | null, kind: string, text: string) => chronicle.push({ tick, nation, kind, text });
   const alive = world.nations.filter(n => n.alive);
   const popStart = new Map(alive.map(n => [n.id, n.population]));
@@ -476,6 +479,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if ((winner.stock.food || 0) < CLAIM_FOOD) { winner.lastRejected.push({ action: "claim_tile", reason: "Hết lương thực để khai hoang" }); continue; }
     L.stock(winner, "food", -CLAIM_FOOD, "claim");
     world.tiles[tile].owner = winner.id;
+    fx({ kind: "claim", tile, nation: winner.id });
     for (const o of ns) if (o !== winner) o.lastRejected.push({ action: "claim_tile", reason: `${winner.name} giành được ô này cùng lượt` });
     winner.lastEvents.push(`Khai hoang thêm ô (${col(tile)}, ${row(tile)}).`);
   }
@@ -518,7 +522,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       const key = String(t.i);
       if (reach.has(t.i)) { delete world.cutoff[key]; continue; }
       world.cutoff[key] = (world.cutoff[key] || 0) + 1;
-      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên bỏ hoang.`); }
+      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; fx({ kind: "lost_tile", tile: t.i, nation: n.id }); n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên bỏ hoang.`); }
     }
   }
 
@@ -555,6 +559,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (BRONZE_CAPS.every(c => caps.has(c)) && owned.some(t => (t.cap.copper || 0) > 0)) up(ERAS.bronze);
     if (era !== n.era) {
       n.era = era; n.eraTick = tick;
+      fx({ kind: "era", tile: n.capital, nation: n.id, text: era });
       say(n.id, "era", `${n.name} bước vào thời ${era}.`);
       if (world.eraGates[era] === undefined) {
         world.eraGates[era] = tick;
@@ -564,7 +569,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   }
 
   world.tick++;
-  return { chronicle, audit: L.audit(world) };
+  return { chronicle, audit: L.audit(world), fx: fxEnd() };
 }
 
 // ---------------------------------------------------------------- economy (§4, §6)
@@ -666,7 +671,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const def = buildingOf(world, b.type); if (!def) continue;
     const x = Math.min(def.work - b.progress, buildWork);
     b.progress += x; buildWork -= x;
-    if (b.progress >= def.work - 1e-9) { b.done = true; n.lastEvents.push(`Hoàn thành ${def.name}.`); say(n.id, "build", `${n.name} xây xong ${def.name}.`); }
+    if (b.progress >= def.work - 1e-9) { b.done = true; fx({ kind: "build", tile: b.tile, nation: n.id, text: def.name }); n.lastEvents.push(`Hoàn thành ${def.name}.`); say(n.id, "build", `${n.name} xây xong ${def.name}.`); }
   }
 
   // World events (§9.2)
@@ -676,25 +681,26 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const lost = Math.min(n.stock.food || 0, foodMade * EVENTS.winter.foodLoss); L.stock(n, "food", -lost, "winter");
     const dead = Math.floor(n.population * winterDeathShare(world, n, m.winter, doneEffect(world, n, "housing") > 0, (n.stock.hide_coat || 0) >= n.population / 2));
     n.population -= dead;
+    fx({ kind: "winter", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "winter");
     n.lastEvents.push(`Mùa đông khắc nghiệt: mất ${fmt(lost)} lương thực, ${dead} người chết rét.`);
     say(n.id, "event", `Mùa đông khắc nghiệt ở ${n.name}: ${dead} người chết rét.`);
   }
-  if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
+  if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; fx({ kind: "drought", tile: n.capital, nation: n.id }); n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
   const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1);
   if (erand() < plagueChance) {
     let dead = Math.floor(n.population * (EVENTS.plague.min + erand() * (EVENTS.plague.max - EVENTS.plague.min)));
     // §9.4 one herb per HERBS.perPeople people halves the deaths
     const herbsNeed = Math.ceil(n.population / HERBS.perPeople), healed = (n.stock.herbs || 0) >= herbsNeed;
     if (healed) { dead = Math.floor(dead * HERBS.plagueCut); L.stock(n, "herbs", -herbsNeed, "plague"); }
-    n.population -= dead; n.lastEvents.push(`Dịch bệnh: ${dead} người chết${healed ? ` (thảo dược cứu được một nửa, dùng ${herbsNeed})` : ""}.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
+    n.population -= dead; fx({ kind: "plague", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "plague"); n.lastEvents.push(`Dịch bệnh: ${dead} người chết${healed ? ` (thảo dược cứu được một nửa, dùng ${herbsNeed})` : ""}.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
   }
-  if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
+  if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); fx({ kind: "bounty", tile: n.capital, nation: n.id }); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
   const grassTile = owned.find(t => t.terrain === "grass");
-  if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
+  if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); fx({ kind: "herd", tile: grassTile.i, nation: n.id }); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }
   const forestTile = owned.find(t => t.terrain === "forest" && (t.res.wood || 0) > 0);
-  if (forestTile && erand() < EVENTS.wildfire.chance) { L.tile(forestTile, "wood", -(forestTile.res.wood || 0) * 0.5, "fire"); n.lastEvents.push("Cháy rừng: một khu rừng mất nửa số gỗ."); }
+  if (forestTile && erand() < EVENTS.wildfire.chance) { L.tile(forestTile, "wood", -(forestTile.res.wood || 0) * 0.5, "fire"); fx({ kind: "fire", tile: forestTile.i, nation: n.id }); n.lastEvents.push("Cháy rừng: một khu rừng mất nửa số gỗ."); }
   const landTile = owned.find(t => t.land);
-  if (landTile && erand() < EVENTS.meteor.chance) { L.tile(landTile, "iron", EVENTS.meteor.iron, "meteor"); say(n.id, "event", `Một thiên thạch rơi xuống lãnh thổ ${n.name}.`); }
+  if (landTile && erand() < EVENTS.meteor.chance) { L.tile(landTile, "iron", EVENTS.meteor.iron, "meteor"); fx({ kind: "meteor", tile: landTile.i, nation: n.id }); say(n.id, "event", `Một thiên thạch rơi xuống lãnh thổ ${n.name}.`); }
   // §9.4 Floods on rivers and swamps: the water takes a building and some stores, then leaves rich silt
   const wet = owned.filter(t => t.river || t.terrain === "swamp");
   if (wet.length && erand() < floodChance(wet)) {
@@ -702,6 +708,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const wetSet = new Set(wet.map(t => t.i)), hit = n.buildings.find(b => wetSet.has(b.tile));
     if (hit) n.buildings = n.buildings.filter(b => b !== hit);
     n.eventTimers.fertile = FLOOD.fertileTicks;
+    fx({ kind: "flood", tile: hit?.tile ?? wet[0].i, nation: n.id });
     n.lastEvents.push(`Lũ lụt: nước cuốn ${fmt(lostFood)} lương thực${hit ? ` và ${buildingOf(world, hit.type)?.name ?? hit.type}` : ""}; phù sa làm ruộng +${FLOOD.fertile * 100}% trong ${FLOOD.fertileTicks} lượt.`);
     say(n.id, "event", `Lũ lụt ở ${n.name}${hit ? `, cuốn trôi ${buildingOf(world, hit.type)?.name ?? hit.type}` : ""}.`);
   }
@@ -712,6 +719,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const fallen = n.buildings.filter(b => dist(b.tile, epi.i) <= QUAKE.radius);
     n.buildings = n.buildings.filter(b => dist(b.tile, epi.i) > QUAKE.radius);
     const dead = Math.floor(n.population * QUAKE.deaths); n.population -= dead;
+    fx({ kind: "quake", tile: epi.i, nation: n.id, n: fallen.length }); fxDeath(epi.i, n.id, dead, "quake");
     let ore = "";
     if (erand() < QUAKE.oreChance) { L.tile(epi, "copper", QUAKE.ore, "quake"); epi.cap.copper = (epi.cap.copper || 0) + QUAKE.ore; ore = " Đá nứt lộ ra một vỉa quặng."; }
     n.lastEvents.push(`Động đất ở (${col(epi.i)}, ${row(epi.i)}): ${fallen.length} công trình sập, ${dead} người chết.${ore}`);
@@ -723,6 +731,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     {
       const dead = Math.min(n.population, beasts.dead), lair = beasts.lair;
       n.population -= dead;
+      fx({ kind: "beasts", tile: lair.i, nation: n.id, text: BEASTS.name[lair.terrain] }); fxDeath(lair.i, n.id, dead, "beasts");
       n.lastEvents.push(`Thú dữ (${BEASTS.name[lair.terrain] ?? "thú hoang"}) tấn công người đi săn hái lượm: ${dead} người chết.`);
       say(n.id, "beasts", `${BEASTS.name[lair.terrain] ?? "Thú hoang"} tấn công người của ${n.name}: ${dead} người chết.`);
     }
@@ -730,6 +739,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (volcano && n.buildings.some(b => dist(b.tile, volcano.i) <= 2) && erand() < EVENTS.eruption.chance) {
     const lostB = n.buildings.filter(b => dist(b.tile, volcano.i) <= 2);
     n.buildings = n.buildings.filter(b => dist(b.tile, volcano.i) > 2);
+    fx({ kind: "eruption", tile: volcano.i, nation: n.id, n: lostB.length });
     say(n.id, "event", `Núi lửa Tro Đen phun trào, ${n.name} mất ${lostB.length} công trình.`);
   }
 
@@ -740,13 +750,14 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (shortage > 1e-9) {
     const dead = Math.min(n.population, Math.ceil(shortage / 2));
     n.population -= dead; n.stability -= 5;
+    fx({ kind: "famine", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "famine");
     n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói.`);
     say(n.id, "famine", `Nạn đói ở ${n.name}: ${dead} người chết.`);
   } else {
     const surplus = (n.stock.food || 0) / Math.max(1, need);
     if (surplus > 0) n.stability += 1;
     const roof = housing(world, n);
-    if (surplus >= GROWTH.surplus && n.population < roof) n.population += growthFor(n.population, roof);
+    if (surplus >= GROWTH.surplus && n.population < roof) { const born = growthFor(n.population, roof); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
   }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
@@ -765,6 +776,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
       if (n.research.progress >= cost) {
         const v = inv(world, n.research.id)!;
         n.inventions.push(v.id); n.research = null;
+        fx({ kind: "invention", tile: n.capital, nation: n.id, text: v.name });
         n.stability += 2 + (v.effects.stabilityOnce || 0);
         const reg = world.registry[v.id];
         if (!reg) { world.registry[v.id] = { by: [n.id], tick }; say(n.id, "invention", `${n.name} làm chủ ${v.name}, lần đầu tiên trên thế giới.`); }
@@ -790,9 +802,10 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     n.population -= leave;
     const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
     if (dest) dest.population += leave;
+    fx({ kind: "migrate", tile: n.capital, nation: n.id, n: leave, to: dest?.capital });
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
   }
-  if (n.stability === 0) { n.riot = true; n.stability = 20; say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
+  if (n.stability === 0) { n.riot = true; n.stability = 20; fx({ kind: "riot", tile: n.capital, nation: n.id }); say(n.id, "riot", `Nội loạn ở ${n.name}.`); }
 }
 
 // ---------------------------------------------------------------- the wild (§9.4)
@@ -815,7 +828,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
   const tick = world.tick;
   for (const h of world.hordes ?? []) {
     if (!h.alive) {
-      if (h.returns !== null && tick >= h.returns) { h.alive = true; h.returns = null; h.strength = HORDES.start; say(null, "horde", `${h.name} lại kéo về vùng hoang.`); }
+      if (h.returns !== null && tick >= h.returns) { h.alive = true; h.returns = null; h.strength = HORDES.start; fx({ kind: "horde_back", tile: h.tile }); say(null, "horde", `${h.name} lại kéo về vùng hoang.`); }
       continue;
     }
     h.strength = Math.min(hordeCap(tick), h.strength + HORDES.growth);
@@ -834,12 +847,14 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
       const fallen = Math.min(n.labor.warrior, Math.round(n.labor.warrior * 0.3));
       const dead = Math.min(n.population, fallen + Math.floor(n.population * HORDES.kill));
       n.population -= dead; n.labor.warrior -= fallen; n.stability -= HORDES.stability;
+      fx({ kind: "raid", tile: n.capital, nation: n.id, from: h.tile, n: Math.round(party), text: h.name }); fxDeath(n.capital, n.id, dead, "raid");
       h.strength = Math.min(hordeCap(tick), h.strength * HORDES.emboldened);
       n.lastEvents.push(`${h.name} cướp phá: ${dead} người chết, mất ${fmt(food)} lương thực và một phần kho (${Math.round(atk)} so với ${Math.round(def)}). Ổn định −${HORDES.stability}.`);
       say(n.id, "raid", `${h.name} từ vùng hoang cướp phá ${n.name}: ${dead} người chết.`);
     } else {
       const fallen = Math.min(n.labor.warrior, Math.round(n.labor.warrior * 0.1));
       n.population -= fallen; n.labor.warrior -= fallen; n.stability += 1;
+      fx({ kind: "repelled", tile: n.capital, nation: n.id, from: h.tile, n: Math.round(party), text: h.name }); fxDeath(n.capital, n.id, fallen, "raid");
       h.strength -= party * HORDES.repelled;
       n.lastEvents.push(`Đẩy lui ${h.name} (${Math.round(def)} so với ${Math.round(atk)}), mất ${fallen} chiến binh.`);
       say(n.id, "raid", `${n.name} đẩy lui cuộc cướp phá của ${h.name}.`);
@@ -953,6 +968,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const won = atk > def, [lo, hi] = won ? WAR.winLoss : WAR.loseLoss;
       const loss = Math.min(men, Math.round(men * (lo + r() * (hi - lo))));
       n.population -= loss; n.labor.warrior -= loss;
+      fx({ kind: "clear", tile: h.tile, nation: n.id, from: n.capital, n: men, text: won ? "won" : "lost" }); fxDeath(h.tile, n.id, loss, "horde");
       if (won) {
         h.alive = false; h.strength = 0; h.returns = world.tick + HORDES.returnTicks;
         n.reputation = Math.min(100, n.reputation + HORDES.clearReputation); n.stability += HORDES.clearStability;
@@ -980,6 +996,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       for (const [k, q] of Object.entries(pay)) L.stock(n, k, -q, "settle");
       for (const j of [tile, ...NEIGHBORS[tile]]) if (world.tiles[j].owner === -1 && world.tiles[j].terrain !== "ocean") world.tiles[j].owner = n.id;
       n.settlements.push({ tile, name, tick: world.tick });
+      fx({ kind: "settle", tile, nation: n.id, from: n.capital, text: name });
       // The settlers stay citizens; leaving home unsettles the people (§2.3)
       n.stability = Math.max(0, n.stability - SETTLEMENT.stability);
       n.lastEvents.push(`${SETTLEMENT.people} người dời đi lập điểm định cư ${name}: ổn định −${SETTLEMENT.stability}.`);
@@ -996,6 +1013,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const rand = rngFor(world.seed, world.tick, "explore", n.id, dir);
       const seen = new Set(n.seen), canSail = m.move.has("shallow");
       let cur = parseTile(a.from) >= 0 && world.tiles[parseTile(a.from)].owner === n.id ? parseTile(a.from) : n.capital, danger = 0;
+      const walked = [cur];
       const passable = (i: number) => {
         if (i < 0) return false;
         const t = world.tiles[i];
@@ -1009,7 +1027,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (!tries.length) break;
         const nx = tries[0];
         const t = world.tiles[nx];
-        cur = nx;
+        cur = nx; walked.push(nx);
         danger = Math.max(danger, tileDanger(world, t));
         for (const j of within(cur, canSail ? 3 : 2)) seen.add(j);
         if (t.owner !== -1 && t.owner !== n.id) {
@@ -1021,6 +1039,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       n.seen = [...seen].sort((x, y) => x - y);
       let dead = 0; for (let k = 0; k < people; k++) if (rand() < BEASTS.explorerBase + BEASTS.explorerPerDanger * danger) dead++;
       if (dead) { n.population -= dead; n.lastEvents.push(`${dead} người thám hiểm không trở về.`); }
+      fx({ kind: "explore", tile: walked[0], nation: n.id, path: walked, n: people }); fxDeath(cur, n.id, dead, "explore");
       n.lastEvents.push(`Đoàn thám hiểm đi hướng ${dir} và trở về.`);
       return null;
     }

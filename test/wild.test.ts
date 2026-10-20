@@ -8,6 +8,7 @@ import { generateWorld, WALL } from "../src/worldgen.ts";
 import { layer, nationResources, nationThreats, tileThreats } from "../src/threats.ts";
 import { buildObservation } from "../src/ai/prompt.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
+import type { MapFx } from "../src/fx.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
@@ -157,4 +158,23 @@ test("threat and resource reports: the AI sees what it can see, the Watcher sees
   assert.equal(tileThreats(w, ice.i)[0].kind, "icewall");
   for (const kind of ["danger", "beasts", "hordes", "flood", "cold", "wood", "herbs"]) assert.equal(layer(w, kind).length, TILE_COUNT, kind);
   assert.deepEqual(layer(w, "nonsense"), []);
+});
+
+test("step() reports where things happened, for the map's animations, without changing the world", () => {
+  const w = founded(1, "fx");
+  const n = w.nations[0], h = w.hordes![0];
+  for (const o of w.hordes!) if (o !== h) o.alive = false;
+  h.tile = within(n.capital, 6).find(i => dist(i, n.capital) === 6 && w.tiles[i].land)!;
+  h.strength = 60; w.tick = HORDES.grace; n.population = 80; n.stability = 20;
+  const inputs: Record<number, TurnInput> = { 0: { kind: "ok", response: { actions: [{ type: "explore", direction: "E", people: 2 }] } } };
+  const fx: MapFx[] = withRules(HORDES as unknown as Record<string, unknown>, { raidChance: 1, raidMax: 1 }, () => step(w, inputs).fx);
+  const raid = fx.find(f => f.kind === "raid");
+  assert.ok(raid && raid.from === h.tile && raid.tile === n.capital, "the raid comes from the horde's camp to the capital");
+  assert.ok(fx.some(f => f.kind === "death" && f.cause === "raid" && (f.n ?? 0) > 0), "with its dead");
+  const ex = fx.find(f => f.kind === "explore");
+  assert.ok(ex?.path && ex.path.length > 1 && ex.path[0] === n.capital, "an expedition's road starts at home");
+  // Recording only: the same inputs on a copy of the world give the same world
+  const a = founded(1, "fx2"), b = founded(1, "fx2");
+  step(a, { 0: { kind: "ok", response: {} } }); step(b, { 0: { kind: "ok", response: {} } });
+  assert.deepEqual(JSON.stringify(a), JSON.stringify(b));
 });

@@ -3,6 +3,7 @@
 
 import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
+import { fx, fxDeath } from "./fx.ts";
 import {
   GESTURES, INJECTION, MESSAGE_MAX, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
@@ -378,6 +379,10 @@ export function resolveBattles(ctx: DiploCtx): void {
     D.population -= lossD; D.labor.warrior = Math.max(0, D.labor.warrior - lossDW);
     const prisoners = won ? Math.floor(lossD * WAR.prisoners) : 0;
     if (prisoners) { A.population += prisoners; A.stability -= Math.floor(prisoners / 5); }
+    // The attackers march from their nearest land to the tile; the dead fall there
+    const home = ownedTiles(world, A.id).reduce((b, t) => dist(t.i, s.tile) < dist(b, s.tile) ? t.i : b, A.capital);
+    fx({ kind: "battle", tile: s.tile, nation: A.id, from: home, n: s.warriors, text: `${won ? "won" : "lost"}:${s.kind}` });
+    fxDeath(s.tile, A.id, lossA, "battle"); fxDeath(s.tile, D.id, lossD, "battle");
     let note = "";
     if (won && s.kind === "raid") {
       let carry = s.warriors * WAR.carryPerWarrior;
