@@ -5,6 +5,7 @@ import { settlementPayment, createWorld, step, ownedTiles, mods, baseCost, inven
 import { inv, costFor } from "../src/catalog.ts";
 import { activeWar, treatiesBetween } from "../src/diplomacy.ts";
 import { col, row, NEIGHBORS, dist } from "../src/hex.ts";
+import { PROSPERITY } from "../src/rules.ts";
 import type { AIResponse, Ruling, TurnInput, World, Nation } from "../src/types.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
@@ -133,7 +134,8 @@ test("trade: offer, accept, goods move (by caravan when far)", () => {
   assert.ok((a.stock.flint || 0) >= 4 - 1e-9);
 });
 
-test("treaties: tribute is paid each tick; breaking costs reputation", () => {
+test("treaties: tribute is paid each tick; breaking costs reputation", ctx => {
+  const margin = PROSPERITY.margin; PROSPERITY.margin = Infinity; ctx.after(() => { PROSPERITY.margin = margin; }); // §4.7 pride's renown aside
   const w = founded(2); meet(w);
   const [a, b] = w.nations;
   a.stock.stone = 100;

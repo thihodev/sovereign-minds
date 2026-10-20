@@ -20,6 +20,7 @@ import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
 import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
+import { prosperityPhase } from "./prosperity.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -653,6 +654,8 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   }
   // 6b. Plague spreads between peoples; quarantines take their toll (§9.5)
   contagionPhase(world, L, say, linksBefore);
+  // 6b. Prosperity and national pride: each people against the nations it knows (§4.7)
+  prosperityPhase(world, say);
 
   // 7. Sight, meetings, intel. Allies share sight (§7.8 level 4).
   for (const n of alive) {

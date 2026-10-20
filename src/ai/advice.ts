@@ -11,6 +11,8 @@ import { mouths } from "../people.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
+import { PROSPERITY } from "../rules.ts";
+import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -121,6 +123,20 @@ export function advice(world: World, n: Nation): Advice[] {
     }
   if (quarantined(n, tick) && !contagious(n, tick) && !sickNear.length)
     say(1, `Đang cách ly tới hết lượt ${n.quarantineUntil} mà quanh bạn không còn dịch: dỡ cách ly ({"type":"quarantine","turns":0}) để buôn bán và chợ biên giới họp lại.`);
+  // Prosperity and pride (§4.7): how the people lives against the nations it knows, and what raises it
+  const pr = n.prosperity;
+  if (pr && pr.known !== null && pr.mood !== "acclaim" && pr.score < pr.known + PROSPERITY.margin / 2) {
+    const WAY: Record<string, string> = {
+      food: `lương thực ${pr.parts.food}/25: tích đủ ${PROSPERITY.foodTurns} lượt ăn trong kho (gốm giảm hư)`,
+      goods: `hàng hóa ${pr.parts.goods}/25: làm nhiều loại hàng (công cụ, áo da, gốm, vải, dây thừng), mỗi loại chỉ tính tới ${PROSPERITY.goodCap} giá trị mỗi người`,
+      room: `chỗ ở ${pr.parts.room}/25: dựng nhà ở, chiếm đất cho thôn xóm, lập điểm định cư (đủ điểm khi còn ${PROSPERITY.roomFull * 100}% chỗ trống)`,
+      health: `sức khỏe và yên bình ${pr.parts.health}/25: tránh chiến tranh, giữ thảo dược chống dịch, áo da chống rét, đừng để đói`,
+    };
+    const weak = (Object.entries(pr.parts) as Array<[string, number]>).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([k]) => WAY[k]);
+    const top = knownProsperity(world, n).sort((a, b) => b.score - a.score || a.o.id - b.o.id)[0], est = top ? estimateProsperity(n, top.o) : "";
+    if (pr.mood === "envy") say(2, `Dân ta ganh tị: thịnh vượng ${pr.score}/100, kém trung bình ${pr.known} của các nước quen biết${top ? ` (${top.o.name}${typeof est === "number" ? ` ~${est}` : ""})` : ""}. Mỗi lượt bất mãn tăng và có nhà bỏ sang nước giàu hơn. Tài nguyên của nước là để dân sống tốt: nâng ${weak.join("; ")}.`);
+    else say(1, `Thịnh vượng ${pr.score}/100, trung bình các nước quen biết ${pr.known}: hơn họ ${PROSPERITY.margin} điểm thì dân tung hô (+${PROSPERITY.acclaimStability} ổn định mỗi lượt), kém ${PROSPERITY.margin} điểm thì dân ganh tị. Nâng ${weak.join("; ")}.`);
+  }
 
   // Customs
   if ((n.family?.births ?? "neutral") === "limit" && n.population < 40) say(2, `Bạn đang hạn chế sinh khi chỉ có ${n.population} dân: dân sẽ co dần. Đổi về "neutral" (family_policy) trừ khi đang đói.`);

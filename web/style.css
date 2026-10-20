@@ -421,6 +421,17 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13
 .bar.discontent i { display: block; height: 100%; background: linear-gradient(90deg, var(--warn), var(--bad)); }
 .petition.schism { border-left: 3px solid var(--warn); }
 
+/* §4.7 prosperity and national pride */
+.bar.prosp { display: flex; height: 10px; border-radius: 99px; margin-bottom: 6px; }
+.bar.prosp i { flex: none; }
+.prosp-cmp { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 3px; font-size: 12.5px; }
+.prosp-cmp li { display: grid; grid-template-columns: minmax(0, 9em) 1fr 2.5em; align-items: center; gap: 8px; }
+.prosp-cmp li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.prosp-cmp li .bar i { background: var(--muted); }
+.prosp-cmp li.me > span { color: var(--ink); font-weight: 600; }
+.prosp-cmp li.me .bar i { background: var(--good); }
+.prosp-cmp b { text-align: right; font-weight: 600; }
+
 /* §10.3 law decrees */
 .law-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .law-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
@@ -447,3 +458,9 @@ ul.advice li.lv1 { border-color: var(--accent); }
 .tension.hot { color: var(--bad); }
 /* §2.8 provinces in the nation profile */
 .card2.province .bar.discontent { margin: 6px 0 2px; }
+
+/* the relations legend */
+.legend-box { font-size: 12.5px; color: var(--muted); }
+.legend-box summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.legend-list { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 2px; }
+.legend-list .rel { display: inline-block; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); }

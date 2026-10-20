@@ -167,7 +167,20 @@
 
     <div class="panel subtabs" id="tab-diplomacy" data-key="diplomacy" hidden>
       <nav class="seg" role="tablist" aria-label="Ngoại giao"><button data-sub="relations">Quan hệ</button><button data-sub="war">Chiến sự <span class="cnt" data-count="war"></span></button><button data-sub="treaties">Hiệp ước <span class="cnt" data-count="treaties"></span></button><button data-sub="hordes">Man di <span class="cnt" data-count="hordes"></span></button><button data-sub="trade">Đoàn buôn <span class="cnt" data-count="trade"></span></button></nav>
-      <section data-sub="relations"><div id="relations"></div></section>
+      <section data-sub="relations">
+        <details class="legend-box"><summary>Chú thích</summary>
+          <ul class="plain legend-list">
+            <li><i class="sw" style="background:var(--muted)"></i> ô màu: màu cờ của quốc gia</li>
+            <li><b>Dòng phải của thẻ:</b> "biết N" là số nước đã gặp, "chưa gặp N" là số nước chưa gặp</li>
+            <li><b>Mỗi chip:</b> tên nước kia · quan hệ: <span class="rel">đã gặp</span> (chưa ký gì), <span class="rel peace">bất tương xâm / hòa bình</span>, <span class="rel ally">liên minh / chư hầu</span>, <span class="rel war">chiến tranh</span></li>
+            <li><b>🤝N</b>: số lần hai nước đã buôn bán với nhau, kể cả các phiên chợ biên giới (10 lần thì có chung ngôn ngữ; từ 5 lần thì học phát minh của nhau rẻ hơn)</li>
+            <li><b class="tension">⚡N</b>: căng thẳng biên giới 0–100 giữa hai nước giáp đất; <b class="tension warm">vàng</b> từ 40 (hay có sự cố), <b class="tension hot">đỏ</b> từ 70 (tranh chấp: cả hai có chính nghĩa để tuyên chiến)</li>
+            <li><b>🦠</b> đang có dịch (lây sang láng giềng, bạn hàng) · <b>🚧</b> đang cách ly</li>
+            <li>Rê chuột lên một chip để xem chi tiết: số lần buôn, phiên chợ, sự cố biên giới gần nhất.</li>
+          </ul>
+        </details>
+        <div id="relations"></div>
+      </section>
       <section data-sub="war"><h3 class="sub">Chiến tranh</h3><div id="wars"></div><h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol></section>
       <section data-sub="treaties"><div id="treaties"></div></section>
       <section data-sub="hordes"><div id="hordes"></div></section>

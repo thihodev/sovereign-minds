@@ -3,7 +3,7 @@
 // numbers in its rules). The values live in the world (its decrees), so a replay or a restart gives the
 // same world; applyLaws() writes them into the rule tables before anything reads them.
 
-import { BORDER, CONNECT, CONTAGION, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR, PROVINCE } from "./rules.ts";
+import { BORDER, CONNECT, CONTAGION, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR, PROVINCE, PROSPERITY } from "./rules.ts";
 import type { World } from "./types.ts";
 
 export interface LawDef {
@@ -43,6 +43,9 @@ export const LAWS: LawDef[] = [
   { key: "growth.rate", group: "Dân số", label: "Tốc độ tăng dân", desc: "Phần tăng logistic mỗi lượt: dân × tốc độ × (1 − dân/chỗ ở).", unit: "", min: 0, max: 0.3, step: 0.01, ...field(GROWTH, "rate") },
   { key: "demo.oldDeath", group: "Dân số", label: "Tỷ lệ người già qua đời mỗi lượt", desc: "", unit: "", min: 0.2, max: 1, step: 0.05, ...field(DEMO, "oldDeath") },
   { key: "demo.infant", group: "Dân số", label: "Tỷ lệ trẻ sơ sinh không qua khỏi", desc: "Mức nền, đã tính trong số sinh; y học và thảo dược giảm, thiếu nước tăng.", unit: "", min: 0, max: 0.6, step: 0.05, ...field(DEMO, "infant") },
+  { key: "prosperity.margin", group: "Thịnh vượng và tự tôn", label: "Chênh lệch thịnh vượng để dân tung hô hay ganh tị", desc: "Hơn trung bình các nước quen biết chừng này điểm thì dân tung hô; kém chừng này thì dân ganh tị.", unit: "điểm", min: 0, max: 50, step: 1, ...field(PROSPERITY, "margin") },
+  { key: "prosperity.acclaimStability", group: "Thịnh vượng và tự tôn", label: "Ổn định thêm mỗi lượt khi dân tung hô", desc: "", unit: "", min: 0, max: 5, step: 1, ...field(PROSPERITY, "acclaimStability") },
+  { key: "prosperity.emigrate", group: "Thịnh vượng và tự tôn", label: "Hệ số dân bỏ sang nước giàu hơn", desc: "Khả năng mỗi lượt = (chênh lệch − ngưỡng) / 100 × hệ số; 0 = không ai bỏ đi.", unit: "", min: 0, max: 5, step: 0.1, ...field(PROSPERITY, "emigrate") },
   { key: "era.neoPop", group: "Kỷ nguyên và phát minh", label: "Dân cần để sang Đồ Đá Mới", desc: "", unit: "người", min: 10, max: 200, step: 5, ...field(ERA_TABLE[1], "pop") },
   { key: "research.depthStep", group: "Kỷ nguyên và phát minh", label: "Giá phát minh tăng theo độ sâu", desc: "Mỗi độ sâu thêm nhân giá × (1 + hệ số).", unit: "", min: 0, max: 2, step: 0.05, ...field(RESEARCH, "depthStep") },
   { key: "trade.toll", group: "Giao thương", label: "Phí qua đất", desc: "Phần mỗi món hàng nộp cho nước có đất mà đoàn buôn đi qua.", unit: "", min: 0, max: 0.5, step: 0.01, ...field(TRADE, "toll") },

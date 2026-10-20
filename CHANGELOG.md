@@ -2,7 +2,23 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.9 (đang làm)
+## v0.10 (đang làm)
+
+- **Thịnh vượng và tự tôn dân tộc (§4.7).**
+  - **Điểm thịnh vượng 0–100**, gồm 4 phần, mỗi phần tối đa 25:
+    - lương thực: đủ điểm khi kho có 2 lượt ăn
+    - hàng hóa mỗi người: mỗi loại hàng tính tối đa 2 đơn vị giá trị mỗi người
+    - chỗ ở: đủ điểm khi còn 15% chỗ trống
+    - sức khỏe và yên bình: trừ dần theo các đợt đói, dịch, rét, chiến tranh
+  - **So với trung bình các nước quen biết:**
+    - Hơn từ 10 điểm: **dân tung hô**: ổn định +1 và bất mãn −2 mỗi lượt, uy tín tăng dần.
+    - Kém từ 10 điểm: **dân ganh tị**: bất mãn tăng (tối đa +3 mỗi lượt), và các gia đình có thể bỏ sang nước giàu hơn, ưu tiên nước giáp biên.
+  - Thịnh vượng tính vào bảng xếp hạng.
+  - Prompt dạy AI tinh thần tự tôn: dân xét triều đình qua việc họ sống thế nào so với láng giềng, và tài nguyên là để phục vụ dân. AI thấy điểm của mình và ước lượng điểm của các nước quen biết; cố vấn chỉ phần yếu nhất cần nâng.
+  - Hồ sơ quốc gia có thanh thịnh vượng và phần so sánh với các nước khác.
+- **Chú thích ký hiệu** trong mục Ngoại giao → Quan hệ: màu cờ, quan hệ, 🤝 số lần buôn, ⚡ căng thẳng biên giới, 🦠 dịch, 🚧 cách ly.
+
+## v0.9
 
 - **Tỉnh (§2.8):** mỗi trung tâm (thủ đô, mỗi điểm định cư) là một tỉnh.
   - **Đất và dân:** đất của tỉnh là các ô gần trung tâm đó nhất. Dân chia theo chỗ ở của từng tỉnh.

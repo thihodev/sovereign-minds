@@ -323,7 +323,7 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 
 ### 4.4 Ổn định
 
-- **Tăng:** còn lương thực trong kho sau khi ăn (+1/lượt), công trình ổn định như Bàn thờ (tổng từ mọi công trình tối đa +1/lượt), hiệu ứng ổn định của phát minh mở, Suối Nước Nóng (+2/lượt), thắng trận (+1), hoàn thành một nghiên cứu (+2 một lần, cộng thưởng một lần của phát minh như Nghi lễ +5).
+- **Tăng:** còn lương thực trong kho sau khi ăn (+1/lượt), công trình ổn định như Bàn thờ (tổng từ mọi công trình tối đa +1/lượt), hiệu ứng ổn định của phát minh mở, Suối Nước Nóng (+2/lượt), thắng trận (+1), hoàn thành một nghiên cứu (+2 một lần, cộng thưởng một lần của phát minh như Nghi lễ +5), dân tung hô vì sống sung túc hơn các nước quen biết (+1/lượt, §4.7).
 - **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), vượt giới hạn ô (−2 mỗi ô thừa, tối đa −10), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh), lập điểm định cư (−5 một lần, vì dời dân), **mỗi điểm định cư vượt quá 3: −1 mỗi lượt** (một bộ máy bộ lạc khó cai quản quá nhiều trung tâm; Bàn thờ, Suối Nước Nóng và hiệu ứng ổn định của phát minh mở bù lại được).
 - Ổn định được làm tròn và giữ trong 0–100 cuối mỗi lượt.
 - **Dưới 30:** mọi năng suất −25%.
@@ -338,6 +338,7 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
   - nội loạn: thêm 25
   - mỗi ô vượt giới hạn quản lý: thêm 2
   - mỗi điểm định cư cô lập: thêm 2 (mục 2.7); mỗi tỉnh có bất ổn từ 50: thêm 1 (mục 2.8)
+  - dân ganh tị vì nghèo hơn các nước quen biết: thêm tới 3 (§4.7); dân tung hô thì bớt 2
 
   Khi ổn định ≥ 60, bất mãn giảm 10 mỗi lượt. AI thấy mức bất mãn trong gói trạng thái, và nhận cảnh báo từ mức 40.
 - **Một phái đòi ra đi:** khi bất mãn đạt 100, dân từ 60 người trở lên, và lần ly khai trước cách ít nhất 30 lượt:
@@ -378,6 +379,28 @@ Một quốc gia giao một lĩnh vực cho một người. Người đó **tự
   - `appoint_official` (1 AP): `{"domain","name","seat"}`
   - `dismiss_official` (0 AP): ổn định −2, các quan khác −5 trung thành
   - `reward_official` (0 AP): `{"official","goods"}`, mỗi 2 giá trị hàng tặng = +1 trung thành; hàng tặng bị tiêu đi
+
+### 4.7 Thịnh vượng và tự tôn
+
+Của cải của một nước là của dân nước ấy: lương thực trong kho, hàng hóa trong tay, chỗ ở rộng rãi, sức khỏe và yên bình. Dân đánh giá triều đình bằng cuộc sống của mình, và so với mọi nước mình quen biết.
+
+- **Điểm thịnh vượng (0–100)**, tính lại cuối mỗi lượt (sau kinh tế), gồm bốn phần, mỗi phần tối đa 25:
+
+| Phần | Đủ 25 điểm khi |
+| --- | --- |
+| Lương thực | kho còn đủ 2 lượt ăn |
+| Hàng hóa | giá trị kho (trừ lương thực) đạt 12 mỗi người; mỗi loại hàng chỉ tính tới 2 giá trị mỗi người, nên nhiều loại hàng mới giàu, một đống xương thì không |
+| Chỗ ở | còn trống 15% chỗ ở (hết chỗ: 0) |
+| Sức khỏe và yên bình | không có "vết thương": người chết vì đói, rét, dịch, thiên tai, thú dữ, man di, chiến trận (4 × tỷ lệ dân chết), nạn đói (+0,3) và chiến tranh (+0,15 mỗi lượt) để lại vết thương, mỗi lượt còn ×0,6 |
+
+- **So với các nước quen biết** (đã gặp, còn sống), lấy trung bình điểm của họ:
+  - **Hơn ≥ 10 điểm — dân tung hô triều đình:** ổn định +1 và bất mãn −2 mỗi lượt; uy tín +1 mỗi 5 lượt.
+  - **Kém ≥ 10 điểm — dân ganh tị:** bất mãn tăng 1 cho mỗi 10 điểm kém (tối đa +3 mỗi lượt). Mỗi lượt có khả năng (chênh lệch với nước giàu nhất − 10) / 100 (tối đa 35%) một số gia đình bỏ sang nước giàu hơn ít nhất 10 điểm, không đang (hay sắp) chiến tranh với mình và còn chỗ ở, ưu tiên nước giáp biên giới: 3% dân, ít nhất 2, nhiều nhất 8 người. Chỉ xảy ra khi nước có từ 30 dân.
+  - Chưa quen ai thì không có gì để so.
+- **Biên niên sử** ghi khi dân một nước bắt đầu tung hô hay ganh tị (mỗi nước nhiều nhất một dòng mỗi 15 lượt).
+- **AI** thấy `prosperity` trong gói trạng thái: điểm, bốn phần, xu hướng, hạng trong các nước quen biết và điểm ước lượng của từng nước (đúng khi có gián điệp hay đồng minh; làm tròn 5 khi thân thiện; làm tròn 10 khi chỉ thấy đất; chỉ "giàu hơn / nghèo hơn" khi mới nghe đồn). Cố vấn chỉ ra hai phần yếu nhất và cách nâng.
+- **Xếp hạng thế giới** cộng nửa điểm thịnh vượng trung bình 10 lượt gần nhất (§9.3).
+- Watcher chỉnh được bằng sắc lệnh luật: ngưỡng chênh lệch, ổn định khi dân tung hô, hệ số dân bỏ đi.
 
 ## 5. Hệ thống phát minh mở
 
@@ -911,6 +934,7 @@ Dịch bệnh không dừng ở biên giới. Code ở `src/contagion.ts`, chạ
 | Đầu tiên thế giới | 10 × (d + 1) cho mỗi phát minh làm chủ đầu tiên (kể cả đồng hạng cùng lượt) |
 | Nhà phát minh | 6 × (d + 1) cho mỗi phát minh mở do mình đề xuất được duyệt |
 | Uy tín | bằng uy tín |
+| Thịnh vượng | nửa điểm thịnh vượng trung bình 10 lượt gần nhất (§4.7) |
 | Tuổi thọ | 1 mỗi 10 lượt |
 
 Năm bảng xếp hạng riêng (chưa có trong engine).
