@@ -5,6 +5,8 @@
 # It also stops an engine started outside Docker (npm start) on the same world, so two
 # engines never write one data/world.db.
 set -euo pipefail
+# Everything runs inside main(): bash reads the whole file before `git pull` can change it under us.
+main() {
 cd "$(dirname "$0")"
 
 PORT=$(grep -E '^PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"'"'"' ' || true)
@@ -34,14 +36,22 @@ if [ "${1:-}" = "now" ]; then
 fi
 
 echo "→ Chờ server trả lời ở cổng $PORT"
-for _ in $(seq 1 60); do
+since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for i in $(seq 1 90); do
   if curl -fs "http://localhost:$PORT/api/state" >/dev/null 2>&1; then
-    docker compose logs --tail 12 sovereign-minds
+    echo; docker compose logs --tail 12 sovereign-minds
     echo "✓ Xong: http://localhost:$PORT"
     exit 0
+  fi
+  # Say why it is slow instead of waiting in silence
+  if [ $((i % 5)) -eq 0 ]; then
+    problems=$(docker compose logs --since "$since" sovereign-minds 2>/dev/null | grep -E "đang được|bị hỏng|malformed|Error|lỗi|Engine dừng" | tail -4 || true)
+    if [ -n "$problems" ]; then echo; echo "$problems"; since=$(date -u +%Y-%m-%dT%H:%M:%SZ); else printf "."; fi
   fi
   sleep 1
 done
 docker compose logs --tail 40 sovereign-minds
-echo "✗ Server chưa trả lời sau 60 giây; xem log ở trên (docker compose logs -f sovereign-minds)." >&2
+echo "✗ Server chưa trả lời sau 90 giây; xem log ở trên (docker compose logs -f sovereign-minds)." >&2
 exit 1
+}
+main "$@"

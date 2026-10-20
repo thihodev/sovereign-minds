@@ -21,6 +21,8 @@ const isMe = (o: Owner | null) => !!o && o.pid === process.pid && o.host === hos
 export function lockHolder(file: string, now = Date.now()): string | null {
   const o = read(file);
   if (!o || isMe(o) || now - o.beat > STALE_MS) return null;
+  // Docker Compose runs one container per service: a lock left by an earlier container of ours is stale
+  if (o.docker && me().docker) return null;
   const where = o.docker ? "trong Docker" : o.host === hostname() ? "trên máy này" : `trên máy ${o.host}`;
   return `một engine khác ${where} (pid ${o.pid}${o.port ? `, cổng ${o.port}` : ""}, nhịp tim ${Math.round((now - o.beat) / 1000)} giây trước)`;
 }

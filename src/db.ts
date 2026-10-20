@@ -3,10 +3,27 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ChronicleEntry, World } from "./types.ts";
 import type { HistoryChapter } from "./historian.ts";
+
+/** A database that fails SQLite's own check is moved aside (with its -wal/-shm) so the engine can start;
+ *  returns where it went, or null when the file is fine or absent. The copy can be salvaged by hand:
+ *  sqlite3 <copy>/world.db ".recover" | sqlite3 data/world.db */
+export function quarantineIfBroken(path: string): string | null {
+  if (!existsSync(path)) return null;
+  let ok = false;
+  try {
+    const db = new DatabaseSync(path);
+    try { ok = (db.prepare("PRAGMA quick_check").get() as { quick_check?: string } | undefined)?.quick_check === "ok"; } finally { db.close(); }
+  } catch { ok = false; }
+  if (ok) return null;
+  const dir = join(dirname(path), "broken", new Date().toISOString().replace(/[:.]/g, "-"));
+  mkdirSync(dir, { recursive: true });
+  for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) renameSync(f, join(dir, f.split("/").pop()!));
+  return dir;
+}
 
 export class Store {
   db: DatabaseSync;

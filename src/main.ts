@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { Store } from "./db.ts";
+import { Store, quarantineIfBroken } from "./db.ts";
 import { DbLock } from "./lock.ts";
 import { Runner } from "./runner.ts";
 import { startServer } from "./server.ts";
@@ -47,6 +47,11 @@ if (holder) {
   process.exit(EXIT_LOCKED);
 }
 lock.onLost = () => { console.error(`[boot] Một engine khác đã lấy ${dbPath}: dừng ngay, không ghi gì thêm.`); process.exit(EXIT_LOCKED); };
+const broken = quarantineIfBroken(dbPath);
+if (broken) {
+  console.error(`[boot] ${dbPath} bị hỏng (SQLite báo lỗi khi kiểm tra), đã chuyển sang ${broken}/ để bắt đầu lại.`);
+  console.error(`[boot] Muốn cứu thế giới cũ: tắt engine, rồi chạy  sqlite3 ${broken}/world.db ".recover" | sqlite3 ${dbPath}  và khởi động lại.`);
+}
 const store = new Store(dbPath);
 const runner = new Runner(store, {
   seed: env.WORLD_SEED || "nguyen-dia-1",
