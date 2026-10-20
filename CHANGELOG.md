@@ -4,6 +4,13 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Cố vấn (§8.2):** gói trạng thái của mỗi nước mở đầu bằng `advice`, do engine tính từ chính luật: điều gì đang chặn họ và làm gì được ngay, kèm con số.
+  - Ví dụ: hết chỗ ở thì mở thêm bằng cách nào, thiếu gì để lập định cư hay sang kỷ nguyên mới, thiếu nước, vượt giới hạn đất, bất mãn, đang hạn chế sinh khi dân ít, chưa nghiên cứu gì.
+  - Hồ sơ quốc gia hiện phần cố vấn này. Prompt rút gọn phần nguy hiểm vì `threats` đã có số liệu.
+- **Mỗi lượt phải ra ít nhất một lệnh (§3.2):**
+  - Trả lời không có lệnh thì nước đó được hỏi lại một lần, kèm lời khuyên của cố vấn.
+  - Từ lượt thứ hai liên tiếp không ra lệnh: −2 ổn định mỗi lượt.
+  - Bot luôn có ít nhất một lệnh.
 - **Phát minh trùng tự xử lý:**
   - Engine tự nhận ra đơn trùng ngay khi nộp, không cần AI: cùng tên nói khác đi, cùng năng lực và hiệu ứng, hoặc mô tả giống mà làm cùng việc.
   - Đơn trùng được ghi "Trùng với X · không thêm mới", và nước đó tự chuyển sang nghiên cứu phát minh đã có.

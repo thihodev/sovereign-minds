@@ -140,6 +140,8 @@ export interface Nation {
   demo?: Demography;
   /** §4.2 family customs chosen by the nation's AI */
   family?: { births: string; fighters: string };
+  /** §3.2 turns in a row with no order given */
+  idleStreak?: number;
   /** §4.5 discontent 0–100: at 100 a faction wants to leave */
   discontent?: number;
   /** §4.5 a nation founded by a faction that left another */

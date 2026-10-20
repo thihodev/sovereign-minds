@@ -108,3 +108,18 @@ test("hamlets: the land houses families too, more on grass and rivers, up to a c
   for (const t of w.tiles) if (t.land && t.owner === -1 && HAMLET.people[t.terrain]) t.owner = n.id;
   assert.equal(housingParts(w, n).hamlets, HAMLET.max, "capped");
 });
+
+test("advice: the engine tells a crowded people how to make room; idle rulers lose stability", async () => {
+  const { advice } = await import("../src/ai/advice.ts");
+  const w = founded("advice");
+  const n = w.nations[0];
+  n.population = 60; n.stock.food = 5;
+  const a = advice(w, n).map(x => x.text).join(" | ");
+  assert.match(a, /không đủ một lượt ăn/);
+  assert.match(a, /chỗ ở/);
+  n.population = 20; n.stock.food = 2000;
+  const stab = n.stability;
+  turn(w, { actions: [] }); turn(w, { actions: [] }); turn(w, { actions: [] });
+  assert.ok(n.stability < stab, `${stab} → ${n.stability}`);
+  assert.ok(n.lastEvents.some(e => /không ra lệnh/.test(e)));
+});

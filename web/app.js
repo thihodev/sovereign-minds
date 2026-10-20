@@ -1074,6 +1074,8 @@
           <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
           ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
+          ${n.advice?.length ? `<h3>Cố vấn (engine gửi cho AI lượt này)</h3><ul class="advice">${n.advice.map(a => `<li class="lv${a.level}">${esc(a.text)}</li>`).join("")}</ul>` : ""}
+          ${n.idleStreak ? `<p class="note warn">Đã ${n.idleStreak} lượt liền không ra lệnh nào.</p>` : ""}
           ${pyramid(n)}
           ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)} <span class="muted">${esc(n.trait.lines.join(" · "))}</span></p>` : ""}
           ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}

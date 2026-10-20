@@ -107,6 +107,8 @@ export const SCHISM = {
   /** The old nation once they are gone: stability +calmAfter; the new one starts at `startStability`. */
   calmAfter: 15, startStability: 70,
 };
+/** §3.2 Every turn a ruler gives at least one order: from the `after`-th idle turn in a row, stability −`stability` a turn. */
+export const IDLE = { after: 2, stability: 2 };
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses
  *  this many people by terrain; at most `max` + `perEra` × era in all. Water houses no one. */
 export const HAMLET = {

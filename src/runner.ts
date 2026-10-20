@@ -2,7 +2,8 @@
 // Quota sleep (§3.4) lives here because it depends on the wall clock, which
 // the deterministic engine must never read.
 
-import { createWorld, step, ownedTiles, housing, housingParts, workers, type NationSpec } from "./engine.ts";
+import { actionPoints, createWorld, step, ownedTiles, housing, housingParts, workers, type NationSpec } from "./engine.ts";
+import { advice } from "./ai/advice.ts";
 import { bookLine, demo } from "./people.ts";
 import { TILE_COUNT } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
@@ -359,6 +360,15 @@ export class Runner {
       r = await askClaude(systemPrompt(this.world), `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
       parsed = r.ok ? extractJson(r.text) : null;
       if (this.stopping) return { kind: "asleep" };
+    }
+    // §3.2 no order at all: ask once more, with what the advisor sees
+    const noOrders = (p: Record<string, unknown> | null) => !!p && n.founded && !(Array.isArray(p.actions) && p.actions.some(a => a && typeof a === "object" && (a as { type?: unknown }).type)) && actionPoints(w, n) >= 1;
+    if (r.ok && noOrders(parsed)) {
+      const tips = advice(w, n).slice(0, 4).map(a => `- ${a.text}`).join("\n");
+      const again = await askClaude(systemPrompt(this.world), `${obs}\n\nYOUR REPLY GAVE NO ORDER. Every turn you must give at least one action (you have ${actionPoints(w, n)} AP). The advisor sees:\n${tips || "- research, claim land, build or explore"}\nReply again with the full JSON object, with at least one action.`, opts);
+      if (this.stopping) return { kind: "asleep" };
+      const p2 = again.ok ? extractJson(again.text) : null;
+      if (p2 && !noOrders(p2)) { r = again; parsed = p2; }
     }
     const log = (kind: string, raw: string, error: string) =>
       this.store.logTurn({ tick, nation: n.id, provider: "claude", model: `${n.model}${n.effort ? `/${n.effort}` : ""}`, kind, raw, parsed: parsed ?? undefined, error, latencyMs: Date.now() - started });

@@ -409,6 +409,13 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (sulky && v.food >= v.need * 2 + 20) spend("reward_official", { official: sulky.id, goods: { food: 20 } });
   }
 
+  // §3.2 never a turn without an order: study something, or send a scout out (the labour plan keeps a hand for it)
+  if (n.founded && !actions.length && ap >= 1) {
+    const pick = !n.research ? researchOptions(world, n).sort((a, b) => inventionCost(world, n, a) - inventionCost(world, n, b) || a.localeCompare(b))[0] : undefined;
+    if (pick) spend("research", { invention: pick });
+    else if (spend("explore", { direction: ["E", "NE", "NW", "W", "SW", "SE"][(tick + n.id) % 6], people: 1 })) explorers = Math.max(explorers, 1);
+  }
+
   // Labour and crafts
   const pendingWork = pending.reduce((s, b) => s + Math.max(0, (buildingOf(world, b.type)?.work ?? 0) - b.progress), 0)
     + builds.reduce((s, b) => s + (buildingOf(world, b.type)?.work ?? 0), 0)

@@ -428,3 +428,10 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13
 .law-table tr[data-key] { cursor: pointer; }
 .law-table tr[data-key]:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .law-table tr.changed td:first-child { font-weight: 700; color: var(--accent); }
+
+/* §8.2 the advisor's notes to a nation */
+ul.advice { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+ul.advice li { padding: 5px 8px; border-left: 3px solid var(--line); background: color-mix(in srgb, var(--ink) 4%, transparent); border-radius: 4px; }
+ul.advice li.lv3 { border-color: var(--bad); }
+ul.advice li.lv2 { border-color: var(--warn); }
+ul.advice li.lv1 { border-color: var(--accent); }

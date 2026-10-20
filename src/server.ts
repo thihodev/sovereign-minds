@@ -15,6 +15,7 @@ import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
 import { systemPrompt } from "./ai/prompt.ts";
+import { advice } from "./ai/advice.ts";
 import { applyLaws, lawTable } from "./laws.ts";
 import type { Runner } from "./runner.ts";
 
@@ -66,7 +67,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         controller: n.controller, provider: n.provider, model: n.model, effort: n.effort ?? "", alive: n.alive, capital: n.capital,
         trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
-        discontent: Math.round(n.discontent ?? 0), origin: n.origin ? { ...n.origin, fromName: w.nations[n.origin.from]?.name } : null,
+        discontent: Math.round(n.discontent ?? 0), advice: n.alive && n.founded ? advice(w, n) : [], idleStreak: n.idleStreak ?? 0, origin: n.origin ? { ...n.origin, fromName: w.nations[n.origin.from]?.name } : null,
         population: n.population, workers: workers(n),
         demo: n.alive ? (() => { const d = demo(n); return { m: d.m, f: d.f, born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, households: households(n), fighters: fighters(n), mouths: mouths(n) }; })() : null,
         family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,

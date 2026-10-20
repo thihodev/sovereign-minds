@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -565,6 +565,13 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     const inp = inputs[n.id];
     if (n.riot) { n.riot = false; n.lastEvents.push("Nội loạn: lượt này các thủ lĩnh không ra được lệnh nào."); continue; }
     if (inp?.kind !== "ok") continue;
+    // §3.2 a ruler gives at least one order a turn; a court that does nothing for long unsettles the people
+    if (n.founded && tick > 0) {
+      const orders = (inp.response.actions || []).filter(x => x && typeof x === "object" && x.type !== "found_nation").length;
+      n.idleStreak = orders || actionPoints(world, n) < 1 ? 0 : (n.idleStreak ?? 0) + 1;
+      if ((n.idleStreak ?? 0) >= IDLE.after) { n.stability = Math.max(0, n.stability - IDLE.stability); n.lastEvents.push(`Triều đình ${n.idleStreak} lượt liền không ra lệnh nào: dân thấy bị bỏ mặc (−${IDLE.stability} ổn định). Mỗi lượt hãy ra ít nhất một lệnh.`); }
+      else if (n.idleStreak === 1) n.lastEvents.push("Lượt này triều đình không ra lệnh nào. Mỗi lượt hãy ra ít nhất một lệnh; từ lượt thứ hai liên tiếp sẽ mất ổn định.");
+    }
     normalizeLabor(n, inp.response.labor);
     if (inp.response.crafts && typeof inp.response.crafts === "object") {
       n.crafts = {};
