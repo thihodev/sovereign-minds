@@ -2,7 +2,8 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.6 (đang làm)
+## v0.7 (đang làm)
+
 
 - **Lãnh thổ liên thông (§2.7):** hàng chỉ về được kho theo một lối: đi bộ qua đất của mình tối đa 6 ô, đường sá, hoặc đường thủy giữa hai bến thuyền.
   - Điểm định cư không có lối về thủ đô bị cô lập (sau 10 lượt ân hạn): đất của nó chỉ nộp 70%, bất mãn +2 mỗi lượt.
@@ -79,6 +80,10 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Tù binh và dân di cư chuyển sang nước khác theo cả gia đình.
   - Hồ sơ quốc gia có tháp dân số, số hộ, số người có thể ra trận và số sinh, tử lượt trước.
   - Engine không cài vai trò theo giới: hai giới làm việc như nhau, chỉ có việc sinh con là khác.
+- **Dân đi lại trên bản đồ** chỉ trên đất của nước mình hoặc theo đường bộ; đi giữa các vùng tách rời thì men theo đường.
+
+## v0.6
+
 - **Đường sá và hải đạo (§2.5).**
   - Hành động mới `build_road`, ba cấp mở theo kỷ nguyên: đường mòn, đường đất nện, đường lát đá. Trên mặt nước tương ứng là luồng lạch, hải đạo có phao tiêu, hải đạo có hải đăng.
   - Vật liệu trả ngay khi ra lệnh; thợ xây làm bằng công còn thừa sau các công trình.
