@@ -1,6 +1,6 @@
 {
   "name": "sovereign-minds",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "An open world where every nation is run by its own Claude mind with its own national trait, starting from the stone age.",
   "type": "module",
   "license": "MIT",
