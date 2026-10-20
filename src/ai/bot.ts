@@ -14,6 +14,7 @@
 import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
+import { riverWay } from "./prompt.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
@@ -463,6 +464,7 @@ function claimTile(v: View): { tile: number; fills: boolean } {
   const wantStone = lacks("stone"), wantWood = lacks("wood"), wantFlint = v.has("P1") && lacks("flint"), wantClay = lacks("clay") && !v.has("P13");
   const wantField = !v.owned.some(t => t.terrain === "grass" || t.terrain === "coast" || t.river);
   let best = -1, bestScore = -Infinity, bestFills = false;
+  const toRiver = riverWay(world, n), riverStep = toRiver && !toRiver.ownRiver && toRiver.path.length <= 6 ? toRiver.path[0] : -1; // §2.1 head for a river nearby
   const seen = new Set<number>();
   for (const t of v.owned) for (const j of NEIGHBORS[t.i]) {
     if (seen.has(j)) continue; seen.add(j);
@@ -476,6 +478,7 @@ function claimTile(v: View): { tile: number; fills: boolean } {
     if (wantFlint && (u.res.flint || 0) > 5) { s += 10; fills = true; }
     if (wantClay && (u.res.clay || 0) > 20) s += 8;
     if (wantField && (u.terrain === "grass" || u.terrain === "coast" || u.river)) { s += 10; fills = true; }
+    if (j === riverStep) s += 10;
     // Stay compact: tiles touching more of our land are easier to hold
     s += NEIGHBORS[j].filter(k => v.mine.has(k)).length;
     if (s > bestScore || (s === bestScore && j < best)) { best = j; bestScore = s; bestFills = fills; }

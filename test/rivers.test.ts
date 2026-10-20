@@ -118,3 +118,20 @@ test("a caravan walks its road; one caught on the land of a new enemy is seized"
   assert.ok((c.stock.stone || 0) > before, "C took the stone");
   assert.ok(a.lastEvents.some(e => /tịch thu/.test(e)), "A is told");
 });
+
+test("the nearest river and the claims that lead there are in the observation", async () => {
+  const { buildObservation, riverWay } = await import("../src/ai/prompt.ts");
+  const w = founded(1, "toward");
+  const n = w.nations[0];
+  // Move the nation to dry land a few tiles from a river it has seen
+  const bank = w.tiles.find(t => t.river && t.land && t.owner === -1 && w.tiles.filter(u => u.land && !u.river && u.owner === -1 && dist(u.i, t.i) === 4 && u.terrain !== "mountain" && within(u.i, 1).every(j => !w.tiles[j].river && w.tiles[j].land)).length)!;
+  const home = w.tiles.find(u => u.land && !u.river && u.owner === -1 && dist(u.i, bank.i) === 4 && u.terrain !== "mountain" && within(u.i, 1).every(j => !w.tiles[j].river && w.tiles[j].land))!;
+  settle(w, n, within(home.i, 1));
+  n.seen = within(home.i, 8);
+  const way = riverWay(w, n)!;
+  assert.ok(way && way.path.length >= 1 && way.path.length <= 4, JSON.stringify(way));
+  assert.ok(w.tiles[way.path.at(-1)!].river, "the way ends on the river");
+  const obs = buildObservation(w, n) as { nearest_river: { tiles_to_claim: number }; claimable: Array<{ toward_river?: boolean }> };
+  assert.equal(obs.nearest_river.tiles_to_claim, way.path.length);
+  assert.ok(obs.claimable.some(c => c.toward_river), "the first step is offered");
+});

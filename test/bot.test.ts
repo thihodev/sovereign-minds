@@ -64,7 +64,7 @@ test("a bot puts a small grounded invention before the judge", () => {
 
 test("a strong bot attacks a much weaker neighbour, takes land, then makes peace", () => {
   // A seed where B has room to hold on: on some maps its capital falls before it can sue for peace
-  const w = createWorld("bot-war-5", bots(2));
+  const w = createWorld("bot-war-3", bots(2));
   tick(w); // founding
   const [A, B] = w.nations;
   // Move B right next to A: its new capital 3 tiles from A's, with a ring of its own

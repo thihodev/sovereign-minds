@@ -1,7 +1,7 @@
 // What a nation's AI sees: one fixed system prompt (§8.1) and a per-tick
 // observation (§8.2) that contains only what that nation knows.
 
-import { col, row, NEIGHBORS } from "../hex.ts";
+import { col, row, dist, NEIGHBORS } from "../hex.ts";
 import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, SCHISM, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
@@ -43,7 +43,7 @@ Capabilities come from inventions: claim the one you are working towards in a pr
 
 YOUR COURT (officials): appoint people to run a field for you; each works every turn on their own, without your AP. Domains: ${Object.entries(OFFICIAL_DOMAINS).map(([k, d]) => `${k} (${d.title}): ${d.desc}`).join("; ")}. Slots: 1 + 1 per ${OFFICIALS.perPop} people + era and invention bonuses (max ${OFFICIALS.max}); one of each domain except governors (one per centre). Each costs ${OFFICIALS.upkeepBase} + skill food a turn; skill 1–5 grows every ${OFFICIALS.skillEvery} turns in office; loyalty 0–100 starts at ${OFFICIALS.start}, rises when your stability is ≥60, falls below 40, when unpaid, and for governors far (> ${OFFICIALS.farSeat} tiles) from the capital; below ${OFFICIALS.idle} they do nothing, at 0 they desert (stability −${OFFICIALS.desert}). Actions: appoint_official (${AP_COST.appoint_official}): {"type":"appoint_official","domain":"…","name":"…","seat":[col,row] (governor: your capital or a settlement)}; dismiss_official (0): {"type":"dismiss_official","official":id} (stability −${OFFICIALS.dismissStability}, the others lose 5 loyalty); reward_official (0): {"type":"reward_official","official":id,"goods":{"food":20}} (+1 loyalty per ${OFFICIALS.giftPerPoint} value given).
 
-RIVERS: river tiles hold fish, clay, reeds and floodplain plants, and flint gravel near the hills. Fields on a river give +${RIVER.fieldBonus * 100}%, on a delta +${RIVER.deltaBonus * 100}%. Fish runs bring extra fish to river land (${RIVER.runChance * 100}% a turn). Fresh water ("fresh_water"): a capital with no river, swamp, hot spring or Giếng (well, building "well") within ${RIVER.waterReach} tiles grows ×${RIVER.dryGrowth} as fast and catches plague ×${RIVER.dryPlague}. With boats (capability đi-nước) explorers spend half a step on river tiles.
+RIVERS: river tiles hold fish, clay, reeds and floodplain plants, and flint gravel near the hills. Fields on a river give +${RIVER.fieldBonus * 100}%, on a delta +${RIVER.deltaBonus * 100}%. Fish runs bring extra fish to river land (${RIVER.runChance * 100}% a turn). Fresh water ("fresh_water"): a capital with no river, swamp, hot spring or Giếng (well, building "well") within ${RIVER.waterReach} tiles grows ×${RIVER.dryGrowth} as fast and catches plague ×${RIVER.dryPlague}. With boats (capability đi-nước) explorers spend half a step on river tiles. A river tile also houses one more family (hamlets) and, with a pier, is a road for boats. Rivers are worth reaching even a few tiles away: "nearest_river" shows the nearest one you have seen and the free tiles to claim, in order, to get there ("claimable" marks the first one toward_river).
 
 TRADE ROADS: a caravan goes overland or by water, whichever arrives first. Overland: road cost per tile = terrain move cost (grass 1, forest 2, jungle 3…), ${TRADE.landSpeed} per turn; it needs porters, 1 per ${TRADE.porterLoad} units, at most ${TRADE.porterShare * 100}% of your workers, and they do not work at home until it arrives; food on it spoils ${TRADE.landSpoil * 100}% a turn. By water: needs a finished Bến thuyền (building "pier", on a river or coast tile, needs Thuyền độc mộc) and boats (good "boat": recipe "boat", 6 wood + 1 rope at a workshop), 1 boat per ${TRADE.boatLoad} units; it sails rivers and shallow sea, ${TRADE.waterSpeed} tiles a turn; food spoils ${TRADE.waterSpoil * 100}%. Roads never enter the land of a nation at war with you; crossing a third nation's land without a passage or alliance treaty costs a toll of ${TRADE.toll * 100}% of every good. On the way: a barbarian camp within ${TRADE.hordeReach} tiles may rob it (${TRADE.hordeLoss * 100}%); storms at sea sink a boat and ${TRADE.stormLoss * 100}% of the goods (${TRADE.stormChance * 100}% a turn); if it is on the land of a nation that goes to war with you, everything is seized. "known_nations[].trade_road" shows how 15 units would go now. With a pier within ${RIVER.pierReach} tiles, your attacks reach 1 tile further to a target on a river or shore, and the defender loses the river's +25%.
 
@@ -97,8 +97,30 @@ function visibleRes(world: World, n: Nation, t: Tile): Record<string, number> {
   return out;
 }
 
+/** §2.1 The nearest river this nation has seen and does not hold yet, and the tiles to claim to reach it:
+ *  free land from the border, the cheapest way (no mountains without climbing, no foreign land). */
+export function riverWay(world: World, n: Nation): { tile: number; path: number[]; ownRiver: number } | null {
+  const own = ownedTiles(world, n.id), ownRiver = own.filter(t => t.river).length, seen = new Set(n.seen), climb = mods(world, n).move.has("mountain");
+  const prev = new Map<number, number>(), queue: number[] = [];
+  for (const t of own) { prev.set(t.i, -1); queue.push(t.i); }
+  while (queue.length) {
+    const k = queue.shift()!, t = world.tiles[k];
+    if (t.owner === -1 && t.river) {
+      const path: number[] = []; for (let i = k; i >= 0 && world.tiles[i].owner !== n.id; i = prev.get(i)!) path.push(i);
+      return { tile: k, path: path.reverse(), ownRiver };
+    }
+    if (prev.size > 4000) break;
+    for (const j of NEIGHBORS[k]) {
+      const u = world.tiles[j];
+      if (prev.has(j) || !seen.has(j) || !u.land || u.owner !== -1 || u.terrain === "icewall" || (u.terrain === "mountain" && !climb)) continue;
+      prev.set(j, k); queue.push(j);
+    }
+  }
+  return null;
+}
+
 export function buildObservation(world: World, n: Nation): Record<string, unknown> {
-  const m = mods(world, n), owned = ownedTiles(world, n.id);
+  const m = mods(world, n), owned = ownedTiles(world, n.id), way = n.founded ? riverWay(world, n) : null;
   const frontier = new Map<number, Tile>();
   for (const t of owned) for (const j of NEIGHBORS[t.i]) { const u = world.tiles[j]; if (u.owner === -1 && u.terrain !== "icewall" && (u.land || m.move.has(u.terrain === "ocean" ? "ocean" : "shallow"))) frontier.set(j, u); }
   const known = n.met.map(id => world.nations[id]).filter(o => o?.alive);
@@ -134,8 +156,18 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     tile_limit: tileLimit(world, n),
     governed: governed(world, n),
     territory: owned.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, road: t.road || undefined, res: visibleRes(world, n, t), building: n.buildings.filter(b => b.tile === t.i).map(b => b.done ? b.type : `${b.type}(đang xây)`).join(",") || undefined })),
-    claimable: [...frontier.values()].sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i).slice(0, 8)
-      .map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, res: visibleRes(world, n, t) })),
+    claimable: (() => {
+      // the richest free tiles next to us, and always the first step toward the nearest river
+      const top = [...frontier.values()].sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i).slice(0, 8);
+      const step = way?.path[0];
+      if (step !== undefined && !top.some(t => t.i === step)) top.push(world.tiles[step]);
+      return top.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, toward_river: t.i === step || undefined, res: visibleRes(world, n, t) }));
+    })(),
+    nearest_river: way ? {
+      tile: xy(way.tile), tiles_to_claim: way.path.length, claim_in_order: way.path.slice(0, 6).map(xy),
+      fresh_water_for_capital: !freshWater(world, n) && dist(way.tile, n.capital) <= RIVER.waterReach ? true : undefined,
+      rivers_you_hold: way.ownRiver || undefined,
+    } : undefined,
     inventions: n.inventions.map(id => ({ id, name: invName(world, id), depth: depthOf(world, id) })),
     capabilities: [...m.caps],
     research: n.research ? { project: n.research.id, name: invName(world, n.research.id), progress: r1(n.research.progress), cost: inventionCost(world, n, n.research.id) } : null,
