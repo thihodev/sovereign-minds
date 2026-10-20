@@ -258,7 +258,11 @@ export interface Petition {
 }
 
 /** A world-wide law issued by the Watcher (§10.2). */
-export interface Decree { id: number; code: string; tick: number; effectiveTick: number; kind: string; text: string; fromPetition: number | null }
+export interface Decree {
+  id: number; code: string; tick: number; effectiveTick: number; kind: string; text: string; fromPetition: number | null;
+  /** §10.3 a law decree: the rule it sets, to what, and what it was */
+  law?: { key: string; value: number; previous: number };
+}
 
 export interface Spy {
   id: number; owner: number; target: number; since: number; active: boolean;

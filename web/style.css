@@ -420,3 +420,11 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13
 .bar.discontent { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .bar.discontent i { display: block; height: 100%; background: linear-gradient(90deg, var(--warn), var(--bad)); }
 .petition.schism { border-left: 3px solid var(--warn); }
+
+/* §10.3 law decrees */
+.law-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.law-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.law-table td { padding: 5px 6px; border-bottom: 1px dashed var(--line); vertical-align: top; }
+.law-table tr[data-key] { cursor: pointer; }
+.law-table tr[data-key]:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.law-table tr.changed td:first-child { font-weight: 700; color: var(--accent); }

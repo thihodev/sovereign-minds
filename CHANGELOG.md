@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Sắc lệnh luật (§10.3):** Watcher đổi thật các con số trong luật (khoảng 30 luật về định cư, chỗ ở, đất, dân số, kỷ nguyên, giao thương, chiến tranh, thiên tai) từ tab Sắc lệnh → Đổi luật.
+  - Engine áp dụng từ lượt sau. Sắc lệnh và giá trị mới hiện trong biên niên.
+  - Luật mà các AI nhận được dựng lại theo con số mới.
+  - Chat Claude biết các luật chỉnh được và giá trị hiện tại.
+  - Sắc lệnh văn bản vẫn có, và ghi rõ là engine không tự thi hành.
 - **Sửa luật dân số:**
   - Thiếu nước, thảo dược và y học giờ chỉ ảnh hưởng tốc độ tăng dân, không làm dân co dần nữa.
   - "Hạn chế sinh" chỉ giảm nhẹ phần sinh bù cho người chết (×0,9), phần tăng thêm thì giảm mạnh (×0,4).

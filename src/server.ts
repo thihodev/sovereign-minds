@@ -14,7 +14,8 @@ import { DEMO, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
-import { SYSTEM_PROMPT } from "./ai/prompt.ts";
+import { systemPrompt } from "./ai/prompt.ts";
+import { applyLaws, lawTable } from "./laws.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
@@ -54,6 +55,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
 
   function statePayload() {
     const w = runner.world;
+    applyLaws(w); // the numbers below follow the laws in force
     return {
       ...statusPayload(),
       owners: w.tiles.map(t => t.owner),
@@ -92,6 +94,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       schisms: (w.schisms ?? []).map(x => ({ ...x, fromName: w.nations[x.from]?.name, nationName: x.nation !== undefined ? w.nations[x.nation]?.name : undefined, toName: x.to !== undefined ? w.nations[x.to]?.name : undefined, waitLeft: x.status === "pending" ? Math.max(0, SCHISM.waitTicks - (w.tick - x.tick)) : 0 })),
       claudeModels: CLAUDE_MODELS, claudeEfforts: CLAUDE_EFFORTS,
       decrees: w.decrees,
+      laws: lawTable(w),
       registry: w.registry,
       proposals: w.proposals.slice(-60),
       customInventions: Object.values(w.custom.inventions).map(v => ({ id: v.id, name: v.name, prereqs: v.prereqs.map(p => ({ id: p, name: invName(w, p) })), rp: v.rp, caps: v.caps, desc: v.desc, by: v.custom?.by, tick: v.custom?.tick, depth: v.custom?.depth, description: v.custom?.description, effects: describeEffects(w, v.effects) })),
@@ -207,6 +210,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const err = runner.judgeByHand(Number(propM[1]), b.approve === true, String(b.reason ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
+      if (path === "/api/laws" && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.addLawDecree(String(b.key ?? ""), Number(b.value), String(b.note ?? ""), b.fromPetition ? Number(b.fromPetition) : null);
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
       if (path === "/api/decrees" && method === "POST") {
         const b = await readBody(req);
         const err = runner.addDecree(String(b.kind ?? "luật"), String(b.text ?? ""), b.fromPetition ? Number(b.fromPetition) : null);
@@ -238,7 +246,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           onDelta: t => ev("delta", { text: t }),
           onDone: (full, sid) => { runner.store.addChat("claude", full, tick); if (sid) runner.store.setMeta("claude_session", sid); ev("done", {}); res.end(); },
           onError: msg => { ev("error", { error: msg }); res.end(); },
-        }, SYSTEM_PROMPT);
+        }, systemPrompt(runner.world));
         return;
       }
       return send(res, 404, { error: "not found" });

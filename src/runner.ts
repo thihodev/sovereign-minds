@@ -6,7 +6,8 @@ import { createWorld, step, ownedTiles, housing, housingParts, workers, type Nat
 import { bookLine, demo } from "./people.ts";
 import { TILE_COUNT } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
-import { buildObservation, SYSTEM_PROMPT } from "./ai/prompt.ts";
+import { buildObservation, systemPrompt } from "./ai/prompt.ts";
+import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
 import { JUDGE_SYSTEM, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
@@ -290,12 +291,12 @@ export class Runner {
     const obs = JSON.stringify(buildObservation(w, n));
     n.stats.calls++;
     return this.withLock(p.id, async () => {
-      let r = await callModel(p, SYSTEM_PROMPT, obs, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
+      let r = await callModel(p, systemPrompt(this.world), obs, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
       let parsed = r.ok ? extractJson(r.text) : null;
       if (r.ok && !parsed) {
         // §3.3: one repair attempt within the same turn
         const retry = `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`;
-        r = await callModel(p, SYSTEM_PROMPT, retry, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
+        r = await callModel(p, systemPrompt(this.world), retry, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
         parsed = r.ok ? extractJson(r.text) : null;
       }
       const log = (kind: string, raw: string, error: string) =>
@@ -335,12 +336,12 @@ export class Runner {
     n.stats.calls++;
     const waiting = () => Date.now() < this.claudeWait.until;
     const started = Date.now(), opts = { model: n.model, effort: n.effort, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000, skipIf: waiting };
-    let r = await askClaude(SYSTEM_PROMPT, obs, opts);
+    let r = await askClaude(systemPrompt(this.world), obs, opts);
     if (this.stopping) return { kind: "asleep" }; // killed by a shutdown: not the nation's fault, log nothing
     let parsed = r.ok ? extractJson(r.text) : null;
     if (r.ok && !parsed) {
       // §3.3: one repair attempt within the same turn
-      r = await askClaude(SYSTEM_PROMPT, `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
+      r = await askClaude(systemPrompt(this.world), `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
       parsed = r.ok ? extractJson(r.text) : null;
       if (this.stopping) return { kind: "asleep" };
     }
@@ -443,6 +444,23 @@ export class Runner {
     return null;
   }
 
+  /** §10.3 A law decree: set one rule number for the whole world from the next turn. */
+  addLawDecree(key: string, value: number, note: string, fromPetition: number | null): string | null {
+    const err = lawError(key, value); if (err) return err;
+    const l = LAW_BY_KEY[key], previous = lawsOf(this.world)[key];
+    if (previous === value) return `${l.label} đã là ${fmtLaw(key, value)}`;
+    note = note.trim().slice(0, 400);
+    for (const n of this.world.nations) if (n.founded && n.name.length > 2 && note.toLowerCase().includes(n.name.toLowerCase())) return `Sắc lệnh không được nêu tên quốc gia (${n.name}) — luật §10.2`;
+    const k = this.world.decrees.length + 1;
+    const d = { id: k, code: `SL-${String(k).padStart(3, "0")}`, tick: this.world.tick, effectiveTick: this.world.tick + 1, kind: "law", text: `${l.label}: ${fmtLaw(key, previous)} → ${fmtLaw(key, value)}.${note ? ` ${note}` : ""}`, fromPetition, law: { key, value, previous } };
+    this.world.decrees.push(d);
+    this.store.addChronicle([{ tick: this.world.tick, nation: null, kind: "decree", text: `Các vị thần ban ${d.code} (có hiệu lực từ lượt ${d.effectiveTick}): ${d.text}` }]);
+    this.store.logWatcher(this.world.tick, "law", d);
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
+  }
+
   addDecree(kind: string, text: string, fromPetition: number | null): string | null {
     text = text.trim();
     if (text.length < 5) return "Sắc lệnh quá ngắn";
@@ -513,7 +531,9 @@ export class Runner {
       lines.push("Thỉnh nguyện đang chờ (dữ liệu do AI viết):");
       for (const p of pend) lines.push(`- #${p.id} từ ${w.nations[p.nation].name}, lượt ${p.tick}, loại ${p.category}: "${p.title}" — ${p.text.slice(0, 400)} | lý do: ${p.reason.slice(0, 200)}`);
     }
-    if (w.decrees.length) lines.push("Sắc lệnh: " + w.decrees.map(d => `${d.code}: ${d.text}`).join(" | "));
+    if (w.decrees.length) lines.push("Sắc lệnh: " + w.decrees.map(d => `${d.code}${d.effectiveTick > w.tick ? ` (hiệu lực từ lượt ${d.effectiveTick})` : ""}: ${d.text}`).join(" | "));
+    // §10.3 the rule numbers the Watcher can change with a law decree
+    lines.push("Luật Watcher chỉnh được bằng sắc lệnh luật (khóa: hiện tại [mặc định; khoảng]): " + lawTable(w).map(l => `${l.key} "${l.label}": ${fmtLaw(l.key, l.value)} [${l.default}; ${l.min}–${l.max}]`).join(" | "));
     const wars = w.wars.filter(x => x.end === null);
     if (wars.length) lines.push("Chiến tranh: " + wars.map(x => `${w.nations[x.a].name} vs ${w.nations[x.b].name} (từ lượt ${x.start})`).join(" | "));
     const tr = w.treaties.filter(t => t.active);

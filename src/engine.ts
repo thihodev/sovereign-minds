@@ -15,6 +15,7 @@ import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetwe
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
+import { applyLaws } from "./laws.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -488,6 +489,7 @@ function centres(n: Nation): number[] { return [n.capital, ...n.settlements.map(
 export interface StepResult { chronicle: ChronicleEntry[]; audit: string[]; fx: MapFx[] }
 
 export function step(world: World, inputs: Record<number, TurnInput>, rulings: Record<number, Ruling> = {}): StepResult {
+  applyLaws(world); // §10.3 the Watcher's law decrees in force this turn
   const tick = world.tick, L = new Ledger(world), chronicle: ChronicleEntry[] = [];
   fxBegin();
   const say = (nation: number | null, kind: string, text: string) => chronicle.push({ tick, nation, kind, text });

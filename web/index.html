@@ -197,21 +197,38 @@
       <div id="petitions"></div>
     </div>
 
-    <div class="panel" id="tab-decrees" hidden>
-      <form class="decree-form" id="decree-form">
-        <label for="decree-kind">Loại</label>
-        <select id="decree-kind">
-          <option value="luật">Luật mới</option>
-          <option value="tham số">Chỉnh tham số</option>
-          <option value="thế giới">Thay đổi thế giới</option>
-        </select>
-        <label for="decree-text">Nội dung (áp dụng cho cả thế giới, không nêu tên quốc gia)</label>
-        <textarea id="decree-text" rows="4" maxlength="1000" placeholder="Ví dụ: Từ nay hư hỏng lương thực giảm từ 30% xuống 25%."></textarea>
-        <input type="hidden" id="decree-from">
-        <div class="row"><button class="primary" type="submit">Ban Sắc lệnh</button><span class="note" id="decree-msg"></span></div>
-        <p class="note">Sắc lệnh có hiệu lực từ lượt sau và hiện trong gói trạng thái của mọi AI. Loại "Chỉnh tham số" và "Luật mới" cần thêm code để Engine thi hành; hãy nhờ Claude Code viết.</p>
-      </form>
-      <ol class="decrees" id="decrees"></ol>
+    <div class="panel subtabs" id="tab-decrees" data-key="decrees" hidden>
+      <nav class="seg" role="tablist" aria-label="Sắc lệnh"><button data-sub="laws">Đổi luật <span class="cnt" data-count="laws"></span></button><button data-sub="text">Sắc lệnh văn bản</button><button data-sub="issued">Đã ban <span class="cnt" data-count="issued"></span></button></nav>
+      <section data-sub="laws">
+        <form class="decree-form" id="law-form">
+          <label for="law-key">Luật</label>
+          <select id="law-key"></select>
+          <p class="note" id="law-info"></p>
+          <label for="law-value">Giá trị mới</label>
+          <input id="law-value" type="number" required>
+          <label for="law-note">Lời giải thích (không bắt buộc, không nêu tên quốc gia)</label>
+          <textarea id="law-note" rows="2" maxlength="400" placeholder="Ví dụ: để các bộ lạc nhỏ có lối ra."></textarea>
+          <div class="row"><button class="primary" type="submit">Ban sắc lệnh luật</button><span class="note" id="law-msg"></span></div>
+          <p class="note">Engine áp dụng thật từ lượt sau, cho cả thế giới. Mọi AI thấy sắc lệnh và con số mới trong luật của mình.</p>
+        </form>
+        <table class="law-table" id="law-table"></table>
+      </section>
+      <section data-sub="text">
+        <form class="decree-form" id="decree-form">
+          <label for="decree-kind">Loại</label>
+          <select id="decree-kind">
+            <option value="luật">Luật mới</option>
+            <option value="thế giới">Thay đổi thế giới</option>
+            <option value="lời phán">Lời phán</option>
+          </select>
+          <label for="decree-text">Nội dung (áp dụng cho cả thế giới, không nêu tên quốc gia)</label>
+          <textarea id="decree-text" rows="4" maxlength="1000" placeholder="Ví dụ: Các vị thần không hạ ngưỡng 50 dân; hãy mở rộng đất để có chỗ ở."></textarea>
+          <input type="hidden" id="decree-from">
+          <div class="row"><button class="primary" type="submit">Ban Sắc lệnh</button><span class="note" id="decree-msg"></span></div>
+          <p class="note">Sắc lệnh văn bản chỉ là lời các vị thần: mọi AI đọc thấy nhưng Engine không tự thi hành. Muốn đổi một con số trong luật, dùng tab "Đổi luật".</p>
+        </form>
+      </section>
+      <section data-sub="issued"><ol class="decrees" id="decrees"></ol></section>
     </div>
 
   </div>

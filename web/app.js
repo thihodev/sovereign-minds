@@ -1360,8 +1360,37 @@
     }
   }
   function renderDecrees() {
-    $("#decrees").innerHTML = S.decrees.slice().reverse().map(d => `<li><b>${esc(d.code)}</b> · lượt ${d.tick} · ${esc(d.kind)}<br>${esc(d.text)}</li>`).join("") || `<li class="note">Chưa có Sắc lệnh.</li>`;
+    $("#decrees").innerHTML = S.decrees.slice().reverse().map(d => `<li><b>${esc(d.code)}</b> · lượt ${d.tick}${d.effectiveTick > S.tick ? ` · hiệu lực từ lượt ${d.effectiveTick}` : ""} · ${d.law ? "<b>luật</b>" : esc(d.kind)}<br>${esc(d.text)}</li>`).join("") || `<li class="note">Chưa có Sắc lệnh.</li>`;
+    setCount("decrees", "issued", S.decrees.length);
+    renderLaws();
   }
+  // §10.3 law decrees: the rule numbers the Watcher can change
+  const fmtV = (l, v) => `${Number.isInteger(v) ? v : Math.round(v * 1000) / 1000}${l.unit ? ` ${l.unit}` : ""}`;
+  function renderLaws() {
+    const laws = S.laws || [], sel = $("#law-key");
+    if (!sel.options.length) {
+      const groups = [...new Set(laws.map(l => l.group))];
+      sel.innerHTML = groups.map(g => `<optgroup label="${esc(g)}">${laws.filter(l => l.group === g).map(l => `<option value="${esc(l.key)}">${esc(l.label)}</option>`).join("")}</optgroup>`).join("");
+      sel.onchange = showLaw;
+    }
+    showLaw();
+    const changed = laws.filter(l => l.value !== l.default || l.pending !== undefined);
+    setCount("decrees", "laws", changed.length);
+    $("#law-table").innerHTML = `<thead><tr><th scope="col">Luật</th><th scope="col">Hiện tại</th><th scope="col">Mặc định</th></tr></thead><tbody>${laws.map(l => `<tr data-key="${esc(l.key)}" class="${l.value !== l.default ? "changed" : ""}"><td>${esc(l.label)}</td><td>${fmtV(l, l.value)}${l.pending !== undefined ? ` → ${fmtV(l, l.pending)} <span class="muted">(lượt sau)</span>` : ""}</td><td class="muted">${fmtV(l, l.default)}</td></tr>`).join("")}</tbody>`;
+    for (const tr of $("#law-table").querySelectorAll("tr[data-key]")) tr.onclick = () => { sel.value = tr.dataset.key; showLaw(); $("#law-value").focus(); };
+  }
+  function showLaw() {
+    const l = (S.laws || []).find(x => x.key === $("#law-key").value); if (!l) return;
+    const inp = $("#law-value");
+    inp.min = l.min; inp.max = l.max; inp.step = l.step;
+    if (document.activeElement !== inp) inp.value = l.pending ?? l.value;
+    $("#law-info").textContent = `Hiện tại ${fmtV(l, l.value)} · mặc định ${fmtV(l, l.default)} · khoảng ${l.min}–${l.max}.${l.desc ? ` ${l.desc}` : ""}`;
+  }
+  $("#law-form").onsubmit = async e => {
+    e.preventDefault();
+    try { await api("/api/laws", { method: "POST", body: { key: $("#law-key").value, value: Number($("#law-value").value), note: $("#law-note").value, fromPetition: $("#decree-from").value || null } }); $("#law-note").value = ""; $("#law-msg").textContent = "Đã ban sắc lệnh luật; có hiệu lực từ lượt sau."; refresh(); }
+    catch (err) { $("#law-msg").textContent = err.message; }
+  };
   function alertMsg(m) { $("#decree-msg").textContent = m; }
   $("#decree-form").onsubmit = async e => {
     e.preventDefault();
