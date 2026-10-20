@@ -5,14 +5,16 @@ import type { BuildingDef, Invention, Recipe } from "./rules.ts";
 
 export type Terrain =
   | "ocean" | "shallow" | "grass" | "forest" | "taiga" | "jungle"
-  | "hill" | "mountain" | "coast" | "swamp" | "desert" | "tundra";
+  | "hill" | "mountain" | "coast" | "swamp" | "desert" | "tundra"
+  /** §12.1 the world's rim: an ice wall nobody can cross, and the glacier land at its foot. */
+  | "icewall" | "glacier";
 export type Zone = "cold" | "temp" | "trop";
 export type Region = "west" | "east" | "isl" | null;
 
 /** Natural reserves that live on tiles. Ores are hidden from AIs. */
 export type ResKey =
   | "game" | "plants" | "fish" | "wood" | "stone" | "flint" | "clay"
-  | "salt" | "reeds" | "copper" | "tin" | "iron";
+  | "salt" | "reeds" | "copper" | "tin" | "iron" | "herbs";
 
 export type Role =
   | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay" | "mine"
@@ -38,6 +40,8 @@ export interface Tile {
   cap: Partial<Record<ResKey, number>>;
   wonder: string | null;
   owner: number; // nation id, -1 = unclaimed
+  /** Distance to the ice wall when it is 8 or less (§12.1): its cold wind reaches that far. */
+  wall?: number;
 }
 
 export interface Flag {
@@ -64,6 +68,12 @@ export interface Nation {
   controller: "ai" | "bot";
   provider: string;
   model: string;
+  /** Set when NATIONS names a model ("groq:openai/gpt-oss-120b"); otherwise the provider default. */
+  pinnedModel?: string;
+  /** Claude nations: the CLI's effort level (low … max); "" = the model's default. */
+  effort?: string;
+  /** National trait id (§2.4, TRAITS in rules.ts); "" = none (worlds made before v0.4). */
+  trait?: string;
   founded: boolean;
   name: string;
   capitalName: string;
@@ -181,6 +191,19 @@ export interface Spy {
 
 export interface Wonder { key: string; name: string; i: number }
 
+/** §9.4 A barbarian horde living in a wilderness. Not a nation: it never talks, trades or signs. */
+export interface Horde {
+  id: number;
+  name: string;
+  tile: number;
+  strength: number;
+  alive: boolean;
+  /** Tick a beaten horde comes back (null while it lives). */
+  returns: number | null;
+  /** Tick of its last raid, and on whom. */
+  lastRaid: { tick: number; nation: number; won: boolean } | null;
+}
+
 export interface ChronicleEntry { tick: number; nation: number | null; kind: string; text: string }
 
 export interface World {
@@ -193,6 +216,8 @@ export interface World {
   rivers: number[][];
   herd: [number, number] | null;
   wild: number[];
+  /** §9.4 the barbarian hordes of the wilderness (worlds before v0.4 have none). */
+  hordes?: Horde[];
   /** Invention id -> first inventor (nation id) and tick. */
   registry: Record<string, { by: number[]; tick: number }>;
   nextBuildingId: number;

@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.3";
+export const RULES_VERSION = "0.4";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -19,20 +19,22 @@ export const TERRAIN: Record<Terrain, { name: string; move: number; defense: num
   swamp: { name: "Đầm lầy", move: 3, defense: 0.25 },
   desert: { name: "Sa mạc", move: 2, defense: 0 },
   tundra: { name: "Lãnh nguyên", move: 2, defense: 0 },
+  icewall: { name: "Tường Băng", move: 99, defense: 0 },
+  glacier: { name: "Băng hà", move: 3, defense: 0.25 },
 };
 
 export const ZONE_NAME = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" } as const;
 export const REGION_NAME = { west: "Lục địa Tây", east: "Lục địa Đông", isl: "Quần đảo Đá Lửa" } as const;
 
 /** Renewable reserves regrow by this share of their cap each tick (§2.1). */
-export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10 };
+export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08 };
 /** Ores are invisible to AIs until they own the capability below (§2.1). */
 export const HIDDEN_ORES: ResKey[] = ["copper", "tin", "iron"];
 export const ORE_SENSE_CAP = "nhận-biết-khoáng";
 
 export const RES_NAME: Record<string, string> = {
   game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét",
-  salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt",
+  salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", herbs: "thảo dược",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
   bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
@@ -80,7 +82,7 @@ export const AP_COST: Record<string, number> = {
   found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
-  declare_war: 2, declare_independence: 2, attack: 1, raid: 1,
+  declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
 };
 // §10.5 Petitions
 export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
@@ -238,7 +240,7 @@ export const RECIPE_BY_ID: Record<string, Recipe> = Object.fromEntries(RECIPES.m
 export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
 /** Standard value of each good (§6.2): an open recipe's output is worth what went in plus labour. */
 export const GOOD_VALUE: Record<string, number> = {
-  food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5,
+  food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
   copper: 3, tin: 4, iron: 4, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
@@ -270,6 +272,47 @@ export const EVENTS = {
   eruption: { chance: 0.005 },
 };
 
+// §9.4 Threats of the wild
+/** Beasts: danger 0–5 per tile from its terrain, more near a horde's wilderness, half on settled land. */
+export const BEASTS = {
+  danger: { jungle: 3, forest: 2, taiga: 2, mountain: 2, glacier: 2, swamp: 2, hill: 1, grass: 1, tundra: 1 } as Partial<Record<Terrain, number>>,
+  name: { jungle: "hổ", forest: "sói và gấu", taiga: "sói", mountain: "báo tuyết", glacier: "gấu trắng", swamp: "cá sấu", hill: "linh cẩu", grass: "sói đồng", tundra: "sói tuyết" } as Partial<Record<Terrain, string>>,
+  wildBonus: 2, wildRadius: 6,
+  /** Chance per tick of an attack = chance × average danger of the land the hunters and gatherers work. */
+  chance: 0.05,
+  /** Share of hunters (and a quarter of gatherers) killed in an attack; halved when every hunter is armed. */
+  share: 0.08, armed: 0.5,
+  /** Explorers: chance to be lost per person, + per point of the worst danger on their path. */
+  explorerBase: 0.02, explorerPerDanger: 0.015,
+};
+/** Barbarian hordes live in the wilderness (§12.4): they grow, raid nearby nations, and can be driven out. */
+export const HORDES = {
+  start: 10, growth: 0.4, capBase: 20, capPerTick: 0.12, capMax: 70,
+  /** Raids begin after `grace` ticks, on nations of at least `minPop` people (worth robbing) with land within `range` tiles. */
+  grace: 20, range: 16, minPop: 40,
+  /** Chance per tick = raidChance × strength / 40 (at most raidMax), against the nearest nation in range. */
+  raidChance: 0.04, raidMax: 0.35,
+  /** A raiding party: at most partyBase + partyPerPop × the target's people, never more than the horde. */
+  partyBase: 8, partyPerPop: 0.4,
+  /** Raided at home, the whole village fights: `militia` of the workers join the warriors at full strength. */
+  militia: 0.3,
+  /** A raid that wins carries off `loot` of food and `lootGoods` of other goods, kills `kill` of the people. */
+  loot: 0.25, lootGoods: 0.1, kill: 0.04, stability: 5, emboldened: 1.1,
+  /** A raid beaten off costs the horde `repelled` of its strength. */
+  repelled: 0.5,
+  /** clear_wild (AP in AP_COST): reach in tiles from the nation's land, and how long until a beaten horde comes back. */
+  clearReach: 8, returnTicks: 40, clearReputation: 5, clearStability: 3,
+  names: ["Man Tro Xám", "Rợ Nanh Sói", "Bộ Mặt Sơn", "Rợ Lửa Đen", "Bầy Đầu Lâu", "Man Sừng Hươu", "Rợ Gió Bấc", "Bộ Răng Đá", "Man Đầm Lầy", "Rợ Lông Quạ", "Bộ Xương Trắng", "Man Hang Tối"],
+};
+/** Floods on rivers and swamps; a delta floods twice as often. The silt makes fields richer for a while. */
+export const FLOOD = { chance: 0.03, deltaMult: 2, foodLoss: 0.1, fertileTicks: 2, fertile: 0.2 };
+/** Earthquakes on hills and mountains: buildings within `radius` of the epicentre fall; ore may be laid bare. */
+export const QUAKE = { chance: 0.006, radius: 3, deaths: 0.02, oreChance: 0.3, ore: 40 };
+/** The ice wall's wind (§12.1): land within `reach` tiles of it has harsher, more frequent winters, even in the tropics. */
+export const ICE_WIND = { reach: 4, winterMult: 1.5, deathMult: 1.5, tropicChance: 0.03 };
+/** Herbs: gatherers bring in `gather` herbs per unit of plants where herbs grow; one herb per `perPeople` people halves plague deaths. */
+export const HERBS = { gather: 0.08, perPeople: 10, plagueCut: 0.5 };
+
 // §12.3 Wonders
 export const WONDER_DEFS = [
   { key: "volcano", name: "Núi lửa Tro Đen", desc: "6 ô quanh núi: ruộng ×2; 0,5% phun trào mỗi lượt." },
@@ -288,3 +331,84 @@ export const INTEL_DECAY_TICKS = 10;
 export const SPY_OPS = { needsCap: "ghi-chép", detectMult: 2, disableTicks: 3, stealDiscount: 0.5, incite: 5 };
 
 export const ERAS = { paleo: "Đồ Đá Cũ", neo: "Đồ Đá Mới", bronze: "Đồ Đồng" };
+
+// §2.4 National traits: each nation is born with one character, chosen before the game.
+// A strength and a weakness in the same terms as invention effects (added in mods()),
+// plus an ethos the nation's AI reads every turn. Tuned with tools/traits.ts.
+export interface TraitDef {
+  id: string;
+  name: string;
+  icon: string;
+  /** For the Watcher, in Vietnamese. */
+  desc: string;
+  /** For the nation's AI, in English: who these people are and what they value. */
+  ethos: string;
+  effects: Invention["effects"];
+  /** Extra discount on inventions a known nation already has (§7.5), on top of the best one. */
+  diffusion?: number;
+  start?: { stability?: number; reputation?: number };
+}
+
+export const TRAITS: TraitDef[] = [
+  {
+    id: "hunters", name: "Thợ săn thảo nguyên", icon: "🏹", desc: "Sống bằng cuộc săn, giỏi theo dấu thú, ít kiên nhẫn với sách vở.",
+    ethos: "A people of the hunt. You read tracks, follow herds and prize courage and sharing the kill. Lean on hunting and the wild lands; knowledge comes slower to you.",
+    effects: { role: { hunt: 0.1 }, rp: -0.1 },
+  },
+  {
+    id: "sages", name: "Hiền triết", icon: "📜", desc: "Tò mò, quan sát và ghi nhớ; nghiên cứu nhanh nhưng yếu khi đánh nhau.",
+    ethos: "A people of questions. You watch the sky, remember everything and honour teachers. Knowledge is your path to greatness; you are poor fighters, so avoid wars you cannot talk your way out of.",
+    effects: { rp: 0.08, combat: -0.15 },
+  },
+  {
+    id: "farmers", name: "Nông dân ven sông", icon: "🌾", desc: "Gắn bó với đất và mùa vụ; hái lượm, trồng trọt, đánh cá giỏi nhưng khó cai quản vùng xa.",
+    ethos: "A people of the river bank. You know seeds, seasons and floods, and you love settled, fertile land. Feed many mouths and grow; distant lands are hard for you to hold.",
+    effects: { role: { gather: 0.15, farm: 0.25, fish: 0.1 }, tiles: -1 },
+  },
+  {
+    id: "artisans", name: "Thợ thủ công", icon: "🔨", desc: "Khéo tay, chế tác và xây dựng giỏi; săn bắt kém.",
+    ethos: "A people of makers. You shape stone, wood and clay with pride and judge others by their craft. Build, make tools and goods worth trading; you are clumsy hunters.",
+    effects: { role: { craft: 0.4, build: 0.3, hunt: -0.08 } },
+  },
+  {
+    id: "warriors", name: "Chiến binh", icon: "⚔️", desc: "Thượng võ, đánh mạnh; bị láng giềng e dè và ít chú tâm học hỏi.",
+    ethos: "A people of warriors. Strength, honour and glory in battle are what you value most. You fight harder than anyone, but neighbours distrust you and learning comes slowly.",
+    effects: { combat: 0.25, rp: -0.05 }, start: { reputation: -10 },
+  },
+  {
+    id: "traders", name: "Thương nhân", icon: "🤝", desc: "Giỏi giao thiệp, học nhanh từ nước đã gặp, được tin cậy; yếu về quân sự.",
+    ethos: "A people of exchange. You love meeting strangers, trading and learning their ways, and your word is trusted. Seek contact, trade and treaties; you are weak in war.",
+    effects: { combat: -0.1 }, diffusion: 0.15, start: { reputation: 10 },
+  },
+  {
+    id: "nomads", name: "Du mục", icon: "🐎", desc: "Quen đi xa và chịu rét; quản được nhiều đất nhưng ngại xây cất.",
+    ethos: "A people on the move. You roam wide lands, endure cold winters and feel cramped behind walls. Claim and hold wide territory; building is not your strength.",
+    effects: { tiles: 2, winter: 0.75, role: { build: -0.2 } },
+  },
+  {
+    id: "mountain", name: "Người núi đá", icon: "⛏️", desc: "Thạo đá, gỗ, đất sét và quặng; hái lượm kém.",
+    ethos: "A people of stone and mountain. You know rock, clay, timber and the veins in the earth, and you value endurance. Gather materials and build strong; foraging is not your gift.",
+    effects: { role: { extract: 0.25, gather: -0.15 } },
+  },
+  {
+    id: "mystics", name: "Thầy tế", icon: "🔥", desc: "Đoàn kết quanh lửa thiêng và nghi lễ; ổn định cao, săn bắt kém.",
+    ethos: "A people of the sacred fire. Rituals, ancestors and unity guide you; your people rarely turn on each other. Keep harmony and a strong culture; you are poor hunters.",
+    effects: { stabilityPerTick: 1, role: { hunt: -0.08 } }, start: { stability: 10 },
+  },
+];
+export const TRAIT_BY_ID: Record<string, TraitDef> = Object.fromEntries(TRAITS.map(t => [t.id, t]));
+
+/** A trait's strengths and weaknesses as short Vietnamese lines, with signs. */
+export function traitLines(t: TraitDef): string[] {
+  const pct = (v: number) => `${v > 0 ? "+" : "−"}${Math.round(Math.abs(v) * 100)}%`, e = t.effects, out: string[] = [];
+  for (const [r, v] of Object.entries(e.role || {})) if (v) out.push(`${r === "extract" ? "khai thác gỗ/đá/đất sét/mỏ" : ROLE_NAME[r as Role] ?? r} ${pct(v)}`);
+  if (e.rp) out.push(`nghiên cứu ${pct(e.rp)}`);
+  if (e.combat) out.push(`chiến đấu ${pct(e.combat)}`);
+  if (e.tiles) out.push(`${e.tiles > 0 ? "+" : "−"}${Math.abs(e.tiles)} ô quản lý`);
+  if (e.winter) out.push(`thiệt hại mùa đông ${pct(e.winter - 1)}`);
+  if (e.stabilityPerTick) out.push(`${e.stabilityPerTick > 0 ? "+" : ""}${e.stabilityPerTick} ổn định/lượt`);
+  if (t.diffusion) out.push(`học từ nước đã gặp rẻ thêm ${Math.round(t.diffusion * 100)}%`);
+  if (t.start?.reputation) out.push(`uy tín khởi đầu ${t.start.reputation > 0 ? "+" : "−"}${Math.abs(t.start.reputation)}`);
+  if (t.start?.stability) out.push(`ổn định khởi đầu +${t.start.stability}`);
+  return out;
+}

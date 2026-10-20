@@ -1,68 +1,51 @@
 # Sovereign Minds
 
-An open world where every nation is governed by its own **free** AI model. The world starts in the stone age. A deterministic World Engine enforces every rule in code: inventions need their prerequisites, nothing appears from nothing. A human **Watcher** observes, judges the nations' petitions, issues world-wide decrees, and can chat with Claude about what is happening.
+An open world where every nation is governed by its own Claude mind, each born with its own national trait, all running on the Watcher's Claude subscription. The world starts in the stone age. A deterministic World Engine enforces every rule in code: inventions need their prerequisites, nothing appears from nothing. A human **Watcher** observes, judges the nations' petitions, issues world-wide decrees, and can chat with Claude about what is happening.
 
 > Tài liệu dưới đây bằng tiếng Việt. Bộ luật đầy đủ: [docs/RULES.md](docs/RULES.md).
 
 ## Thế giới này là gì
 
-- Mỗi quốc gia do một model AI miễn phí điều hành (Gemini, Mistral, DeepSeek qua NVIDIA NIM, GLM của Z.ai, Nemotron qua OpenRouter…). Mỗi lượt, AI nhận một gói JSON trạng thái và trả về JSON hành động.
+- Mỗi quốc gia do một Claude điều hành (Haiku hoặc Sonnet, effort tùy chọn), dùng chung gói Claude của bạn. Mỗi nước sinh ra với một **đặc thù riêng**: Thợ săn, Hiền triết, Nông dân ven sông, Chiến binh, Thương nhân…, mỗi đặc thù có một lợi thế và một điểm yếu thật trong luật. Mỗi lượt, AI nhận một gói JSON trạng thái và trả về JSON hành động.
 - **Engine là trọng tài duy nhất.** Hành động sai luật bị từ chối và vẫn mất AP. Tài nguyên được ghi sổ cái và kiểm toán sau mỗi lượt.
 - AI **tự đặt tên, vẽ cờ, viết tuyên ngôn**, mở rộng lãnh thổ, nghiên cứu theo cây phát minh, do thám nước khác, và **dâng thỉnh nguyện** xin sửa luật.
 - Bạn là **Watcher**: xem bản đồ sống, đọc suy nghĩ của từng AI, duyệt thỉnh nguyện, ban Sắc lệnh, và **chat với Claude** (bằng gói Claude của bạn) về tình hình thế giới.
-- Chỉ dùng gói miễn phí. Quốc gia nào hết quota sẽ **ngủ đông** tới khi quota hồi lại, không bị phạt.
+- Không tốn phí API: mọi thứ chạy qua gói Claude (Pro/Max) của bạn. Khi gói hết giới hạn, cả thế giới cùng chờ rồi chạy tiếp, không nước nào bị phạt.
 
 ## Chạy bằng một lệnh
 
-Cần Docker (Docker Desktop trên macOS/Windows, hoặc Docker Engine trên Linux).
+Cần Docker (Docker Desktop trên macOS/Windows, hoặc Docker Engine trên Linux) và một gói Claude (Pro hoặc Max).
 
 ```bash
 git clone https://github.com/thihodev/sovereign-minds.git
 cd sovereign-minds
-cp .env.example .env        # điền các API key miễn phí bạn có
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Mở **http://localhost:3000**.
+Mở **http://localhost:3000**, rồi:
 
-Chưa có key nào cũng chạy được: quốc gia thiếu key sẽ do một bot đơn giản chơi thay. Khi bạn thêm key vào `.env` và lưu file, hệ thống tự nạp lại sau lượt hiện tại và quốc gia đó chuyển sang AI.
+1. **Đăng nhập Claude** ở khung Chat Claude: bấm **Đăng nhập Claude**, mở trang đăng nhập, cho phép truy cập, dán mã xác nhận vào ô và bấm **Xác nhận**. Nếu cách này không chạy trên máy bạn, đăng nhập trong terminal: `docker compose exec -it sovereign-minds claude auth login` (chạy ngoài Docker thì `CLAUDE_CONFIG_DIR=data/claude claude auth login`).
+2. **Tạo thế giới** trong hộp thoại **Thế giới mới** (tự mở ở lần chạy đầu). Chọn số quốc gia, rồi chọn cho từng nước:
+   - **đặc thù** (mục 2.4 trong `docs/RULES.md`): một lợi thế, một điểm yếu và một tính cách dân tộc
+   - **model:** Haiku hoặc Sonnet
+   - **effort:** low … max
 
-### Lấy key miễn phí
+Mọi quốc gia, Trọng tài và Sử gia đều chạy bằng tài khoản Claude đó qua Claude Code CLI (đã cài sẵn trong image), không tốn phí API. Thông tin đăng nhập nằm trong `data/claude/` trên máy bạn, không bao giờ vào cơ sở dữ liệu hay git.
 
-| Vai mặc định | Nhà cung cấp | Lấy key | Biến trong `.env` |
-| --- | --- | --- | --- |
-| Quốc gia 1 | Google Gemini (project **không** gắn thanh toán) | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
-| Quốc gia 2 | Z.ai (GLM Flash, Trung Quốc) | https://z.ai/manage-apikey/apikey-list | `ZAI_API_KEY` |
-| Quốc gia 3 | OpenRouter (model `:free`, ví dụ `dots-studio/dots-3-note-preview:free` của rednote) | https://openrouter.ai/settings/keys | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` |
-| Quốc gia 5 | Cohere (Trial key) | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
-| Quốc gia 6 | Cloudflare Workers AI (token mẫu "Workers AI") | https://dash.cloudflare.com/profile/api-tokens | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
-| Trọng tài | **Claude Sonnet 5.5** qua tài khoản Claude bạn đăng nhập (tab Chat Claude); Groq và các nhà cung cấp miễn phí khác làm dự phòng | — | `JUDGE_PROVIDERS=claude,groq,…` |
-| Sử gia | Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
+**Giới hạn gói:** mỗi lượt là một lệnh Claude cho mỗi nước. Haiku với effort low tốn ít nhất; Sonnet và effort cao tốn nhiều hơn. Nhịp mặc định 20 phút. Khi hết giới hạn gói, cả thế giới chờ đến lúc gói được làm mới rồi tự chạy tiếp, không nước nào đi trước nước nào. Model và effort đổi được giữa trận trong hồ sơ quốc gia.
 
-Không dùng: Mistral (gói miễn phí không bật được API key, đòi nâng cấp), NVIDIA NIM (bắt xác minh số điện thoại, có nơi không nhận được OTP), SambaNova (mọi model đòi phương thức thanh toán sau lần dùng thử). Groq vừa làm một quốc gia vừa làm Sử gia.
+### Nhà cung cấp miễn phí (tùy chọn)
 
-Danh sách quốc gia đặt bằng `NATIONS` trong `.env`, mỗi nhà cung cấp là một quốc gia. Tên model đổi thường xuyên; nếu nhà cung cấp báo sai model, đặt lại bằng biến `*_MODEL` (xem `.env.example`).
-
-Kiểm tra key và hạn mức thật:
+Engine vẫn hỗ trợ các nhà cung cấp có gói miễn phí (Gemini, Groq, Cohere, Cloudflare, OpenRouter, Z.ai, Ollama, một endpoint tương thích OpenAI bất kỳ) qua `NATIONS`, `JUDGE_PROVIDERS` và `HISTORIAN_PROVIDER=auto`; xem `.env.example`. Kiểm tra key và hạn mức:
 
 ```bash
 docker compose exec sovereign-minds npm run check-providers
 ```
 
-### Đăng nhập Claude để chat
+### Chat với Claude
 
-Tab **Chat Claude** dùng Claude Code CLI (đã cài sẵn trong image) với gói Claude của bạn, không tốn phí API.
-
-1. Bấm **Đăng nhập Claude**, mở trang đăng nhập, cho phép truy cập.
-2. Dán mã xác nhận vào ô và bấm **Xác nhận**.
-
-Nếu cách trên không chạy được trên máy bạn, đăng nhập trong terminal:
-
-```bash
-docker compose exec -it sovereign-minds claude auth login
-```
-
-Thông tin đăng nhập nằm trong `data/claude/` trên máy bạn, không bao giờ vào cơ sở dữ liệu hay git. Claude đọc một bản tóm tắt thế giới ở mỗi tin nhắn; nó chỉ tư vấn, không tự thay đổi được thế giới.
+Tab **Chat Claude** dùng cùng tài khoản. Claude đọc một bản tóm tắt thế giới ở mỗi tin nhắn; nó chỉ tư vấn, không tự thay đổi được thế giới.
 
 ## Tự cập nhật khi có code mới
 
@@ -89,7 +72,8 @@ Tạo thế giới mới: `docker compose down`, xóa (hoặc đổi tên) `data
 
 | Hệ thống | Đã chạy |
 | --- | --- |
-| Thế giới | Bản đồ 64×64 ô lục giác theo seed: 2 lục địa, eo đất, quần đảo, sông, 7 kỳ quan, 3 đới khí hậu |
+| Thế giới | Bản đồ 128×128 ô lục giác theo seed, bao quanh bởi Tường Băng không vượt qua được: 2 lục địa, eo đất, quần đảo, băng hà, sông, 7 kỳ quan, 3 đới khí hậu, 6 vùng hoang |
+| Mối đe dọa | Thú dữ theo địa hình, bộ lạc man di cướp phá (đánh tan được bằng `clear_wild`), lũ lụt, động đất, gió băng, mùa đông, dịch bệnh (thảo dược giảm một nửa), hạn hán; mỗi AI nhận báo cáo đe dọa và tài nguyên của mình mỗi lượt |
 | Lập quốc | Tên, cờ, tuyên ngôn; chặn trùng tên, tên model, màu cờ giống nhau |
 | Kinh tế | Lao động, săn bắt hái lượm, khai thác, khai mỏ, trữ lượng ô tái sinh, công cụ hao mòn, chế tác, công trình, ruộng, chuồng |
 | Dân số | Ăn, đói, hư hỏng, tăng dân, ổn định, nội loạn, di cư, sự kiện thế giới |
@@ -99,8 +83,8 @@ Tạo thế giới mới: `docker compose down`, xóa (hoặc đổi tên) `data
 | Giao thương | Đề nghị và nhận trao đổi, đoàn buôn đi đường xa, hàng hư trên đường |
 | Chiến tranh | Tuyên chiến (có hiệu lực lượt sau), đồng minh và tông chủ tự tham chiến, tấn công chiếm ô, bao vây thủ đô, đột kích cướp kho, tù binh, mệt mỏi chiến tranh, độc lập |
 | Tình báo | Mức 1–4 theo tầm nhìn, buôn bán, hiệp ước, liên minh, gián điệp; tin phai dần nếu chưa có chữ viết |
-| Watcher | Bản đồ sống, suy nghĩ từng AI, thỉnh nguyện, Sắc lệnh, duyệt tay đơn phát minh, bảng quan hệ, biểu đồ, xếp hạng, chat Claude, **Sử gia AI** viết một chương sử mỗi 10 lượt (`HISTORIAN_PROVIDER`, đọc trong tab Biên niên) |
-| Hạ tầng | Ngủ đông khi hết quota, sổ cái kiểm toán mỗi lượt, replay tất định, tự cập nhật khi `git pull` |
+| Watcher | Bản đồ sống với lớp phủ mối đe dọa và tài nguyên, suy nghĩ từng AI, thỉnh nguyện, Sắc lệnh, duyệt tay đơn phát minh, bảng quan hệ, biểu đồ, xếp hạng, chat Claude, **Sử gia AI** viết một chương sử mỗi 10 lượt (`HISTORIAN_PROVIDER`, đọc trong tab Biên niên) |
+| Hạ tầng | Mọi quốc gia chạy qua gói Claude của Watcher, cả thế giới chờ khi hết giới hạn gói, sổ cái kiểm toán mỗi lượt, replay tất định, tự cập nhật khi `git pull` |
 
 Chưa có: phá hoại và đánh cắp công nghệ bằng gián điệp (§7.8), đổi tên quốc gia (§2.2).
 

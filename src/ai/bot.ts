@@ -11,10 +11,11 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
-import { AP_COST, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, GOOD_VALUE, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { AP_COST, CLAIM_FOOD, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, deltaE, homeDefence, housing, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -499,9 +500,20 @@ function hostileBorder(v: View): boolean {
 }
 
 interface WarPlan { warriors: number; strikes: Array<{ tile: number; warriors: number }>; bridge?: number }
+/** §9.4 Warriors to keep at home while a barbarian horde could raid us: enough to beat it off, at most a fifth of the workers. */
+function wildGuard(v: View): number {
+  const { world, n } = v;
+  if (n.population < HORDES.minPop) return 0;
+  const threat = liveHordes(world).filter(h => landDistance(world, n, h.tile) <= HORDES.range + 2).reduce((s, h) => Math.max(s, raidParty(h, n)), 0);
+  if (!threat) return 0;
+  // The raid is resolved with homeDefence(): ask it what one more warrior is worth (weapons and walls included)
+  const now = homeDefence(world, n), perMan = Math.max(0.1, homeDefence(world, { ...n, labor: { ...n.labor, warrior: n.labor.warrior + 1 } }) - now);
+  return Math.max(0, Math.min(Math.round(v.workers * 0.25), n.labor.warrior + Math.ceil((threat * 1.1 - now) / perMan)));
+}
+
 function warPlan(v: View): WarPlan | null {
   const { world, n } = v;
-  if (!v.wars.length) return null;
+  if (!v.wars.length) { const guard = wildGuard(v); return guard > 0 ? { warriors: guard, strikes: [] } : null; }
   const aggressor = v.wars.some(w => w.a === n.id && !w.reason.startsWith("bảo vệ"));
   const warriors = Math.max(2, Math.round(v.workers * (aggressor ? 0.3 : 0.25)));
   const strikes: WarPlan["strikes"] = [];

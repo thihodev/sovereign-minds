@@ -12,7 +12,8 @@ import { buildingWorks, mods, ownedTiles, parseTile } from "./engine.ts";
 import type { Battle, Nation, Treaty, TreatyType, War, World } from "./types.ts";
 
 export type Say = (nation: number | null, kind: string, text: string) => void;
-export interface Strike { n: Nation; target: Nation; tile: number; warriors: number; kind: "attack" | "raid" }
+/** kind "wild" (§9.4 clear_wild) only reserves the men for the turn; it is never fought here. */
+export interface Strike { n: Nation; target: Nation; tile: number; warriors: number; kind: "attack" | "raid" | "wild" }
 export interface DiploCtx { world: World; tick: number; L: Ledger; say: Say; strikes: Strike[]; sent: Set<string>; accepts: Array<{ n: Nation; offer: number }>; treatyAccepts: Array<{ n: Nation; offer: number }> }
 
 // ---------------------------------------------------------------- relations
@@ -332,7 +333,7 @@ export function resolveRelations(ctx: DiploCtx): void {
 export function resolveBattles(ctx: DiploCtx): void {
   const { world, tick, L, say } = ctx;
   const facing = new Map<number, number>();
-  for (const s of ctx.strikes) facing.set(s.target.id, (facing.get(s.target.id) || 0) + 1);
+  for (const s of ctx.strikes) if (s.kind !== "wild") facing.set(s.target.id, (facing.get(s.target.id) || 0) + 1);
   const frontMemo = new Map<number, number>();
   const frontOf = (D: Nation): number => {
     if (!frontMemo.has(D.id)) frontMemo.set(D.id, Math.max(facing.get(D.id) || 1, borderTiles(world, D.id)));
@@ -340,7 +341,7 @@ export function resolveBattles(ctx: DiploCtx): void {
   };
   for (const s of ctx.strikes) {
     const A = s.n, D = s.target;
-    if (!A.alive || !D.alive || !activeWar(world, A.id, D.id)) continue;
+    if (s.kind === "wild" || !A.alive || !D.alive || !activeWar(world, A.id, D.id)) continue;
     const r = rngFor(world.seed, tick, "battle", A.id, D.id, s.tile);
     const luck = () => WAR.luck[0] + r() * (WAR.luck[1] - WAR.luck[0]);
     /** (armed men + militia at half strength) × bonuses × morale × luck; defenders also get home, terrain, walls and river. */

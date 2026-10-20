@@ -1,7 +1,7 @@
 {
   "name": "sovereign-minds",
-  "version": "0.3.0",
-  "description": "An open world where every nation is run by its own free AI model, starting from the stone age.",
+  "version": "0.4.0",
+  "description": "An open world where every nation is run by its own Claude mind with its own national trait, starting from the stone age.",
   "type": "module",
   "license": "MIT",
   "engines": {

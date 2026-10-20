@@ -3,21 +3,23 @@
 // the deterministic engine must never read.
 
 import { createWorld, step, ownedTiles, type NationSpec } from "./engine.ts";
+import { TILE_COUNT } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
 import { buildObservation, SYSTEM_PROMPT } from "./ai/prompt.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
 import { JUDGE_SYSTEM, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
-import { rngFor } from "./rng.ts";
+import { rngFor, shuffle } from "./rng.ts";
+import { TRAITS, TRAIT_BY_ID } from "./rules.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
-import { askClaude, claudeStatus } from "./claude.ts";
+import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus } from "./claude.ts";
 import type { Store } from "./db.ts";
 import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
 
 export interface RunnerConfig {
   seed: string;
-  nations: string[]; // provider ids, "bot" allowed
+  nations: string[]; // "claude[:model[:effort]]", provider ids, "bot"
   fillWithBots: boolean;
   tickSeconds: number;
   aiTimeoutSec: number;
@@ -32,20 +34,48 @@ export type RunnerEvent =
   | { type: "history"; chapter: HistoryChapter; entry: ChronicleEntry }
   | { type: "reload" };
 
+/** What the Watcher picks before a game (§2.4): one row per nation. */
+export interface WorldSetup { seed: string; tickSeconds: number; nations: Array<{ trait?: string; model?: string; effort?: string }> }
+
 const SLEEP_STEPS_MIN = [15, 30, 60, 120, 240, 360];
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export function nationSpecs(cfg: RunnerConfig): { specs: NationSpec[]; notes: string[] } {
   const specs: NationSpec[] = [], notes: string[] = [];
-  for (const id of cfg.nations) {
+  for (const entry of cfg.nations) {
+    // "provider" or "provider:model" (the model may itself contain ":", e.g. openrouter:x/y:free)
+    const cut = entry.indexOf(":"), id = cut < 0 ? entry : entry.slice(0, cut), pinned = cut < 0 ? "" : entry.slice(cut + 1).trim();
     if (id === "bot") { specs.push({ controller: "bot", provider: "bot", model: "bot" }); continue; }
+    if (id === "claude") {
+      const [model, effort] = pinned.split(":");
+      specs.push({ controller: "ai", provider: "claude", model: CLAUDE_MODELS.some(m => m.id === model) ? model : "haiku", effort: CLAUDE_EFFORTS.includes(effort) ? effort : "low" });
+      continue;
+    }
     const p = PROVIDERS[id];
     if (!p) { notes.push(`Bỏ qua nhà cung cấp lạ "${id}"`); continue; }
-    if (providerKey(p)) specs.push({ controller: "ai", provider: id, model: providerModel(p) });
+    if (providerKey(p)) specs.push({ controller: "ai", provider: id, model: pinned || providerModel(p), pinnedModel: pinned || undefined });
     else if (cfg.fillWithBots) { specs.push({ controller: "bot", provider: id, model: `bot (thiếu ${p.keyEnv})` }); notes.push(`${p.label}: thiếu ${p.keyEnv}, dùng bot thay thế`); }
     else notes.push(`${p.label}: thiếu ${p.keyEnv}, không tạo quốc gia`);
   }
+  // §2.4 every nation is born with a different trait, drawn from the seed
+  const traits = shuffle(TRAITS.map(t => t.id), rngFor(cfg.seed, "traits"));
+  specs.forEach((sp, k) => { sp.trait = traits[k % traits.length]; });
   return { specs, notes };
+}
+
+/** A Watcher's setup as nation specs: unknown values fall back, blank traits are drawn from the unused ones. */
+export function setupSpecs(setup: WorldSetup): NationSpec[] | string {
+  const rows = setup.nations.slice(0, 8);
+  if (rows.length < 2) return "Cần ít nhất 2 quốc gia";
+  const chosen = rows.map(r => r.trait && TRAIT_BY_ID[r.trait] ? r.trait : "");
+  if (new Set(chosen.filter(Boolean)).size !== chosen.filter(Boolean).length) return "Mỗi đặc thù chỉ dùng cho một quốc gia";
+  const free = shuffle(TRAITS.map(t => t.id).filter(id => !chosen.includes(id)), rngFor(setup.seed, "traits"));
+  return rows.map((r, k) => ({
+    controller: "ai", provider: "claude",
+    model: CLAUDE_MODELS.some(m => m.id === r.model) ? r.model! : "haiku",
+    effort: CLAUDE_EFFORTS.includes(r.effort ?? "") ? r.effort : "low",
+    trait: chosen[k] || free.shift() || "",
+  }));
 }
 
 export class Runner {
@@ -61,6 +91,10 @@ export class Runner {
   /** Watcher rulings waiting for the next tick (§5.4: the Watcher can judge by hand). */
   manualRulings = new Map<number, Ruling>();
   private judgeSleep = new Map<string, number>();
+  /** §3.4 Claude nations share the Watcher's plan: a plan limit or a lost login holds the whole world. */
+  claudeWait = { until: 0, reason: "" };
+  /** Answers already in for a tick that is waiting on Claude, kept so no turn is asked (or paid for) twice. */
+  private held: { tick: number; inputs: Record<number, TurnInput> } | null = null;
   /** §10.1: writes a chapter every few ticks, off the tick loop. */
   historian: Historian | null;
 
@@ -69,7 +103,12 @@ export class Runner {
 
   constructor(store: Store, cfg: RunnerConfig) {
     this.store = store; this.cfg = cfg;
-    const saved = store.loadState();
+    let saved = store.loadState();
+    if (saved && saved.tiles.length !== TILE_COUNT) {
+      // A world from another map size (v0.3 had 64 × 64): keep it in data/backups/ and wait for a new one
+      console.log(`[world] Thế giới đã lưu có ${saved.tiles.length} ô, bản đồ bây giờ ${TILE_COUNT} ô: đã sao lưu vào ${store.backupAndReset()}, chờ tạo thế giới mới.`);
+      saved = null;
+    }
     if (saved) this.world = migrate(saved);
     else {
       const { specs, notes } = nationSpecs(cfg);
@@ -77,12 +116,14 @@ export class Runner {
       for (const n of notes) console.log(`[world] ${n}`);
       store.saveState(this.world);
       store.addChronicle([{ tick: 0, nation: null, kind: "genesis", text: `Khai thiên lập địa: thế giới Nguyên Địa (seed "${cfg.seed}") với ${this.world.nations.length} bộ lạc.` }]);
+      // A new install waits for the Watcher to choose the nations (§2.4)
+      store.setMeta("setup_pending", "1"); store.setMeta("paused", "1");
     }
     // Keys may have been added since the world was created: upgrade bots to AIs.
     for (const n of this.world.nations) {
       const p = PROVIDERS[n.provider];
-      if (p && n.controller === "bot" && providerKey(p)) { n.controller = "ai"; n.model = providerModel(p); n.status = "active"; console.log(`[world] ${p.label} có key: quốc gia ${n.id + 1} chuyển sang AI`); }
-      if (p && n.controller === "ai") n.model = providerModel(p);
+      if (p && n.controller === "bot" && providerKey(p)) { n.controller = "ai"; n.model = n.pinnedModel || providerModel(p); n.status = "active"; console.log(`[world] ${p.label} có key: quốc gia ${n.id + 1} chuyển sang AI`); }
+      if (p && n.controller === "ai") n.model = n.pinnedModel || providerModel(p);
     }
     this.paused = store.getMeta("paused") === "1";
     this.loadManual();
@@ -118,7 +159,15 @@ export class Runner {
     try {
       const w = this.world, alive = w.nations.filter(n => n.alive);
       const inputs: Record<number, TurnInput> = {};
-      await Promise.all(alive.map(async n => { inputs[n.id] = await this.turnFor(n); this.emit({ type: "turn", nation: n.id, kind: inputs[n.id].kind }); }));
+      const held = this.held?.tick === w.tick ? this.held.inputs : {};
+      await Promise.all(alive.map(async n => { inputs[n.id] = held[n.id] ?? await this.turnFor(n); this.emit({ type: "turn", nation: n.id, kind: inputs[n.id].kind }); }));
+      if (Date.now() < this.claudeWait.until && alive.some(n => n.provider === "claude" && n.controller === "ai" && inputs[n.id].kind === "asleep")) {
+        // Fair play: nobody moves until every Claude nation can. Answers already in wait for the retry.
+        this.held = { tick: w.tick, inputs: Object.fromEntries(Object.entries(inputs).filter(([, v]) => v.kind !== "asleep")) };
+        this.nextTickAt = this.claudeWait.until;
+        return;
+      }
+      this.held = null;
 
       const aiAlive = alive.filter(n => n.controller === "ai");
       if (alive.length && alive.every(n => inputs[n.id].kind === "asleep") && aiAlive.length) {
@@ -185,10 +234,10 @@ export class Runner {
       if (out[p.id] || calls >= this.cfg.judgesPerTick) continue;
       const proposer = w.nations[p.nation].provider;
       // Claude (the Watcher's own login) comes first when it is listed and logged in.
-      if (this.cfg.judgeProviders.includes("claude") && (this.judgeSleep.get("claude") || 0) < Date.now() && this.claudeReady()) {
+      if (this.cfg.judgeProviders.includes("claude") && (this.judgeSleep.get("claude") || 0) < Date.now() && Date.now() >= this.claudeWait.until && this.claudeReady()) {
         calls++;
         const model = process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5", started = Date.now();
-        const r = await this.withLock("claude", () => askClaude(JUDGE_SYSTEM, judgeUserPrompt(w, p), { model, timeoutMs: Math.max(120, this.cfg.aiTimeoutSec) * 1000 }));
+        const r = await askClaude(JUDGE_SYSTEM, judgeUserPrompt(w, p), { model, timeoutMs: Math.max(120, this.cfg.aiTimeoutSec) * 1000 });
         const j = r.ok ? extractJson(r.text) : null;
         this.store.logTurn({ tick: w.tick, nation: -1, provider: "claude", model, kind: j ? "ruling" : (r.ok ? "invalid" : r.kind), raw: r.ok ? r.text : "", parsed: j ?? undefined, error: r.ok ? "" : r.message, latencyMs: Date.now() - started });
         if (j) { out[p.id] = parseRuling(j, `Claude · ${model}`); continue; }
@@ -224,6 +273,7 @@ export class Runner {
       this.store.logTurn({ tick, nation: n.id, provider: n.provider, model: n.model, kind: "bot", raw: "", parsed: response, error: "", latencyMs: 0 });
       return { kind: "ok", response };
     }
+    if (n.provider === "claude") return this.claudeTurn(n);
     const p = PROVIDERS[n.provider];
     if (!p || !providerKey(p)) { n.status = "error"; n.statusNote = `Thiếu key ${p?.keyEnv ?? n.provider}`; return { kind: "asleep" }; }
     if ((n.status === "asleep" || n.status === "error") && Date.now() < n.sleepUntil) return { kind: "asleep" };
@@ -231,16 +281,16 @@ export class Runner {
     const obs = JSON.stringify(buildObservation(w, n));
     n.stats.calls++;
     return this.withLock(p.id, async () => {
-      let r = await callModel(p, SYSTEM_PROMPT, obs, { timeoutMs: this.cfg.aiTimeoutSec * 1000 });
+      let r = await callModel(p, SYSTEM_PROMPT, obs, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
       let parsed = r.ok ? extractJson(r.text) : null;
       if (r.ok && !parsed) {
         // §3.3: one repair attempt within the same turn
         const retry = `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`;
-        r = await callModel(p, SYSTEM_PROMPT, retry, { timeoutMs: this.cfg.aiTimeoutSec * 1000 });
+        r = await callModel(p, SYSTEM_PROMPT, retry, { timeoutMs: this.cfg.aiTimeoutSec * 1000, model: n.model });
         parsed = r.ok ? extractJson(r.text) : null;
       }
       const log = (kind: string, raw: string, error: string) =>
-        this.store.logTurn({ tick, nation: n.id, provider: p.id, model: providerModel(p), kind, raw, parsed: parsed ?? undefined, error, latencyMs: r.latencyMs });
+        this.store.logTurn({ tick, nation: n.id, provider: p.id, model: n.model, kind, raw, parsed: parsed ?? undefined, error, latencyMs: r.latencyMs });
 
       if (r.ok && parsed) {
         if (n.status !== "active") this.store.addChronicle([{ tick, nation: n.id, kind: "wake", text: `${n.name} thức dậy sau giấc ngủ đông.` }]);
@@ -265,6 +315,87 @@ export class Runner {
       log(r.kind, "", r.message);
       return { kind: "silent", reason: r.kind };
     });
+  }
+
+  /** One Claude nation's turn through the Watcher's Claude login, at the nation's model and effort. */
+  private async claudeTurn(n: Nation): Promise<TurnInput> {
+    const w = this.world, tick = w.tick;
+    if (Date.now() < this.claudeWait.until) return { kind: "asleep" };
+    if (!this.claudeReady()) { this.holdClaude(5 * 60, "Claude chưa đăng nhập: đăng nhập trong tab Chat Claude để các quốc gia chơi tiếp."); return { kind: "asleep" }; }
+    const obs = JSON.stringify(buildObservation(w, n));
+    n.stats.calls++;
+    const waiting = () => Date.now() < this.claudeWait.until;
+    const started = Date.now(), opts = { model: n.model, effort: n.effort, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000, skipIf: waiting };
+    let r = await askClaude(SYSTEM_PROMPT, obs, opts);
+    let parsed = r.ok ? extractJson(r.text) : null;
+    if (r.ok && !parsed) {
+      // §3.3: one repair attempt within the same turn
+      r = await askClaude(SYSTEM_PROMPT, `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
+      parsed = r.ok ? extractJson(r.text) : null;
+    }
+    const log = (kind: string, raw: string, error: string) =>
+      this.store.logTurn({ tick, nation: n.id, provider: "claude", model: `${n.model}${n.effort ? `/${n.effort}` : ""}`, kind, raw, parsed: parsed ?? undefined, error, latencyMs: Date.now() - started });
+    if (r.ok && parsed) { n.status = "active"; n.statusNote = ""; log("ok", r.text, ""); return { kind: "ok", response: parsed as AIResponse }; }
+    if (r.ok) { log("invalid", r.text, "Không đọc được JSON"); n.statusNote = "Trả lời sai định dạng"; return { kind: "silent", reason: "json" }; }
+    if (waiting()) return { kind: "asleep" }; // another nation's call already set the wait; nothing to log or extend
+    log(r.kind, "", r.message);
+    if (r.kind === "ratelimit") { this.holdClaude(Math.max(60, (r.retryAfterSec ?? 15 * 60) + 5), `Hết giới hạn gói Claude, thế giới chờ đến khi được làm mới. ${r.message.slice(0, 160)}`); return { kind: "asleep" }; }
+    if (r.kind === "auth") { this.claudeCheck = { at: 0, ok: false }; this.holdClaude(5 * 60, `Claude báo lỗi đăng nhập: ${r.message.slice(0, 160)}`); return { kind: "asleep" }; }
+    n.statusNote = r.message.slice(0, 200);
+    return { kind: "silent", reason: r.kind };
+  }
+
+  private holdClaude(secs: number, reason: string): void {
+    const until = Date.now() + secs * 1000;
+    if (until > this.claudeWait.until) this.claudeWait = { until, reason };
+    this.emit({ type: "status" });
+  }
+
+  /** After a login from the web UI: stop waiting and play now. */
+  claudeLoggedIn(): void {
+    this.claudeCheck = { at: 0, ok: false };
+    if (this.claudeWait.until > Date.now()) { this.claudeWait = { until: 0, reason: "" }; this.nextTickAt = Math.min(this.nextTickAt, Date.now() + 2000); }
+    this.emit({ type: "status" });
+  }
+
+  // ---------------------------------------------------------------- new world (§2.4)
+
+  /** Back up the current world and start a new one from the Watcher's setup. */
+  async newWorld(setup: WorldSetup): Promise<{ error?: string; backup?: string }> {
+    const seed = String(setup.seed || "").trim().slice(0, 60) || `nguyen-dia-${Date.now().toString(36)}`;
+    const specs = setupSpecs({ ...setup, seed });
+    if (typeof specs === "string") return { error: specs };
+    this.paused = true;
+    while (this.busy) await sleep(200);
+    if (this.historian) this.historian.stopped = true;
+    const backup = this.store.backupAndReset();
+    this.world = createWorld(seed, specs);
+    this.cfg.seed = seed;
+    this.held = null; this.claudeWait = { until: 0, reason: "" }; this.lastError = "";
+    this.manualRulings.clear(); this.judgeSleep.clear();
+    this.store.saveState(this.world);
+    const traits = this.world.nations.map(n => TRAIT_BY_ID[n.trait ?? ""]?.name).filter(Boolean).join(", ");
+    this.store.addChronicle([{ tick: 0, nation: null, kind: "genesis", text: `Khai thiên lập địa: thế giới Nguyên Địa (seed "${seed}") với ${this.world.nations.length} bộ lạc: ${traits}.` }]);
+    this.historian = historianFromEnv(this.store, this.world, this.cfg.aiTimeoutSec, (chapter, entry) => this.emit({ type: "history", chapter, entry }));
+    this.setTickSeconds(setup.tickSeconds || this.cfg.tickSeconds); // the reset emptied meta: write it back
+    this.store.setMeta("setup_pending", "0");
+    this.setPaused(false);
+    this.emit({ type: "reload" });
+    console.log(`[world] Thế giới mới "${seed}" (${this.world.nations.length} quốc gia); bản cũ lưu ở ${backup}`);
+    return { backup };
+  }
+
+  /** Change a Claude nation's model or effort; applies from its next turn. */
+  setNationModel(id: number, model: string, effort: string): string | null {
+    const n = this.world.nations[id];
+    if (!n || n.provider !== "claude") return "Chỉ đổi được model của quốc gia chạy bằng Claude";
+    if (!CLAUDE_MODELS.some(m => m.id === model)) return "Model không hợp lệ";
+    if (!CLAUDE_EFFORTS.includes(effort)) return "Effort không hợp lệ";
+    n.model = model; n.effort = effort;
+    this.store.logWatcher(this.world.tick, "model", { id, model, effort });
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
   }
 
   // ---------------------------------------------------------------- Watcher powers (§10)

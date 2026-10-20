@@ -5,12 +5,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
-import { RULES_VERSION } from "./rules.ts";
+import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { housing, inventionCost, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { chat, claudeStatus, login, logout } from "./claude.ts";
+import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
+import { layer, nationResources, nationThreats, tileThreats } from "./threats.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
@@ -43,7 +44,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
   const authorized = (req: IncomingMessage, url: URL) => !token || req.headers["x-watcher-token"] === token || url.searchParams.get("token") === token;
 
   function statusPayload() {
-    return { tick: runner.world.tick, paused: runner.paused, busy: runner.busy, nextTickAt: runner.nextTickAt, tickSeconds: runner.cfg.tickSeconds, lastError: runner.lastError.slice(0, 500), version: opts.version, rules: RULES_VERSION };
+    return { tick: runner.world.tick, paused: runner.paused, busy: runner.busy, nextTickAt: runner.nextTickAt, tickSeconds: runner.cfg.tickSeconds, lastError: runner.lastError.slice(0, 500), version: opts.version, rules: RULES_VERSION,
+      setupPending: runner.store.getMeta("setup_pending") === "1", claudeWait: runner.claudeWait.until > Date.now() ? runner.claudeWait : null };
   }
 
   function statePayload() {
@@ -53,7 +55,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       owners: w.tiles.map(t => t.owner),
       nations: w.nations.map(n => ({
         id: n.id, name: n.name, capitalName: n.capitalName, people: n.people, flag: n.flag, manifesto: n.manifesto, founded: n.founded,
-        controller: n.controller, provider: n.provider, model: n.model, alive: n.alive, capital: n.capital,
+        controller: n.controller, provider: n.provider, model: n.model, effort: n.effort ?? "", alive: n.alive, capital: n.capital,
+        trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
         population: n.population, workers: workers(n), housing: housing(w, n), stability: n.stability, reputation: n.reputation, era: n.era,
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n),
@@ -67,7 +70,9 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
         formerNames: n.formerNames,
+        threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null,
       })),
+      hordes: (w.hordes ?? []).map(h => ({ ...h, strength: Math.round(h.strength) })),
       spies: w.spies,
       petitions: w.petitions,
       decrees: w.decrees,
@@ -117,7 +122,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       }
       if (path === "/api/tile") {
         const i = Number(url.searchParams.get("i")), t = runner.world.tiles[i];
-        return t ? send(res, 200, t) : send(res, 404, { error: "no tile" });
+        return t ? send(res, 200, { ...t, threats: tileThreats(runner.world, i) }) : send(res, 404, { error: "no tile" });
+      }
+      if (path === "/api/layer") {
+        const values = layer(runner.world, String(url.searchParams.get("kind") || ""));
+        return values.length ? send(res, 200, { tick: runner.world.tick, values }) : send(res, 400, { error: "kind?" });
       }
       if (path === "/api/chronicle") return send(res, 200, runner.store.chronicle(Math.min(500, Number(url.searchParams.get("limit")) || 100), Number(url.searchParams.get("before")) || undefined));
       if (path === "/api/history") return send(res, 200, runner.store.history(Math.min(500, Number(url.searchParams.get("limit")) || 100)));
@@ -143,6 +152,27 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         runner.store.logWatcher(runner.world.tick, "control", b);
         return send(res, 200, statusPayload());
       }
+      // ---- new world (§2.4) and each nation's model
+      if (path === "/api/setup" && method === "GET") {
+        return send(res, 200, {
+          traits: TRAITS.map(t => ({ id: t.id, name: t.name, icon: t.icon, desc: t.desc, lines: traitLines(t) })),
+          models: CLAUDE_MODELS, efforts: CLAUDE_EFFORTS, seed: runner.world.seed, tickSeconds: runner.cfg.tickSeconds,
+          nations: runner.world.nations.length, claude: { loggedIn: runner.claudeReady() },
+        });
+      }
+      if (path === "/api/world/new" && method === "POST") {
+        const b = await readBody(req);
+        const r = await runner.newWorld({ seed: String(b.seed ?? ""), tickSeconds: Number(b.tickSeconds) || 0, nations: Array.isArray(b.nations) ? (b.nations as Array<Record<string, unknown> | null>).map(x => ({ trait: String(x?.trait ?? ""), model: String(x?.model ?? ""), effort: String(x?.effort ?? "") })) : [] });
+        if (r.error) return send(res, 400, { error: r.error });
+        runner.store.logWatcher(0, "new_world", { ...b, backup: r.backup });
+        return send(res, 200, { ok: true, backup: r.backup });
+      }
+      const modelM = path.match(/^\/api\/nation\/(\d+)\/model$/);
+      if (modelM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.setNationModel(Number(modelM[1]), String(b.model ?? ""), String(b.effort ?? ""));
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
       const petM = path.match(/^\/api\/petitions\/(\d+)$/);
       if (petM && method === "POST") {
         const b = await readBody(req);
@@ -164,7 +194,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       // ---- Claude
       if (path === "/api/claude" && method === "GET") return send(res, 200, { ...claudeStatus(), login: login.info() });
       if (path === "/api/claude/login/start" && method === "POST") return send(res, 200, await login.start());
-      if (path === "/api/claude/login/code" && method === "POST") { const b = await readBody(req); return send(res, 200, await login.submitCode(String(b.code ?? ""))); }
+      if (path === "/api/claude/login/code" && method === "POST") {
+        const b = await readBody(req), r = await login.submitCode(String(b.code ?? ""));
+        if (r.state === "done") runner.claudeLoggedIn();
+        return send(res, 200, r);
+      }
       if (path === "/api/claude/login/cancel" && method === "POST") { login.cancel(); return send(res, 200, login.info()); }
       if (path === "/api/claude/logout" && method === "POST") { logout(); runner.store.setMeta("claude_session", ""); return send(res, 200, { ok: true }); }
       if (path === "/api/chat" && method === "GET") return send(res, 200, runner.store.chatHistory(100));

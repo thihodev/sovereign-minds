@@ -25,23 +25,25 @@ Thế giới là lưới ô lục giác 64 × 64. Mỗi quốc gia bắt đầu 
 | Địa hình | Tài nguyên có thể có | Di chuyển (lượt/ô) | Phòng thủ |
 | --- | --- | --- | --- |
 | Đồng cỏ | thú săn, cây dại | 1 | +0% |
-| Rừng | gỗ, thú săn, cây dại | 2 | +25% |
+| Rừng | gỗ, thú săn, cây dại, thảo dược (35% ô) | 2 | +25% |
 | Rừng lá kim (hàn đới) | gỗ, thú săn | 2 | +25% |
-| Rừng rậm (nhiệt đới) | gỗ, cây dại | 3 | +50% |
+| Rừng rậm (nhiệt đới) | gỗ, cây dại, thảo dược | 3 | +50% |
 | Đồi | đá, đá lửa (40% ô), quặng đồng (20% ô, ẩn), quặng thiếc (2% ô, ẩn) | 2 | +50% |
 | Núi | đá, quặng đồng (10%), thiếc (6%), sắt (8%) (đều ẩn) | không đi qua (đến khi có phát minh) | +100% |
 | Ven biển | cá, cây dại, muối (25% ô) | 1 | +0% |
-| Đầm lầy | đất sét, sậy | 3 | +25% |
+| Đầm lầy | đất sét, sậy, thảo dược | 3 | +25% |
 | Sa mạc | đá | 2 | +0% |
 | Lãnh nguyên (hàn đới) | thú săn, đá | 2 | +0% |
+| Băng hà (chân Tường Băng) | thú săn (tuần lộc, voi ma mút), đá, đá lửa (15% ô) | 3 | +25% |
 | Biển nông | cá | chỉ đi được khi có năng lực `đi-nước` | — |
 | Biển sâu | — | không đi được | — |
+| Tường Băng (viền thế giới) | — | không ai đi qua, đứng trên hay khai hoang được | — |
 
 - **Sông** không phải một địa hình mà là một dấu trên ô: ô có sông được thêm cá và đất sét. Ô có sông được +25% phòng thủ khi bị tấn công.
 - **Di chuyển:** cột "lượt/ô" là thiết kế cho đoàn người đi trên bản đồ (mục 7.6) (chưa có trong engine). Engine hiện chỉ dùng địa hình để quyết định ô nào đi qua được: biển nông cần `đi-nước` (hoặc hiệu ứng `move` biển nông), núi cần hiệu ứng `move` núi, biển sâu không bao giờ đi được. Sa mạc thiếu nước (chưa có trong engine).
-- Mỗi ô có trữ lượng hữu hạn. Tài nguyên tái tạo hồi phục mỗi lượt theo % của trần ban đầu: thú săn 10%, cá 8%, gỗ 5%, cây dại 15%, sậy 10%, không vượt trần ban đầu. Đá, đá lửa, đất sét, muối và quặng không tái tạo.
+- Mỗi ô có trữ lượng hữu hạn. Tài nguyên tái tạo hồi phục mỗi lượt theo % của trần ban đầu: thú săn 10%, cá 8%, gỗ 5%, cây dại 15%, sậy 10%, thảo dược 8%, không vượt trần ban đầu. Đá, đá lửa, đất sét, muối và quặng không tái tạo.
 - **Tài nguyên ẩn:** quặng đồng, thiếc, sắt không hiện trên bản đồ của AI và không khai thác được cho đến khi thành phố sở hữu phát minh có năng lực `nhận-biết-khoáng` (thấy cả ba) hoặc phát minh mở có hiệu ứng `reveal` cho từng loại quặng. Than (chưa có trong engine).
-- Điểm khai sinh cách nhau ≥ 12 ô, không ở quần đảo, không trong vòng 3 ô quanh kỳ quan. Tổng giá trị tài nguyên trong bán kính 3 của mỗi điểm khai sinh nằm trong ±5% quanh cùng một mức chuẩn, nên chênh nhau tối đa khoảng 10%. Nếu không tìm đủ chỗ thì Engine nới khoảng cách xuống ≥ 10 ô và bỏ kiểm tra giá trị.
+- Điểm khai sinh cách nhau ≥ 17 ô (láng giềng gần nhất lý tưởng ≤ 25 ô), không ở quần đảo, không trong vòng 3 ô quanh kỳ quan, không trong vòng 8 ô của Tường Băng, và có đủ gỗ, đá, thịt hoặc cá, cây dại trong bán kính 2. Tổng giá trị tài nguyên trong bán kính 3 của mỗi điểm khai sinh nằm trong ±5% quanh cùng một mức chuẩn, nên chênh nhau tối đa khoảng 10%. Nếu không tìm đủ chỗ thì Engine nới khoảng cách xuống ≥ 13 ô và bỏ kiểm tra giá trị.
 
 Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây dại 20–80, cá 60 (ô có sông thêm 60), gỗ 150–200, đá 300–500, đá lửa 40, đất sét 150, sậy 60, muối 30, quặng đồng 80, thiếc 60, sắt 100. Tài nguyên tái tạo hồi theo % của trần, nên 7 ô khởi đầu chỉ nuôi bền vững khoảng 40–50 người bằng săn hái. Muốn đông dân hơn thì phải mở rộng lãnh thổ hoặc phát minh trồng trọt.
 
@@ -65,6 +67,27 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
 - **Mất ô:** ô bị chiếm trong chiến tranh, nhượng qua hiệp ước, bị bỏ (`abandon_tile`), hoặc bị cắt rời: một ô không liền với thủ đô hay điểm định cư nào trong 5 lượt liên tiếp sẽ thành vô chủ.
+
+### 2.4 Đặc thù quốc gia
+
+Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng nước nào. Watcher chọn đặc thù (hoặc để ngẫu nhiên) trong hộp thoại **Thế giới mới**, và đặc thù giữ nguyên suốt trận. Mỗi đặc thù có hai phần:
+
+- **Luật:** một lợi thế và một điểm yếu, viết cùng dạng với hiệu ứng phát minh (thưởng nghề, RP, chiến đấu, ô quản lý, thiệt hại mùa đông, ổn định mỗi lượt), và Engine cộng như thêm một phát minh. Thương nhân còn được giảm thêm 15 điểm % khi học phát minh từ nước đã gặp (mục 7.5, tối đa 75%). Một số đặc thù đổi uy tín hoặc ổn định lúc khởi đầu.
+- **Bản sắc:** trường `identity` trong gói quan sát (mục 8.2) cho AI biết tên đặc thù, tính cách dân tộc và các con số trên. AI được dặn để bản sắc ấy dẫn dắt tên gọi, văn hóa, ưu tiên và ngoại giao.
+
+| Đặc thù | Tính cách | Lợi thế và điểm yếu |
+| --- | --- | --- |
+| 🏹 Thợ săn thảo nguyên | Sống bằng cuộc săn, giỏi theo dấu thú, ít kiên nhẫn với sách vở. | săn bắt +10%; nghiên cứu −10% |
+| 📜 Hiền triết | Tò mò, quan sát và ghi nhớ; nghiên cứu nhanh nhưng yếu khi đánh nhau. | nghiên cứu +8%; chiến đấu −15% |
+| 🌾 Nông dân ven sông | Gắn bó với đất và mùa vụ; hái lượm, trồng trọt, đánh cá giỏi nhưng khó cai quản vùng xa. | hái lượm +15%; nông dân +25%; đánh cá +10%; −1 ô quản lý |
+| 🔨 Thợ thủ công | Khéo tay, chế tác và xây dựng giỏi; săn bắt kém. | chế tác +40%; xây dựng +30%; săn bắt −8% |
+| ⚔️ Chiến binh | Thượng võ, đánh mạnh; bị láng giềng e dè và ít chú tâm học hỏi. | nghiên cứu −5%; chiến đấu +25%; uy tín khởi đầu −10 |
+| 🤝 Thương nhân | Giỏi giao thiệp, học nhanh từ nước đã gặp, được tin cậy; yếu về quân sự. | chiến đấu −10%; học từ nước đã gặp rẻ thêm 15%; uy tín khởi đầu +10 |
+| 🐎 Du mục | Quen đi xa và chịu rét; quản được nhiều đất nhưng ngại xây cất. | xây dựng −20%; +2 ô quản lý; thiệt hại mùa đông −25% |
+| ⛏️ Người núi đá | Thạo đá, gỗ, đất sét và quặng; hái lượm kém. | khai thác gỗ/đá/đất sét/mỏ +25%; hái lượm −15% |
+| 🔥 Thầy tế | Đoàn kết quanh lửa thiêng và nghi lễ; ổn định cao, săn bắt kém. | săn bắt −8%; +1 ổn định/lượt; ổn định khởi đầu +10 |
+
+Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay vòng qua mọi điểm khai sinh, mỗi seed 300 lượt. Trên bản đồ 128 × 128 có đủ mối đe dọa (mục 9.4), với 3 seed, điểm xếp hạng trung bình của từng đặc thù nằm trong khoảng −10% đến +13% so với mức trung bình, và không nước nào diệt vong. Bot không biết khai thác chiến tranh và giao thương, nên con số này đánh giá thấp Chiến binh và Thương nhân.
 
 ## 3. Thời gian và vòng lượt
 
@@ -569,18 +592,35 @@ Mỗi lượt, mỗi quốc gia bốc thăm sự kiện từ bảng dưới đâ
 
 | Sự kiện | Xác suất mỗi lượt | Điều kiện | Tác động | Giảm nhẹ bằng |
 | --- | --- | --- | --- | --- |
-| Mùa đông khắc nghiệt | 4% (×2 ở hàn đới, không có ở nhiệt đới) | mọi nơi | mất 30% lương thực làm ra trong lượt, 5% dân chết rét | mỗi thứ sau giảm một nửa số chết: Thuộc da, có công trình có chỗ ở (Lều), áo da đủ cho nửa dân số |
+| Mùa đông khắc nghiệt | 4% (×2 ở hàn đới, không có ở nhiệt đới); có đất trong vòng 4 ô của Tường Băng: ít nhất 3%, rồi ×1,5, kể cả ở nhiệt đới | mọi nơi | mất 30% lương thực làm ra trong lượt, 5% dân chết rét | mỗi thứ sau giảm một nửa số chết: Thuộc da, có công trình có chỗ ở (Lều), áo da đủ cho nửa dân số |
 | Hạn hán | 3% | không ở hàn đới | hái lượm và ruộng −50% trong 2 lượt | tưới tiêu (phải tự phát minh) |
-| Lũ lụt | 3% | sông, đầm lầy | phá 1 công trình; ruộng màu mỡ hơn +20% lượt sau (chưa có trong engine) | đê (phải tự phát minh) |
-| Dịch bệnh | 2% (×2 nếu dân > 80, ×0,7 nếu có Suối Nước Nóng) | mọi nơi | 10–20% dân chết. Lây qua đường giao thương (chưa có trong engine) | cách ly, thảo dược |
+| Lũ lụt | 3% (×2 nếu có châu thổ) | có ô sông hoặc đầm lầy | nước cuốn 10% lương thực trong kho và 1 công trình trên ô sông/đầm; ruộng +20% trong 2 lượt sau | xây công trình xa nước |
+| Dịch bệnh | 2% (×2 nếu dân > 80, ×0,7 nếu có Suối Nước Nóng) | mọi nơi | 10–20% dân chết. Lây qua đường giao thương (chưa có trong engine) | thảo dược: có ≥ 1 thảo dược cho mỗi 10 dân thì số chết giảm một nửa (dùng hết số đó) |
 | Đàn thú di cư | 5% | có ô đồng cỏ | +100 thú săn trên một ô đồng cỏ (một lần, không tái tạo) | — |
 | Mùa bội thu | 5% | mọi nơi | +30% lương thực làm ra trong lượt | — |
 | Cháy rừng | 2% | có ô rừng còn gỗ | ô rừng đó mất 50% gỗ. Lộ đất trồng (chưa có trong engine) | — |
-| Động đất | 0,5% | đồi, núi | phá công trình trong 3 ô; có thể lộ quặng (chưa có trong engine) | — |
+| Động đất | 0,6% | có ô đồi, núi | phá mọi công trình trong 3 ô quanh tâm chấn (một ô đồi núi của nước đó), 2% dân chết; 30% lộ 40 quặng đồng ở tâm chấn | xây xa đồi núi |
 | Núi lửa phun trào | 0,5% | có công trình trong vòng 2 ô quanh Núi lửa Tro Đen | mất mọi công trình trong bán kính đó | — |
 | Thiên thạch rơi | 0,1% | mọi nơi | 5 đơn vị sắt thiên thạch trên một ô đất liền | — |
 
-Sự kiện được thông báo trước 1 lượt cho quốc gia có phát minh mang năng lực `quan-sát-trời` (chưa có trong engine).
+Mùa đông có gió băng giết người ×1,5. Sự kiện được thông báo trước 1 lượt cho quốc gia có phát minh mang năng lực `quan-sát-trời` (chưa có trong engine).
+
+### 9.4 Mối đe dọa của vùng hoang
+
+Ngoài sự kiện ở 9.2, thế giới có những mối đe dọa thường trực, tính bằng code trong `src/wild.ts` và `step()`.
+
+- **Thú dữ.** Mỗi ô đất có độ nguy hiểm 0–5 theo địa hình: rừng rậm 3 (hổ); rừng, rừng lá kim, núi, băng hà, đầm lầy 2 (sói và gấu, báo tuyết, gấu trắng, cá sấu); đồi, đồng cỏ, lãnh nguyên 1; nơi khác 0. Cộng 2 nếu trong vòng 6 ô quanh nơi ở của một bộ lạc man di còn sống. Chia đôi với đất đã thuần: ô trong vòng 1 ô của thủ đô hay điểm định cư, hoặc có công trình. Mỗi lượt, thú dữ tấn công với xác suất 5% × độ nguy hiểm trung bình của đất có thú săn hoặc cây dại của quốc gia, giết khoảng 8% số thợ săn cộng một phần tư số người hái lượm (ít nhất 1 người); thợ săn đủ công cụ (mỗi món cho 4 người) thì chết một nửa. Đoàn thám hiểm mất mỗi người với xác suất 2% + 1,5% × độ nguy hiểm lớn nhất trên đường đi.
+- **Bộ lạc man di.** Mỗi vùng hoang (mục 12.4) có một bộ lạc man di, không phải quốc gia: không nói chuyện, buôn bán hay ký kết. Sức mạnh bắt đầu từ 10, mỗi lượt +0,4, tối đa 20 + 0,12 × lượt (trần 70). Từ lượt 20, mỗi bộ lạc nhắm quốc gia gần nhất có **ít nhất 40 dân** và có đất trong vòng 16 ô; xác suất cướp mỗi lượt là 4% × sức mạnh/40 (tối đa 35%). Toán cướp gồm min(sức mạnh, 8 + 40% dân của nước bị cướp), đọ với sức thủ tại nhà: (chiến binh + vũ khí như ở 7.4 + 30% người lao động) × thưởng chiến đấu × (ổn định/100 + 0,5) × (1 + 50% sân nhà + hàng rào), cả hai bên nhân may rủi 0,8–1,2. Man di thắng: lấy 25% lương thực và 10% mỗi thứ hàng khác, giết 30% chiến binh cùng 4% dân, ổn định −5, bộ lạc mạnh thêm 10%. Bị đẩy lui: bộ lạc mất 50% quy mô toán cướp, bên thủ mất 10% chiến binh, ổn định +1.
+- **`clear_wild` (2 AP):** `{"type":"clear_wild","horde":id,"warriors":n}` đánh vào nơi ở của một bộ lạc đã nhìn thấy, khi đất của mình cách đó ≤ 8 ô. (Chiến binh + vũ khí) × thưởng × ổn định × may rủi đọ với sức mạnh × (1 + phòng thủ địa hình). Thắng: bộ lạc tan, 40 lượt sau mới kéo về với sức 10; uy tín +5, ổn định +3. Thương vong như trận đánh ở 7.4.
+- **Gió băng.** Đất trong vòng 4 ô của Tường Băng làm mùa đông thường hơn và chết nhiều hơn (mục 9.2).
+- **Lũ lụt, động đất:** mục 9.2.
+
+Mỗi lượt, gói trạng thái (mục 8.2) có thêm:
+- `threats`: mọi mối đe dọa quốc gia đang chịu, mức 1–3 kèm con số (thiếu ăn, mùa đông, dịch bệnh, hạn hán, lũ, động đất, thú dữ, từng bộ lạc man di đã nhìn thấy, chiến tranh, quá nhiều đất, bất ổn, hết chỗ ở, núi lửa).
+- `resources`: trữ lượng trên lãnh thổ (chỉ loại nhìn thấy được), ô vô chủ gần nhất đã thấy cho mỗi loại, và loại không có trên đất mình.
+- `hordes`: các bộ lạc man di đã nhìn thấy, kèm khoảng cách.
+
+Watcher xem cùng báo cáo đó nhưng đầy đủ (kể cả bộ lạc và quặng mà quốc gia chưa thấy), cùng các lớp phủ bản đồ: mối đe dọa tổng hợp, thú dữ, man di, lũ lụt, giá rét, và trữ lượng từng loại tài nguyên.
 
 ### 9.3 Kết thúc và xếp hạng
 
@@ -611,7 +651,7 @@ Watcher thấy mọi thứ và có một quyền tác động chính: ban hành 
 - **Dòng suy nghĩ:** trường `thought` của từng AI mỗi lượt, và hộp thư ngoại giao của mỗi quốc gia trong lượt.
 - **Phát minh:** danh sách Sổ Phát Minh, ai phát minh gì đầu tiên, đơn đang chờ, đơn nào bị trọng tài bác và lý do; nút chấm tay.
 - **Quan hệ:** bảng quan hệ giữa các nước, chiến tranh, hiệp ước, trận đánh; biểu đồ theo lượt và bảng xếp hạng.
-- **Biên niên sử:** nhật ký sự kiện theo lượt. Mỗi 10 lượt (`HISTORIAN_EVERY`), một AI "Sử gia" (không thuộc quốc gia nào) viết lại các lượt đó thành một chương sử kể chuyện bằng tiếng Việt (150–300 chữ), đọc trong tab Biên niên (`/api/history`). Sử gia dùng nhà cung cấp trong `HISTORIAN_PROVIDER` (mã nhà cung cấp, `claude` để dùng gói Claude của bạn, hoặc `off`); bỏ trống thì lấy nhà cung cấp có key đầu tiên trong groq, cohere, cloudflare, sambanova, mistral, gemini, openrouter, ollama, custom, ưu tiên nhà cung cấp không điều hành quốc gia nào. Sử gia chạy sau khi lượt đã lưu, không bao giờ làm lượt sau phải chờ, chỉ đọc thế giới nên không ảnh hưởng tính tất định. Hết quota hoặc trả lời hỏng thì bỏ qua và thử lại ở lượt sau; bị chậm thì mỗi lượt viết bù một chương.
+- **Biên niên sử:** nhật ký sự kiện theo lượt. Mỗi 10 lượt (`HISTORIAN_EVERY`), một AI "Sử gia" (không thuộc quốc gia nào) viết lại các lượt đó thành một chương sử kể chuyện bằng tiếng Việt (150–300 chữ), đọc trong tab Biên niên (`/api/history`). Sử gia dùng `HISTORIAN_PROVIDER`: bỏ trống hoặc `claude` thì dùng gói Claude của bạn (Haiku, effort low; đổi bằng `HISTORIAN_MODEL`), `off` để tắt, một mã nhà cung cấp miễn phí, hoặc `auto` để lấy nhà cung cấp có key đầu tiên trong groq, cohere, cloudflare, sambanova, mistral, gemini, openrouter, ollama, custom, ưu tiên nhà cung cấp không điều hành quốc gia nào. Sử gia chạy sau khi lượt đã lưu, không bao giờ làm lượt sau phải chờ, chỉ đọc thế giới nên không ảnh hưởng tính tất định. Hết quota hoặc trả lời hỏng thì bỏ qua và thử lại ở lượt sau; bị chậm thì mỗi lượt viết bù một chương.
 - **Điều khiển thời gian:** tạm dừng, chạy từng lượt, đổi nhịp lượt (5 giây tới 24 giờ). Tua lại xem lại (replay) trong giao diện (chưa có trong engine: replay hiện chỉ chạy trong bộ test).
 - **Chat với Claude** qua Claude Code CLI, kèm bản tóm tắt thế giới.
 
@@ -694,7 +734,7 @@ Giai đoạn đầu lưu trong **một file SQLite trên máy bạn**. Khi muố
 | Dữ liệu | Nội dung | Ước tính mỗi mùa |
 | --- | --- | --- |
 | Nhật ký hành động | nguyên văn câu trả lời của mọi AI mỗi lượt; bắt buộc để replay | \~20 MB (500 lượt × 9 nước × \~4 KB) |
-| Ảnh chụp thế giới | toàn bộ 4.096 ô, kho, dân số, chụp mỗi 10 lượt (nén gzip) | \~20 MB (50 ảnh × \~400 KB) |
+| Ảnh chụp thế giới | toàn bộ 16.384 ô, kho, dân số, chụp mỗi 10 lượt (nén gzip) | \~20 MB (50 ảnh × \~400 KB) |
 | Sổ Phát Minh | mọi phát minh, người phát minh, độ sâu, năng lực | dưới 1 MB |
 | Phán quyết trọng tài | điểm, lý do, bản đơn đã sửa | dưới 5 MB |
 | Biên niên sử | sự kiện từng lượt + các chương của Sử gia | dưới 5 MB |
@@ -717,19 +757,20 @@ Giai đoạn đầu lưu trong **một file SQLite trên máy bạn**. Khi muố
 
 ### 12.1 Địa lý
 
-- **Diện tích:** 64 × 64 = 4.096 ô, khoảng 55% đất liền.
+- **Diện tích:** 128 × 128 = 16.384 ô. Hình dạng lục địa, eo đất và quần đảo tính theo tỉ lệ nên giữ như bản đồ 64 × 64 cũ, chỉ rộng gấp đôi mỗi chiều; số sông, khoảng cách kỳ quan, điểm khai sinh và vùng hoang tăng theo.
+- **Tường Băng:** vách băng cao vút bao quanh cả thế giới, dày 3–6 ô (độ dày thay đổi theo nhiễu của seed), chiếm khoảng 14% số ô. Không đi qua, không đứng trên, không khai hoang, không có tài nguyên. Đất trong vòng 2 ô của tường là **băng hà**; trong vòng 4 ô là vùng **gió băng** (mục 9.4). Sông chảy tới chân tường thì dừng lại (nước tan đọng thành hồ) chứ không đổ ra biển.
 - **Hai lục địa lớn** (Lục địa Tây, Lục địa Đông) nối nhau bằng một **eo đất** hẹp 2–3 ô: con đường bộ duy nhất giữa hai bên, nơi tự nhiên sẽ thành điểm buôn bán và tranh chấp.
 - **Một quần đảo** (Quần đảo Đá Lửa) ngoài khơi, chỉ đến được khi đi được biển nông. Đảo giàu đá lửa và cá.
-- **Tối đa 8 sông lớn** chảy từ núi hoặc đồi cao ra biển. Ô sông giáp biển là **châu thổ**: đất trồng ×1,5, nhưng lũ lụt ×2 (chưa có trong engine).
+- **Tối đa 24 sông lớn** (thực tế khoảng 10–12) chảy từ núi hoặc đồi cao ra biển. Ô sông giáp biển là **châu thổ**: đất trồng ×1,5, nhưng lũ lụt ×2 (chưa có trong engine).
 - **Dãy núi** chia mỗi lục địa thành vài vùng. Quặng đồng và thiếc chủ yếu nằm ở đồi và núi, và thiếc hiếm hơn đồng khoảng 4–5 lần, nên thời đồ đồng sẽ sinh ra thương mại đường dài.
 
 ### 12.2 Đới khí hậu
 
 | Đới | Vị trí | Địa hình chính | Ảnh hưởng |
 | --- | --- | --- | --- |
-| Hàn đới | hàng 0–12 (bắc) | lãnh nguyên, rừng lá kim | mùa đông khắc nghiệt ×2; không có hạn hán. Lương thực −20%, dịch bệnh ×0,5, da +50% (chưa có trong engine) |
-| Ôn đới | hàng 13–50 | đồng cỏ, rừng, sông, đồi, đầm lầy, ít sa mạc | chuẩn |
-| Nhiệt đới | hàng 51–63 (nam) | rừng rậm, đầm lầy, sa mạc, đồng cỏ | không có mùa đông khắc nghiệt. Cây dại +30%, dịch bệnh ×1,5 (chưa có trong engine) |
+| Hàn đới | hàng 0–26 (bắc) | lãnh nguyên, rừng lá kim | mùa đông khắc nghiệt ×2; không có hạn hán. Lương thực −20%, dịch bệnh ×0,5, da +50% (chưa có trong engine) |
+| Ôn đới | hàng 27–101 | đồng cỏ, rừng, sông, đồi, đầm lầy, ít sa mạc | chuẩn |
+| Nhiệt đới | hàng 102–127 (nam) | rừng rậm, đầm lầy, sa mạc, đồng cỏ | không có mùa đông khắc nghiệt. Cây dại +30%, dịch bệnh ×1,5 (chưa có trong engine) |
 
 Ba địa hình riêng của các đới (Lãnh nguyên, Rừng lá kim, Rừng rậm) đã nằm trong bảng 2.1.
 
@@ -750,17 +791,17 @@ Mỗi kỳ quan là duy nhất trên thế giới. Quốc gia sở hữu ô đó
 ### 12.4 Muông thú và vùng hoang
 
 - **Đàn bò rừng** di cư theo một tuyến cố định trên đồng cỏ, mỗi 8 lượt đổi chiều (chưa có trong engine: tuyến được sinh và vẽ trên bản đồ, nhưng sự kiện "Đàn thú di cư" ở 9.2 bốc thăm cho mọi quốc gia có ô đồng cỏ).
-- **Thú dữ** (sói, hổ hang) sống ở rừng rậm và núi: tỷ lệ chết của đoàn thám hiểm đi qua đó tăng từ 3% lên 8%.
-- **Tối đa 3 vùng hoang** cách mọi điểm khai sinh ≥ 8 ô và cách nhau ≥ 14 ô. Đây là nơi dành cho Watcher thả bộ lạc mới bằng Sắc lệnh (chưa có trong engine), hoặc cho các quốc gia khai hoang.
+- **Thú dữ** sống khắp nơi, dữ nhất ở rừng rậm, rừng, núi, băng hà và quanh vùng hoang (mục 9.4).
+- **6 vùng hoang** ở rìa đất của các dân tộc đầu tiên: cách mọi điểm khai sinh 11–23 ô, cách nhau ≥ 20 ô, ngoài vùng gió băng. Mỗi vùng hoang có một bộ lạc man di (mục 9.4). Đây cũng là nơi dành cho Watcher thả bộ lạc mới bằng Sắc lệnh (chưa có trong engine).
 
 ### 12.5 Cách sinh bản đồ
 
 1. Chọn seed (`WORLD_SEED`). Cùng seed luôn ra cùng bản đồ.
-2. Sinh độ cao và độ ẩm bằng nhiễu nhiều lớp (fbm), ép theo khuôn "2 lục địa + eo đất + quần đảo".
+2. Dựng Tường Băng quanh viền, rồi sinh độ cao và độ ẩm bằng nhiễu nhiều lớp (fbm), ép theo khuôn "2 lục địa + eo đất + quần đảo".
 3. Gán địa hình theo độ cao × độ ẩm × vĩ độ: 8% đất cao nhất là núi, tiếp theo đến 22% là đồi.
 4. Vẽ sông từ đỉnh núi chảy theo dốc xuống biển, đánh dấu châu thổ.
 5. Rải tài nguyên theo địa hình, đặt 7 kỳ quan cách nhau ≥ 6 ô theo luật "mỗi lục địa ít nhất 2".
-6. Chọn điểm khai sinh (cách nhau ≥ 12 ô, rải đều các đới khí hậu, cùng mức giá trị ±5%); trượt thì thử vị trí khác.
+6. Chọn điểm khai sinh (cách nhau ≥ 17 ô, xa Tường Băng, rải đều các đới khí hậu, cùng mức giá trị ±5%); trượt thì thử vị trí khác.
 7. Watcher xem trước bản đồ, đổi seed nếu chưa ưng, rồi bấm "Khai thiên lập địa" để bắt đầu lượt 0 (chưa có trong engine: thế giới được tạo ngay lần khởi động đầu tiên; muốn đổi seed thì xóa `data/world.db`).
 
 ### 12.6 Số quốc gia: 5 khi khởi đầu
@@ -785,7 +826,7 @@ Model có thể đổi bằng biến `*_MODEL`. Muốn chạy không tốn quota
 | Dự bị 1 | [Cohere](https://docs.cohere.com/docs/rate-limits) | command-a-03-2025 | 1.000 request/tháng |
 | Dự bị 2 | [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) | llama-3.3-70b-instruct-fp8-fast | 10.000 neuron/ngày, \~30 lần gọi |
 | Dự bị 3 | SambaNova | DeepSeek-V3.2 | — |
-| Sử gia | `HISTORIAN_PROVIDER` (mặc định nhà cung cấp rảnh đầu tiên, thường là Groq) | model của nhà cung cấp đó hoặc `HISTORIAN_MODEL` | mỗi 10 lượt viết 1 chương (mục 10.1) |
+| Sử gia | `HISTORIAN_PROVIDER` (mặc định `claude`; `auto` cho nhà cung cấp miễn phí rảnh đầu tiên) | Claude Haiku, hoặc `HISTORIAN_MODEL` | mỗi 10 lượt viết 1 chương (mục 10.1) |
 
 Toàn bộ đều là gói miễn phí. Thế giới nhanh có thể sinh hơn 28 đơn phát minh mỗi ngày. Khi Groq hết quota, đơn chuyển sang dự bị; khi mọi ứng viên đều hết quota, đơn xếp hàng chờ (mục 3.4). Nếu thường xuyên thiếu thì đổi trọng tài sang Jev, khoảng 0,0002 USD mỗi đơn (chưa có trong engine).
 

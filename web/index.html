@@ -38,9 +38,11 @@
         <option value="60">1 phút</option>
         <option value="300">5 phút</option>
         <option value="600">10 phút</option>
+        <option value="1200">20 phút</option>
         <option value="1800">30 phút</option>
         <option value="3600">1 giờ</option>
       </select>
+      <button type="button" id="btn-new-world" title="Chọn đặc thù, model và effort cho từng quốc gia rồi bắt đầu thế giới mới">Thế giới mới</button>
       <button class="icon" id="btn-theme" type="button" aria-label="Đổi giao diện sáng/tối">
         <svg class="ico-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
         <svg class="ico-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" hidden><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -66,12 +68,32 @@
 </header>
 
 <div class="error" id="engine-error" role="alert" hidden></div>
+<div class="error wait" id="claude-wait" role="status" hidden></div>
 
 <div class="mapctl" role="toolbar" aria-label="Điều khiển bản đồ">
   <button type="button" id="zoom-in" aria-label="Phóng to bản đồ" title="Phóng to (+)" aria-keyshortcuts="+">+</button>
   <span class="zl mono" id="zoom-level" aria-live="polite">1.0×</span>
   <button type="button" id="zoom-out" aria-label="Thu nhỏ bản đồ" title="Thu nhỏ (−)" aria-keyshortcuts="-">−</button>
   <button type="button" id="zoom-fit" aria-label="Xem toàn thế giới" title="Xem toàn thế giới (0)" aria-keyshortcuts="0"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+<div class="layer-box" role="group" aria-label="Lớp phủ bản đồ">
+  <label for="layer-kind">Lớp phủ</label>
+  <select id="layer-kind">
+    <option value="">Không</option>
+    <optgroup label="Mối đe dọa">
+      <option value="danger">Mối đe dọa (tổng hợp)</option>
+      <option value="beasts">Thú dữ</option>
+      <option value="hordes">Man di</option>
+      <option value="flood">Lũ lụt</option>
+      <option value="cold">Giá rét, gió băng</option>
+    </optgroup>
+    <optgroup label="Tài nguyên (trữ lượng hiện tại)">
+      <option value="game">Thú săn</option><option value="plants">Cây dại</option><option value="fish">Cá</option><option value="herbs">Thảo dược</option>
+      <option value="wood">Gỗ</option><option value="stone">Đá</option><option value="flint">Đá lửa</option><option value="clay">Đất sét</option>
+      <option value="salt">Muối</option><option value="reeds">Sậy</option><option value="copper">Quặng đồng (ẩn với AI)</option><option value="tin">Quặng thiếc (ẩn với AI)</option><option value="iron">Sắt (ẩn với AI)</option>
+    </optgroup>
+  </select>
+  <span class="layer-scale" id="layer-scale" hidden><i></i><span id="layer-scale-text"></span></span>
 </div>
 <details class="legend-box" id="legend-box">
   <summary>Chú giải</summary>
@@ -119,7 +141,7 @@
     </div>
 
     <div class="panel" id="tab-inventions" hidden>
-      <p class="note">Các nước tự phát minh: đơn qua kiểm tra cứng của Engine rồi tới Trọng tài AI (miễn phí, khác nhà cung cấp với nước nộp). Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
+      <p class="note">Các nước tự phát minh: đơn qua kiểm tra cứng của Engine rồi tới Trọng tài Claude (tài khoản Claude của bạn). Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
       <div id="proposals"></div>
       <h3 class="sub">Sổ phát minh do các nước tạo</h3>
       <div id="custom-inventions"></div>
@@ -134,6 +156,7 @@
     <div class="panel" id="tab-diplomacy" hidden>
       <div class="tablewrap"><table id="relations"></table></div>
       <h3 class="sub">Chiến tranh</h3><div id="wars"></div>
+      <h3 class="sub">Man di ở vùng hoang</h3><div id="hordes"></div>
       <h3 class="sub">Hiệp ước</h3><div id="treaties"></div>
       <h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol>
     </div>
@@ -183,6 +206,25 @@
 <dialog id="tree-dialog" class="wide" aria-labelledby="tree-dlg-title">
   <div class="dlg-head"><h2 id="tree-dlg-title">Cây phát minh</h2><div class="legend-inline tree-legend" id="tree-big-legend"></div><button type="button" id="tree-close">Đóng</button></div>
   <div class="treewrap big"><div class="treebox" id="tree-big"></div><div class="tree-tip" role="tooltip" hidden></div></div>
+</dialog>
+<dialog id="setup-dialog" aria-labelledby="setup-title">
+  <form id="setup-form" method="dialog">
+    <div class="dlg-head"><h2 id="setup-title">Thế giới mới</h2><button type="button" id="setup-close">Đóng</button></div>
+    <div class="setup-body">
+      <p class="note">Mọi quốc gia chơi bằng tài khoản Claude bạn đã đăng nhập (không cần API key). Mỗi nước sinh ra với một đặc thù riêng: một lợi thế và một điểm yếu thật trong luật chơi, cùng tính cách mà AI của nước đó đọc mỗi lượt. Model và effort đổi được giữa trận trong hồ sơ quốc gia; đặc thù thì giữ suốt trận.</p>
+      <p class="note warnline" id="setup-claude"></p>
+      <div class="setup-grid">
+        <label for="setup-seed">Seed bản đồ</label><input type="text" id="setup-seed" maxlength="60" autocomplete="off">
+        <label for="setup-count">Số quốc gia</label><select id="setup-count"></select>
+        <label for="setup-tick">Nhịp lượt</label>
+        <select id="setup-tick"><option value="600">10 phút</option><option value="1200">20 phút</option><option value="1800">30 phút</option><option value="3600">1 giờ</option></select>
+      </div>
+      <div class="row"><button type="button" id="setup-random">Ngẫu nhiên đặc thù</button><button type="button" id="setup-all-haiku">Tất cả Haiku · low</button><span class="note" id="setup-cost"></span></div>
+      <ol class="setup-rows" id="setup-rows"></ol>
+      <p class="note">Thế giới hiện tại được sao lưu vào <span class="mono">data/backups/</span> trước khi tạo mới.</p>
+      <div class="row"><button type="submit" class="primary" id="setup-go">Bắt đầu thế giới mới</button><span class="note" id="setup-msg" role="status"></span></div>
+    </div>
+  </form>
 </dialog>
 <dialog id="help-dialog" aria-labelledby="help-title">
   <div class="dlg-head"><h2 id="help-title">Phím tắt</h2><button type="button" id="help-close">Đóng</button></div>

@@ -62,18 +62,19 @@ test("historian parses JSON or prose and rejects stubs", () => {
   assert.equal(parseChapter(JSON.stringify({ title: "", text: words(100) })), null);
 });
 
-test("historian provider choice: off, claude, explicit, and a free one without a nation", () => {
+test("historian provider choice: claude by default, off, explicit, and auto picks a free one without a nation", () => {
   const keys = ["GROQ_API_KEY", "COHERE_API_KEY", "CLOUDFLARE_API_TOKEN", "SAMBANOVA_API_KEY", "MISTRAL_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "OLLAMA_BASE_URL", "CUSTOM_BASE_URL", "CUSTOM_API_KEY"];
   const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
   try {
     for (const k of keys) delete process.env[k];
     assert.equal(chooseHistorian("off", new Set()), null);
-    assert.equal(chooseHistorian("", new Set()), null, "no key anywhere: off");
+    assert.equal(chooseHistorian("", new Set())?.provider, "claude", "default: the Watcher's Claude login");
+    assert.equal(chooseHistorian("auto", new Set()), null, "auto with no key anywhere: off");
     assert.equal(chooseHistorian("claude", new Set())?.provider, "claude");
     assert.equal(chooseHistorian("groq", new Set())?.provider, "", "explicit provider without key is refused");
     process.env.MISTRAL_API_KEY = "k"; process.env.GEMINI_API_KEY = "k";
-    assert.equal(chooseHistorian("", new Set(["mistral"]))?.provider, "gemini", "prefers a provider that runs no nation");
-    assert.equal(chooseHistorian("", new Set(["mistral", "gemini"]))?.provider, "mistral", "else the first with a key");
+    assert.equal(chooseHistorian("auto", new Set(["mistral"]))?.provider, "gemini", "prefers a provider that runs no nation");
+    assert.equal(chooseHistorian("auto", new Set(["mistral", "gemini"]))?.provider, "mistral", "else the first with a key");
     assert.equal(chooseHistorian("Gemini", new Set(["gemini"]))?.provider, "gemini");
   } finally { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
 });

@@ -13,9 +13,10 @@
     ocean: ["Biển sâu", "#1d4a66"], shallow: ["Biển nông", "#2d6c8c"], grass: ["Đồng cỏ", "#9dbb68"], forest: ["Rừng", "#4e7d45"],
     taiga: ["Rừng lá kim", "#3d6450"], jungle: ["Rừng rậm", "#2c6a3a"], hill: ["Đồi", "#b39a63"], mountain: ["Núi", "#8b8179"],
     coast: ["Ven biển", "#d3cb9b"], swamp: ["Đầm lầy", "#6d8a6c"], desert: ["Sa mạc", "#dcc48a"], tundra: ["Lãnh nguyên", "#b7c2b4"],
+    glacier: ["Băng hà", "#c4d8e2"], icewall: ["Tường Băng", "#eef7fc"],
   };
   const ZONE = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" };
-  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải" };
+  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải" };
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 
   let ST = null, S = null, geo = null, hoverI = -1;
@@ -65,7 +66,7 @@
   const view = { z: 1, tx: 0, ty: 0 };
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let pinnedI = -1, focusFx = null, anim = 0;
-  const WILD_R = 4; // hexes around each wilderness centre shown as "vùng hoang"
+  const WILD_R = 6; // hexes around each wilderness centre shown as "vùng hoang" (beasts are fiercer there, §9.4)
 
   function layout() {
     // keep what the Watcher was looking at when the screen changes size
@@ -102,6 +103,19 @@
       if (t === "mountain") { g.beginPath(); g.moveTo(x - s * .55, y + s * .35); g.lineTo(x, y - s * .5); g.lineTo(x + s * .55, y + s * .35); g.closePath(); g.fillStyle = "#6b625b"; g.fill(); }
       else if (t === "hill") { g.beginPath(); g.arc(x, y + s * .3, s * .42, Math.PI * 1.1, Math.PI * 1.9); g.strokeStyle = "#8d7746"; g.lineWidth = Math.max(px, s * .12); g.stroke(); }
       else if (t === "forest" || t === "taiga" || t === "jungle") { g.fillStyle = "rgba(10,40,20,.35)"; g.beginPath(); g.arc(x - s * .22, y + s * .05, s * .2, 0, 7); g.arc(x + s * .22, y - s * .08, s * .2, 0, 7); g.fill(); }
+      else if (t === "glacier") { g.strokeStyle = "rgba(90,130,160,.55)"; g.lineWidth = Math.max(px * .8, s * .08); g.beginPath(); g.moveTo(x - s * .45, y - s * .1); g.lineTo(x - s * .1, y + s * .15); g.lineTo(x + s * .35, y - s * .05); g.stroke(); }
+      else if (t === "icewall") {
+        // seracs: pale spikes, and a deep blue cliff shadow on every face that looks into the world
+        g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(x - s * .5, y + s * .35); g.lineTo(x - s * .2, y - s * .55); g.lineTo(x + s * .05, y + s * .1); g.lineTo(x + s * .3, y - s * .4); g.lineTo(x + s * .55, y + s * .35); g.closePath(); g.fill();
+        const nb = NB(i);
+        g.strokeStyle = "rgba(38,86,122,.75)"; g.lineWidth = Math.max(1.5 * px, s * .38); g.beginPath();
+        for (let k = 0; k < 6; k++) {
+          if (nb[k] < 0 || T[nb[k]] === "icewall") continue;
+          const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
+          g.moveTo(x + s * .86 * Math.cos(a1), y + s * .86 * Math.sin(a1)); g.lineTo(x + s * .86 * Math.cos(a2), y + s * .86 * Math.sin(a2));
+        }
+        g.stroke();
+      }
     }
     g.lineCap = "round"; g.lineJoin = "round";
     for (const path of ST.rivers) { g.beginPath(); path.forEach((i, k) => { const [x, y] = center(i); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.strokeStyle = "#5fb4e6"; g.lineWidth = Math.max(1.4 * px, s * .32); g.stroke(); }
@@ -115,6 +129,38 @@
 
   const nationColor = id => S.nations[id]?.founded ? S.nations[id].flag.colors[0] : "#cccccc";
   const nationName = n => n.founded ? n.name : `Bộ lạc ${n.id + 1}`;
+
+  // ------------------------------------------------ map layers: threats and resources (§9.4)
+  const THREAT_LAYERS = { danger: "Mối đe dọa (tổng hợp)", beasts: "Thú dữ", hordes: "Man di", flood: "Lũ lụt", cold: "Giá rét, gió băng" };
+  let layerKind = "", layerData = null, layerMax = 1, layerReq = 0;
+  async function loadLayer() {
+    const my = ++layerReq;
+    if (!layerKind) { layerData = null; showLayerScale(); scheduleRender(); return; }
+    let r; try { r = await api(`/api/layer?kind=${encodeURIComponent(layerKind)}`); } catch { return; }
+    if (my !== layerReq) return;
+    layerData = r.values;
+    if (layerKind in THREAT_LAYERS) layerMax = 5;
+    else { const pos = layerData.filter(v => v > 0).sort((a, b) => a - b); layerMax = pos.length ? pos[Math.floor(pos.length * 0.95)] || pos[pos.length - 1] : 1; }
+    showLayerScale(); scheduleRender();
+  }
+  function showLayerScale() {
+    const box = $("#layer-scale"); box.hidden = !layerData;
+    if (!layerData) return;
+    const threat = layerKind in THREAT_LAYERS;
+    box.className = `layer-scale ${threat ? "threat" : "res"}`;
+    $("#layer-scale-text").textContent = threat ? "an toàn → nguy hiểm" : `0 → ${Math.round(layerMax)}+ ${RES[layerKind] ?? layerKind}`;
+  }
+  function drawLayer(g, vis, s) {
+    if (!layerData) return;
+    const threat = layerKind in THREAT_LAYERS;
+    for (let i = 0; i < layerData.length; i++) {
+      const v = layerData[i]; if (!(v > 0) || !vis(i)) continue;
+      const a = clamp(v / layerMax, 0, 1), [x, y] = center(i);
+      hexPath(g, x, y, s * 1.02);
+      g.fillStyle = threat ? `rgba(225,45,30,${(0.1 + a * 0.62).toFixed(3)})` : `rgba(255,212,0,${(0.14 + a * 0.68).toFixed(3)})`;
+      g.fill();
+    }
+  }
 
   function render() {
     if (!geo || !S) return;
@@ -144,6 +190,7 @@
     g.globalAlpha = .42;
     S.owners.forEach((o, i) => { if (o < 0 || !vis(i)) return; const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = nationColor(o); g.fill(); });
     g.globalAlpha = 1;
+    drawLayer(g, vis, s);
     // borders
     g.lineWidth = clamp(s * .22 * z, 1.5, 5) * px;
     S.owners.forEach((o, i) => {
@@ -170,6 +217,16 @@
       for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? R * .45 : R; g.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); }
       g.closePath(); g.fillStyle = "#ffd84a"; g.fill(); g.lineWidth = px; g.strokeStyle = "#3a2a00"; g.stroke();
       if (s * z >= 14) label(g, w.name, x, y + R + 8 * px, small, "#ffe9a0", 500, px);
+    }
+    // barbarian hordes (§9.4): a dark camp-fire marker with their strength
+    for (const h of S.hordes || []) {
+      const [x, y] = center(h.tile), R = clamp(s * 1.1 * z, 7, 16) * px;
+      g.globalAlpha = h.alive ? 1 : .45;
+      g.beginPath(); g.arc(x, y, R, 0, 7); g.fillStyle = "#2a0d0a"; g.fill(); g.lineWidth = 2 * px; g.strokeStyle = h.alive ? "#ff6b3d" : "#b9a69e"; g.stroke();
+      g.beginPath(); g.moveTo(x - R * .45, y + R * .4); g.lineTo(x + R * .45, y - R * .5); g.moveTo(x + R * .45, y + R * .4); g.lineTo(x - R * .45, y - R * .5);
+      g.strokeStyle = "#ffd2b8"; g.lineWidth = Math.max(1.5 * px, R * .16); g.stroke();
+      if (s * z >= 4) label(g, h.alive ? `${h.name} · ${h.strength}` : `${h.name} (đã tan)`, x, y + R + 9 * px, small, h.alive ? "#ffb59a" : "#cbbab3", 600, px);
+      g.globalAlpha = 1;
     }
     // caravans: a parcel riding the road between the two capitals
     const cars = S.caravans || [];
@@ -408,6 +465,8 @@
 
   // ---------------------------------------------------------------- header
   function statusLabel(s) {
+    if (s.setupPending) return ["Chờ tạo thế giới", "warn"];
+    if (s.claudeWait && !s.busy) return ["Chờ Claude", "warn"];
     if (s.busy) return ["Đang xử lý lượt", "warn"];
     if (s.paused) return ["Tạm dừng", "bad"];
     return ["Đang chạy", "ok"];
@@ -419,9 +478,13 @@
     $("#version").textContent = `v${s.version}`;
     const sel = $("#tick-seconds"); if (![...sel.options].some(o => +o.value === s.tickSeconds)) sel.add(new Option(`${s.tickSeconds} giây`, s.tickSeconds)); sel.value = s.tickSeconds;
     const err = $("#engine-error"); err.hidden = !s.lastError; err.textContent = s.lastError ? `Lỗi Engine (thế giới tạm dừng):\n${s.lastError}` : "";
+    const cw = $("#claude-wait"); cw.hidden = !s.claudeWait || !!s.lastError;
+    cw.textContent = s.claudeWait ? `${s.claudeWait.reason}\nThử lại lúc ${hhmm(s.claudeWait.until)}.` : "";
+    if (s.setupPending && !setupAsked) { setupAsked = true; openSetup(); }
     Object.assign(S || {}, s); window.__status = s;
     tickCountdown();
   }
+  const hhmm = t => new Date(t).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
   function tickCountdown() {
     const s = window.__status, cd = $("#countdown"), bar = $("#tickbar"); if (!s) return;
     const idle = s.paused || s.busy, leftMs = Math.max(0, s.nextTickAt - Date.now()), left = Math.ceil(leftMs / 1000);
@@ -587,10 +650,11 @@
       <div class="chips">${blds.map(b => `<span>${esc(b.name)}${b.done ? "" : " (đang xây)"}</span>`).join("") || `<span class="none">không có</span>`}</div>
       ${tile === null && (n.settlements || []).length ? `<h4>Điểm định cư</h4><div class="chips">${n.settlements.map(x => `<span>${esc(x.name)}</span>`).join("")}</div>` : ""}
       ${wars.length ? `<h4>Đang chiến tranh</h4><div class="meta">${wars.map(w => esc(w.a === n.id ? w.bName : w.aName)).join(", ")}</div>` : ""}
+      ${tile === null && n.alive ? `<h4>Mối đe dọa</h4>${threatList((n.threats || []).filter(t => t.level >= 1).slice(0, 5), "Không có mối đe dọa đáng kể.")}<h4>Tài nguyên trên lãnh thổ</h4>${resChips(n)}` : ""}
       <div class="row"><button type="button" class="primary" data-act="detail">Mở hồ sơ đầy đủ</button>${n.alive ? `<button type="button" data-act="locate">Xem trên bản đồ</button>` : ""}${tile === null ? `<button type="button" data-act="list">Danh sách quốc gia</button>` : ""}</div>`;
     el.querySelector(".flag").replaceWith(flagCanvas(n.flag, 54, 36));
     el.querySelector(".nname").textContent = nationName(n);
-    el.querySelector(".nmeta").textContent = [n.people, n.capitalName && `thủ đô ${n.capitalName}`, n.model].filter(Boolean).join(" · ");
+    el.querySelector(".nmeta").textContent = [n.trait && `${n.trait.icon} ${n.trait.name}`, n.people, n.capitalName && `thủ đô ${n.capitalName}`, modelLabel(n)].filter(Boolean).join(" · ");
     if (n.thought) el.querySelector(".thought").textContent = `“${n.thought}”`;
     el.querySelector("[data-act=detail]").onclick = () => openNation(n.id);
     el.querySelector("[data-act=locate]")?.addEventListener("click", () => centerOn(n.capital));
@@ -618,6 +682,7 @@
       <div class="chips">${t.river ? "<span>Sông</span>" : ""}${t.delta ? "<span>Châu thổ</span>" : ""}${t.land ? "" : "<span>Biển</span>"}${capOf ? `<span>Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>` : ""}${stl ? `<span>Điểm định cư ${esc(stl.name)}</span>` : ""}${inWild(i) ? "<span>Vùng hoang</span>" : ""}${ST.herd?.includes(i) ? "<span>Điểm dừng đàn bò rừng</span>" : ""}${w ? `<span class="wonder">Kỳ quan: ${esc(w.name)}</span>` : ""}</div>
       <h4>Trữ lượng</h4>
       ${keys.length ? `<table class="res"><tr><th>Tài nguyên</th><th>Hiện có</th><th>Tối đa</th></tr>${keys.map(k => `<tr><td>${esc(RES[k] ?? k)}${HIDDEN_RES.has(k) ? ` <span class="pill">ẩn với AI</span>` : ""}</td><td class="mono">${Math.round(t.res?.[k] || 0)}</td><td class="mono">${Math.round(t.cap?.[k] || 0)}</td></tr>`).join("")}</table>` : `<p class="note">Không có trữ lượng.</p>`}
+      <h4>Mối đe dọa ở ô này</h4>${threatList(t.threats || [], "Không có gì đáng ngại.")}
       <h4>Trận đánh ở ô này</h4>
       ${battles.length ? `<ol class="chronicle">${battles.map(b => `<li><span class="t">${b.tick}</span><span>${esc(nm(b.attacker))} ${b.kind === "raid" ? "đột kích" : "tấn công"} ${esc(nm(b.defender))}: ${b.won ? "thắng" : "thua"} (${b.a} vs ${b.d}), thương vong ${b.lossA}/${b.lossD}</span></li>`).join("")}</ol>` : `<p class="note">Chưa có trận nào gần đây.</p>`}
       <h4>Chủ sở hữu</h4>${owner ? "" : `<p class="note">Vô chủ.</p>`}`;
@@ -627,9 +692,13 @@
   }
 
   // ---------------------------------------------------------------- nations
+  const MODEL_NAME = { haiku: "Haiku", sonnet: "Sonnet" };
+  const modelLabel = n => n.provider === "claude" ? `Claude ${MODEL_NAME[n.model] ?? n.model}${n.effort ? ` · ${n.effort}` : ""}` : n.model;
+  const traitTag = n => n.trait ? `<div class="trait" title="${esc(n.trait.lines.join(" · "))}">${esc(n.trait.icon)} <b>${esc(n.trait.name)}</b> · <span class="muted">${esc(n.trait.lines.join(", "))}</span></div>` : "";
   function statusPill(n) {
     if (!n.alive) return `<span class="pill bad">Diệt vong</span>`;
     if (n.controller === "bot") return `<span class="pill">Bot</span>`;
+    if (n.provider === "claude" && window.__status?.claudeWait) return `<span class="pill warn">Chờ Claude</span>`;
     if (n.status === "asleep") return `<span class="pill warn">Ngủ đến ${new Date(n.sleepUntil).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>`;
     if (n.status === "error") return `<span class="pill bad">Lỗi key</span>`;
     return `<span class="pill ok">Đang chơi</span>`;
@@ -639,9 +708,11 @@
     for (const n of S.nations) {
       const el = document.createElement("article"); el.className = `nation${n.alive ? "" : " dead"}`;
       const pct = n.research ? Math.min(100, n.research.progress / n.research.cost * 100) : 0;
-      el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><div class="name">${esc(nationName(n))}</div><div class="model">${esc(n.model)} · ${esc(n.era)}</div></div>${statusPill(n)}</div>
+      el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><div class="name">${esc(nationName(n))}</div><div class="model">${esc(modelLabel(n))} · ${esc(n.era)}</div></div>${statusPill(n)}</div>
+        ${traitTag(n)}
         <div class="kv"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.tiles}/${n.tileLimit}</b><span>ô</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div></div>
         ${n.research ? `<div class="muted" style="font-size:12px">Nghiên cứu ${esc(n.research.name)} · ${n.research.progress}/${n.research.cost} RP</div><div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
+        ${(() => { const top = (n.threats || []).find(t => t.level >= 2); return top && n.alive ? `<div class="threat-tag lv${top.level}" title="${esc(top.detail)}">⚠ ${esc(top.title)}</div>` : ""; })()}
         ${n.thought ? `<div class="thought">“${esc(n.thought)}”</div>` : ""}
         <div class="row actions"><button type="button" data-act="locate"${n.alive ? "" : " disabled"}>Xem trên bản đồ</button><button type="button" data-act="detail">Chi tiết</button></div>`;
       el.querySelector(".flag").replaceWith(flagCanvas(n.flag));
@@ -662,10 +733,14 @@
     const stock = Object.entries(n.stock).map(([k, v]) => `${RES[k] ?? k} ${v}`).join(", ");
     const intel = Object.entries(n.intel || {}).map(([oid, it]) => `<tr><td>${esc(S.nations[oid]?.name)}</td><td>mức ${it.level}</td><td>lượt ${it.asOf}</td><td>${esc(JSON.stringify(it.report).slice(0, 220))}</td></tr>`).join("");
     $("#nation-detail").innerHTML = `
-      <div class="row"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(n.model)}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
+      <div class="row"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       ${n.manifesto ? `<p><i>“${esc(n.manifesto)}”</i></p>` : ""}
+      ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)}</p><p class="muted">${esc(n.trait.lines.join(" · "))}</p>` : ""}
+      ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
       ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
       ${n.statusNote ? `<p class="note">Ghi chú: ${esc(n.statusNote)}</p>` : ""}
+      <h3>Mối đe dọa</h3>${threatList(n.threats || [], "Không có.")}
+      <h3>Tài nguyên</h3>${resTable(n)}
       <h3>Suy nghĩ lượt này</h3><p>${esc(n.thought || "—")}</p>
       <h3>Bản ghi nhớ (AI tự viết)</h3><pre>${esc(n.memory || "—")}</pre>
       <h3>Lao động</h3><p>${esc(labor || "—")}</p>
@@ -682,8 +757,101 @@
       <h3>5 lượt gần nhất (nguyên văn)</h3>${turns.map(t => `<pre>lượt ${t.tick} · ${esc(t.kind)} · ${t.latency_ms}ms${t.error ? " · " + esc(t.error) : ""}\n${esc((t.raw || "").slice(0, 1500))}</pre>`).join("") || "<p>—</p>"}`;
     $("#nation-detail .flagbig").replaceWith(flagCanvas(n.flag, 72, 48));
     $("#dlg-close").onclick = () => d.close();
+    if ($("#dlg-model")) {
+      const opt = await setupInfo().catch(() => null);
+      if (opt) {
+        fillSelect($("#dlg-model"), opt.models.map(m => [m.id, m.label]), n.model);
+        fillSelect($("#dlg-effort"), opt.efforts.map(e => [e, `effort ${e}`]), n.effort || "low");
+      }
+      $("#dlg-model-save").onclick = async () => {
+        try { await api(`/api/nation/${id}/model`, { method: "POST", body: { model: $("#dlg-model").value, effort: $("#dlg-effort").value } }); $("#dlg-model-msg").textContent = "Đã lưu, áp dụng từ lượt sau."; refresh(); }
+        catch (e) { $("#dlg-model-msg").textContent = e.message; }
+      };
+    }
     d.showModal();
   }
+
+  // ---------------------------------------------------------------- threats and resources (§9.4)
+  const LEVEL = ["ghi nhận", "để ý", "nghiêm trọng", "khẩn cấp"];
+  function threatList(list, empty) {
+    if (!list.length) return `<p class="note">${esc(empty)}</p>`;
+    return `<ul class="threats">${list.map(t => `<li class="lv${t.level}"><span class="pill ${["", "", "warn", "bad"][t.level]}">${LEVEL[t.level]}</span> <b>${esc(t.title)}</b> <span class="d">${esc(t.detail)}</span></li>`).join("")}</ul>`;
+  }
+  function resChips(n) {
+    const lines = n.resources?.territory || [];
+    if (!lines.length) return `<p class="note">Không có.</p>`;
+    return `<div class="chips">${lines.map(l => `<span title="${l.regrows ? "tái tạo dần" : "không tái tạo"}${l.hidden ? "; AI của nước này chưa nhìn thấy" : ""}">${esc(RES[l.key] ?? l.key)} ${l.left}/${l.max}${l.regrows ? " ↻" : ""}${l.hidden ? " (ẩn)" : ""}</span>`).join("")}</div>`;
+  }
+  function resTable(n) {
+    const r = n.resources; if (!r) return "<p>—</p>";
+    const near = Object.entries(r.nearest || {});
+    return `${resChips(n)}
+      ${r.missing?.length ? `<p class="muted">Không có trên lãnh thổ: ${esc(r.missing.join(", "))}.</p>` : ""}
+      ${near.length ? `<table class="res"><tr><th>Tài nguyên</th><th>Ô vô chủ gần nhất đã thấy</th><th>Cách thủ đô</th><th>Trữ lượng</th></tr>${near.map(([k, v]) => `<tr><td>${esc(RES[k] ?? k)}</td><td class="mono">${v.tile.join(", ")}</td><td class="mono">${v.dist} ô</td><td class="mono">${v.amount}</td></tr>`).join("")}</table>` : ""}`;
+  }
+  $("#layer-kind").onchange = e => { layerKind = e.target.value; loadLayer(); };
+
+  // ---------------------------------------------------------------- new world (§2.4)
+  let setupCache = null, setupAsked = false;
+  const setupInfo = async () => setupCache ??= await api("/api/setup");
+  function fillSelect(sel, pairs, value) {
+    sel.replaceChildren(...pairs.map(([v, t]) => new Option(t, v)));
+    if (value !== undefined) sel.value = value;
+  }
+  async function openSetup() {
+    setupCache = null;
+    let o; try { o = await setupInfo(); } catch (e) { console.error("[setup]", e); return; }
+    const d = $("#setup-dialog"), rows = $("#setup-rows");
+    $("#setup-claude").textContent = o.claude.loggedIn ? "" : "Claude chưa đăng nhập: các quốc gia sẽ chờ đến khi bạn đăng nhập ở khung Chat Claude.";
+    $("#setup-seed").value = `nguyen-dia-${Math.random().toString(36).slice(2, 7)}`;
+    fillSelect($("#setup-count"), [2, 3, 4, 5, 6, 7, 8].map(k => [k, `${k} quốc gia`]), Math.min(8, Math.max(2, o.nations || 6)));
+    $("#setup-tick").value = [600, 1200, 1800, 3600].includes(o.tickSeconds) ? o.tickSeconds : 1200;
+    const traitPairs = [["", "🎲 Ngẫu nhiên"], ...o.traits.map(t => [t.id, `${t.icon} ${t.name}`])];
+    const byId = Object.fromEntries(o.traits.map(t => [t.id, t]));
+    const keep = [...rows.querySelectorAll("li")].map(li => ({ trait: li.querySelector(".t").value, model: li.querySelector(".m").value, effort: li.querySelector(".e").value }));
+    const describe = li => { const t = byId[li.querySelector(".t").value]; li.querySelector(".lines").textContent = t ? `${t.desc} ${t.lines.join(" · ")}` : "Một đặc thù chưa ai chọn, rút ngẫu nhiên khi bắt đầu."; };
+    const cost = () => {
+      const r = [...rows.querySelectorAll("li")], son = r.filter(li => li.querySelector(".m").value === "sonnet").length;
+      const hi = r.filter(li => ["high", "xhigh", "max"].includes(li.querySelector(".e").value)).length;
+      $("#setup-cost").textContent = `${r.length} lệnh Claude mỗi lượt${son ? `, ${son} Sonnet` : ""}${hi ? `, ${hi} effort cao` : ""}: Sonnet và effort cao tốn giới hạn gói nhiều hơn.`;
+    };
+    const build = () => {
+      const n = +$("#setup-count").value;
+      rows.replaceChildren(...Array.from({ length: n }, (_, k) => {
+        const li = document.createElement("li"), prev = keep[k] || {};
+        li.innerHTML = `<div class="pick"><span class="num">${k + 1}</span>
+          <select class="t" aria-label="Đặc thù quốc gia ${k + 1}"></select><select class="m" aria-label="Model quốc gia ${k + 1}"></select><select class="e" aria-label="Effort quốc gia ${k + 1}"></select></div><div class="lines"></div>`;
+        fillSelect(li.querySelector(".t"), traitPairs, prev.trait ?? "");
+        fillSelect(li.querySelector(".m"), o.models.map(m => [m.id, m.label]), prev.model ?? "haiku");
+        fillSelect(li.querySelector(".e"), o.efforts.map(e => [e, `effort ${e}`]), prev.effort ?? "low");
+        li.querySelector(".t").onchange = () => { describe(li); keep[k] = { ...keep[k], trait: li.querySelector(".t").value }; };
+        li.querySelector(".m").onchange = li.querySelector(".e").onchange = () => { keep[k] = { trait: li.querySelector(".t").value, model: li.querySelector(".m").value, effort: li.querySelector(".e").value }; cost(); };
+        describe(li);
+        return li;
+      }));
+      cost();
+    };
+    $("#setup-count").onchange = build;
+    $("#setup-random").onclick = () => {
+      const ids = o.traits.map(t => t.id).sort(() => Math.random() - 0.5);
+      rows.querySelectorAll("li").forEach((li, k) => { li.querySelector(".t").value = ids[k % ids.length]; describe(li); keep[k] = { ...keep[k], trait: ids[k % ids.length] }; });
+    };
+    $("#setup-all-haiku").onclick = () => { rows.querySelectorAll("li").forEach((li, k) => { li.querySelector(".m").value = "haiku"; li.querySelector(".e").value = "low"; keep[k] = { ...keep[k], model: "haiku", effort: "low" }; }); cost(); };
+    $("#setup-close").onclick = () => d.close();
+    $("#setup-msg").textContent = "";
+    build();
+    d.showModal();
+  }
+  $("#btn-new-world").onclick = openSetup;
+  $("#setup-form").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const nations = [...$("#setup-rows").querySelectorAll("li")].map(li => ({ trait: li.querySelector(".t").value, model: li.querySelector(".m").value, effort: li.querySelector(".e").value }));
+    const chosen = nations.map(x => x.trait).filter(Boolean);
+    if (new Set(chosen).size !== chosen.length) { $("#setup-msg").textContent = "Mỗi đặc thù chỉ dùng cho một quốc gia."; return; }
+    $("#setup-go").disabled = true; $("#setup-msg").textContent = "Đang chờ lượt hiện tại xong rồi tạo thế giới…";
+    try { await api("/api/world/new", { method: "POST", body: { seed: $("#setup-seed").value.trim(), tickSeconds: +$("#setup-tick").value, nations } }); location.reload(); }
+    catch (e) { $("#setup-msg").textContent = e.message; $("#setup-go").disabled = false; }
+  });
 
   // ---------------------------------------------------------------- chronicle
   const chron = $("#chronicle");
@@ -862,6 +1030,7 @@
       if (a.id === b.id) return `<td>—</td>`;
       const r = a.relations?.[b.id] ?? ""; return `<td class="rel ${relClass(r)}">${esc(r)}${a.trades?.[b.id] ? ` · ${a.trades[b.id]} lần buôn` : ""}</td>`;
     }).join("")}</tr>`).join("");
+    $("#hordes").innerHTML = (S.hordes || []).map(h => `<div class="card2"><b>${esc(h.name)}</b><span class="meta">${h.alive ? `sức mạnh ${h.strength}` : `đã bị đánh tan, trở lại lượt ${h.returns}`} · nơi ở ${h.tile % ST.n}, ${(h.tile / ST.n) | 0}${h.lastRaid ? ` · lần cướp gần nhất lượt ${h.lastRaid.tick} vào ${esc(nm(h.lastRaid.nation))}: ${h.lastRaid.won ? "thắng" : "bị đẩy lui"}` : ""}</span></div>`).join("") || `<p class="note">Thế giới này không có man di.</p>`;
     $("#wars").innerHTML = (S.wars || []).map(w => `<div class="card2"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}</span></div>`).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
     const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
     $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;
@@ -1121,7 +1290,7 @@
     addChronicle(await api("/api/chronicle?limit=200"), false);
     const es = new EventSource("/api/events");
     es.addEventListener("status", e => applyStatus(JSON.parse(e.data)));
-    es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh(); });
+    es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh(); if (layerKind) loadLayer(); });
     es.addEventListener("reload", () => location.reload());
     es.addEventListener("history", e => { const d = JSON.parse(e.data); addChapters([d.chapter]); addChronicle([d.entry]); });
     let rt, lastW = mapview.clientWidth;

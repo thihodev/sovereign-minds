@@ -58,17 +58,18 @@ class LoginSession {
 
   start(): Promise<LoginInfo> {
     this.cancel();
-    if (process.platform !== "linux" || USE_SYSTEM) {
-      // macOS `script` needs a real terminal; the web login works inside Docker (Linux).
-      this.state = "error"; this.error = `Đăng nhập qua web chỉ chạy trong Docker. ${TERMINAL_HINT}`;
+    if (process.platform === "win32" || USE_SYSTEM) {
+      this.state = "error"; this.error = `Đăng nhập qua web không chạy trên máy này. ${TERMINAL_HINT}`;
       return Promise.resolve(this.info());
     }
     mkdirSync(CLAUDE_CONFIG_DIR, { recursive: true });
     this.state = "starting"; this.url = ""; this.error = ""; this.out = "";
-    // The CLI wants a terminal; `script` gives it a pseudo-terminal on Linux and macOS.
-    const cmd = `${CLI()} auth login --claudeai`;
-    const args = process.platform === "darwin" ? ["-q", "/dev/null", ...cmd.split(" ")] : ["-q", "-e", "-c", cmd, "/dev/null"];
-    const p = spawn("script", args, { env: cliEnv() });
+    // The CLI wants a terminal. On Linux `script` gives it one; macOS `script` refuses
+    // piped stdio (tcgetattr), so there Python's pty module does it (as autoclip-studio does).
+    const [bin, args] = process.platform === "darwin"
+      ? ["python3", ["-c", "import os,pty,sys\nsys.exit(os.waitstatus_to_exitcode(pty.spawn(sys.argv[1:])))", CLI(), "auth", "login", "--claudeai"]]
+      : ["script", ["-q", "-e", "-c", `${CLI()} auth login --claudeai`, "/dev/null"]];
+    const p = spawn(bin, args, { env: cliEnv() });
     this.proc = p;
     const onData = (d: Buffer) => {
       this.out += d.toString("utf8");
@@ -86,7 +87,10 @@ class LoginSession {
       if (this.state === "idle") return;
       const st = claudeStatus();
       if (st.loggedIn) { this.state = "done"; this.error = ""; }
-      else { this.state = "error"; this.error = this.error || `Đăng nhập không thành công (mã ${code}). ${this.out.slice(-200)} ${TERMINAL_HINT}`; }
+      else {
+        const tail = this.out.replace(/\x1b\][^\x07]*\x07|\x1b\[[0-9;?]*[a-zA-Z]/g, "").split(/\r?\n/).map(l => l.trim()).filter(Boolean).pop() || "";
+        this.state = "error"; this.error = this.error || `Đăng nhập không thành công (mã ${code}). ${tail.slice(-200)} ${TERMINAL_HINT}`;
+      }
     });
     p.on("error", e => { this.state = "error"; this.error = `Không chạy được lệnh đăng nhập: ${e.message}`; });
     this.timer = setTimeout(() => { if (this.proc) { this.error = "Hết 15 phút chờ đăng nhập."; this.cancel(); this.state = "error"; } }, 15 * 60 * 1000);
@@ -176,13 +180,50 @@ export function chat(message: string, context: string, sessionId: string | null,
   p.stdin.end();
 }
 
-// ---------------------------------------------------------------- one-shot (the Historian)
+// ---------------------------------------------------------------- one-shot (nations, judge, Historian)
+
+/** Models a nation may run on (CLI aliases for the current Haiku and Sonnet). */
+export const CLAUDE_MODELS = [{ id: "haiku", label: "Haiku" }, { id: "sonnet", label: "Sonnet" }];
+export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 
 export type AskClaudeResult = { ok: true; text: string } | { ok: false; kind: "ratelimit" | "auth" | "timeout" | "error"; message: string; retryAfterSec: number | null };
 
-/** One prompt, one answer: no tools, no session to resume. Used by the Historian (§10.1). */
-export function askClaude(system: string, user: string, opts: { model: string; timeoutMs: number }): Promise<AskClaudeResult> {
+// Every nation shares the Watcher's one subscription: at most CLAUDE_CONCURRENCY runs at once.
+let running = 0;
+const waiting: Array<() => void> = [];
+async function slot<T>(fn: () => Promise<T>): Promise<T> {
+  const max = Math.max(1, Number(process.env.CLAUDE_CONCURRENCY) || 2);
+  if (running >= max) await new Promise<void>(r => waiting.push(r));
+  running++;
+  try { return await fn(); } finally { running--; waiting.shift()?.(); }
+}
+
+/** A wall-clock time in the message is in the account's timezone, which may not be the server's: never trust it for long. */
+const CLOCK_PARSE_MAX_SEC = 60 * 60;
+/** Seconds until a plan limit resets, from "…limit reached|1767225600" (exact) or "resets 3pm" (capped) style messages. */
+export function limitResetSec(msg: string, now = Date.now()): number | null {
+  const epoch = msg.match(/\|(\d{10})\b/);
+  if (epoch) return Math.max(0, Number(epoch[1]) - now / 1000);
+  const at = msg.match(/resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!at) return null;
+  let h = Number(at[1]);
+  const ampm = at[3]?.toLowerCase();
+  if (ampm === "pm" && h < 12) h += 12;
+  if (ampm === "am" && h === 12) h = 0;
+  const d = new Date(now); d.setHours(h, Number(at[2] || 0), 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return Math.min(CLOCK_PARSE_MAX_SEC, (d.getTime() - now) / 1000);
+}
+
+/** One prompt, one answer: no tools, no session to resume. Used by nations, the judge and the Historian.
+ *  `skipIf` is asked once a slot is free: a call queued behind one that hit the plan limit is not sent. */
+export function askClaude(system: string, user: string, opts: { model: string; timeoutMs: number; effort?: string; skipIf?: () => boolean }): Promise<AskClaudeResult> {
+  return slot(async () => opts.skipIf?.() ? { ok: false, kind: "ratelimit", message: "Đang chờ giới hạn gói Claude", retryAfterSec: null } : askOnce(system, user, opts));
+}
+
+function askOnce(system: string, user: string, opts: { model: string; timeoutMs: number; effort?: string }): Promise<AskClaudeResult> {
   const args = ["-p", "--output-format", "json", "--model", opts.model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", system, "--tools", ""];
+  if (opts.effort && CLAUDE_EFFORTS.includes(opts.effort)) args.push("--effort", opts.effort);
   return new Promise(res => {
     const p = spawn(CLI(), args, { env: cliEnv(), cwd: tmpdir() });
     let out = "", stderr = "", timedOut = false;
@@ -198,7 +239,7 @@ export function askClaude(system: string, user: string, opts: { model: string; t
       if (code === 0 && !j.is_error && typeof j.result === "string" && j.result) return res({ ok: true, text: j.result });
       const msg = String(j.result || stderr.slice(-400) || `Claude CLI thoát với mã ${code}`);
       const kind = /limit|quota|overloaded/i.test(msg) ? "ratelimit" : /log ?in|auth|credential|401/i.test(msg) ? "auth" : "error";
-      res({ ok: false, kind, message: msg.slice(0, 400), retryAfterSec: null });
+      res({ ok: false, kind, message: msg.slice(0, 400), retryAfterSec: kind === "ratelimit" ? limitResetSec(msg) : null });
     });
     p.stdin.on("error", () => { /* the CLI exited early; reported on close */ });
     p.stdin.write(user);

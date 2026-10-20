@@ -4,14 +4,16 @@
 import { DatabaseSync } from "node:sqlite";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type { ChronicleEntry, World } from "./types.ts";
 import type { HistoryChapter } from "./historian.ts";
 
 export class Store {
   db: DatabaseSync;
+  path: string;
 
   constructor(path: string) {
+    this.path = path;
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`
@@ -113,6 +115,17 @@ export class Store {
     return (this.db.prepare("SELECT id, role, text, tick, created_at FROM chat ORDER BY id DESC LIMIT ?").all(limit) as unknown[]).reverse();
   }
   clearChat(): void { this.db.exec("DELETE FROM chat"); }
+
+  /** Copy the whole database to data/backups/, then empty it for a new world. Returns the backup's path. */
+  backupAndReset(): string {
+    const dir = join(dirname(this.path), "backups");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `world-${new Date().toISOString().replace(/[:.]/g, "-")}.db`);
+    this.db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+    const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>;
+    for (const { name } of tables) this.db.exec(`DELETE FROM "${name.replace(/"/g, '""')}"`);
+    return file;
+  }
 
   close(): void { this.db.close(); }
 }

@@ -58,7 +58,7 @@ body.right-open .mapctl { right: calc(var(--right-w) + 2 * var(--gap) + 6px); }
 .mapctl .zl { color: #d7e3e8; font-size: 11px; }
 
 .legend-box { position: fixed; z-index: 15; bottom: 16px; left: 16px; max-width: min(520px, calc(100vw - 32px)); color: #d7e3e8; font-size: 12px; background: rgba(8,20,28,.62); border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(4px); transition: left .18s; }
-body.left-open .legend-box { left: calc(var(--left-w) + 2 * var(--gap) + 6px); }
+body.left-open .legend-box, body.left-open .layer-box { left: calc(var(--left-w) + 2 * var(--gap) + 6px); }
 .legend-box summary { cursor: pointer; font-weight: 600; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-top: 6px; }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
@@ -284,7 +284,8 @@ dialog.wide[open] { display: grid; grid-template-rows: auto 1fr; overflow: hidde
   .dock-head { position: relative; padding-top: 12px; }
   body.right-open .mapctl { right: 10px; bottom: calc(55dvh + 8px); }
   body.left-open .legend-box, .legend-box { left: 10px; bottom: 10px; }
-  body.right-open .legend-box { display: none; }
+  body.right-open .legend-box, body.right-open .layer-box { display: none; }
+  body.left-open .layer-box, .layer-box { left: 10px; bottom: 50px; }
   .mapctl { right: 10px; bottom: 10px; }
   .kv { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .kv.kv6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -301,3 +302,38 @@ dialog.wide[open] { display: grid; grid-template-rows: auto 1fr; overflow: hidde
 #ranking tr.gone { opacity: .6; }
 #ranking .sw { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
 #ranking td:nth-child(2) { white-space: nowrap; }
+
+/* New world setup (§2.4) */
+.error.wait { background: color-mix(in srgb, var(--warn) 22%, var(--panel)); }
+#setup-dialog { width: min(820px, calc(100vw - 16px)); }
+.setup-body { padding: 12px 16px 16px; display: grid; gap: 10px; }
+.setup-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.setup-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.setup-rows li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 4px; }
+.setup-rows .pick { display: grid; grid-template-columns: 2.2em minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 6px; align-items: center; }
+.setup-rows .num { font-weight: 700; color: var(--muted); }
+.setup-rows .lines { font-size: 12px; color: var(--muted); }
+.warnline:empty { display: none; }
+.warnline { color: var(--warn); }
+.trait { font-size: 12px; }
+.trait b { font-weight: 600; }
+.model-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 600px) {
+  .setup-rows .pick { grid-template-columns: 2em minmax(0, 1fr); }
+  .setup-rows .pick select:nth-of-type(n+2) { grid-column: 2; }
+}
+
+/* Map layers and threats (§9.4) */
+.layer-box { position: fixed; z-index: 15; bottom: 56px; left: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: #d7e3e8; font-size: 12px; background: rgba(8,20,28,.62); border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(4px); max-width: calc(100vw - 32px); transition: left .18s; }
+.layer-box select { background: rgba(255,255,255,.94); color: #14201c; padding: 3px 6px; font-size: 12px; }
+.layer-scale { display: inline-flex; align-items: center; gap: 6px; }
+.layer-scale i { width: 64px; height: 8px; border-radius: 4px; display: inline-block; }
+.layer-scale.threat i { background: linear-gradient(90deg, rgba(225,45,30,.1), rgba(225,45,30,.72)); }
+.layer-scale.res i { background: linear-gradient(90deg, rgba(255,212,0,.14), rgba(255,212,0,.82)); }
+.threats { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; }
+.threats li { border-left: 3px solid var(--line); padding: 2px 0 2px 8px; }
+.threats li.lv2 { border-color: var(--warn); }
+.threats li.lv3 { border-color: var(--bad); }
+.threats .d { color: var(--muted); }
+.threat-tag { font-size: 12px; font-weight: 600; color: var(--warn); }
+.threat-tag.lv3 { color: var(--bad); }

@@ -2,7 +2,28 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.3 (đang làm)
+## v0.4 (đang làm)
+
+- **Mọi quốc gia chơi bằng tài khoản Claude đã đăng nhập** (Claude Code CLI, gói Pro/Max, không cần API key). Mỗi nước chọn model (Haiku, Sonnet) và effort (low … max); đổi được giữa trận trong hồ sơ quốc gia. Trọng tài và Sử gia cũng mặc định dùng Claude (Sử gia: Haiku, effort low). Nhà cung cấp miễn phí vẫn dùng được qua `NATIONS`, `JUDGE_PROVIDERS` và `HISTORIAN_PROVIDER=auto`.
+- **Đặc thù quốc gia (§2.4):** 9 đặc thù, mỗi đặc thù có một lợi thế và một điểm yếu thật trong luật, cộng với tính cách mà AI đọc mỗi lượt (trường `identity`). Đã cân bằng bằng `tools/traits.ts`.
+- **Hộp thoại Thế giới mới:** chọn seed, số quốc gia (2–8), nhịp lượt, rồi đặc thù, model và effort cho từng nước. Thế giới cũ được sao lưu vào `data/backups/`. Lần cài mới, thế giới chờ Watcher chọn rồi mới chạy.
+- **Chung một gói Claude:** tối đa `CLAUDE_CONCURRENCY` (mặc định 2) lệnh `claude` chạy cùng lúc. Khi hết giới hạn gói hoặc Claude chưa đăng nhập, cả thế giới chờ (không nước nào đi trước). Câu trả lời đã nhận được giữ lại cho lần chạy tiếp, để không hỏi lại và không tốn thêm lượt gói. Đăng nhập từ web xong thì thế giới chạy tiếp ngay.
+- Đăng nhập Claude từ web chạy được trên macOS khi không dùng Docker (dùng `pty` của Python thay cho `script`).
+- Nhịp lượt mặc định 20 phút.
+- **Bản đồ 128 × 128** (gấp 4 lần), bao quanh bởi **Tường Băng** dày 3–6 ô: không ai vượt qua hay khai hoang được. Chân tường là **băng hà** (tuần lộc, voi ma mút, đá), trong vòng 4 ô có **gió băng** (mùa đông thường và chết nhiều hơn, kể cả ở nhiệt đới). Sông, kỳ quan, điểm khai sinh và vùng hoang tăng theo kích thước. Điểm khai sinh phải có cây dại (để làm sợi, dây, lều) và xa Tường Băng. Thế giới 64 × 64 đã lưu được tự sao lưu vào `data/backups/`, rồi chờ tạo thế giới mới.
+- **Mối đe dọa mới (§9.4):**
+  - **thú dữ:** độ nguy hiểm theo địa hình và theo khoảng cách tới vùng hoang; tấn công thợ săn, người hái lượm, đoàn thám hiểm
+  - **6 bộ lạc man di** ở vùng hoang: lớn dần, cướp phá nước từ 40 dân trở lên trong tầm 16 ô; có thể đẩy lui, hoặc đánh tan bằng hành động mới `clear_wild`
+  - **lũ lụt** và **động đất** (trước đây chỉ có trong luật, giờ đã có trong engine)
+  - **gió băng**
+- **Thảo dược:** tài nguyên mới ở rừng rậm, đầm lầy và một số khu rừng; người hái lượm mang về; đủ thảo dược thì dịch bệnh chết ít đi một nửa.
+- **Báo cáo đe dọa và tài nguyên** (`src/threats.ts`):
+  - **AI** nhận `threats`, `resources`, `hordes` trong gói trạng thái mỗi lượt, chỉ gồm những gì nước đó thấy được.
+  - **Watcher** xem bản đầy đủ trong khung chi tiết, thẻ quốc gia và hồ sơ quốc gia.
+  - **Bản đồ** có lớp phủ cho mối đe dọa (tổng hợp, thú dữ, man di, lũ lụt, giá rét) và cho trữ lượng từng tài nguyên; trại man di được vẽ trên bản đồ và liệt kê ở tab Ngoại giao.
+- Bot giữ đủ chiến binh khi có man di ở gần.
+
+## v0.3
 
 - Trọng tài mặc định là **Claude Sonnet 5.5** qua tài khoản Claude của Watcher (`JUDGE_PROVIDERS` bắt đầu bằng `claude`, đổi model bằng `JUDGE_CLAUDE_MODEL`). Claude chưa đăng nhập hoặc bị giới hạn thì Engine tạm dùng các nhà cung cấp miễn phí phía sau, và thử lại Claude sau 15 phút.
 - Điểm khai sinh công bằng hơn: mỗi điểm phải có đủ gỗ (≥150), đá (≥150) và thịt hoặc cá (≥80) trong bán kính 2; khi chọn bộ điểm khai sinh, ưu tiên láng giềng gần nhất trong khoảng 12–18 ô. Với 4 quốc gia: 20/20 vào Đồ Đá Mới (trước là 13/20), không còn nước kẹt ở 25–35 dân (trước là 7/20).

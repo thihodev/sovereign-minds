@@ -1,7 +1,7 @@
-// Hex grid helpers: 64 x 64 tiles, pointy-top, "odd-r" offset layout.
+// Hex grid helpers: 128 x 128 tiles, pointy-top, "odd-r" offset layout.
 // A tile is addressed by its index i = row * N + col.
 
-export const N = 64;
+export const N = 128;
 export const TILE_COUNT = N * N;
 
 const DIRS = [

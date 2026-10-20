@@ -81,14 +81,14 @@ export function parseChapter(reply: string): { title: string; text: string } | n
   return { title, text };
 }
 
-/** HISTORIAN_PROVIDER: a provider id, "claude", "off", or unset for the first free one with a key. */
+/** HISTORIAN_PROVIDER: "claude" (the default), "off", "auto" for the first free provider with a key, or a provider id. */
 export const DEFAULT_ORDER = "groq,cohere,cloudflare,sambanova,mistral,gemini,openrouter,ollama,custom";
 
 export function chooseHistorian(setting: string, nationProviders: Set<string>): { provider: string; note: string } | null {
   setting = setting.trim().toLowerCase();
   if (setting === "off") return null;
-  if (setting === "claude") return { provider: "claude", note: "" };
-  if (setting) {
+  if (setting === "claude" || !setting) return { provider: "claude", note: "" };
+  if (setting !== "auto") {
     const p = PROVIDERS[setting];
     if (!p) return { provider: "", note: `Sử gia: không biết nhà cung cấp "${setting}", tắt Sử gia` };
     if (!providerKey(p)) return { provider: "", note: `Sử gia: thiếu ${p.keyEnv}, tắt Sử gia` };
@@ -163,7 +163,7 @@ export class Historian {
 export function historianFromEnv(store: Store, world: World, timeoutSec: number, onChapter: (c: HistoryChapter, entry: ChronicleEntry) => void): Historian | null {
   const env = process.env;
   const nationProviders = new Set(world.nations.filter(n => n.alive && n.controller === "ai").map(n => n.provider));
-  const choice = chooseHistorian(env.HISTORIAN_PROVIDER || "", nationProviders);
+  const choice = chooseHistorian(env.HISTORIAN_PROVIDER || "claude", nationProviders);
   if (choice?.note) console.log(`[sử gia] ${choice.note}`);
   if (!choice || !choice.provider) return null;
   const every = Number(env.HISTORIAN_EVERY) || 10, override = (env.HISTORIAN_MODEL || "").trim();
@@ -171,9 +171,9 @@ export function historianFromEnv(store: Store, world: World, timeoutSec: number,
   const timeoutMs = Math.max(timeoutSec, 120) * 1000;
   let ask: Ask, author: string;
   if (choice.provider === "claude") {
-    const model = override || env.CLAUDE_MODEL || "sonnet";
+    const model = override || "haiku";
     author = `Claude · ${model}`;
-    ask = (system, user) => askClaude(system, user, { model, timeoutMs });
+    ask = (system, user) => askClaude(system, user, { model, timeoutMs, effort: "low" });
   } else {
     const p = PROVIDERS[choice.provider], model = override || providerModel(p);
     author = `${p.label} · ${model}`;
