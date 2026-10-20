@@ -249,7 +249,7 @@
 
   // A light outline keeps a dark flag colour readable on forest and a light one on snow
   function figure(g, x, y, r, color, px) {
-    g.lineWidth = 1.4 * px; g.strokeStyle = "rgba(255,255,255,.92)"; g.fillStyle = color;
+    g.lineWidth = Math.min(1.4 * px, r * .22); g.strokeStyle = "rgba(255,255,255,.85)"; g.fillStyle = color; // thin for small figures, or a crowd turns to a white smudge
     g.beginPath(); g.arc(x, y - r * 1.6, r * .62, 0, 7); g.fill(); g.stroke();
     g.beginPath(); g.moveTo(x - r * .8, y + r * .6); g.lineTo(x, y - r * 1.1); g.lineTo(x + r * .8, y + r * .6); g.closePath(); g.fill(); g.stroke();
   }
@@ -265,36 +265,61 @@
   function icon(g, text, x, y, size) { g.font = `${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, x, y); }
   function floatText(g, text, x, y, size, color, px) { label(g, text, x, y, size, color, 800, px); }
 
+  /** People one figure stands for: one each up to FIGURES_MAX people, then a few each, so the map never clogs. */
+  const FIGURES_MAX = 160;
+  const perFigure = n => Math.max(1, Math.ceil(n.population / FIGURES_MAX));
+  /** Everyone is on the map: workers walk to their work, the rest (children, elders, idle hands) stay round the centres. */
   function drawAmbient(g, now, s, z, px, vis) {
     if (!ANIM.on || s * z < AMBIENT_MIN) return;
     const r = clamp(s * .3 * z, 3, 7) * px, iconSize = clamp(s * .8 * z, 10, 18) * px, still = reduceMotion.matches;
+    // a spot inside a tile for figure k: spread out, not stacked
+    const spot = (tile, k, salt) => { const a = hash(tile, k, salt) * Math.PI * 2, d = Math.sqrt(hash(k, tile, salt + 7)); return [Math.cos(a) * s * .62 * d, Math.sin(a) * s * .5 * d]; };
     for (const n of S.nations) {
       if (!n.alive || !n.founded) continue;
-      const color = n.flag.colors[0];
+      const color = n.flag.colors[0], unit = perFigure(n);
+      let working = 0;
       for (const w of n.work || []) {
+        working += w.n;
         if (!vis(w.tile)) continue;
         const home = centreFor(n, w.tile), [hx, hy] = center(home), [wx, wy] = center(w.tile);
         if (s * z >= 7 && ROLE_ICON[w.role]) { g.globalAlpha = .9; icon(g, ROLE_ICON[w.role], wx + s * .45, wy - s * .45, iconSize); g.globalAlpha = 1; }
-        const people = Math.min(4, Math.ceil(w.n / 3));
+        const people = Math.max(1, Math.round(w.n / unit));
         for (let k = 0; k < people; k++) {
-          const ph = hash(w.tile, k, n.id, w.role.length), period = 7000 + ph * 5000;
+          const ph = hash(w.tile, k, n.id, w.role.length), period = 7000 + ph * 5000, [ox, oy] = spot(w.tile, k, w.role.length);
           let x, y;
           if (home === w.tile || still) {
-            // working on the spot: a slow circle around the tile
-            const a = (still ? ph : (now / period + ph)) * Math.PI * 2;
-            x = wx + Math.cos(a) * s * .45; y = wy + Math.sin(a) * s * .3;
+            // working on the spot, drifting a little round their place
+            const a = (still ? 0 : now / period + ph) * Math.PI * 2;
+            x = wx + ox + Math.cos(a) * s * .08; y = wy + oy + Math.sin(a) * s * .06;
           } else {
             // there and back: walk out, work a while, walk home
             const t = ((now / period) + ph) % 1, leg = t < .4 ? ease(t / .4) : t < .6 ? 1 : 1 - ease((t - .6) / .4);
-            const side = (k - (people - 1) / 2) * s * .22;
-            [x, y] = lerp([hx + side, hy], [wx + side, wy], leg);
+            [x, y] = lerp([hx + ox * .6, hy + oy * .6], [wx + ox, wy + oy], leg);
             if (t >= .4 && t < .6) y += Math.sin(now / 180 + k) * s * .06; // busy at the work
           }
           figure(g, x, y, r, color, px);
         }
       }
+      // The rest of the people: at home round the capital and the settlements, a little smaller
+      // homes: their tiles within 2 of each centre (the capital's count twice), so the crowd spreads round the flag, not under it
+      const hearth = c => { const near = new Set([c]); for (const j of NB(c)) if (j >= 0) { near.add(j); for (const k of NB(j)) if (k >= 0) near.add(k); } return [c, ...[...near].filter(j => j !== c && S.owners[j] === n.id)]; };
+      const homes = [...hearth(n.capital), ...hearth(n.capital).slice(1), ...(n.settlements || []).flatMap(x => hearth(x.tile))];
+      const home = Math.max(0, Math.round((n.population - working) / unit));
+      for (let k = 0; k < home; k++) {
+        const c = homes[(k * 7 + Math.floor(k / homes.length)) % homes.length];
+        if (!vis(c)) continue;
+        const [cx, cy] = center(c), [ox, oy] = spot(c, k, 99), ph = hash(c, k, n.id, 5);
+        const a = (still ? 0 : now / (9000 + ph * 6000) + ph) * Math.PI * 2;
+        figure(g, cx + ox * 1.15 + Math.cos(a) * s * .1, cy + oy * 1.15 + Math.sin(a) * s * .08, r * .75, color, px);
+      }
+      // how many, under the capital's name
+      if (vis(n.capital)) {
+        const [cx, cy] = center(n.capital), fs = clamp(s * 1.1 * z, 10, 15) * px;
+        label(g, `👥 ${n.population}${unit > 1 ? ` · 1 hình = ${unit} người` : ""}`, cx, cy + fs * (n.status === "asleep" || n.status === "error" ? 3.4 : 2.3), fs * .8, "#fff7d6", 600, px);
+      }
     }
   }
+
 
   function drawEvents(g, now, s, z, px) {
     if (!ANIM.queue.length) return;
