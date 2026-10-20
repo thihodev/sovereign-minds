@@ -246,7 +246,15 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 - **Hôn nhân:** năng lực `hôn-nhân` (có từ một phát minh) cho sinh ×1,1 và +0,5 ổn định mỗi lượt.
 - **Hộ:** mỗi cặp vợ chồng trưởng thành là một hộ, người lớn đơn thân tính hai người một hộ.
 - **Chỗ ở:** thủ đô chứa 25 người tự nhiên (hang, bãi trú). Mỗi điểm định cư +10, Hang Đại Động +50, công trình có chỗ ở (Lều +10, công trình mở) cộng thêm.
-- **Trần chỗ ở theo trung tâm:** mỗi trung tâm (thủ đô và mỗi điểm định cư) chứa tối đa **3 công trình có chỗ ở** (Lều và công trình mở có `housing`). Engine từ chối lệnh `build` vượt trần (tính cả công trình đang xây), và khi tính chỗ ở chỉ cộng các công trình tốt nhất trong trần, nên mất một điểm định cư thì lều thừa bỏ trống. Như vậy thủ đô chứa tối đa 25 + 30 = 55 người, mỗi điểm định cư thêm tối đa 10 + 30 = 40 người: muốn đông dân thì phải mở rộng ra điểm định cư mới.
+- **Thôn xóm:** các gia đình cũng sống rải rác trên đất. Mỗi ô đất của quốc gia (trừ ô trung tâm) chứa thêm:
+  - đồng cỏ, ven biển: 3 người
+  - rừng, rừng lá kim, rừng rậm, đồi: 2 người
+  - đầm lầy, sa mạc, lãnh nguyên, băng hà: 1 người
+  - núi và ô biển: 0
+  - ô có sông: thêm 1
+
+  Tổng tối đa 40 + 20 × số kỷ nguyên đã qua. Mở rộng đất vì thế cũng nâng trần dân số.
+- **Trần chỗ ở theo trung tâm:** mỗi trung tâm (thủ đô và mỗi điểm định cư) chứa tối đa **3 công trình có chỗ ở** (Lều và công trình mở có `housing`). Engine từ chối lệnh `build` vượt trần (tính cả công trình đang xây), và khi tính chỗ ở chỉ cộng các công trình tốt nhất trong trần, nên mất một điểm định cư thì lều thừa bỏ trống. Như vậy thủ đô chứa tối đa 25 + 30 = 55 người, mỗi điểm định cư thêm tối đa 10 + 30 = 40 người, cộng thôn xóm trên đất: muốn đông dân thì mở rộng đất và lập điểm định cư mới.
 - **Cơ cấu lao động:** số lao động = tổng sức làm việc theo nhóm: trẻ em 0,1, thiếu niên 0,8, người trưởng thành 1, người già 0,5. Với cơ cấu bình thường thì khoảng 70% dân số. AI phân lao động vào 13 vai: hái lượm (`gather`), săn bắt (`hunt`), đánh cá (`fish`), nông dân (`farm`), đốn gỗ (`wood`), khai đá (`stone`), nhặt đá lửa (`flint`), lấy đất sét (`clay`), khai mỏ (`mine`), chế tác (`craft`), xây dựng (`build`), nghiên cứu (`research`), chiến binh (`warrior`). Người thám hiểm không phải một vai: họ được rút tạm từ nhóm hái lượm và người rảnh trong lượt đi thám hiểm.
 - **Phân quá số người:** Engine thu nhỏ theo tỷ lệ, phần lẻ chia cho các vai có phần thập phân lớn nhất, và báo lại trong danh sách bị từ chối.
 - **Người không được phân vai** tự động đi hái lượm.

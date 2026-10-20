@@ -11,7 +11,7 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
-import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
@@ -106,7 +106,8 @@ function tileWorth(v: View, t: Tile): number {
   let food = (t.cap.game || 0) * (REGEN.game || 0) + (t.cap.plants || 0) * (REGEN.plants || 0) + (t.cap.fish || 0) * (REGEN.fish || 0);
   if (!t.land) food *= 0.7;
   return food + Math.min(5, (R.wood || 0) / 40) + Math.min(3, (R.stone || 0) / 100) + Math.min(4, (R.flint || 0) / 10) + Math.min(3, (R.clay || 0) / 50)
-    + (see("copper") && R.copper ? 6 : 0) + (t.river ? 4 : 0) + (t.terrain === "grass" || t.terrain === "coast" ? 2 : 0);
+    + (see("copper") && R.copper ? 6 : 0) + (t.river ? 4 : 0) + (t.terrain === "grass" || t.terrain === "coast" ? 2 : 0)
+    + (t.land && v.house - v.pop <= 3 ? (HAMLET.people[t.terrain] || 0) * 1.5 : 0); // §4.2 room for hamlets when the people is out of housing
 }
 
 function look(world: World, n: Nation): View {

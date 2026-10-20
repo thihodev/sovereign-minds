@@ -86,6 +86,14 @@ export const DEMO = {
   marriageCap: "hôn-nhân", marriage: 1.1, marriageStability: 0.5,
 };
 
+/** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses
+ *  this many people by terrain; at most `max` + `perEra` × era in all. Water houses no one. */
+export const HAMLET = {
+  people: { grass: 3, coast: 3, forest: 2, taiga: 2, jungle: 2, hill: 2, swamp: 1, desert: 1, tundra: 1, glacier: 1, mountain: 0, icewall: 0, ocean: 0, shallow: 0 } as Record<string, number>,
+  /** A river tile houses this many more. */
+  river: 1,
+  max: 40, perEra: 20,
+};
 /** §4.2 Buildings that give housing (tents, open-invention housing): at most `perCentre` per centre (capital + each settlement). */
 export const HOUSING = { perCentre: 3 };
 

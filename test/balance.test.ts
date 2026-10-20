@@ -2,7 +2,7 @@
 // research pace by depth and by researcher, pottery, sprawl, and decisive but costly war.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { baseCost, createWorld, growthFor, housing, researchPoints, step, tileLimit, type NationSpec } from "../src/engine.ts";
+import { baseCost, createWorld, growthFor, housing, housingParts, researchPoints, step, tileLimit, type NationSpec } from "../src/engine.ts";
 import { col, row, NEIGHBORS } from "../src/hex.ts";
 import { ROLE_NAME } from "../src/rules.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
@@ -45,9 +45,9 @@ test("housing: three tents per centre; only that many count", () => {
   turn(w, { 0: { actions: [tent] } });
   assert.equal(n.buildings.filter(b => b.type === "tent").length, 4, "a settlement opens three more slots");
   for (const b of n.buildings) if (b.type === "tent") { b.done = true; b.progress = 4; }
-  assert.equal(housing(w, n), 25 + 10 + 4 * 10);
+  assert.equal(housing(w, n), 25 + 10 + 4 * 10 + housingParts(w, n).hamlets, "plus the hamlets on the land");
   n.settlements = []; // the settlement is lost: the fourth tent stands empty
-  assert.equal(housing(w, n), 25 + 3 * 10);
+  assert.equal(housing(w, n), 25 + 3 * 10 + housingParts(w, n).hamlets);
 });
 
 test("growth is logistic toward housing; the tile limit grows with √population", () => {

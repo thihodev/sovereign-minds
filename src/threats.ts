@@ -104,7 +104,7 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   if (held > limit) add("overreach", 2, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10). Đường nối các trung tâm nâng giới hạn.`);
   if (n.stability < 30) add("unrest", n.stability < 15 ? 3 : 2, "Bất ổn", `Ổn định ${n.stability}: dưới 30 sản xuất −25%, dưới 15 dân bỏ đi, về 0 thì nội loạn.`);
   const roof = housing(world, n);
-  if (n.population >= roof) add("housing", 1, "Hết chỗ ở", `Dân ${n.population}/${roof} chỗ ở: dân không tăng nữa cho đến khi có thêm lều hay điểm định cư.`);
+  if (n.population >= roof) add("housing", 1, "Hết chỗ ở", `Dân ${n.population}/${roof} chỗ ở: dân không tăng nữa cho đến khi có thêm lều, điểm định cư, hay đất mới cho thôn xóm.`);
   const volcano = world.wonders.find(w => w.key === "volcano");
   if (volcano && n.buildings.some(b => dist(b.tile, volcano.i) <= 2)) add("volcano", 1, "Núi lửa", `${pct(EVENTS.eruption.chance)} mỗi lượt Núi lửa Tro Đen phun trào, phá mọi công trình trong 2 ô.`);
   return out.sort((a, b) => b.level - a.level);

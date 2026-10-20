@@ -94,3 +94,17 @@ test("herbs save infants", () => {
   assert.ok((withHerbs.born ?? 0) >= (without.born ?? 0));
   assert.ok(DEMO.herbSave > 0);
 });
+
+test("hamlets: the land houses families too, more on grass and rivers, up to a cap", async () => {
+  const { housing, housingParts } = await import("../src/engine.ts");
+  const { HAMLET } = await import("../src/rules.ts");
+  const w = founded("hamlets");
+  const n = w.nations[0];
+  const before = housing(w, n), parts = housingParts(w, n);
+  assert.ok(parts.hamlets > 0, "the six tiles around the capital hold hamlets");
+  const free = w.tiles.find(t => t.land && t.owner === -1 && (HAMLET.people[t.terrain] || 0) >= 2)!;
+  free.owner = n.id;
+  assert.equal(housing(w, n), before + HAMLET.people[free.terrain] + (free.river ? HAMLET.river : 0), "one more tile, more room");
+  for (const t of w.tiles) if (t.land && t.owner === -1 && HAMLET.people[t.terrain]) t.owner = n.id;
+  assert.equal(housingParts(w, n).hamlets, HAMLET.max, "capped");
+});

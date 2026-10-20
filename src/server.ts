@@ -9,7 +9,7 @@ import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
-import { governed, housing, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
+import { governed, housing, housingParts, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
 import { DEMO, OFFICIAL_DOMAINS, ROADS } from "./rules.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
@@ -65,7 +65,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
         population: n.population, workers: workers(n),
         demo: n.alive ? (() => { const d = demo(n); return { m: d.m, f: d.f, born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, households: households(n), fighters: fighters(n), mouths: mouths(n) }; })() : null,
-        family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), stability: n.stability, reputation: n.reputation, era: n.era,
+        family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
         roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n), works: (n.roadWorks ?? []).length } : null,

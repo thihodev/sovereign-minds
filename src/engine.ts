@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -220,11 +220,19 @@ export function growthFor(pop: number, roof: number): number {
 /** §4.2 housing buildings allowed: HOUSING.perCentre per centre, plus what eras and inventions add per centre. */
 export function housingSlots(n: Nation, world?: World): number { return (HOUSING.perCentre + (world ? mods(world, n).housingSlots : 0)) * (1 + n.settlements.length); }
 export function isHousing(world: World, type: string): boolean { return (buildingOf(world, type)?.effect.housing || 0) > 0; }
-export function housing(world: World, n: Nation): number {
+/** §4.2 Where the people live: the capital's natural shelter, settlements, housing buildings, hamlets on the land, the cave. */
+export function housingParts(world: World, n: Nation): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number } {
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
-  const roofs = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
+  const buildings = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
     .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
-  return START.naturalHousing + n.settlements.length * SETTLEMENT.housing + roofs + (ownsWonder(world, n, "cave") ? 50 : 0);
+  const hubs = new Set(centres(n)), hamletMax = HAMLET.max + HAMLET.perEra * eraIndex(n);
+  let hamlets = 0;
+  for (const t of world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0);
+  return { natural: START.naturalHousing, settlements: n.settlements.length * SETTLEMENT.housing, buildings, hamlets: Math.min(hamletMax, hamlets), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0 };
+}
+export function housing(world: World, n: Nation): number {
+  const p = housingParts(world, n);
+  return p.natural + p.settlements + p.buildings + p.hamlets + p.wonder;
 }
 /** §2.1 Fresh water near the capital: a river, a swamp, the hot spring or a well within RIVER.waterReach tiles. */
 export function freshWater(world: World, n: Nation): boolean {

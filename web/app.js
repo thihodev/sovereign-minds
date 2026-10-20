@@ -1051,6 +1051,7 @@
     const rows = [3, 2, 1, 0].map(a => `<div class="pyr-row"><div class="pyr-m"><i style="width:${w(d.m[a])}"></i><b>${d.m[a]}</b></div><span>${AGE_NAMES[a]}</span><div class="pyr-f"><i style="width:${w(d.f[a])}"></i><b>${d.f[a]}</b></div></div>`).join("");
     return `<h3>Dân cư</h3>
       <div class="pyr" role="img" aria-label="Tháp dân số"><div class="pyr-head"><span>♂ Nam ${d.m.reduce((a, b) => a + b, 0)}</span><span></span><span>Nữ ${d.f.reduce((a, b) => a + b, 0)} ♀</span></div>${rows}</div>
+      ${n.housingParts ? `<p class="note">Chỗ ở ${n.housing}: thủ đô ${n.housingParts.natural}${n.housingParts.settlements ? ` · điểm định cư ${n.housingParts.settlements}` : ""} · lều ${n.housingParts.buildings} · thôn xóm trên đất ${n.housingParts.hamlets}/${n.housingParts.hamletMax}${n.housingParts.wonder ? ` · hang ${n.housingParts.wonder}` : ""}</p>` : ""}
       <p class="note">${d.households} hộ · ${d.fighters} người có thể ra trận · ăn ${d.mouths} suất · lượt trước: +${d.born} trẻ, ${d.infants} trẻ sơ sinh mất, ${d.aged} người qua đời vì tuổi già hay lao lực</p>
       <div class="chips"><span>👪 ${esc(n.family.birthsName)}</span><span>⚔ ${esc(n.family.fightersName)}</span></div>`;
   }
