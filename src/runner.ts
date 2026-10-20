@@ -9,7 +9,7 @@ import { botTurn } from "./ai/bot.ts";
 import { buildObservation, systemPrompt } from "./ai/prompt.ts";
 import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
-import { JUDGE_SYSTEM, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
+import { JUDGE_SYSTEM, JUDGE_SYSTEM_BATCH, judgeBatchPrompt, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
@@ -240,19 +240,28 @@ export class Runner {
     this.store.setMeta("manual_rulings", JSON.stringify([...this.manualRulings.entries()]));
     const nationProviders = new Set(w.nations.filter(n => n.alive && n.controller === "ai").map(n => n.provider));
     let calls = 0;
+    // Claude (the Watcher's own login) comes first when it is listed and logged in: up to JUDGE_BATCH proposals a call
+    const batch = Math.max(1, Number(process.env.JUDGE_BATCH) || 4);
+    if (this.cfg.judgeProviders.includes("claude")) {
+      const todo = pending.filter(p => !out[p.id]);
+      for (let i = 0; i < todo.length && calls < this.cfg.judgesPerTick; i += batch) {
+        if ((this.judgeSleep.get("claude") || 0) >= Date.now() || Date.now() < this.claudeWait.until || !this.claudeReady()) break;
+        const group = todo.slice(i, i + batch);
+        calls++;
+        const model = process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5", started = Date.now();
+        const r = group.length === 1
+          ? await askClaude(JUDGE_SYSTEM, judgeUserPrompt(w, group[0]), { model, timeoutMs: Math.max(120, this.cfg.aiTimeoutSec) * 1000 })
+          : await askClaude(JUDGE_SYSTEM_BATCH, judgeBatchPrompt(w, group), { model, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000 });
+        const j = r.ok ? extractJson(r.text) : null;
+        this.store.logTurn({ tick: w.tick, nation: -1, provider: "claude", model, kind: j ? "ruling" : (r.ok ? "invalid" : r.kind), raw: r.ok ? r.text : "", parsed: j ?? undefined, error: r.ok ? "" : r.message, latencyMs: Date.now() - started });
+        if (j && group.length === 1) out[group[0].id] = parseRuling(j, `Claude · ${model}`);
+        else if (j && Array.isArray(j.rulings)) for (const x of j.rulings as Array<Record<string, unknown>>) { const p = group.find(g => g.id === Number(x.id)); if (p) out[p.id] = parseRuling(x, `Claude · ${model}`); }
+        if (!r.ok && (r.kind === "ratelimit" || r.kind === "auth")) { this.judgeSleep.set("claude", Date.now() + 15 * 60 * 1000); this.claudeCheck = { at: 0, ok: false }; break; }
+      }
+    }
     for (const p of pending) {
       if (out[p.id] || calls >= this.cfg.judgesPerTick) continue;
       const proposer = w.nations[p.nation].provider;
-      // Claude (the Watcher's own login) comes first when it is listed and logged in.
-      if (this.cfg.judgeProviders.includes("claude") && (this.judgeSleep.get("claude") || 0) < Date.now() && Date.now() >= this.claudeWait.until && this.claudeReady()) {
-        calls++;
-        const model = process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5", started = Date.now();
-        const r = await askClaude(JUDGE_SYSTEM, judgeUserPrompt(w, p), { model, timeoutMs: Math.max(120, this.cfg.aiTimeoutSec) * 1000 });
-        const j = r.ok ? extractJson(r.text) : null;
-        this.store.logTurn({ tick: w.tick, nation: -1, provider: "claude", model, kind: j ? "ruling" : (r.ok ? "invalid" : r.kind), raw: r.ok ? r.text : "", parsed: j ?? undefined, error: r.ok ? "" : r.message, latencyMs: Date.now() - started });
-        if (j) { out[p.id] = parseRuling(j, `Claude · ${model}`); continue; }
-        if (!r.ok && (r.kind === "ratelimit" || r.kind === "auth")) { this.judgeSleep.set("claude", Date.now() + 15 * 60 * 1000); this.claudeCheck = { at: 0, ok: false }; }
-      }
       const candidates = this.cfg.judgeProviders.map(id => PROVIDERS[id]).filter(pr => pr && providerKey(pr) && pr.id !== proposer && (this.judgeSleep.get(pr.id) || 0) < Date.now());
       candidates.sort((a, b) => Number(nationProviders.has(a.id)) - Number(nationProviders.has(b.id)));
       for (const pr of candidates) {
@@ -266,6 +275,12 @@ export class Runner {
       }
     }
     return out;
+  }
+
+  /** Why proposals are still waiting, for the Watcher. */
+  judgeInfo(): { claudeSleepUntil: number | null; claudeWaitUntil: number | null; perTick: number; batch: number } {
+    const sleep = this.judgeSleep.get("claude") || 0;
+    return { claudeSleepUntil: sleep > Date.now() ? sleep : null, claudeWaitUntil: this.claudeWait.until > Date.now() ? this.claudeWait.until : null, perTick: this.cfg.judgesPerTick, batch: Math.max(1, Number(process.env.JUDGE_BATCH) || 4) };
   }
 
   judgeByHand(id: number, approve: boolean, reason: string): string | null {

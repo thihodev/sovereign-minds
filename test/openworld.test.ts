@@ -106,3 +106,27 @@ test("the court: appoint, the work they do on their own, slots, rewards, dismiss
   turn(w, { actions: [{ type: "dismiss_official", official: gov.id }] });
   assert.equal(n.officials!.length, 0);
 });
+
+test("the engine catches a duplicate invention by itself and studies the one in the book", async () => {
+  const { nearDuplicate } = await import("../src/catalog.ts");
+  const w = founded("dupes");
+  const n = w.nations[0];
+  grant(w, n, ["thuộc-da"]);
+  const id = Object.keys(w.custom.inventions).at(-1)!;
+  Object.assign(w.custom.inventions[id], { name: "Lều da thú", desc: "Lều dựng bằng da thú căng trên khung gỗ", effects: { role: { hunt: 0.1 } } });
+  // same name in other words, same doing, no new capability: a duplicate
+  assert.equal(nearDuplicate(w, { name: "Lều da", description: "Dựng lều bằng da thú", caps: [], effects: [{ kind: "role_bonus", role: "hunt", percent: 10 }] })?.id, id);
+  // a new capability: a step beyond, not a duplicate
+  assert.equal(nearDuplicate(w, { name: "Lều da", description: "Dựng lều bằng da thú", caps: ["nhà-ở"], effects: [{ kind: "role_bonus", role: "hunt", percent: 10 }] }), null);
+  // proposed by a nation that does not own it: no judge is asked, and it studies the one in the book
+  const other = createWorld("dupes-2", bots(1));
+  other.custom = w.custom;
+  step(other, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "sun" } }] } } });
+  const b = other.nations[0];
+  b.inventions.push("fire"); b.research = null; b.stock.food = 500;
+  step(other, { 0: { kind: "ok", response: { actions: [{ type: "propose_invention", name: "Lều da", description: "Dựng lều bằng da thú căng khung", prereqs: ["fire"], effects: [{ kind: "role_bonus", role: "hunt", percent: 10 }] }] } } });
+  const p = other.proposals.at(-1)!;
+  assert.equal(p.status, "duplicate", JSON.stringify(b.lastRejected));
+  assert.equal(p.ruling?.judge, "Engine");
+  assert.equal(b.research?.id, id, "it studies the invention in the book");
+});

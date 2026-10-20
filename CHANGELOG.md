@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Phát minh trùng tự xử lý:**
+  - Engine tự nhận ra đơn trùng ngay khi nộp, không cần AI: cùng tên nói khác đi, cùng năng lực và hiệu ứng, hoặc mô tả giống mà làm cùng việc.
+  - Đơn trùng được ghi "Trùng với X · không thêm mới", và nước đó tự chuyển sang nghiên cứu phát minh đã có.
+  - Trọng tài Claude chấm tối đa 4 đơn mỗi lần gọi và thấy năng lực, hiệu ứng của các phát minh giống nhau để so trùng tốt hơn.
+  - Mục Phát minh ghi rõ khi nào trọng tài chấm, và lý do đơn còn chờ.
 - **Sắc lệnh luật (§10.3):** Watcher đổi thật các con số trong luật (khoảng 30 luật về định cư, chỗ ở, đất, dân số, kỷ nguyên, giao thương, chiến tranh, thiên tai) từ tab Sắc lệnh → Đổi luật.
   - Engine áp dụng từ lượt sau. Sắc lệnh và giá trị mới hiện trong biên niên.
   - Luật mà các AI nhận được dựng lại theo con số mới.

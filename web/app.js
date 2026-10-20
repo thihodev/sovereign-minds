@@ -1499,12 +1499,16 @@
     badge.hidden = !pending; badge.textContent = pending;
     const box = $("#proposals"), pbox = $("#proposals-pending"), decidedN = props.length - pending;
     box.innerHTML = decidedN ? "" : `<p class="note">Chưa có đơn nào được quyết.</p>`;
-    pbox.innerHTML = pending ? "" : `<p class="note">Không có đơn nào đang chờ.</p>`;
+    const J = S.judge, when = t => new Date(t).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    pbox.innerHTML = pending
+      ? `<p class="note">Trọng tài Claude tự chấm ở đầu lượt sau (tối đa ${J ? J.perTick * J.batch : "?"} đơn mỗi lượt) và tự nhận ra đơn trùng; bạn chỉ cần bấm nếu muốn quyết thay.${J?.claudeSleepUntil ? ` Hiện trọng tài đang chờ hạn mức gói Claude tới ${when(J.claudeSleepUntil)}.` : ""}${J?.claudeWaitUntil ? ` Cả thế giới đang chờ Claude tới ${when(J.claudeWaitUntil)}.` : ""}</p>`
+      : `<p class="note">Không có đơn nào đang chờ.</p>`;
     setCount("inventions", "pending", pending); setCount("inventions", "decided", decidedN); setCount("inventions", "book", (S.customInventions || []).length);
     const ST2 = { pending: ["Chờ trọng tài", "warn"], approved: ["Được duyệt", "ok"], rejected: ["Bị bác", "bad"], duplicate: ["Trùng", ""] };
     const open = new Set([...document.querySelectorAll("#proposals details[open]")].map(d => d.dataset.id));
     for (const p of props) {
-      const [st, cls] = ST2[p.status], r = p.ruling, decided = p.status !== "pending";
+      const [st0, cls] = ST2[p.status], r = p.ruling, decided = p.status !== "pending";
+      const st = p.status === "duplicate" && p.inventionName ? `Trùng với ${p.inventionName} · không thêm mới` : st0;
       // Pending ones stay open for a decision; decided ones fold into one line (click to read)
       const el = document.createElement(decided ? "details" : "article"); el.className = `card2 prop${decided ? " decided" : ""}`;
       el.dataset.id = p.id; if (open.has(String(p.id))) el.open = true;

@@ -248,6 +248,43 @@ export function similarInventions(world: World, name: string, description: strin
   }).filter(x => x.score > 0.2).sort((x, y) => y.score - x.score || x.v.id.localeCompare(y.v.id)).slice(0, limit).map(x => x.v);
 }
 
+/** What an invention does, as a set of effect keys ("role:hunt", "tiles", "unlock:boat"…), for duplicate checks. */
+function effectKeys(e: Record<string, unknown> | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const [k, v] of Object.entries(e ?? {})) {
+    if (v === undefined || v === null || v === 0 || v === false) continue;
+    if (Array.isArray(v)) for (const x of v) out.add(`${k}:${typeof x === "object" ? JSON.stringify(x) : String(x)}`);
+    else if (typeof v === "object") for (const [s, x] of Object.entries(v as Record<string, unknown>)) { if (x) out.add(`${k}:${s}`); }
+    else out.add(k);
+  }
+  return out;
+}
+const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every(x => b.has(x));
+
+/** §5.7 Is this proposal, in substance, an invention already in the book? Deterministic: no AI. It is a duplicate only
+ *  when it claims no capability the other lacks, and either its name is the other's (in other words) or it does the
+ *  same things with a matching description. */
+export function nearDuplicate(world: World, p: { name: string; description: string; caps: string[]; effects: Array<Record<string, unknown>> }): { id: string; why: string } | null {
+  const mine = parseEffects(world, p.effects, () => true).effects as unknown as Record<string, unknown>;
+  const sig = effectKeys(mine), nameT = tokens(p.name), textT = tokens(`${p.name} ${p.description}`);
+  let best: { id: string; why: string; score: number } | null = null;
+  for (const v of allInventions(world)) {
+    if (!p.caps.every(c => v.caps.includes(c))) continue; // it claims something new: not a duplicate
+    const vName = tokens(v.name), vText = tokens(`${v.name} ${v.desc} ${v.custom?.description ?? ""}`);
+    const shared = [...nameT].filter(x => vName.has(x)).length;
+    const nameMatch = shared >= 2 && shared >= Math.min(nameT.size, vName.size); // one name holds the other: "Lều da" / "Lều da thú"
+    const textSim = [...textT].filter(x => vText.has(x)).length / Math.max(1, Math.min(textT.size, vText.size));
+    const vSig = effectKeys(v.effects as unknown as Record<string, unknown>), sameDoing = sig.size > 0 && sameSet(sig, vSig);
+    const capsDoing = p.caps.length > 0 && sameSet(new Set(p.caps), new Set(v.caps)) && sameDoing;
+    let why = "", score = 0;
+    if (nameMatch && (sameDoing || sig.size === 0 || textSim >= 0.4)) { why = `cùng tên gọi "${v.name}"`; score = 2 + textSim; }
+    else if (capsDoing) { why = "cùng năng lực và cùng hiệu ứng"; score = 1.5 + textSim; }
+    else if (sameDoing && textSim >= 0.6) { why = `cùng hiệu ứng, mô tả giống ${Math.round(textSim * 100)}%`; score = 1 + textSim; }
+    if (score && (!best || score > best.score || (score === best.score && v.id < best.id))) best = { id: v.id, why, score };
+  }
+  return best ? { id: best.id, why: best.why } : null;
+}
+
 export type ProposalCheck = { ok: true; proposal: Omit<Proposal, "id" | "tick" | "status" | "ruling" | "inventionId"> } | { ok: false; error: string; duplicateOf?: string };
 
 export function checkProposal(world: World, n: Nation, a: Record<string, unknown>): ProposalCheck {

@@ -10,7 +10,7 @@ import {
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, HAMLET, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
-import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
+import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
@@ -514,7 +514,9 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   for (const p of world.proposals) {
     if (p.status !== "pending" || !rulings[p.id]) continue;
     const n = world.nations[p.nation];
-    const id = applyRuling(world, p, rulings[p.id]);
+    // Another nation's invention approved earlier this turn may already be this one (§5.7)
+    const dupNow = nearDuplicate(world, p);
+    const id = applyRuling(world, p, dupNow && !rulings[p.id].duplicate_of ? { ...rulings[p.id], duplicate_of: dupNow.id, reason: `Trùng với ${invName(world, dupNow.id)} (${dupNow.id}): ${dupNow.why}.` } : rulings[p.id]);
     const r = p.ruling!;
     if (id) {
       const v = inv(world, id)!;
@@ -522,7 +524,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       n.lastEvents.push(`Đơn phát minh "${p.name}" được duyệt thành ${id}${v.prereqs.length > p.prereqs.length ? " (trọng tài thêm tiên quyết)" : ""}. ${n.research ? "Chọn research để bắt đầu." : "Bắt đầu nghiên cứu ngay, được giảm 20% RP."}`);
       if (!n.research && v.prereqs.every(x => n.inventions.includes(x)) && envOk(world, n, id)) n.research = { id, progress: 0 };
     } else if (p.inventionId) { // applyRuling marked it a duplicate of an invention already in the book
-      n.lastEvents.push(`Đơn "${p.name}" trùng với ${invName(world, p.inventionId!)} (${p.inventionId}) đã có trong Sổ: hãy nghiên cứu nó.`);
+      n.lastEvents.push(`Đơn "${p.name}" trùng với ${invName(world, p.inventionId!)} (${p.inventionId}) đã có trong Sổ.${studyInstead(world, n, p.inventionId!)}`);
     } else {
       n.lastEvents.push(`Trọng tài bác đơn "${p.name}" (${r.causality + r.material + r.physics}/6): ${r.reason}`);
       say(n.id, "proposal", `Trọng tài bác đơn phát minh "${p.name}" của ${n.name}.`);
@@ -979,6 +981,17 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
 
+/** A nation whose proposal was a duplicate studies the invention in the book instead, when it can. Returns what happened, in words. */
+function studyInstead(world: World, n: Nation, id: string): string {
+  const v = inv(world, id); if (!v) return "";
+  if (n.inventions.includes(id)) return " Bạn đã có nó.";
+  if (!v.prereqs.every(p => n.inventions.includes(p))) return ` Cần trước: ${v.prereqs.filter(p => !n.inventions.includes(p)).map(p => invName(world, p)).join(", ")}.`;
+  if (!envOk(world, n, id)) return " Đất của bạn chưa đủ điều kiện để làm nó.";
+  if (n.research && n.research.id !== id) return ` Nghiên cứu nó bằng research ${id} khi xong dự án hiện tại.`;
+  if (!n.research) n.research = { id, progress: 0 };
+  return ` Đã chuyển thành dự án nghiên cứu ${id}.`;
+}
+
 // ---------------------------------------------------------------- discontent and schism (§4.5)
 
 /** Free land a faction could settle: clear of every nation, near enough to the old one; the richest ring first. */
@@ -1319,6 +1332,15 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         return check.error;
       }
       const id = world.proposals.length + 1;
+      // §5.7 the engine itself catches an invention already in the book, before any judge is asked
+      const dup = nearDuplicate(world, check.proposal);
+      if (dup) {
+        const v = inv(world, dup.id)!;
+        world.proposals.push({ id, tick: world.tick, status: "duplicate", inventionId: dup.id, ...check.proposal,
+          ruling: { judge: "Engine", causality: 0, material: 0, physics: 0, duplicate_of: dup.id, add_prereqs: [], remove_effects: [], remove_capabilities: [], reason: `Trùng với ${v.name} (${dup.id}): ${dup.why}.` } });
+        n.lastEvents.push(`Đơn "${check.proposal.name}" trùng với ${v.name} (${dup.id}) đã có trong Sổ (${dup.why}).${studyInstead(world, n, dup.id)}`);
+        return null;
+      }
       world.proposals.push({ id, tick: world.tick, status: "pending", ruling: null, inventionId: null, ...check.proposal });
       say(n.id, "proposal", `${n.name} nộp đơn phát minh "${check.proposal.name}" (độ sâu ${check.proposal.depth}, ${check.proposal.power} điểm sức mạnh). Đơn chờ trọng tài.`);
       return null;
