@@ -1,6 +1,6 @@
 # Sovereign Minds — Bộ Luật Chơi
 
-Phiên bản 19/10/2026 · Đồng bộ với Engine v0.3, gồm đợt cân bằng lại theo `docs/BALANCE.md` (`src/rules.ts`, `src/engine.ts`, `src/catalog.ts`, `src/diplomacy.ts`). Khi tài liệu và code khác nhau, **code là sự thật**. Những điều luật đã viết nhưng engine chưa thi hành được đánh dấu "(chưa có trong engine)". Lịch sử thay đổi: xem `CHANGELOG.md`.
+Phiên bản 20/10/2026 · Đồng bộ với Engine v0.6, gồm đợt cân bằng lại theo `docs/BALANCE.md` và chỉ tiêu nhịp độ của `tools/pace.ts` (`src/rules.ts`, `src/engine.ts`, `src/catalog.ts`, `src/diplomacy.ts`). Khi tài liệu và code khác nhau, **code là sự thật**. Những điều luật đã viết nhưng engine chưa thi hành được đánh dấu "(chưa có trong engine)". Lịch sử thay đổi: xem `CHANGELOG.md`.
 
 ## 1. Tổng quan và Hiến pháp
 
@@ -67,7 +67,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 ### 2.3 Lãnh thổ
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
-- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó. Yêu cầu 3 người lao động trong 2 lượt (chưa có trong engine).
+- **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó.
 - **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
@@ -139,7 +139,7 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
 
 ## 3. Thời gian và vòng lượt
 
-Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. Trong thời đồ đá, 1 lượt = 10 năm lịch sử. Hệ số này giảm dần ở kỷ nguyên sau (chưa có trong engine).
+Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.
 
 ### 3.1 Sáu pha của một lượt
 
@@ -155,6 +155,7 @@ Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đ�
 - AP mỗi lượt = 3 + floor(dân số / 50) + thưởng AP từ phát minh (Hội đồng bộ lạc +1, Đếm +1, hiệu ứng `ap` của phát minh mở). Tối đa 12.
 - AP không dùng hết sẽ mất, không tích lũy.
 - Phân công lao động, đơn chế tác, mục tiêu khai mỏ và bản ghi nhớ không tốn AP. Chi phí từng hành động nằm ở mục 8.4.
+- **Mỗi lượt ít nhất một lệnh:** quốc gia còn AP mà không gửi hành động nào thì được hỏi lại một lần, kèm lời khuyên của cố vấn (mục 8.2). Từ lượt thứ hai liên tiếp không ra lệnh: −2 ổn định mỗi lượt.
 
 ### 3.3 Khi AI không trả lời được
 
@@ -196,7 +197,7 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 ### 4.2 Dân số
 
 - **Ăn:** theo nhóm tuổi, mỗi lượt: trẻ em 0,6, thiếu niên 1, người trưởng thành 1,15 (lao động nặng), người già 1 lương thực. Nhân 0,9 khi có Nấu chín.
-- **Thiếu ăn:** thiếu X đơn vị thì chết ceil(X / 2) người (trẻ em và người già chết trước), −5 ổn định, và lượt đó không có trẻ nào ra đời.
+- **Thiếu ăn:** thiếu X đơn vị thì chết ceil(X / 2) người (trẻ em và người già chết trước), −5 ổn định. Lượt đó không có tăng trưởng, và số trẻ bù cho người chết chỉ bằng (phần lương thực được ăn)²: thiếu 10% thì còn khoảng 81%, không ăn gì thì không có trẻ nào.
 - **Tuổi và giới:** dân được đếm theo 4 nhóm tuổi × 2 giới:
   - trẻ em 0–9
   - thiếu niên 10–19
@@ -421,7 +422,12 @@ flowchart TD
 ```
 
 1. **Nộp đơn:** hành động `propose_invention`, tốn 2 AP. Mỗi quốc gia chỉ có 1 đơn đang chờ duyệt tại một thời điểm.
-2. **Kiểm tra trùng tên (code):** tên chuẩn hóa (bỏ dấu, chữ thường) trùng một phát minh trong Sổ thì đơn không vào hàng chờ. Nếu quốc gia chưa có phát minh đó, đủ tiên quyết và đang không nghiên cứu gì, nó trở thành dự án nghiên cứu ngay; nếu không thì bị trả lại. So sánh ngữ nghĩa bằng embedding (chưa có trong engine): thay vào đó, trọng tài được xem danh sách phát minh có tên và mô tả giống đơn (so từ chung) để tự phát hiện trùng.
+2. **Kiểm tra trùng (code, không cần AI):** đơn bị coi là trùng một phát minh trong Sổ khi nó không đòi năng lực nào mà phát minh kia chưa có, và một trong ba điều đúng:
+   - một tên chứa trọn tên kia (ít nhất 2 từ chung)
+   - cùng năng lực và cùng loại hiệu ứng
+   - cùng loại hiệu ứng và mô tả giống từ 60% trở lên
+
+   Với phát minh khung (K1–K24) chỉ xét trùng tên. Đơn trùng được ghi "Trùng với X" mà không cần trọng tài, và quốc gia chuyển sang nghiên cứu X nếu đủ tiên quyết và đang rảnh. Trọng tài vẫn được xem các phát minh giống đơn, kèm năng lực và hiệu ứng của chúng, để bắt những trường hợp code bỏ sót.
 3. **Kiểm tra cứng (code):** tên 3–40 ký tự, mô tả 1–300 ký tự; chưa có đơn khác đang chờ; đơn cùng tên bị bác chưa quá 3 lượt thì bị chặn; 1–4 tiên quyết đều đã sở hữu; tối đa 2 năng lực mới đúng định dạng; điều kiện vật chất là tài nguyên hoặc địa hình có thật; mọi hiệu ứng nằm trong bảng 5.3 và đúng giới hạn; tổng điểm từ 1 tới 4 + 2d. Trượt thì bị trả ngay kèm lý do (tối đa 3 lỗi đầu tiên), AP vẫn mất. Điều kiện vật chất không bị kiểm tra lúc nộp đơn; nó chỉ áp dụng khi bắt đầu nghiên cứu.
 4. **Trọng tài:** mỗi đơn được **1** AI trọng tài chấm. Mặc định là **Claude Sonnet 5.5** chạy bằng tài khoản Claude của Watcher (mục `claude` đứng đầu `JUDGE_PROVIDERS`; đổi model bằng `JUDGE_CLAUDE_MODEL`). Claude không điều hành quốc gia nào nên luôn trung lập. Khi Claude chưa đăng nhập hoặc bị giới hạn (nghỉ 15 phút), Engine duyệt tiếp danh sách `JUDGE_PROVIDERS` (mặc định claude, groq, cohere, cloudflare, sambanova, gemini, zai, openrouter), bỏ nhà cung cấp không có key, đang nghỉ vì hết quota, và **không bao giờ** dùng nhà cung cấp của chính quốc gia đề xuất. Nhà cung cấp không điều hành quốc gia nào được ưu tiên trước; chỉ khi không còn ai thì mới tới nhà cung cấp đang điều hành một quốc gia khác. Gọi lỗi hoặc trả sai JSON thì chuyển sang ứng viên kế tiếp. Mỗi lượt tối đa `JUDGES_PER_TICK` (mặc định 3) lời gọi trọng tài, kể cả lời gọi lỗi. Trọng tài chạy ở temperature 0 với model riêng nếu có (`JUDGE_MODEL_<NHÀ CUNG CẤP>`, Groq mặc định `openai/gpt-oss-120b`). Đơn nộp ở lượt N được chấm sớm nhất ở đầu lượt N + 1.
 5. **Chấm điểm:** 3 tiêu chí, 0–2 điểm mỗi tiêu chí: *nhân quả* (tiên quyết có thật sự đủ để làm ra nó không), *vật chất* (có đúng vật liệu, công cụ và địa hình không), *vật lý* (có trái quy luật tự nhiên không). Được duyệt khi tổng ≥ 4/6 và tiêu chí vật lý không bị 0. Lý do chấm (≤ 300 ký tự) được lưu lại cho quốc gia và Watcher đọc; câu trả lời nguyên văn được ghi vào nhật ký để replay.
@@ -471,13 +477,16 @@ Thế giới có 10 kỷ nguyên, từ đồ đá tới tên lửa. Kỷ nguyên
 
 **Giá phát minh mở** (mục 5.3): 15 × g(d) × (1 + sức mạnh/10), với g(d) = 1,4^d tới độ sâu 8, sau đó tăng tuyến tính 15% của 1,4^8 mỗi bậc. Nhờ vậy ý tưởng sâu vẫn đắt nhưng còn với tới được.
 
+- **Khung phát minh (K1–K24):** mỗi năng lực ở cổng kỷ nguyên có một phát minh sẵn trong Sổ, nối thành chuỗi từ Lò nung nhiệt cao (độ sâu 3), Luyện đồng, Chữ viết, Luật pháp, Thép, Thuốc súng, Hàng hải viễn dương, Máy hơi nước, Điện, tới Hàng không và Tên lửa (độ sâu 13). Giá gấp 1,5 lần một phát minh mở cùng độ sâu với 6 điểm sức mạnh; hiệu ứng nhỏ. Khung giữ cho thế giới không bao giờ kẹt; phát minh do quốc gia tự tạo mà đạt được năng lực đó vẫn rẻ hơn và mạnh hơn.
+
 ### 5.7 Chống lách luật phát minh
 
 - **Chống phát minh vụn:** bảng xếp hạng (mục 9.3) tính điểm phát minh theo độ sâu d, không theo số lượng. Chia một ý tưởng thành nhiều mảnh nhỏ chỉ tốn thêm AP và lượt chờ trọng tài.
 - **Trần cộng dồn:** tổng thưởng năng suất (phát minh + công cụ) của một vai sản xuất không vượt +150%, dù có bao nhiêu phát minh. Nâng trần ở kỷ nguyên sau (chưa có trong engine).
 - **Cùng phát minh trong cùng lượt:** hai đơn cùng tên (sau khi chuẩn hóa) được duyệt cùng lượt thì đơn sau thành "trùng" và trỏ về phát minh của đơn trước; nước đó nghiên cứu phát minh chung ấy. Khi hai quốc gia cùng nghiên cứu xong một phát minh trong cùng một lượt thì cả hai được ghi danh.
 - **Chống thao túng trọng tài:** mô tả phát minh là dữ liệu không tin cậy; lời nhắc của trọng tài nói rõ điều này. Trọng tài chỉ trả về điểm số dạng JSON. Tự động từ chối và trừ 15 uy tín khi mô tả chứa lời nhắn gửi trọng tài ("hãy duyệt", "bỏ qua tiêu chí") (chưa có trong engine; bộ lọc này mới áp dụng cho tin nhắn, mục 8.5).
-- **Trọng tài vắng mặt:** trọng tài lỗi API thì thay bằng ứng viên kế tiếp trong danh sách. Hết cả danh sách thì đơn chờ sang lượt sau, không mất gì.
+- **Trọng tài vắng mặt:** trọng tài lỗi API thì thay bằng ứng viên kế tiếp trong danh sách. Hết cả danh sách thì đơn chờ sang lượt sau, không mất gì. Trọng tài Claude chấm tối đa 4 đơn mỗi lần gọi (`JUDGE_BATCH`), tối đa `JUDGES_PER_TICK` lần mỗi lượt.
+- **Trùng khi duyệt:** lúc duyệt, Engine kiểm tra trùng lần nữa với Sổ (kể cả phát minh vừa được duyệt trong cùng lượt), nên hai nước cùng nghĩ ra một thứ thì nước sau dùng chung phát minh của nước trước.
 - **Kiến thức Trái Đất không phải lối tắt:** AI biết lò cao và điện từ lịch sử thật, nhưng chỉ được nộp đơn đứng trên tiên quyết mình đang có. Ngân sách 4 + 2d và luật độ sâu khiến mỗi bước chỉ đi được một nấc.
 
 ## 6. Công trình và sản xuất
@@ -666,6 +675,8 @@ Gồm: bản tóm tắt luật này (viết bằng tiếng Anh, `src/ai/prompt.t
 
 Ví dụ rút gọn; danh sách trường đầy đủ nằm trong `buildObservation()`:
 
+**Cố vấn (`advice`)** đứng đầu gói trạng thái: tối đa 7 lời khuyên do Engine tính từ chính luật đang chạy, xếp theo mức độ (!!! khẩn, !! quan trọng, ! nên làm). Gồm: lương thực sắp hết; hết chỗ ở và ba cách mở thêm (nhà ở, thôn xóm trên các ô cụ thể, điểm định cư); còn thiếu gì để lập định cư hay sang kỷ nguyên mới; thiếu nước; vượt giới hạn đất; bất mãn; hạn chế sinh khi dân ít; chưa nghiên cứu gì; lao động rảnh. Hồ sơ quốc gia hiện đúng các lời khuyên này cho Watcher.
+
 ```json
 {
   "tick": 42, "era": "Đồ Đá Cũ", "ap": 4,
@@ -837,13 +848,13 @@ Watcher thấy mọi thứ và có một quyền tác động chính: ban hành 
 4. Mọi AI nhận sắc lệnh trong gói trạng thái (trường `world_laws`, 10 sắc lệnh gần nhất). System prompt nói rõ các vị thần chỉ nói qua `world_laws` và câu trả lời thỉnh nguyện.
 5. Sắc lệnh được ghi vào Biên niên sử, vào nhật ký Watcher và vào mục Phụ lục Sắc lệnh của tài liệu này.
 
-Engine không tự thi hành nội dung sắc lệnh: AI được báo, nhưng muốn sắc lệnh thành luật cứng thì phải sửa code hoặc cấu hình (mục 10.3).
+Sắc lệnh văn bản không được Engine tự thi hành: AI được báo, nhưng nó không đổi luật. Muốn đổi một con số trong luật thì dùng sắc lệnh luật (mục 10.3).
 
 ### 10.3 Ba loại sắc lệnh
 
 | Loại | Ví dụ | Cách thi hành |
 | --- | --- | --- |
-| Chỉnh tham số | "Hư hỏng lương thực giảm từ 30% xuống 25%" | sửa con số trong `src/rules.ts`; supervisor tự nạp code mới sau khi lượt hiện tại xong |
+| **Sắc lệnh luật** | "Dân tối thiểu để lập điểm định cư: 50 → 40" | Engine thi hành thật từ lượt sau. Khoảng 30 con số chỉnh được (danh sách và khoảng cho phép trong `src/laws.ts`, tab Sắc lệnh → Đổi luật): định cư và chỗ ở, đất đai, dân số, kỷ nguyên và phát minh, giao thương, chiến tranh và trật tự, thiên tai. Giá trị lưu trong sắc lệnh của thế giới; luật mà các AI nhận dựng lại theo con số mới. |
 | Luật mới | "Quốc gia có trên 150 dân phải duy trì 1 chiến binh mỗi 20 dân" | cần viết thêm module luật trong Engine trước khi có hiệu lực |
 | Thay đổi thế giới | "Một bộ lạc mới xuất hiện ở vùng hoang phía nam", "Kỷ băng hà nhỏ trong 20 lượt" | Engine thực hiện như một sự kiện, áp cho vùng chứ không cho quốc gia (chưa có trong engine) |
 

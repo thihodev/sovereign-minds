@@ -4,6 +4,15 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Chỉ tiêu nhịp độ (`tools/pace.ts`):** chạy nhiều thế giới bot và báo ✓/✗ theo các chỉ tiêu:
+  - lượt đầu tiên vào Đồ Đá Mới 50–160, vào Đồ Đồng 150–380
+  - dân trung vị lượt 300: 100–300; điểm định cư trung vị 1–5
+  - tối đa 1 nước diệt vong, tối đa 4 nước ly khai
+  - tốc độ dưới 90 ms mỗi lượt, sổ cái khớp
+
+  Bảy seed đều đạt.
+- **Sửa nạn đói:** thiếu ăn nhẹ không còn chặn hết số sinh. Số trẻ bù cho người chết bằng (phần lương thực được ăn)². Trước đây vài lượt thiếu ăn nhẹ liên tiếp có thể đưa một nước 50 dân về 0.
+- **Tài liệu luật:** đồng bộ với v0.6; bỏ luật "3 người trong 2 lượt" chưa từng có trong engine; nói rõ một lượt gộp những gì xảy ra trong một thập kỷ.
 - **Khung phát minh của thế giới mở (§5.6):** 24 phát minh sẵn có (K1–K24, từ Lò nung nhiệt cao, Luyện đồng, Chữ viết… tới Máy hơi nước, Điện, Hàng không, Tên lửa), mỗi cái cho một năng lực ở cổng kỷ nguyên.
   - Giá gấp 1,5 lần một phát minh tự tạo cùng độ sâu, nên phát minh do các nước tự tạo vẫn rẻ và mạnh hơn. Nhưng thế giới không bao giờ kẹt hẳn.
   - Bot giờ cũng lên được Đồ Đồng.

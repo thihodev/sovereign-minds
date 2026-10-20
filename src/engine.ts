@@ -897,39 +897,37 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const shortage = need - eaten, prand = rngFor(world.seed, tick, "people", n.id);
   const d = demo(n);
   d.born = 0; d.infants = 0;
+  const fed = need > 0 ? eaten / need : 1;
   if (shortage > 1e-9) {
     const dead = Math.min(n.population, Math.ceil(shortage / 2));
     takePeople(n, dead, "famine"); n.stability -= 5;
-    d.aged = grow(n, prand); // no children are born in a famine
     fx({ kind: "famine", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "famine");
-    n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói.`);
+    n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói${fed < 0.9 ? `; chỉ ${Math.round(fed * 100)}% trẻ thay người mất được sinh ra` : ""}.`);
     say(n.id, "famine", `Nạn đói ở ${n.name}: ${dead} người chết.`);
-  } else {
-    const surplus = (n.stock.food || 0) / Math.max(1, need);
-    if (surplus > 0) n.stability += 1;
-    const roof = housing(world, n);
-    // §4.2 a turn of age: the groups move up, the old and the worn die; births replace them and,
-    // with food to spare and room to live, add the logistic growth — all as fertile as the people now is
-    const before = n.population;
-    d.aged = grow(n, prand);
-    const fert = fertility(n, m.caps.has(DEMO.marriageCap)), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1);
-    // births replace the dead at most one for one (fewer when women or partners are missing, a little fewer
-    // when births are limited); with food to spare a fertile people also grows
-    const replace = n.population >= roof ? 0 : d.aged * keep, grow2 = n.population >= roof || surplus < GROWTH.surplus ? 0 : growthFor(before, roof) * (1 + m.growth) * fert;
-    const want = replace + grow2;
-    if (want > 0) {
-      // Infants who do not live: the base rate is in the births already; medicine and herbs save more,
-      // no fresh water loses more — of the growth only, so a people never dies out of it
-      let rate = DEMO.infant * (dry ? DEMO.dryInfant : 1) * (1 - m.medicine);
-      const herbsWant = want * DEMO.herbsPerBirth, herbs = Math.min(n.stock.herbs || 0, herbsWant);
-      if (herbs > 0) { L.stock(n, "herbs", -herbs, "births"); rate *= 1 - DEMO.herbSave * herbs / herbsWant; }
-      const born = Math.max(0, Math.min(roof - n.population, Math.max(GROWTH.min, Math.floor(replace + grow2 * (1 - rate) / (1 - DEMO.infant) + prand()))));
-      d.infants = Math.max(0, Math.round(want / (1 - DEMO.infant) * rate));
-      babies(n, born, prand); d.born = born;
-      if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
-    }
-    if (m.caps.has(DEMO.marriageCap)) n.stability += DEMO.marriageStability;
   }
+  const surplus = shortage > 1e-9 ? -1 : (n.stock.food || 0) / Math.max(1, need);
+  if (surplus > 0) n.stability += 1;
+  const roof = housing(world, n);
+  // §4.2 a turn of age: the groups move up, the old and the worn die; births replace them (as many as the
+  // food fed: a short famine costs some births, not all) and, with food to spare and room to live, add the
+  // logistic growth — all as fertile as the people now is
+  const before = n.population;
+  d.aged = grow(n, prand);
+  const fert = fertility(n, m.caps.has(DEMO.marriageCap)), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1) * (shortage > 1e-9 ? fed * fed : 1);
+  const replace = n.population >= roof ? 0 : d.aged * keep, grow2 = n.population >= roof || surplus < GROWTH.surplus ? 0 : growthFor(before, roof) * (1 + m.growth) * fert;
+  const want = replace + grow2;
+  if (want > 0) {
+    // Infants who do not live: the base rate is in the births already; medicine and herbs save more,
+    // no fresh water loses more — of the growth only, so a people never dies out of it
+    let rate = DEMO.infant * (dry ? DEMO.dryInfant : 1) * (1 - m.medicine);
+    const herbsWant = want * DEMO.herbsPerBirth, herbs = Math.min(n.stock.herbs || 0, herbsWant);
+    if (herbs > 0) { L.stock(n, "herbs", -herbs, "births"); rate *= 1 - DEMO.herbSave * herbs / herbsWant; }
+    const born = Math.max(0, Math.min(roof - n.population, Math.max(shortage > 1e-9 ? 0 : GROWTH.min, Math.floor(replace + grow2 * (1 - rate) / (1 - DEMO.infant) + prand()))));
+    d.infants = Math.max(0, Math.round(want / (1 - DEMO.infant) * rate));
+    babies(n, born, prand); d.born = born;
+    if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
+  }
+  if (m.caps.has(DEMO.marriageCap)) n.stability += DEMO.marriageStability;
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
   if (ownsWonder(world, n, "salt")) spoil *= 0.5;
