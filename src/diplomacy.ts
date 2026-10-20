@@ -9,9 +9,10 @@ import {
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
+import { add, part, take } from "./people.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
-import { buildingWorks, mods, ownedTiles, parseTile } from "./engine.ts";
+import { buildingWorks, mods, ownedTiles, parseTile, workers } from "./engine.ts";
 import type { Battle, Caravan, Nation, Treaty, TreatyType, War, World } from "./types.ts";
 import type { Route } from "./routes.ts";
 
@@ -410,7 +411,7 @@ function onTheRoad(ctx: DiploCtx, c: Caravan, from: Nation): void {
     const safety = 1 - (roadOf(world.tiles[at])?.safety ?? 0); // §2.5 a kept road or lane is safer
     if (horde && r() < Math.min(0.5, TRADE.hordeChance * horde.strength / 40) * safety) {
       const lost = share(TRADE.hordeLoss, "barbarians");
-      const dead = Math.min(from.population, c.porters ? 1 : 0); from.population -= dead;
+      const dead = Math.min(from.population, c.porters ? 1 : 0); take(from, dead, "porter");
       fx({ kind: "robbed", tile: at, nation: from.id, from: horde.tile, text: horde.name }); fxDeath(at, from.id, dead, "raid");
       from.lastEvents.push(`${horde.name} chặn cướp đoàn buôn tới ${world.nations[c.to].name}: mất ${fmtGoods(world, lost)}${dead ? `, ${dead} người khuân vác chết` : ""}.`);
     }
@@ -461,20 +462,23 @@ export function resolveBattles(ctx: DiploCtx): void {
     // an enemy at war with them, or at least every attack they face this tick
     const fronts = frontOf(D);
     const dMen = Math.floor(D.labor.warrior / fronts);
-    const militia = Math.max(1, Math.floor(D.population * 0.7 * WAR.militiaShare / fronts));
+    const militia = Math.max(1, Math.floor(workers(D) * WAR.militiaShare / fronts));
     const aStr = strength(A, s.warriors, 0, false), dStr = strength(D, dMen, militia, true);
     const won = aStr > dStr;
     const lossRate = (win: boolean) => { const [lo, hi] = win ? WAR.winLoss : WAR.loseLoss; return lo + r() * (hi - lo); };
     const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won)));
     const rateD = lossRate(!won), lossDW = Math.min(dMen, Math.round(dMen * rateD)), lossDM = Math.min(militia, Math.round(militia * rateD));
     const lossD = Math.min(D.population, lossDW + lossDM);
-    A.population -= lossA; A.labor.warrior = Math.max(0, A.labor.warrior - lossA);
+    take(A, lossA, "war"); A.labor.warrior = Math.max(0, A.labor.warrior - lossA);
     // The fallen lose their weapons (bows first, then spears)
     const loseWeapons = (n: Nation, k: number) => { for (const w of Object.keys(WAR.weapon)) { if (k <= 0) break; const q = Math.min(k, Math.floor(n.stock[w] || 0)); if (q) { L.stock(n, w, -q, "battle"); k -= q; } } };
     loseWeapons(A, lossA); loseWeapons(D, lossDW);
-    D.population -= lossD; D.labor.warrior = Math.max(0, D.labor.warrior - lossDW);
-    const prisoners = won ? Math.floor(lossD * WAR.prisoners) : 0;
-    if (prisoners) { A.population += prisoners; A.stability -= Math.floor(prisoners / 5); }
+    // §4.2 warriors fall by the defender's custom; the militia is the whole village
+    const fallenD = take(D, Math.min(lossDW, lossD), "war"), fallenM = take(D, lossD - Math.min(lossDW, lossD), "raid");
+    D.labor.warrior = Math.max(0, D.labor.warrior - lossDW);
+    const taken = won ? part({ m: fallenD.m.map((x, i) => x + fallenM.m[i]), f: fallenD.f.map((x, i) => x + fallenM.f[i]) }, WAR.prisoners) : null;
+    const prisoners = taken ? taken.m.reduce((a, b) => a + b, 0) + taken.f.reduce((a, b) => a + b, 0) : 0;
+    if (taken && prisoners) { add(A, taken); A.stability -= Math.floor(prisoners / 5); }
     // The attackers march from their nearest land to the tile; the dead fall there
     const home = ownedTiles(world, A.id).reduce((b, t) => dist(t.i, s.tile) < dist(b, s.tile) ? t.i : b, A.capital);
     fx({ kind: "battle", tile: s.tile, nation: A.id, from: home, n: s.warriors, text: `${won ? "won" : "lost"}:${s.kind}` });

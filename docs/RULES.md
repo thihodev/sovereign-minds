@@ -195,12 +195,59 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 
 ### 4.2 Dân số
 
-- **Ăn:** mỗi người tiêu 1 lương thực mỗi lượt (0,9 khi có Nấu chín).
-- **Thiếu ăn:** thiếu X đơn vị thì chết ceil(X / 2) người, −5 ổn định.
-- **Tăng dân (logistic):** sau khi ăn, nếu lương thực còn trong kho ≥ 20% nhu cầu và còn chỗ ở, dân tăng floor(dân × 8% × (1 − dân / chỗ ở)), tối thiểu 1, không vượt chỗ ở. Dân tăng nhanh nhất khi mới dùng nửa chỗ ở và chậm dần khi gần kín (ví dụ 100 dân, 200 chỗ ở: +4; 190 dân, 200 chỗ ở: +1). Không còn chỗ ở thì không tăng.
+- **Ăn:** theo nhóm tuổi, mỗi lượt: trẻ em 0,6, thiếu niên 1, người trưởng thành 1,15 (lao động nặng), người già 1 lương thực. Nhân 0,9 khi có Nấu chín.
+- **Thiếu ăn:** thiếu X đơn vị thì chết ceil(X / 2) người (trẻ em và người già chết trước), −5 ổn định, và lượt đó không có trẻ nào ra đời.
+- **Tuổi và giới:** dân được đếm theo 4 nhóm tuổi × 2 giới:
+  - trẻ em 0–9
+  - thiếu niên 10–19
+  - người trưởng thành 20–49
+  - người già 50+
+
+  Một lượt là 10 năm, nên mỗi lượt mọi người lên một nhóm. Mỗi lượt cũng có:
+  - 1/3 người trưởng thành sang nhóm người già
+  - 80% người già qua đời vì tuổi già
+  - 10% người trưởng thành qua đời vì lao lực
+
+  Dân mới lập quốc có cơ cấu 19% / 19% / 44% / 18%, nam nữ ngang nhau.
+- **Sinh:** số trẻ sinh ra gồm hai phần, đều nhân với **mức sinh**:
+  - phần bù đủ số người vừa qua đời (tối đa một đổi một)
+  - khi lương thực còn ≥ 20% nhu cầu, thêm phần tăng logistic floor(dân × 8% × (1 − dân / chỗ ở))
+
+  Không bao giờ vượt chỗ ở; tối thiểu 1 trẻ khi còn chỗ.
+
+  **Mức sinh** được tính từ:
+  - tỷ lệ phụ nữ trưởng thành so với một dân tộc bình thường
+  - có đủ bạn đời hay không (đủ khi số đàn ông trưởng thành ≥ 0,5 × phụ nữ trưởng thành)
+  - phong tục sinh
+  - phong tục hôn nhân
+
+  Mất phụ nữ trẻ thì sinh ít đi; có nhiều phụ nữ hơn bình thường thì không sinh nhiều hơn.
+- **Trẻ sơ sinh:** 30% trẻ sơ sinh không sống được, và mức này đã tính sẵn trong tỷ lệ sinh. Các yếu tố làm thay đổi mức này:
+  - hiệu ứng y học giảm theo tỷ lệ của nó
+  - thảo dược: 0,2 thảo dược cho mỗi ca sinh cứu được 30% số trẻ đó
+  - thiếu nước sạch làm mức này ×1,25
+- **Người già** dạy nghề, thêm tối đa +10% nghiên cứu. Khi dân giảm một nửa, nếu còn từ 3 người già trở lên thì không thất truyền phát minh (mục 5.5).
+- **Ai chết vì gì:**
+  - nạn đói, mùa đông, dịch bệnh: trẻ em và người già chết trước
+  - thú dữ: người lớn đi săn và hái lượm
+  - trận đánh: chiến binh, theo phong tục ra trận
+  - man di và thiên tai: mọi lứa tuổi
+  - dân bỏ đi vì bất ổn: cả gia đình, chủ yếu người trẻ, và họ sang nước nhận họ như cũ
+- **Phong tục (hành động `family_policy`, 1 AP):**
+  - **Sinh:**
+    - "khuyến khích": sinh ×1,3, phụ nữ trưởng thành làm việc ×0,85
+    - "tự nhiên": ×1 và ×0,95
+    - "hạn chế": sinh ×0,6, phụ nữ làm việc đủ
+  - **Ra trận:**
+    - "chỉ đàn ông": quân chỉ bằng một nửa, nhưng các bà mẹ an toàn nên sinh không bị ảnh hưởng khi thua trận
+    - "mọi người lớn": quân gấp đôi, nhưng tổn thất trận mạc làm giảm số sinh
+
+    Chỉ thiếu niên và người trưởng thành thuộc giới được ra trận mới làm chiến binh được; Engine cắt bớt chiến binh vượt số đó.
+- **Hôn nhân:** năng lực `hôn-nhân` (có từ một phát minh) cho sinh ×1,1 và +0,5 ổn định mỗi lượt.
+- **Hộ:** mỗi cặp vợ chồng trưởng thành là một hộ, người lớn đơn thân tính hai người một hộ.
 - **Chỗ ở:** thủ đô chứa 25 người tự nhiên (hang, bãi trú). Mỗi điểm định cư +10, Hang Đại Động +50, công trình có chỗ ở (Lều +10, công trình mở) cộng thêm.
 - **Trần chỗ ở theo trung tâm:** mỗi trung tâm (thủ đô và mỗi điểm định cư) chứa tối đa **3 công trình có chỗ ở** (Lều và công trình mở có `housing`). Engine từ chối lệnh `build` vượt trần (tính cả công trình đang xây), và khi tính chỗ ở chỉ cộng các công trình tốt nhất trong trần, nên mất một điểm định cư thì lều thừa bỏ trống. Như vậy thủ đô chứa tối đa 25 + 30 = 55 người, mỗi điểm định cư thêm tối đa 10 + 30 = 40 người: muốn đông dân thì phải mở rộng ra điểm định cư mới.
-- **Cơ cấu:** 30% dân là trẻ em và người già, không lao động; số lao động = floor(70% dân số). AI phân lao động vào 13 vai: hái lượm (`gather`), săn bắt (`hunt`), đánh cá (`fish`), nông dân (`farm`), đốn gỗ (`wood`), khai đá (`stone`), nhặt đá lửa (`flint`), lấy đất sét (`clay`), khai mỏ (`mine`), chế tác (`craft`), xây dựng (`build`), nghiên cứu (`research`), chiến binh (`warrior`). Người thám hiểm không phải một vai: họ được rút tạm từ nhóm hái lượm và người rảnh trong lượt đi thám hiểm.
+- **Cơ cấu lao động:** số lao động = tổng sức làm việc theo nhóm: trẻ em 0,1, thiếu niên 0,8, người trưởng thành 1, người già 0,5. Với cơ cấu bình thường thì khoảng 70% dân số. AI phân lao động vào 13 vai: hái lượm (`gather`), săn bắt (`hunt`), đánh cá (`fish`), nông dân (`farm`), đốn gỗ (`wood`), khai đá (`stone`), nhặt đá lửa (`flint`), lấy đất sét (`clay`), khai mỏ (`mine`), chế tác (`craft`), xây dựng (`build`), nghiên cứu (`research`), chiến binh (`warrior`). Người thám hiểm không phải một vai: họ được rút tạm từ nhóm hái lượm và người rảnh trong lượt đi thám hiểm.
 - **Phân quá số người:** Engine thu nhỏ theo tỷ lệ, phần lẻ chia cho các vai có phần thập phân lớn nhất, và báo lại trong danh sách bị từ chối.
 - **Người không được phân vai** tự động đi hái lượm.
 - Phân công mặc định lúc khởi đầu: 7 săn, 4 hái, 2 nghiên cứu, 1 chế tác.

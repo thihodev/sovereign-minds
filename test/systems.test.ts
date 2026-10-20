@@ -191,10 +191,11 @@ test("settlements: found one, tiles cut off go wild", () => {
   n.inventions.push("P4");
   const far = w.tiles.find(t => t.land && t.terrain !== "mountain" && t.owner === -1 && dist(t.i, n.capital) >= 6 && dist(t.i, n.capital) <= 8)!;
   const near = w.tiles.find(t => t.land && t.terrain !== "mountain" && t.owner === -1 && dist(t.i, n.capital) === 4)!;
-  const go = (tile: number) => turn(w, { 0: { actions: [{ type: "found_settlement", tile: xy(tile), name: "Bến Mới" }] } });
+  let ready = false; // the old and the worn die each turn (§4.2): keep 60 people for every try
+  const go = (tile: number) => { if (ready) n.population = 60; return turn(w, { 0: { actions: [{ type: "found_settlement", tile: xy(tile), name: "Bến Mới" }] } }); };
   go(far.i);
   assert.match(n.lastRejected[0].reason, /Cần ít nhất 50 dân/);
-  n.population = 60;
+  ready = true;
   go(near.i);
   assert.match(n.lastRejected[0].reason, /ít nhất 6 ô/);
   n.stock.wood = 4; n.stock.stone = 10;
@@ -205,7 +206,7 @@ test("settlements: found one, tiles cut off go wild", () => {
   go(far.i);
   assert.equal(n.settlements.length, 1);
   assert.equal(w.tiles[far.i].owner, n.id);
-  assert.ok(n.population >= 60, "the settlers stay citizens");
+  assert.ok(n.population - (n.demo!.born ?? 0) + (n.demo!.aged ?? 0) >= 60, "the settlers stay citizens (only the old and the worn died)");
   assert.equal(Math.round(n.stock.wood), 7);
   assert.equal(Math.round(n.stock.stone), 7);
   assert.ok(n.lastEvents.some(e => /ổn định −5/.test(e)), "the move unsettles the people");

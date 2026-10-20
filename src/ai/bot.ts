@@ -13,6 +13,7 @@
 
 import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
+import { fighters, mouths } from "../people.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
@@ -134,7 +135,7 @@ function look(world: World, n: Nation): View {
   }
   return {
     world, n, m, owned, mine: new Set(owned.map(t => t.i)), centres: [n.capital, ...n.settlements.map(s => s.tile)],
-    pop: n.population, workers: workers(n), need: n.population * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
+    pop: n.population, workers: workers(n), need: mouths(n) * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
     has: id => n.inventions.includes(id), stock: k => n.stock[k] || 0,
     wild: { hunt: sustain(world, n, owned, "game"), gather: sustain(world, n, owned, "plants") * drought, fish: sustain(world, n, owned, "fish") },
     farmSlots, farmPerWorker: farmSlots ? farmFood / farmSlots * stabMult : 0, stabMult, drought,
@@ -378,6 +379,16 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       spend("propose_invention", { name: idea.name, description: idea.description, prereqs: idea.prereqs, effects: [{ kind: "role_bonus", role: idea.role, percent: 10 }] });
     }
   }
+  // 5a. Customs (§4.2), looked at every 5 turns: more children when there is food and room, fewer
+  // when hunger looms; men to war, everyone when a war needs more hands than the men
+  if (n.founded && tick % 5 === n.id % 5) {
+    const room = v.house - v.pop, fam = n.family ?? { births: "neutral", fighters: "all" };
+    const births = capFood < v.need * 1.05 || v.food < v.need * 0.3 ? "limit" : room >= v.house * 0.2 && capFood > v.need * 1.3 ? "encourage" : "neutral";
+    const menOnly = { ...n, family: { ...fam, fighters: "men" } } as Nation;
+    const fight = atWar && fighters(menOnly) < Math.max(n.labor.warrior, 10) ? "all" : "men";
+    if (births !== fam.births || fight !== fam.fighters) spend("family_policy", { births, fighters: fight });
+  }
+
   // 5b. The court (§4.6): fill the slots in a fixed order; keep the officials paid and loyal
   if (n.founded && tick > 0) {
     const court = n.officials ?? [], has = (d: string) => court.some(o => o.domain === d);

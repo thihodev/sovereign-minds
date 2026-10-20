@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, DEMO, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -15,6 +15,7 @@ import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetwe
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
+import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
@@ -194,7 +195,8 @@ function doneEffect(world: World, n: Nation, key: "housing" | "stability" | "spo
   for (const b of n.buildings) if (buildingWorks(world, b)) sum += buildingOf(world, b.type)?.effect[key] || 0;
   return sum;
 }
-export function workers(n: Nation): number { return Math.floor(n.population * WORKER_SHARE); }
+/** §4.2 Workers: each age group's share of a full day's work. */
+export function workers(n: Nation): number { return workForce(n); }
 /** §2.3 What a settlement takes from the stock: SETTLEMENT.materials units of wood and/or stone,
  *  always from the larger pile first. null when the nation cannot pay. */
 export function settlementPayment(n: Nation): Record<string, number> | null {
@@ -461,6 +463,12 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
     n.lastRejected.push({ action: "labor", reason: `Phân công ${total} người nhưng chỉ có ${w} người lao động; đã thu nhỏ theo tỷ lệ` });
     n.labor = scaled;
   } else n.labor = out;
+  // §4.2 only youths and adults of the sexes the people sends to war can be warriors
+  const pool = fighters(n);
+  if (n.labor.warrior > pool) {
+    n.lastRejected.push({ action: "labor", reason: `Chỉ có ${pool} người có thể ra trận (${DEMO.fighters[n.family?.fighters ?? "all"]}); ${n.labor.warrior - pool} chiến binh về hái lượm` });
+    n.labor.gather += n.labor.warrior - pool; n.labor.warrior = pool;
+  }
 }
 
 /** Centres a tile must stay connected to (§2.3). */
@@ -645,7 +653,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
     const caps = mods(world, n).caps;
     // §5.5 Lost knowledge: a population halved in one tick, with no writing, forgets its newest idea
-    if (n.population < (popStart.get(n.id) || 0) * 0.5 && !caps.has("ghi-chép")) {
+    if (n.population < (popStart.get(n.id) || 0) * 0.5 && !caps.has("ghi-chép") && elders(n) < DEMO.keepers) { // §4.2 elders still remember
       const lost = [...n.inventions].reverse().find(id => !START.inventions.includes(id) && !n.inventions.some(o => inv(world, o)?.prereqs.includes(id)));
       if (lost) { n.inventions = n.inventions.filter(x => x !== lost); say(n.id, "lost", `${n.name} mất quá nửa dân số và thất truyền ${invName(world, lost)}.`); }
     }
@@ -786,7 +794,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (erand() < winterChance(world, n)) {
     const lost = Math.min(n.stock.food || 0, foodMade * EVENTS.winter.foodLoss); L.stock(n, "food", -lost, "winter");
     const dead = Math.floor(n.population * winterDeathShare(world, n, m.winter, doneEffect(world, n, "housing") > 0, (n.stock.hide_coat || 0) >= n.population / 2));
-    n.population -= dead;
+    takePeople(n, dead, "winter");
     fx({ kind: "winter", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "winter");
     n.lastEvents.push(`Mùa đông khắc nghiệt: mất ${fmt(lost)} lương thực, ${dead} người chết rét.`);
     say(n.id, "event", `Mùa đông khắc nghiệt ở ${n.name}: ${dead} người chết rét.`);
@@ -799,7 +807,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     // §9.4 one herb per HERBS.perPeople people halves the deaths
     const herbsNeed = Math.ceil(n.population / HERBS.perPeople), healed = (n.stock.herbs || 0) >= herbsNeed;
     if (healed) { dead = Math.floor(dead * HERBS.plagueCut); L.stock(n, "herbs", -herbsNeed, "plague"); }
-    n.population -= dead; fx({ kind: "plague", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "plague"); n.lastEvents.push(`Dịch bệnh: ${dead} người chết${healed ? ` (thảo dược cứu được một nửa, dùng ${herbsNeed})` : ""}.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
+    takePeople(n, dead, "plague"); fx({ kind: "plague", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "plague"); n.lastEvents.push(`Dịch bệnh: ${dead} người chết${healed ? ` (thảo dược cứu được một nửa, dùng ${herbsNeed})` : ""}.`); say(n.id, "event", `Dịch bệnh ở ${n.name}: ${dead} người chết.`);
   }
   if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); fx({ kind: "bounty", tile: n.capital, nation: n.id }); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
   const grassTile = owned.find(t => t.terrain === "grass");
@@ -833,7 +841,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const epi = rocky[Math.floor(erand() * rocky.length)];
     const fallen = n.buildings.filter(b => dist(b.tile, epi.i) <= QUAKE.radius);
     n.buildings = n.buildings.filter(b => dist(b.tile, epi.i) > QUAKE.radius);
-    const dead = Math.floor(n.population * QUAKE.deaths); n.population -= dead;
+    const dead = Math.floor(n.population * QUAKE.deaths); takePeople(n, dead, "disaster");
     breakRoads(world, owned.filter(t => t.land && dist(t.i, epi.i) <= QUAKE.radius).map(t => t.i));
     fx({ kind: "quake", tile: epi.i, nation: n.id, n: fallen.length }); fxDeath(epi.i, n.id, dead, "quake");
     let ore = "";
@@ -846,7 +854,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (beasts && erand() < beasts.chance) {
     {
       const dead = Math.min(n.population, beasts.dead), lair = beasts.lair;
-      n.population -= dead;
+      takePeople(n, dead, "beasts");
       fx({ kind: "beasts", tile: lair.i, nation: n.id, text: BEASTS.name[lair.terrain] }); fxDeath(lair.i, n.id, dead, "beasts");
       n.lastEvents.push(`Thú dữ (${BEASTS.name[lair.terrain] ?? "thú hoang"}) tấn công người đi săn hái lượm: ${dead} người chết.`);
       say(n.id, "beasts", `${BEASTS.name[lair.terrain] ?? "Thú hoang"} tấn công người của ${n.name}: ${dead} người chết.`);
@@ -860,12 +868,15 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
 
   // Eating, starvation, growth, spoilage (§4.2)
-  const need = n.population * m.foodPerPerson;
+  const need = mouths(n) * m.foodPerPerson;
   const eaten = Math.min(n.stock.food || 0, need); L.stock(n, "food", -eaten, "eat");
-  const shortage = need - eaten;
+  const shortage = need - eaten, prand = rngFor(world.seed, tick, "people", n.id);
+  const d = demo(n);
+  d.born = 0; d.infants = 0;
   if (shortage > 1e-9) {
     const dead = Math.min(n.population, Math.ceil(shortage / 2));
-    n.population -= dead; n.stability -= 5;
+    takePeople(n, dead, "famine"); n.stability -= 5;
+    d.aged = grow(n, prand); // no children are born in a famine
     fx({ kind: "famine", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "famine");
     n.lastEvents.push(`Thiếu ${fmt(shortage)} lương thực: ${dead} người chết đói.`);
     say(n.id, "famine", `Nạn đói ở ${n.name}: ${dead} người chết.`);
@@ -873,7 +884,24 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const surplus = (n.stock.food || 0) / Math.max(1, need);
     if (surplus > 0) n.stability += 1;
     const roof = housing(world, n);
-    if (surplus >= GROWTH.surplus && n.population < roof) { const base = Math.floor(growthFor(n.population, roof) * (1 + m.growth)), born = Math.min(roof - n.population, dry ? Math.max(GROWTH.min, Math.floor(base * RIVER.dryGrowth)) : base); n.population += born; if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born }); }
+    // §4.2 a turn of age: the groups move up, the old and the worn die; births replace them and,
+    // with food to spare and room to live, add the logistic growth — all as fertile as the people now is
+    const before = n.population;
+    d.aged = grow(n, prand);
+    const fert = fertility(n, m.caps.has(DEMO.marriageCap));
+    // births replace the dead at most one for one (fewer when women or partners are missing); a fertile people grows faster
+    const want = n.population >= roof ? 0 : d.aged * Math.min(1, fert) + (surplus >= GROWTH.surplus ? growthFor(before, roof) * (1 + m.growth) * fert : 0);
+    if (want > 0) {
+      // Infants who do not live: fewer with medicine and herbs, more with no fresh water
+      let rate = DEMO.infant * (dry ? DEMO.dryInfant : 1) * (1 - m.medicine);
+      const herbsWant = want * DEMO.herbsPerBirth, herbs = Math.min(n.stock.herbs || 0, herbsWant);
+      if (herbs > 0) { L.stock(n, "herbs", -herbs, "births"); rate *= 1 - DEMO.herbSave * herbs / herbsWant; }
+      const born = Math.max(0, Math.min(roof - n.population, Math.max(GROWTH.min, Math.floor(want * (1 - rate) / (1 - DEMO.infant) + prand()))));
+      d.infants = Math.max(0, Math.round(want / (1 - DEMO.infant) * rate));
+      babies(n, born, prand); d.born = born;
+      if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
+    }
+    if (m.caps.has(DEMO.marriageCap)) n.stability += DEMO.marriageStability;
   }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
@@ -883,7 +911,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   L.stock(n, "hide", -(n.stock.hide || 0) * SPOILAGE.hide, "spoil");
 
   // Research (§5.5)
-  const rp = researchPoints(labor.research) * (1 + m.rp) * mult("research");
+  const teach = n.population ? Math.min(DEMO.rpMax, elders(n) / n.population * DEMO.rpPerShare) : 0; // §4.2 elders teach
+  const rp = researchPoints(labor.research) * (1 + m.rp + teach) * mult("research");
   if (n.research) {
     if (!inv(world, n.research.id) || n.inventions.includes(n.research.id)) n.research = null;
     else {
@@ -915,9 +944,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
   if (n.stability < 15 && n.population > 0) {
     const leave = Math.max(1, Math.floor(n.population * 0.05));
-    n.population -= leave;
+    const gone = takePeople(n, leave, "migrate");
     const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
-    if (dest) dest.population += leave;
+    if (dest) addPeople(dest, gone); // whole families move
     fx({ kind: "migrate", tile: n.capital, nation: n.id, n: leave, to: dest?.capital });
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
   }
@@ -1001,7 +1030,7 @@ function workFor(world: World, n: Nation, o: Official, act: (type: string, a: Re
       if (o.seat === null || world.tiles[o.seat].owner !== n.id) return "mất lãnh địa";
       const want = o.skill >= 3 ? 2 : 1, got: string[] = [];
       const room = Math.floor(tileLimit(world, n) - governed(world, n));
-      const need = n.population * m.foodPerPerson;
+      const need = mouths(n) * m.foodPerPerson;
       const options = within(o.seat, 3).map(i => world.tiles[i])
         .filter(t => t.owner === -1 && (t.land || (t.terrain === "shallow" && m.move.has("shallow"))) && t.terrain !== "icewall" && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id))
         .sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i);
@@ -1013,7 +1042,7 @@ function workFor(world: World, n: Nation, o: Official, act: (type: string, a: Re
       return got.length ? `khai hoang ${got.join(", ")}` : room <= 0 ? "giữ đất (đã đủ giới hạn quản lý)" : "giữ đất (không đủ lương thực hay không còn ô tốt)";
     }
     case "agriculture": {
-      const need = n.population * m.foodPerPerson, pending = n.buildings.some(b => !b.done && (buildingOf(world, b.type)?.effect.farmSlots || 0) > 0);
+      const need = mouths(n) * m.foodPerPerson, pending = n.buildings.some(b => !b.done && (buildingOf(world, b.type)?.effect.farmSlots || 0) > 0);
       if ((n.stock.food || 0) >= need * 1.5 || pending || !(n.inventions.includes("P14") || m.unlocked.has("field"))) return "đôn đốc mùa màng";
       const def = buildingOf(world, "field")!;
       const spot = ownedTiles(world, n.id).filter(t => t.land && (def.terrains!.includes(t.terrain) || t.river) && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile))
@@ -1103,14 +1132,14 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
       for (const [k, q] of Object.entries(n.stock)) if (k !== "food" && q >= 1) L.stock(n, k, -Math.floor(q * HORDES.lootGoods), "barbarians");
       const fallen = Math.min(n.labor.warrior, Math.round(n.labor.warrior * 0.3));
       const dead = Math.min(n.population, fallen + Math.floor(n.population * HORDES.kill));
-      n.population -= dead; n.labor.warrior -= fallen; n.stability -= HORDES.stability;
+      takePeople(n, fallen, "war"); takePeople(n, dead - fallen, "raid"); n.labor.warrior -= fallen; n.stability -= HORDES.stability;
       fx({ kind: "raid", tile: n.capital, nation: n.id, from: h.tile, n: Math.round(party), text: h.name }); fxDeath(n.capital, n.id, dead, "raid");
       h.strength = Math.min(hordeCap(tick), h.strength * HORDES.emboldened);
       n.lastEvents.push(`${h.name} cướp phá: ${dead} người chết, mất ${fmt(food)} lương thực và một phần kho (${Math.round(atk)} so với ${Math.round(def)}). Ổn định −${HORDES.stability}.`);
       say(n.id, "raid", `${h.name} từ vùng hoang cướp phá ${n.name}: ${dead} người chết.`);
     } else {
       const fallen = Math.min(n.labor.warrior, Math.round(n.labor.warrior * 0.1));
-      n.population -= fallen; n.labor.warrior -= fallen; n.stability += 1;
+      takePeople(n, fallen, "war"); n.labor.warrior -= fallen; n.stability += 1;
       fx({ kind: "repelled", tile: n.capital, nation: n.id, from: h.tile, n: Math.round(party), text: h.name }); fxDeath(n.capital, n.id, fallen, "raid");
       h.strength -= party * HORDES.repelled;
       n.lastEvents.push(`Đẩy lui ${h.name} (${Math.round(def)} so với ${Math.round(atk)}), mất ${fallen} chiến binh.`);
@@ -1124,7 +1153,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -1201,6 +1230,18 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
       claims.push({ n, tile });
+      return null;
+    }
+    case "family_policy": {
+      // §4.2 the people's customs: how many children, who goes to war
+      const fam = (n.family ??= { births: "neutral", fighters: "all" });
+      const births = a.births === undefined ? fam.births : String(a.births), fight = a.fighters === undefined ? fam.fighters : String(a.fighters);
+      if (!DEMO.births[births]) return `births phải là một trong: ${Object.keys(DEMO.births).join(", ")}`;
+      if (!DEMO.fighters[fight]) return `fighters phải là một trong: ${Object.keys(DEMO.fighters).join(", ")}`;
+      if (births === fam.births && fight === fam.fighters) return "Phong tục không đổi";
+      fam.births = births; fam.fighters = fight;
+      n.lastEvents.push(`Phong tục mới: ${DEMO.births[births].name}, ${DEMO.fighters[fight]}.`);
+      say(n.id, "family", `${n.name} đổi phong tục: ${DEMO.births[births].name}, ${DEMO.fighters[fight]}.`);
       return null;
     }
     case "build_road": {
@@ -1301,7 +1342,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const def = h.strength * (1 + TERRAIN[world.tiles[h.tile].terrain].defense) * luck();
       const won = atk > def, [lo, hi] = won ? WAR.winLoss : WAR.loseLoss;
       const loss = Math.min(men, Math.round(men * (lo + r() * (hi - lo))));
-      n.population -= loss; n.labor.warrior -= loss;
+      takePeople(n, loss, "war"); n.labor.warrior -= loss;
       fx({ kind: "clear", tile: h.tile, nation: n.id, from: n.capital, n: men, text: won ? "won" : "lost" }); fxDeath(h.tile, n.id, loss, "horde");
       if (won) {
         h.alive = false; h.strength = 0; h.returns = world.tick + HORDES.returnTicks;
@@ -1374,7 +1415,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       n.seen = [...seen].sort((x, y) => x - y);
       let dead = 0; for (let k = 0; k < people; k++) if (rand() < BEASTS.explorerBase + BEASTS.explorerPerDanger * danger) dead++;
-      if (dead) { n.population -= dead; n.lastEvents.push(`${dead} người thám hiểm không trở về.`); }
+      if (dead) { takePeople(n, dead, "explore"); n.lastEvents.push(`${dead} người thám hiểm không trở về.`); }
       fx({ kind: "explore", tile: walked[0], nation: n.id, path: walked, n: people }); fxDeath(cur, n.id, dead, "explore");
       n.lastEvents.push(`Đoàn thám hiểm đi hướng ${dir} và trở về.`);
       return null;
@@ -1387,7 +1428,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (dist(n.capital, target.capital) > SPY.maxDistance) return `Quá xa (tối đa ${SPY.maxDistance} ô)`;
       if (world.spies.some(s => s.active && s.owner === n.id && s.target === target.id)) return "Đã có gián điệp ở đó";
       if (n.population < 10) return "Dân số quá ít để cử người đi";
-      n.population -= 1;
+      takePeople(n, 1, "explore");
       if (rngFor(world.seed, world.tick, "spy", n.id, target.id)() < SPY.successChance) {
         world.spies.push({ id: world.nextSpyId++, owner: n.id, target: target.id, since: world.tick, active: true, acted: "" });
         n.lastEvents.push(`Gián điệp đã trà trộn vào ${target.name}.`);

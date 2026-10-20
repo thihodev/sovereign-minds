@@ -155,7 +155,7 @@ test("rename_nation: only in the window after a new era, once, with founding rul
   turn(w, { 0: act({ type: "rename_nation", name: "Tân Quốc" }) });
   assert.match(a.lastRejected[0].reason, /kỷ nguyên mới/);
   // Enter the Neolithic: mài + thuần-dưỡng + 50 people
-  a.inventions.push("P1", "P10", "P3", "P6", "P15"); a.population = 60; a.stock.food = 1500;
+  a.inventions.push("P1", "P10", "P3", "P6", "P15"); a.population = 75; a.stock.food = 1500;
   turn(w);
   assert.equal(a.era, "Đồ Đá Mới");
   assert.equal(a.eraTick, w.tick - 1);

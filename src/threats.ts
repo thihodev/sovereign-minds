@@ -4,6 +4,7 @@
 
 import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
+import { mouths } from "./people.ts";
 import { canSeeRes, freshWater, governed, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
 import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
@@ -24,7 +25,7 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   const add = (kind: string, level: number, title: string, detail: string) => out.push({ kind, level, title, detail });
 
   // Hunger
-  const need = n.population * m.foodPerPerson, food = n.stock.food || 0, turns = need > 0 ? food / need : 99;
+  const need = mouths(n) * m.foodPerPerson, food = n.stock.food || 0, turns = need > 0 ? food / need : 99;
   if (turns < 2.5) add("famine", turns < 1 ? 3 : turns < 1.5 ? 2 : 1, "Thiếu ăn", `Kho ${r1(food)} lương thực, mỗi lượt ăn ${r1(need)} (đủ ${r1(turns)} lượt); lương thực hư ${pct(Math.max(SPOILAGE.min, m.spoilage - m.spoilageCut))} mỗi lượt.`);
 
   // Winter and the ice wall's wind

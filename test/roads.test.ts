@@ -25,7 +25,7 @@ function turn(w: World, acts: Record<number, AIResponse> = {}) {
   return r;
 }
 const xy = (i: number) => [col(i), row(i)];
-const builders = (k: number) => ({ gather: 10, hunt: 0, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: k, research: 0, warrior: 0 });
+const builders = (k: number) => ({ gather: 0, hunt: 0, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: k, research: 0, warrior: 0 });
 /** Give a nation capabilities and effects through a ready-made open invention. */
 function grant(w: World, n: Nation, caps: string[], effects = {}) {
   const id = `X${w.custom.next++}`;

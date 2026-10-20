@@ -1043,6 +1043,17 @@
       box.append(el);
     }
   }
+  // §4.2 the people by age and sex: men to the left, women to the right, the young at the bottom
+  const AGE_NAMES = ["Trẻ em 0–9", "Thiếu niên 10–19", "Trưởng thành 20–49", "Người già 50+"];
+  function pyramid(n) {
+    const d = n.demo; if (!d) return "";
+    const top = Math.max(1, ...d.m, ...d.f), w = x => `${Math.round(x / top * 100)}%`;
+    const rows = [3, 2, 1, 0].map(a => `<div class="pyr-row"><div class="pyr-m"><i style="width:${w(d.m[a])}"></i><b>${d.m[a]}</b></div><span>${AGE_NAMES[a]}</span><div class="pyr-f"><i style="width:${w(d.f[a])}"></i><b>${d.f[a]}</b></div></div>`).join("");
+    return `<h3>Dân cư</h3>
+      <div class="pyr" role="img" aria-label="Tháp dân số"><div class="pyr-head"><span>♂ Nam ${d.m.reduce((a, b) => a + b, 0)}</span><span></span><span>Nữ ${d.f.reduce((a, b) => a + b, 0)} ♀</span></div>${rows}</div>
+      <p class="note">${d.households} hộ · ${d.fighters} người có thể ra trận · ăn ${d.mouths} suất · lượt trước: +${d.born} trẻ, ${d.infants} trẻ sơ sinh mất, ${d.aged} người qua đời vì tuổi già hay lao lực</p>
+      <div class="chips"><span>👪 ${esc(n.family.birthsName)}</span><span>⚔ ${esc(n.family.fightersName)}</span></div>`;
+  }
   async function openNation(id) {
     const n = S.nations[id], d = $("#nation-dialog");
     const turns = await api(`/api/nation/${id}/turns?limit=5`).catch(() => []);
@@ -1060,6 +1071,7 @@
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
           <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
+          ${pyramid(n)}
           ${n.trait ? `<h3>Đặc thù: ${esc(n.trait.icon)} ${esc(n.trait.name)}</h3><p>${esc(n.trait.desc)} <span class="muted">${esc(n.trait.lines.join(" · "))}</span></p>` : ""}
           ${n.provider === "claude" && n.alive ? `<h3>Model</h3><div class="model-pick"><label class="sr-only" for="dlg-model">Model</label><select id="dlg-model"></select><label class="sr-only" for="dlg-effort">Effort</label><select id="dlg-effort"></select><button type="button" id="dlg-model-save">Lưu</button><span class="note" id="dlg-model-msg">Áp dụng từ lượt sau.</span></div>` : ""}
           ${n.statusNote ? `<p class="note">Ghi chú: ${esc(n.statusNote)}</p>` : ""}

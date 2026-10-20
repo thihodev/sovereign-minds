@@ -33,7 +33,7 @@ test("eras: gates open with capabilities, people and resource; each era brings p
   const n = w.nations[0];
   const tiles0 = mods(w, n).tiles, slots0 = housingSlots(n, w), cap0 = mods(w, n).roleCap;
   grant(w, n, ["mài", "trồng-trọt", "nhiệt-cao", "nhận-biết-khoáng", "chứa", "luyện-đồng", "luyện-sắt"]);
-  ownedTiles(w, n.id)[1].cap.copper = 50; ownedTiles(w, n.id)[2].cap.iron = 50;
+  ownedTiles(w, n.id)[1].cap.copper = 50; ownedTiles(w, n.id)[2].cap.iron = 50; n.population = 160; // the old and the worn die each turn (§4.2)
   assert.equal(nextEraNeeds(w, n)?.era, "Đồ Đá Mới");
   turn(w);
   assert.equal(n.era, "Đồ Sắt", "three gates in one turn when all are met");

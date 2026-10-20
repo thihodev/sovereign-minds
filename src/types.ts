@@ -136,6 +136,16 @@ export interface Nation {
   officials?: Official[];
   /** §2.5 Roads and sea lanes ordered and paid for, built in order by the builders' spare work. */
   roadWorks?: RoadWork[];
+  /** §4.2 People by age group (0–9, 10–19, 20–49, 50+), men and women; sums to population. */
+  demo?: Demography;
+  /** §4.2 family customs chosen by the nation's AI */
+  family?: { births: string; fighters: string };
+}
+
+export interface Demography {
+  m: number[]; f: number[];
+  /** Last turn: children born (who lived), infants lost, deaths of old age and hardship. */
+  born?: number; infants?: number; aged?: number;
 }
 
 export interface RoadWork { tile: number; level: number; progress: number }

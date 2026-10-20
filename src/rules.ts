@@ -56,6 +56,36 @@ export const FOOD_PER_PERSON = 1;
 /** §4.2 Growth is logistic toward housing: +floor(pop × rate × (1 − pop/housing)), at least `min`,
  *  when the food left after eating is ≥ `surplus` of need. Mutable so tools/simulate.ts --variant can tune it. */
 export const GROWTH = { rate: 0.08, surplus: 0.2, min: 1 };
+/** §4.2 People by age and sex. A turn is ten years, so the groups move up one step a turn:
+ *  children (0–9), youths (10–19), adults (20–49, a 30-year group: a third grows old each turn), elders (50+). */
+export const DEMO = {
+  ages: ["trẻ em", "thiếu niên", "trưởng thành", "người già"],
+  /** Share of each group in a settled people (men and women alike); births are scaled to this structure. */
+  start: [0.19, 0.19, 0.44, 0.18],
+  /** Food eaten and work done per person, by group. */
+  eat: [0.6, 1, 1.15, 1],
+  work: [0.1, 0.8, 1, 0.5],
+  /** Each turn: a third of the adults grow old; elders die of age; adults die of hardship. */
+  ageOut: 1 / 3, oldDeath: 0.8, adultDeath: 0.1,
+  /** Births need partners: full rate while adult men are at least `pairing` × adult women. */
+  pairing: 0.5,
+  /** Children who die before they grow (already in the base rate); medicine and herbs cut it, no fresh water raises it. */
+  infant: 0.3, dryInfant: 1.5,
+  /** Herbs used per birth to save `herbSave` of the infants who would die. */
+  herbsPerBirth: 0.2, herbSave: 0.3,
+  /** Elders keep the old knowledge (§5.5 lost knowledge needs fewer than `keepers`) and teach: +research up to `rpMax`. */
+  keepers: 3, rpPerShare: 0.5, rpMax: 0.1,
+  /** The family customs a nation's AI chooses (action family_policy). */
+  births: {
+    encourage: { name: "khuyến khích sinh", fert: 1.3, womenWork: 0.85 },
+    neutral: { name: "tự nhiên", fert: 1, womenWork: 0.95 },
+    limit: { name: "hạn chế sinh", fert: 0.6, womenWork: 1 },
+  } as Record<string, { name: string; fert: number; womenWork: number }>,
+  fighters: { men: "chỉ đàn ông ra trận", all: "mọi người lớn ra trận" } as Record<string, string>,
+  /** Capability of a marriage custom: births ×marriage, stability +marriageStability a turn. */
+  marriageCap: "hôn-nhân", marriage: 1.1, marriageStability: 0.5,
+};
+
 /** §4.2 Buildings that give housing (tents, open-invention housing): at most `perCentre` per centre (capital + each settlement). */
 export const HOUSING = { perCentre: 3 };
 
@@ -81,7 +111,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, build_road: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,

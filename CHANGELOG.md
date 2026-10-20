@@ -4,6 +4,17 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Dân cư theo tuổi và giới, gia đình (§4.2).**
+  - Dân được đếm theo 4 nhóm tuổi × 2 giới. Mỗi lượt cả nhóm lên một bậc tuổi; người già qua đời vì tuổi già.
+  - Số sinh phụ thuộc số phụ nữ trưởng thành và việc có đủ bạn đời.
+  - Trẻ sơ sinh tử vong; y học và thảo dược cứu được một phần.
+  - Trẻ em ăn ít hơn và chưa làm việc; người già dạy nghề và giữ tri thức.
+  - Đói, rét, dịch bệnh làm trẻ em và người già chết trước. Trận mạc làm chiến binh chết.
+  - **Phong tục do AI chọn** (`family_policy`): khuyến khích, tự nhiên hay hạn chế sinh; chỉ đàn ông hay mọi người lớn ra trận.
+  - Năng lực `hôn-nhân` từ phát minh tăng số sinh và ổn định.
+  - Tù binh và dân di cư chuyển sang nước khác theo cả gia đình.
+  - Hồ sơ quốc gia có tháp dân số, số hộ, số người có thể ra trận và số sinh, tử lượt trước.
+  - Engine không cài vai trò theo giới: hai giới làm việc như nhau, chỉ có việc sinh con là khác.
 - **Đường sá và hải đạo (§2.5).**
   - Hành động mới `build_road`, ba cấp mở theo kỷ nguyên: đường mòn, đường đất nện, đường lát đá. Trên mặt nước tương ứng là luồng lạch, hải đạo có phao tiêu, hải đạo có hải đăng.
   - Vật liệu trả ngay khi ra lệnh; thợ xây làm bằng công còn thừa sau các công trình.

@@ -402,3 +402,16 @@ button.link:hover { text-decoration: underline; }
 #nation-detail .seg { top: 0; }
 .manifesto { font-style: italic; margin: 0; }
 ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13px; }
+
+/* §4.2 population pyramid */
+.pyr { display: grid; gap: 3px; font-size: 12px; }
+.pyr-head, .pyr-row { display: grid; grid-template-columns: 1fr 118px 1fr; align-items: center; gap: 6px; }
+.pyr-head span:first-child { text-align: right; color: #5aa9e6; font-weight: 600; }
+.pyr-head span:last-child { color: #e67aa8; font-weight: 600; }
+.pyr-row > span { text-align: center; color: var(--muted); white-space: nowrap; }
+.pyr-m, .pyr-f { display: flex; align-items: center; gap: 4px; height: 16px; }
+.pyr-m { flex-direction: row-reverse; }
+.pyr-m i, .pyr-f i { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
+.pyr-m i { background: #5aa9e6; }
+.pyr-f i { background: #e67aa8; }
+.pyr b { font-weight: 600; font-variant-numeric: tabular-nums; }
