@@ -191,10 +191,6 @@
   const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   const hash = (...k) => { let h = 2166136261; for (const x of k) { h ^= x; h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; };
-  function centreFor(n, tile) {
-    const cs = [n.capital, ...(n.settlements || []).map(s => s.tile)];
-    return cs.reduce((b, c) => hexDist(c, tile) < hexDist(b, tile) ? c : b, cs[0]);
-  }
   /** Queue a tick's effects: the dramatic ones last a little longer, everything starts staggered. */
   function playFx(list) {
     if (!list?.length) return;
@@ -268,6 +264,66 @@
   /** People one figure stands for: one each up to FIGURES_MAX people, then a few each, so the map never clogs. */
   const FIGURES_MAX = 160;
   const perFigure = n => Math.max(1, Math.ceil(n.population / FIGURES_MAX));
+  /** Where a nation's people may walk: their own tiles (their waters too), or a road on land.
+   *  Per nation: a nearest-centre search over that ground (land steps 1, water steps 3, so they keep to land),
+   *  rebuilt only when the borders, the roads or the centres change. */
+  const walkCache = new Map(); // nation id → { key, pass, src, par, capital, routes }
+  let walkS = null, walkSig = -1;
+  function walkMaps(n) {
+    if (walkS !== S) {
+      walkS = S;
+      let h = 2166136261;
+      const mix = x => { h ^= x + 2; h = Math.imul(h, 16777619); };
+      mix(S.owners.length);
+      for (let i = 0; i < S.owners.length; i++) { mix(S.owners[i]); mix(S.roads?.[i] || 0); }
+      if ((h >>> 0) !== walkSig) { walkSig = h >>> 0; walkCache.clear(); }
+    }
+    const centres = [n.capital, ...(n.settlements || []).map(x => x.tile)], key = centres.join(",");
+    let m = walkCache.get(n.id);
+    if (m && m.key === key) return m;
+    const T = S.owners.length, pass = new Uint8Array(T), src = new Int32Array(T).fill(-1), par = new Int32Array(T).fill(-1), dist = new Int32Array(T).fill(1 << 30);
+    for (let i = 0; i < T; i++) pass[i] = S.owners[i] === n.id || (S.roads?.[i] > 0 && !isWater(i)) ? 1 : 0;
+    const buckets = [[]];
+    for (const c of centres) if (c >= 0 && pass[c] && dist[c]) { dist[c] = 0; src[c] = c; buckets[0].push(c); }
+    for (let d = 0; d < buckets.length; d++) for (const i of buckets[d] || []) {
+      if (dist[i] !== d) continue;
+      for (const j of NB(i)) {
+        if (j < 0 || !pass[j]) continue;
+        const nd = d + (isWater(j) ? 3 : 1);
+        if (nd < dist[j]) { dist[j] = nd; src[j] = src[i]; par[j] = i; (buckets[nd] ||= []).push(j); }
+      }
+    }
+    m = { key, pass, src, par, capital: n.capital, routes: new Map() };
+    walkCache.set(n.id, m);
+    return m;
+  }
+  /** The tiles a worker walks, home centre first, work last; one tile when their patch has no centre and no road to one
+   *  (they live and work there); null when there is nowhere of theirs to stand. */
+  function walkRoute(m, w) {
+    if (m.routes.has(w)) return m.routes.get(w);
+    let t = w;
+    if (!m.pass[t]) {
+      // a site off their ground (a road being laid into the wild): they work from the nearest tile of theirs
+      t = -1;
+      let ring = [w]; const seen = new Set(ring);
+      for (let d = 0; d < 3 && t < 0 && ring.length; d++) {
+        const next = [];
+        for (const i of ring) for (const j of NB(i)) if (j >= 0 && !seen.has(j)) { seen.add(j); next.push(j); }
+        const ok = next.filter(j => m.pass[j]);
+        t = ok.find(j => m.src[j] >= 0) ?? ok[0] ?? -1;
+        ring = next;
+      }
+      if (t < 0 && m.pass[m.capital]) t = m.capital;
+    }
+    let path = null;
+    if (t >= 0) {
+      path = [t];
+      if (m.src[t] >= 0) while (m.par[path[path.length - 1]] >= 0) path.push(m.par[path[path.length - 1]]);
+      path.reverse();
+    }
+    m.routes.set(w, path);
+    return path;
+  }
   /** Everyone is on the map: workers walk to their work, the rest (children, elders, idle hands) stay round the centres. */
   function drawAmbient(g, now, s, z, px, vis) {
     if (!ANIM.on || s * z < AMBIENT_MIN) return;
@@ -278,23 +334,31 @@
       if (!n.alive || !n.founded) continue;
       const color = n.flag.colors[0], unit = perFigure(n);
       let working = 0;
+      const wm = walkMaps(n);
       for (const w of n.work || []) {
         working += w.n;
-        if (!vis(w.tile)) continue;
-        const home = centreFor(n, w.tile), [hx, hy] = center(home), [wx, wy] = center(w.tile);
+        // home centre → work, tile by tile over their own ground or a road; never across the wild
+        const path = walkRoute(wm, w.tile);
+        if (!path) continue;
+        const L = path.length, at = path[L - 1];
+        if (!vis(at) && !vis(path[0])) continue;
+        const [wx, wy] = center(at);
         if (s * z >= 7 && ROLE_ICON[w.role]) { g.globalAlpha = .9; icon(g, ROLE_ICON[w.role], wx + s * .45, wy - s * .45, iconSize); g.globalAlpha = 1; }
         const people = Math.max(1, Math.round(w.n / unit));
         for (let k = 0; k < people; k++) {
-          const ph = hash(w.tile, k, n.id, w.role.length), period = 7000 + ph * 5000, [ox, oy] = spot(w.tile, k, w.role.length);
+          const ph = hash(w.tile, k, n.id, w.role.length), period = (7000 + ph * 5000) * (1 + Math.max(0, L - 5) * .12), [ox, oy] = spot(at, k, w.role.length);
           let x, y;
-          if (home === w.tile || still) {
+          if (L === 1 || still) {
             // working on the spot, drifting a little round their place
             const a = (still ? 0 : now / period + ph) * Math.PI * 2;
             x = wx + ox + Math.cos(a) * s * .08; y = wy + oy + Math.sin(a) * s * .06;
           } else {
-            // there and back: walk out, work a while, walk home
+            // there and back along the way: walk out, work a while, walk home
             const t = ((now / period) + ph) % 1, leg = t < .4 ? ease(t / .4) : t < .6 ? 1 : 1 - ease((t - .6) / .4);
-            [x, y] = lerp([hx + ox * .6, hy + oy * .6], [wx + ox, wy + oy], leg);
+            const p = leg * (L - 1), i = Math.min(L - 2, Math.floor(p)), [bx, by] = lerp(center(path[i]), center(path[i + 1]), p - i);
+            // spread round the home and the work, close to the way between them so no one steps off it
+            const end = .6 + .4 * leg, sc = end + (.25 - end) * Math.min(1, p, L - 1 - p);
+            x = bx + ox * sc; y = by + oy * sc;
             if (t >= .4 && t < .6) y += Math.sin(now / 180 + k) * s * .06; // busy at the work
           }
           figure(g, x, y, r, color, px);
@@ -302,9 +366,9 @@
       }
       // The rest of the people: at home round the capital and the settlements, a little smaller
       // homes: their tiles within 2 of each centre (the capital's count twice), so the crowd spreads round the flag, not under it
-      const hearth = c => { const near = new Set([c]); for (const j of NB(c)) if (j >= 0) { near.add(j); for (const k of NB(j)) if (k >= 0) near.add(k); } return [c, ...[...near].filter(j => j !== c && S.owners[j] === n.id)]; };
+      const hearth = c => { if (c < 0 || !wm.pass[c]) return []; const near = new Set([c]); for (const j of NB(c)) if (j >= 0) { near.add(j); for (const k of NB(j)) if (k >= 0) near.add(k); } return [c, ...[...near].filter(j => j !== c && S.owners[j] === n.id)]; };
       const homes = [...hearth(n.capital), ...hearth(n.capital).slice(1), ...(n.settlements || []).flatMap(x => hearth(x.tile))];
-      const home = Math.max(0, Math.round((n.population - working) / unit));
+      const home = homes.length ? Math.max(0, Math.round((n.population - working) / unit)) : 0;
       for (let k = 0; k < home; k++) {
         const c = homes[(k * 7 + Math.floor(k / homes.length)) % homes.length];
         if (!vis(c)) continue;
