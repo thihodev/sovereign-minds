@@ -146,6 +146,24 @@ export interface Nation {
   discontent?: number;
   /** §4.5 a nation founded by a faction that left another */
   origin?: { from: number; tick: number; leader: string };
+  /** §4.7 how well the people lives, and how it feels about it against the nations it knows */
+  prosperity?: Prosperity;
+}
+
+/** §4.7 Prosperity 0–100 (four parts of 25) and national pride. */
+export interface Prosperity {
+  score: number;
+  parts: { food: number; goods: number; room: number; health: number };
+  /** Scars of famine, plague, cold and war, 0–1, fading each turn. */
+  woe: number;
+  /** The last scores, oldest first. */
+  history: number[];
+  /** The average of the nations it knows (null: knows none), and what the people feel about it. */
+  known: number | null;
+  mood: "acclaim" | "envy" | null;
+  /** Tick of the last chronicle line; people who left for a richer nation last turn, and where. */
+  said?: number;
+  left?: { k: number; to: number };
 }
 
 /** §4.5 A faction that wants to leave its nation and found its own, waiting for the Watcher. */

@@ -9,6 +9,8 @@ import { freshWater, governed, housing, housingParts, housingSlots, inventionCos
 import { mouths } from "../people.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
+import { PROSPERITY } from "../rules.ts";
+import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -91,6 +93,21 @@ export function advice(world: World, n: Nation): Advice[] {
     else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}`);
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
+  }
+
+  // Prosperity and pride (§4.7): how the people lives against the nations it knows, and what raises it
+  const pr = n.prosperity;
+  if (pr && pr.known !== null && pr.mood !== "acclaim" && pr.score < pr.known + PROSPERITY.margin / 2) {
+    const WAY: Record<string, string> = {
+      food: `lương thực ${pr.parts.food}/25: tích đủ ${PROSPERITY.foodTurns} lượt ăn trong kho (gốm giảm hư)`,
+      goods: `hàng hóa ${pr.parts.goods}/25: làm nhiều loại hàng (công cụ, áo da, gốm, vải, dây thừng), mỗi loại chỉ tính tới ${PROSPERITY.goodCap} giá trị mỗi người`,
+      room: `chỗ ở ${pr.parts.room}/25: dựng nhà ở, chiếm đất cho thôn xóm, lập điểm định cư (đủ điểm khi còn ${PROSPERITY.roomFull * 100}% chỗ trống)`,
+      health: `sức khỏe và yên bình ${pr.parts.health}/25: tránh chiến tranh, giữ thảo dược chống dịch, áo da chống rét, đừng để đói`,
+    };
+    const weak = (Object.entries(pr.parts) as Array<[string, number]>).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([k]) => WAY[k]);
+    const top = knownProsperity(world, n).sort((a, b) => b.score - a.score || a.o.id - b.o.id)[0], est = top ? estimateProsperity(n, top.o) : "";
+    if (pr.mood === "envy") say(2, `Dân ta ganh tị: thịnh vượng ${pr.score}/100, kém trung bình ${pr.known} của các nước quen biết${top ? ` (${top.o.name}${typeof est === "number" ? ` ~${est}` : ""})` : ""}. Mỗi lượt bất mãn tăng và có nhà bỏ sang nước giàu hơn. Tài nguyên của nước là để dân sống tốt: nâng ${weak.join("; ")}.`);
+    else say(1, `Thịnh vượng ${pr.score}/100, trung bình các nước quen biết ${pr.known}: hơn họ ${PROSPERITY.margin} điểm thì dân tung hô (+${PROSPERITY.acclaimStability} ổn định mỗi lượt), kém ${PROSPERITY.margin} điểm thì dân ganh tị. Nâng ${weak.join("; ")}.`);
   }
 
   // Customs

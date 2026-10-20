@@ -1137,6 +1137,7 @@
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
           <h3>Kỷ nguyên: ${esc(n.era)}</h3>${n.nextEra ? `<p class="muted">Để sang <b>${esc(n.nextEra.era)}</b> còn cần: ${esc(n.nextEra.missing.join(", ") || "đã đủ, sẽ sang ở lượt sau")}</p>` : `<p class="muted">Đã tới kỷ nguyên cuối.</p>`}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${prosperityBlock(n)}
           ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
           ${n.advice?.length ? `<h3>Cố vấn (engine gửi cho AI lượt này)</h3><ul class="advice">${n.advice.map(a => `<li class="lv${a.level}">${esc(a.text)}</li>`).join("")}</ul>` : ""}
           ${n.idleStreak ? `<p class="note warn">Đã ${n.idleStreak} lượt liền không ra lệnh nào.</p>` : ""}
@@ -1190,6 +1191,22 @@
 
   // ---------------------------------------------------------------- the court (§4.6)
   const DOMAIN_ICON = { governor: "🏰", general: "⚔", agriculture: "🌾", scholar: "📜", merchant: "🪙", builder: "🔨", explorer: "🧭" };
+  // ---------------------------------------------------------------- prosperity and pride (§4.7)
+  const PROSP_PARTS = [["food", "Lương thực", "#c9a227"], ["goods", "Hàng hóa", "#3fb3cf"], ["room", "Chỗ ở", "#4cc283"], ["health", "Sức khỏe & yên bình", "#ff8f6b"]];
+  function prosperityBlock(n) {
+    const p = n.prosperity;
+    if (!p || !n.alive || !n.founded) return "";
+    const mood = p.mood === "acclaim" ? `<span class="pill ok">dân tung hô</span>` : p.mood === "envy" ? `<span class="pill bad">dân ganh tị</span>` : "";
+    const bar = `<div class="bar prosp" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.score}" aria-label="Thịnh vượng">${PROSP_PARTS.map(([k, h, c]) => `<i style="width:${p.parts[k]}%;background:${c}" title="${esc(`${h}: ${p.parts[k]}/25`)}"></i>`).join("")}</div>`;
+    const legend = `<div class="legend-inline">${PROSP_PARTS.map(([k, h, c]) => `<span><i style="background:${c}"></i>${h} ${p.parts[k]}/25</span>`).join("")}</div>`;
+    // this people against the nations it knows, most prosperous first
+    const rows = [{ id: n.id, name: n.name, score: p.score, me: true }, ...(p.others || [])].sort((a, b) => b.score - a.score || a.id - b.id);
+    const cmp = (p.others || []).length ? `<ul class="prosp-cmp">${rows.map(r => `<li${r.me ? ` class="me"` : ""}><span>${esc(r.name)}</span><div class="bar"><i style="width:${r.score}%"></i></div><b class="mono">${r.score}</b></li>`).join("")}</ul>
+      <p class="note">Hạng ${p.rank.rank}/${p.rank.of} trong các nước quen biết · trung bình của họ ${p.known ?? "—"}${p.left ? ` · lượt trước ${p.left.k} người bỏ sang ${esc(nm(p.left.to))}` : ""}</p>` : `<p class="note">Chưa quen nước nào để so bì.</p>`;
+    const trend = (p.history || []).length > 1 ? ` <span class="muted">· ${p.history.slice(-6).join(" → ")}</span>` : "";
+    return `<h3>Thịnh vượng: ${p.score}/100 ${mood}</h3>${bar}${legend}<p class="note">Dân so cuộc sống của mình với các nước quen biết: hơn trung bình thì tung hô triều đình, kém thì ganh tị và có nhà bỏ sang nước giàu hơn.${trend}</p>${cmp}`;
+  }
+
   function courtList(n) {
     const c = n.officials || [];
     if (!c.length) return `<p class="note">Chưa bổ nhiệm ai.</p>`;
@@ -1659,10 +1676,10 @@
     statsCache = await api("/api/stats").catch(() => []);
     drawChart();
     // the Engine scores the world (§9.3); the Watcher only shows it
-    const PARTS = [["people", "Dân", "Dân số"], ["land", "Đất", "3 điểm mỗi ô"], ["knowledge", "Tri thức", "Phát minh đã biết, sâu hơn đáng giá hơn"], ["firsts", "Đầu tiên", "Phát minh đầu tiên trên thế giới"], ["inventor", "Sáng tạo", "Phát minh tự đề xuất được công nhận"], ["honour", "Uy tín", "Uy tín"], ["age", "Tuổi", "Số thập kỷ tồn tại"]];
+    const PARTS = [["people", "Dân", "Dân số"], ["land", "Đất", "3 điểm mỗi ô"], ["knowledge", "Tri thức", "Phát minh đã biết, sâu hơn đáng giá hơn"], ["firsts", "Đầu tiên", "Phát minh đầu tiên trên thế giới"], ["inventor", "Sáng tạo", "Phát minh tự đề xuất được công nhận"], ["honour", "Uy tín", "Uy tín"], ["prosperity", "Thịnh vượng", "Nửa điểm thịnh vượng trung bình 10 lượt gần nhất"], ["age", "Tuổi", "Số thập kỷ tồn tại"]];
     const rows = S.ranking || [];
     // one row per nation: score, and a bar split by where the points come from (hover a piece for its value)
-    const COL = ["#4cc283", "#c9a227", "#3fb3cf", "#ffd84a", "#c77dff", "#ff8f6b", "#98a7a1"];
+    const COL = ["#4cc283", "#c9a227", "#3fb3cf", "#ffd84a", "#c77dff", "#ff8f6b", "#e67aa8", "#98a7a1"];
     const top = Math.max(1, ...rows.map(r => r.score));
     $("#ranking").innerHTML = rows.length ? `<div class="legend-inline">${PARTS.map(([, h, t], i) => `<span title="${esc(t)}"><i style="background:${COL[i]}"></i>${h}</span>`).join("")}</div>
       <ol class="rank">${rows.map(r => `<li${r.alive ? "" : ` class="gone"`}><div class="row"><i class="sw" style="background:${esc(S.nations[r.nation]?.flag.colors[0] || "#888")}"></i><b>${esc(r.name)}${r.alive ? "" : " †"}</b><span style="flex:1"></span><b class="mono">${r.score}</b></div>

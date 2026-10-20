@@ -129,6 +129,26 @@ export const BORDER = {
    *  beyond what it keeps (food: two turns of eating; others: marketKeep) to a nation holding less than marketLack of it. */
   marketBelow: 60, marketValue: 12, marketKeep: 20, marketLack: 5,
 };
+/** §4.7 Prosperity and national pride. A people judges its rulers by how well it lives: a score 0–100 of four parts
+ *  of 25 each: food in store (full at `foodTurns` turns of eating), goods (value of the non-food stores per person,
+ *  each kind counting at most `goodCap` a person, full at `goodsPerHead`: many kinds of goods, not one heap), room (full while `roomFull` of the housing is free, none when full) and health and peace
+ *  (deaths of famine, cold, plague, beasts, raids and war — `woePerDeath` × the share who died — a famine
+ *  (`woeFamine`) and a war (`woeWar` a turn) leave a woe that fades ×`woeFade` a turn). */
+export const PROSPERITY = {
+  foodTurns: 2, goodsPerHead: 12, goodCap: 2, roomFull: 0.15,
+  woeFade: 0.6, woePerDeath: 4, woeFamine: 0.3, woeWar: 0.15,
+  /** Against the average of the nations it knows: `margin`+ points richer → acclaim: stability +acclaimStability and
+   *  discontent −acclaimCalm a turn, reputation +1 every `reputationEvery` turns; `margin`+ poorer → envy: discontent
+   *  +1 per `envyDivisor` points behind (at most envyMax) a turn. */
+  margin: 10, acclaimStability: 1, acclaimCalm: 2, reputationEvery: 5, envyDivisor: 10, envyMax: 3,
+  /** Envy makes families leave for the richest nation it knows (a neighbour sharing a border first) that is `margin`+
+   *  richer, not at war with it and has room: chance a turn (gap − margin) / 100 × emigrate, at most emigrateMax;
+   *  envyShare of the people go (at least 2, at most envyPeople), only from a people of envyMinPop+. */
+  emigrate: 1, emigrateMax: 0.35, envyShare: 0.03, envyPeople: 8, envyMinPop: 30,
+  /** A chronicle line at most every `sayEvery` turns a nation; `history` turns kept; the world ranking adds
+   *  `rankWeight` × the average over them (§9.3). */
+  sayEvery: 15, history: 10, rankWeight: 0.5,
+};
 /** §3.2 Every turn a ruler gives at least one order: from the `after`-th idle turn in a row, stability −`stability` a turn. */
 export const IDLE = { after: 2, stability: 2 };
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses

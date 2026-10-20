@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createWorld, ownedTiles, step, type NationSpec } from "../src/engine.ts";
-import { SCHISM } from "../src/rules.ts";
+import { PROSPERITY, SCHISM } from "../src/rules.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
@@ -47,7 +47,8 @@ test("a faction forms at 100, waits for the Watcher, and gives up if nobody answ
   assert.ok(n.lastEvents.some(e => /quay về/.test(e)), String(stab()));
 });
 
-test("refused: they ask a nation they know to take them in; it accepts, or they go home", () => {
+test("refused: they ask a nation they know to take them in; it accepts, or they go home", t => {
+  const margin = PROSPERITY.margin; PROSPERITY.margin = Infinity; t.after(() => { PROSPERITY.margin = margin; }); // §4.7 envy of the rich host aside
   const w = createWorld("refuge", bots(2));
   step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } },
     1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "moon" } }] } } });
