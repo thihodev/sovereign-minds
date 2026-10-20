@@ -62,14 +62,35 @@ export function take(n: Nation, k: number, cause: Cause): Demography {
   const c = cells(d).map((x, i) => x - gone[i]);
   d.m = c.slice(0, 4); d.f = c.slice(4);
   n.population = total(d);
+  const k2 = sum(gone);
+  if (cause === "migrate") d.left = (d.left ?? 0) + k2;
+  else if (k2) (d.died ??= {})[cause] = (d.died[cause] ?? 0) + k2;
   return split(gone);
 }
+/** A new turn's account of births, deaths and moves (§4.2). */
+export function openBook(n: Nation): void {
+  const d = demo(n);
+  d.died = {}; d.left = 0; d.arrived = 0; d.start = n.population; d.born = 0; d.infants = 0; d.aged = 0;
+}
+/** The turn's account in words, for the nation, the Watcher and the chat. */
+export function bookLine(n: Nation): string {
+  const d = demo(n), parts: string[] = [];
+  if (d.born) parts.push(`+${d.born} trẻ ra đời`);
+  if (d.arrived) parts.push(`+${d.arrived} người tới`);
+  if (d.aged) parts.push(`−${d.aged} qua đời vì tuổi già hay lao lực`);
+  const NAME: Record<string, string> = { famine: "đói", winter: "rét", plague: "dịch", disaster: "thiên tai", beasts: "thú dữ", raid: "man di", war: "trận mạc", explore: "thám hiểm", porter: "khuân vác", any: "khác" };
+  for (const [k, v] of Object.entries(d.died ?? {})) if (v) parts.push(`−${v} chết vì ${NAME[k] ?? k}`);
+  if (d.left) parts.push(`−${d.left} bỏ đi`);
+  if (d.infants) parts.push(`(${d.infants} trẻ sơ sinh không qua khỏi)`);
+  return `Dân số ${d.start ?? n.population} → ${n.population}${parts.length ? `: ${parts.join(", ")}` : ""}.`;
+}
 
-/** Add people (born, captured, arrived). */
-export function add(n: Nation, who: Demography): void {
+/** Add people who arrive (captured, taken in). */
+export function add(n: Nation, who: Demography, arrived = true): void {
   const d = demo(n);
   d.m = d.m.map((x, i) => x + (who.m[i] || 0)); d.f = d.f.map((x, i) => x + (who.f[i] || 0));
   n.population = total(d);
+  if (arrived) d.arrived = (d.arrived ?? 0) + total(who);
 }
 /** Part of a group of people (largest remainder). */
 export function part(who: Demography, share: number): Demography {
@@ -115,16 +136,20 @@ export function grow(n: Nation, rand: () => number): number {
   return died;
 }
 
-/** How fertile the people is now against a settled people of its size: adult women, partners, customs. */
-export function fertility(n: Nation, marriage: boolean): number {
+/** How able the people is to bear children against a settled people of its size: adult women and partners.
+ *  A people short of women or partners bears fewer; more women than usual does not make it bear more. */
+export function breeding(n: Nation): number {
   const d = demo(n), pop = Math.max(1, total(d));
   const women = d.f[2] / (pop * DEMO.start[2] / 2);
   const pair = d.f[2] ? Math.min(1, d.m[2] / (d.f[2] * DEMO.pairing)) : 0;
-  // a people short of women or partners bears fewer; more women than usual does not make it bear more
-  return Math.min(1, women * pair) * (DEMO.births[n.family?.births ?? "neutral"]?.fert ?? 1) * (marriage ? DEMO.marriage : 1);
+  return Math.min(1, women * pair);
+}
+/** How fertile the people is now for growth: breeding × the birth custom × marriage. */
+export function fertility(n: Nation, marriage: boolean): number {
+  return breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.fert ?? 1) * (marriage ? DEMO.marriage : 1);
 }
 /** Newborns: half boys, half girls; the odd one by the seed. */
 export function babies(n: Nation, k: number, rand: () => number): void {
   const boys = Math.floor(k / 2) + (k % 2 && rand() < 0.5 ? 1 : 0);
-  add(n, { m: [boys, 0, 0, 0], f: [k - boys, 0, 0, 0] });
+  add(n, { m: [boys, 0, 0, 0], f: [k - boys, 0, 0, 0] }, false);
 }

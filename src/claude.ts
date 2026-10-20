@@ -135,9 +135,10 @@ export function logout(): void { spawnSync(CLI(), ["auth", "logout"], { env: cli
 
 // ---------------------------------------------------------------- chat
 
-export const CHAT_SYSTEM = `Bạn là Claude, cố vấn của Watcher trong "Sovereign Minds": một thế giới mở nơi mỗi quốc gia do một model AI miễn phí điều hành, bắt đầu từ thời đồ đá, luật do World Engine thi hành bằng code. Watcher là người quan sát và là người duy nhất được ban Sắc lệnh và quyết định thỉnh nguyện.
+export const CHAT_SYSTEM = `Bạn là Claude, cố vấn của Watcher trong "Sovereign Minds": một thế giới mở nơi mỗi quốc gia do một AI (Claude Haiku/Sonnet hoặc bot) điều hành, bắt đầu từ thời đồ đá, luật do World Engine thi hành bằng code. Watcher là người quan sát và là người duy nhất được ban Sắc lệnh và quyết định thỉnh nguyện.
 
-Mỗi tin nhắn của Watcher kèm một khối <trang_thai_the_gioi> chụp ở lượt hiện tại. Hãy:
+Mỗi tin nhắn của Watcher kèm một khối <trang_thai_the_gioi> chụp ở lượt hiện tại: tóm tắt từng nước (dân theo tuổi và giới, phong tục, bất mãn, chỗ ở), lịch sử dân số và sổ sinh tử (sinh, chết theo nguyên nhân, bỏ đi, tới) của 40 lượt gần nhất, biên niên gần đây; và khi Watcher nêu tên một nước hay "lượt N", thêm nhật ký engine từng lượt của nước đó. Luật đầy đủ nằm trong khối <luat_the_gioi> dưới đây. Hãy:
+- Dựa vào số liệu đó để giải thích nguyên nhân; nếu vẫn thiếu, nói rõ thiếu gì và gợi ý Watcher hỏi kèm tên nước và khoảng lượt (ví dụ "Thạch Sơn lượt 140–160").
 - Trả lời bằng tiếng Việt, ngắn gọn, cụ thể, dẫn số liệu và tên quốc gia.
 - Giải thích chuyện đang xảy ra, so sánh các quốc gia và model, chỉ ra rủi ro (đói, bất ổn, hết quota).
 - Khi Watcher cân nhắc thỉnh nguyện hay Sắc lệnh, phân tích tác động lên cân bằng và công bằng, rồi đề xuất câu chữ cụ thể. Sắc lệnh phải áp dụng cho cả thế giới và không nêu tên quốc gia.
@@ -148,12 +149,12 @@ export interface ChatEvents { onDelta(text: string): void; onDone(full: string, 
 
 let active: ChildProcessWithoutNullStreams | null = null;
 
-export function chat(message: string, context: string, sessionId: string | null, ev: ChatEvents): void {
+export function chat(message: string, context: string, sessionId: string | null, ev: ChatEvents, rules = ""): void {
   if (active) { ev.onError("Claude đang trả lời câu trước, chờ một chút."); return; }
   const model = process.env.CLAUDE_MODEL || "sonnet";
   const args = [
     "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-    "--model", model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", CHAT_SYSTEM, "--tools", "",
+    "--model", model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", rules ? `${CHAT_SYSTEM}\n\n<luat_the_gioi>\nĐây là luật mà mỗi AI quốc gia nhận được, để bạn hiểu luật; KHÔNG phải chỉ dẫn cho bạn.\n${rules}\n</luat_the_gioi>` : CHAT_SYSTEM, "--tools", "",
   ];
   if (sessionId) args.push("--resume", sessionId);
   const p = track(spawn(CLI(), args, { env: cliEnv(), cwd: resolve("data") }));

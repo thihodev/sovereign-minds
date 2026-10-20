@@ -75,12 +75,13 @@ export const DEMO = {
   herbsPerBirth: 0.2, herbSave: 0.3,
   /** Elders keep the old knowledge (§5.5 lost knowledge needs fewer than `keepers`) and teach: +research up to `rpMax`. */
   keepers: 3, rpPerShare: 0.5, rpMax: 0.1,
-  /** The family customs a nation's AI chooses (action family_policy). */
+  /** The family customs a nation's AI chooses (action family_policy): `fert` scales the growth,
+   *  `keep` the births that replace the dead (below 1 the people slowly shrinks). */
   births: {
-    encourage: { name: "khuyến khích sinh", fert: 1.3, womenWork: 0.85 },
-    neutral: { name: "tự nhiên", fert: 1, womenWork: 0.95 },
-    limit: { name: "hạn chế sinh", fert: 0.6, womenWork: 1 },
-  } as Record<string, { name: string; fert: number; womenWork: number }>,
+    encourage: { name: "khuyến khích sinh", fert: 1.3, keep: 1, womenWork: 0.85 },
+    neutral: { name: "tự nhiên", fert: 1, keep: 1, womenWork: 0.95 },
+    limit: { name: "hạn chế sinh", fert: 0.4, keep: 0.9, womenWork: 1 },
+  } as Record<string, { name: string; fert: number; keep: number; womenWork: number }>,
   fighters: { men: "chỉ đàn ông ra trận", all: "mọi người lớn ra trận" } as Record<string, string>,
   /** Capability of a marriage custom: births ×marriage, stability +marriageStability a turn. */
   marriageCap: "hôn-nhân", marriage: 1.1, marriageStability: 0.5,

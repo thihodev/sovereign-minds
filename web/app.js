@@ -211,7 +211,7 @@
     raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔ đánh man di thất bại", battle: f => String(f.text).startsWith("won") ? "⚔ thắng trận" : "⚔ thua trận",
     beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
     fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
-    road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
+    schism: f => `✊ ${f.n} người theo ${f.text} xin ly khai, chờ bạn duyệt`, road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
     drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
   };
   const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun", "road"]);

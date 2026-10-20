@@ -4,6 +4,19 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Sửa luật dân số:**
+  - Thiếu nước, thảo dược và y học giờ chỉ ảnh hưởng tốc độ tăng dân, không làm dân co dần nữa.
+  - "Hạn chế sinh" chỉ giảm nhẹ phần sinh bù cho người chết (×0,9), phần tăng thêm thì giảm mạnh (×0,4).
+  - Trước bản sửa này, một nước nhỏ không có nước ngọt mà lại hạn chế sinh có thể chết dần.
+- **Sổ sinh tử mỗi lượt:** mỗi nước nhận một dòng "Dân số A → B: +sinh, −tuổi già, −chết vì …, −bỏ đi, +tới".
+  - DB lưu sổ này (cột `detail` của `nation_stats`) và toàn bộ nhật ký engine từng lượt của mỗi nước (bảng `nation_log`).
+- **Chat Claude hiểu thế giới hơn:**
+  - Đọc luật đầy đủ mà các nước nhận.
+  - Thấy dân theo tuổi và giới, phong tục, bất mãn, chỗ ở của từng nước, lịch sử dân số cùng sổ sinh tử 40 lượt gần nhất, và các phái xin ly khai.
+  - Khi câu hỏi nêu tên một nước (và "lượt N"), Chat Claude nhận thêm nhật ký engine từng lượt của nước đó.
+- **Công cụ `tools/history.ts "<quốc gia>" [từ] [tới]`:** xem lịch sử một nước theo từng lượt: dân, lương thực, ổn định, đất, sinh tử, hành động AI gửi, nhật ký engine, biên niên, và bản chụp mỗi 10 lượt cho giai đoạn trước v0.6.
+- **Ly khai:** khi một phái đòi ra đi, dải tin trên bản đồ báo "xin ly khai, chờ bạn duyệt"; biên niên ghi thêm chỗ để duyệt.
+- **Sông:** AI thấy con sông gần nhất mình đã thấy và các ô cần chiếm để tới đó (`nearest_river`).
 - **Bất mãn và ly khai (§4.5).**
   - Cai trị kém (ổn định thấp, nạn đói, nội loạn, đất quá rộng) làm bất mãn tăng dần. Tới 100, một phái 20–35% dân xin bỏ đi lập quốc riêng trên đất trống.
   - **Watcher duyệt trong mục Thỉnh nguyện** và chọn model, effort (hoặc bot) cho quốc gia mới. Nước mới kế thừa người, kho, phát minh, kỷ nguyên, đặc thù và phong tục, rồi tự đặt tên và cờ ở lượt đầu.

@@ -15,7 +15,7 @@ import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetwe
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
-import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, take as takePeople, workForce } from "./people.ts";
+import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
 
@@ -493,6 +493,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   const say = (nation: number | null, kind: string, text: string) => chronicle.push({ tick, nation, kind, text });
   const alive = world.nations.filter(n => n.alive);
   const popStart = new Map(alive.map(n => [n.id, n.population]));
+  for (const n of alive) openBook(n); // §4.2 this turn's births, deaths and moves
 
   // 1. Read inputs
   for (const n of alive) {
@@ -669,6 +670,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       if (lost) { n.inventions = n.inventions.filter(x => x !== lost); say(n.id, "lost", `${n.name} mất quá nửa dân số và thất truyền ${invName(world, lost)}.`); }
     }
     n.peakPopulation = Math.max(n.peakPopulation, n.population);
+    if (n.founded) n.lastEvents.push(bookLine(n)); // §4.2 where the people went, every turn
     const owned = ownedTiles(world, n.id);
     // Eras only move forward (§5.6): a shrinking people keeps its era.
     let era = n.era;
@@ -899,15 +901,18 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     // with food to spare and room to live, add the logistic growth — all as fertile as the people now is
     const before = n.population;
     d.aged = grow(n, prand);
-    const fert = fertility(n, m.caps.has(DEMO.marriageCap));
-    // births replace the dead at most one for one (fewer when women or partners are missing); a fertile people grows faster
-    const want = n.population >= roof ? 0 : d.aged * Math.min(1, fert) + (surplus >= GROWTH.surplus ? growthFor(before, roof) * (1 + m.growth) * fert : 0);
+    const fert = fertility(n, m.caps.has(DEMO.marriageCap)), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1);
+    // births replace the dead at most one for one (fewer when women or partners are missing, a little fewer
+    // when births are limited); with food to spare a fertile people also grows
+    const replace = n.population >= roof ? 0 : d.aged * keep, grow2 = n.population >= roof || surplus < GROWTH.surplus ? 0 : growthFor(before, roof) * (1 + m.growth) * fert;
+    const want = replace + grow2;
     if (want > 0) {
-      // Infants who do not live: fewer with medicine and herbs, more with no fresh water
+      // Infants who do not live: the base rate is in the births already; medicine and herbs save more,
+      // no fresh water loses more — of the growth only, so a people never dies out of it
       let rate = DEMO.infant * (dry ? DEMO.dryInfant : 1) * (1 - m.medicine);
       const herbsWant = want * DEMO.herbsPerBirth, herbs = Math.min(n.stock.herbs || 0, herbsWant);
       if (herbs > 0) { L.stock(n, "herbs", -herbs, "births"); rate *= 1 - DEMO.herbSave * herbs / herbsWant; }
-      const born = Math.max(0, Math.min(roof - n.population, Math.max(GROWTH.min, Math.floor(want * (1 - rate) / (1 - DEMO.infant) + prand()))));
+      const born = Math.max(0, Math.min(roof - n.population, Math.max(GROWTH.min, Math.floor(replace + grow2 * (1 - rate) / (1 - DEMO.infant) + prand()))));
       d.infants = Math.max(0, Math.round(want / (1 - DEMO.infant) * rate));
       babies(n, born, prand); d.born = born;
       if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
@@ -1015,7 +1020,8 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
       const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: Math.round(n.population * share), site, leader, grievance: grievance(world, n), status: "pending" };
       list.push(x);
       n.lastEvents.push(`Một phái bất mãn (${x.people} người, thủ lĩnh ${leader}) muốn bỏ đi lập quốc riêng ở (${col(site)}, ${row(site)}) vì ${x.grievance}. Họ đang chờ các vị thần cho phép.`);
-      say(n.id, "schism", `Ở ${n.name}, ${x.people} người theo ${leader} muốn ra đi lập quốc riêng vì ${x.grievance}.`);
+      say(n.id, "schism", `Ở ${n.name}, ${x.people} người theo ${leader} muốn ra đi lập quốc riêng vì ${x.grievance}. Chờ các vị thần quyết trong mục Thỉnh nguyện.`);
+      fx({ kind: "schism", tile: n.capital, nation: n.id, n: x.people, to: site, text: leader });
       continue;
     }
     // Not let go, or no answer in time: they look for a nation that will take them in

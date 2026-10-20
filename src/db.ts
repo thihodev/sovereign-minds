@@ -47,7 +47,11 @@ export class Store {
       CREATE TABLE IF NOT EXISTS watcher_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tick INTEGER, kind TEXT, payload TEXT, created_at TEXT);
       CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, text TEXT, tick INTEGER, created_at TEXT);
       CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, from_tick INTEGER, to_tick INTEGER, title TEXT, text TEXT, author TEXT, created_at TEXT);
+      CREATE TABLE IF NOT EXISTS nation_log (tick INTEGER, nation INTEGER, events TEXT, PRIMARY KEY (tick, nation));
     `);
+    // v0.6: each turn's births, deaths by cause, moves and customs, next to the totals
+    const cols = this.db.prepare("PRAGMA table_info(nation_stats)").all() as Array<{ name: string }>;
+    if (!cols.some(c => c.name === "detail")) this.db.exec("ALTER TABLE nation_stats ADD COLUMN detail TEXT");
   }
 
   getMeta(key: string): string | null {
@@ -108,10 +112,26 @@ export class Store {
   }
 
   addStats(world: World): void {
-    const ins = this.db.prepare("INSERT OR REPLACE INTO nation_stats (tick, nation, population, food, stability, tiles, inventions, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    const ins = this.db.prepare("INSERT OR REPLACE INTO nation_stats (tick, nation, population, food, stability, tiles, inventions, status, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     const tiles = new Map<number, number>();
     for (const t of world.tiles) if (t.owner >= 0) tiles.set(t.owner, (tiles.get(t.owner) || 0) + 1);
-    for (const n of world.nations) ins.run(world.tick, n.id, n.population, Math.round((n.stock.food || 0) * 10) / 10, n.stability, tiles.get(n.id) || 0, n.inventions.length, n.status);
+    for (const n of world.nations) {
+      const d = n.demo;
+      const detail = d ? { born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, died: d.died ?? {}, left: d.left ?? 0, arrived: d.arrived ?? 0, discontent: Math.round(n.discontent ?? 0), births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all" } : null;
+      ins.run(world.tick, n.id, n.population, Math.round((n.stock.food || 0) * 10) / 10, n.stability, tiles.get(n.id) || 0, n.inventions.length, n.status, detail ? JSON.stringify(detail) : null);
+    }
+  }
+  /** Everything the engine told each nation this turn (§3.1 events), kept for the Watcher and the chat. */
+  addNationLog(world: World): void {
+    const ins = this.db.prepare("INSERT OR REPLACE INTO nation_log (tick, nation, events) VALUES (?, ?, ?)");
+    for (const n of world.nations) if (n.alive || n.lastEvents.length) ins.run(world.tick - 1, n.id, JSON.stringify({ events: n.lastEvents, rejected: n.lastRejected.map(r => `${r.action}: ${r.reason}`) }));
+  }
+  nationLog(nation: number, from: number, to: number): Array<{ tick: number; events: string[]; rejected: string[] }> {
+    return (this.db.prepare("SELECT tick, events FROM nation_log WHERE nation = ? AND tick BETWEEN ? AND ? ORDER BY tick").all(nation, from, to) as Array<{ tick: number; events: string }>)
+      .map(r => ({ tick: r.tick, ...JSON.parse(r.events) }));
+  }
+  nationStats(nation: number, from: number, to: number): Array<{ tick: number; population: number; food: number; stability: number; tiles: number; detail: string | null }> {
+    return this.db.prepare("SELECT tick, population, food, stability, tiles, detail FROM nation_stats WHERE nation = ? AND tick BETWEEN ? AND ? ORDER BY tick").all(nation, from, to) as Array<{ tick: number; population: number; food: number; stability: number; tiles: number; detail: string | null }>;
   }
   statsAt(tick: number): unknown[] {
     return this.db.prepare("SELECT nation, population, inventions, tiles FROM nation_stats WHERE tick = ?").all(tick);

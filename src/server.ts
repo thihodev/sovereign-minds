@@ -14,6 +14,7 @@ import { DEMO, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
+import { SYSTEM_PROMPT } from "./ai/prompt.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
@@ -231,13 +232,13 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         runner.store.addChat("user", message, tick);
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
         const ev = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-        const context = runner.summary(runner.store.chronicle(30) as Array<{ tick: number; text: string }>);
+        const context = runner.summary(runner.store.chronicle(60) as Array<{ tick: number; text: string }>, message);
         const session = runner.store.getMeta("claude_session") || null;
         chat(message, context, session, {
           onDelta: t => ev("delta", { text: t }),
           onDone: (full, sid) => { runner.store.addChat("claude", full, tick); if (sid) runner.store.setMeta("claude_session", sid); ev("done", {}); res.end(); },
           onError: msg => { ev("error", { error: msg }); res.end(); },
-        });
+        }, SYSTEM_PROMPT);
         return;
       }
       return send(res, 404, { error: "not found" });

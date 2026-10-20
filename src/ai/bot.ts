@@ -385,7 +385,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // when hunger looms; men to war, everyone when a war needs more hands than the men
   if (n.founded && tick % 5 === n.id % 5) {
     const room = v.house - v.pop, fam = n.family ?? { births: "neutral", fighters: "all" };
-    const births = capFood < v.need * 1.05 || v.food < v.need * 0.3 ? "limit" : room >= v.house * 0.2 && capFood > v.need * 1.3 ? "encourage" : "neutral";
+    const births = v.pop >= 40 && (capFood < v.need * 1.05 || v.food < v.need * 0.3) ? "limit" : room >= v.house * 0.2 && capFood > v.need * 1.3 ? "encourage" : "neutral";
     const menOnly = { ...n, family: { ...fam, fighters: "men" } } as Nation;
     const fight = atWar && fighters(menOnly) < Math.max(n.labor.warrior, 10) ? "all" : "men";
     if (births !== fam.births || fight !== fam.fighters) spend("family_policy", { births, fighters: fight });

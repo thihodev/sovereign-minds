@@ -178,6 +178,8 @@ export interface Demography {
   m: number[]; f: number[];
   /** Last turn: children born (who lived), infants lost, deaths of old age and hardship. */
   born?: number; infants?: number; aged?: number;
+  /** Last turn's other comings and goings: deaths by cause, people who left or arrived, the population it began with. */
+  died?: Record<string, number>; left?: number; arrived?: number; start?: number;
 }
 
 export interface RoadWork { tile: number; level: number; progress: number }

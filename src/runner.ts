@@ -2,7 +2,8 @@
 // Quota sleep (§3.4) lives here because it depends on the wall clock, which
 // the deterministic engine must never read.
 
-import { createWorld, step, ownedTiles, type NationSpec } from "./engine.ts";
+import { createWorld, step, ownedTiles, housing, housingParts, workers, type NationSpec } from "./engine.ts";
+import { bookLine, demo } from "./people.ts";
 import { TILE_COUNT } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
 import { buildObservation, SYSTEM_PROMPT } from "./ai/prompt.ts";
@@ -11,7 +12,7 @@ import { JUDGE_SYSTEM, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
-import { TRAITS, TRAIT_BY_ID } from "./rules.ts";
+import { DEMO, SCHISM, TRAITS, TRAIT_BY_ID } from "./rules.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus, killAllClaude } from "./claude.ts";
 import type { Store } from "./db.ts";
@@ -193,6 +194,7 @@ export class Runner {
       this.store.saveState(w);
       this.store.addChronicle(res.chronicle);
       this.store.addStats(w);
+      this.store.addNationLog(w);
       this.nextTickAt = Date.now() + this.cfg.tickSeconds * 1000;
       this.lastFx = { tick: w.tick - 1, fx: res.fx };
       this.emit({ type: "tick", tick: w.tick, chronicle: res.chronicle, fx: res.fx });
@@ -459,13 +461,52 @@ export class Runner {
   requestStep(): void { this.stepRequested = true; }
 
   /** A compact text summary of the world for Claude. */
-  summary(chronicle: Array<{ tick: number; text: string }>): string {
+  summary(chronicle: Array<{ tick: number; text: string }>, message = ""): string {
     const w = this.world;
     const lines = [`Lượt ${w.tick} (mỗi lượt = 10 năm). Seed: ${w.seed}. ${this.paused ? "Đang tạm dừng." : ""}`];
     for (const n of w.nations) {
       const tiles = ownedTiles(w, n.id).length;
-      lines.push(`- [${n.id + 1}] ${n.name}${n.alive ? "" : " (diệt vong)"} | ${n.controller === "ai" ? n.model : "bot"} | trạng thái ${n.status}${n.statusNote ? ` (${n.statusNote.slice(0, 80)})` : ""} | dân ${n.population} | lương thực ${Math.round(n.stock.food || 0)} | ổn định ${n.stability} | ${tiles} ô | ${n.inventions.length} phát minh | đang nghiên cứu ${n.research?.id ?? "-"} | kỷ ${n.era} | uy tín ${n.reputation} | đã gặp: ${n.met.map(o => w.nations[o].name).join(", ") || "chưa"}`);
+      lines.push(`- [${n.id + 1}] ${n.name}${n.alive ? "" : " (diệt vong)"} | ${n.controller === "ai" ? `${n.model}${n.effort ? ` · ${n.effort}` : ""}` : "bot"} | trạng thái ${n.status}${n.statusNote ? ` (${n.statusNote.slice(0, 80)})` : ""} | dân ${n.population} | lương thực ${Math.round(n.stock.food || 0)} | ổn định ${n.stability} | bất mãn ${Math.round(n.discontent ?? 0)} | ${tiles} ô | ${n.inventions.length} phát minh | đang nghiên cứu ${n.research?.id ?? "-"} | kỷ ${n.era} | uy tín ${n.reputation} | đã gặp: ${n.met.map(o => w.nations[o].name).join(", ") || "chưa"}${n.origin ? ` | ly khai từ ${w.nations[n.origin.from]?.name} ở lượt ${n.origin.tick}` : ""}`);
+      if (n.alive && n.founded) {
+        const d = demo(n), hp = housingParts(w, n);
+        lines.push(`  dân theo tuổi (nam/nữ): trẻ em ${d.m[0]}/${d.f[0]}, thiếu niên ${d.m[1]}/${d.f[1]}, trưởng thành ${d.m[2]}/${d.f[2]}, già ${d.m[3]}/${d.f[3]} | phong tục: ${DEMO.births[n.family?.births ?? "neutral"]?.name}, ${DEMO.fighters[n.family?.fighters ?? "all"]} | chỗ ở ${housing(w, n)} (thủ đô ${hp.natural}, định cư ${hp.settlements}, lều ${hp.buildings}, thôn xóm ${hp.hamlets}/${hp.hamletMax}) | lao động ${workers(n)} | ${n.settlements.length} điểm định cư`);
+        lines.push(`  lượt vừa rồi: ${bookLine(n)}`);
+      }
       if (n.lastThought) lines.push(`  suy nghĩ gần nhất (dữ liệu): "${n.lastThought.slice(0, 200)}"`);
+    }
+    // §4.2 the last 40 turns: population every 5 turns, and what moved it
+    const from = Math.max(0, w.tick - 40);
+    lines.push(`Lịch sử dân số lượt ${from}–${w.tick} (mỗi 5 lượt) và sổ sinh tử cộng dồn (chỉ có từ khi engine bắt đầu ghi):`);
+    for (const n of w.nations) {
+      const rows = this.store.nationStats(n.id, from, w.tick);
+      if (!rows.length) continue;
+      const series = rows.filter((r, k) => k === rows.length - 1 || r.tick % 5 === 0).map(r => `L${r.tick}:${r.population}`).join(" ");
+      const tot: Record<string, number> = {};
+      for (const r of rows) {
+        if (!r.detail) continue;
+        const x = JSON.parse(r.detail) as { born: number; aged: number; infants: number; left: number; arrived: number; died: Record<string, number> };
+        for (const [k, v] of Object.entries({ "sinh": x.born, "tuổi già/lao lực": -x.aged, "trẻ sơ sinh mất (không tính vào dân)": x.infants, "bỏ đi": -x.left, "tới": x.arrived })) if (v) tot[k] = (tot[k] || 0) + v;
+        for (const [k, v] of Object.entries(x.died)) tot[`chết vì ${k}`] = (tot[`chết vì ${k}`] || 0) - v;
+      }
+      lines.push(`- ${n.name}: ${series}${Object.keys(tot).length ? ` | ${Object.entries(tot).map(([k, v]) => `${k} ${v > 0 ? "+" : ""}${v}`).join(", ")}` : ""}`);
+    }
+    // A nation named in the question: its engine log turn by turn
+    const asked = w.nations.filter(n => n.name.length > 1 && message.toLowerCase().includes(n.name.toLowerCase()));
+    const ticks = [...message.matchAll(/(?:lượt|L)\s*(\d{1,5})/gi)].map(m => Number(m[1])).filter(t => t <= w.tick);
+    const lo = ticks.length ? Math.max(0, Math.min(...ticks) - 2) : Math.max(0, w.tick - 25), hi = ticks.length ? Math.min(w.tick, Math.max(...ticks) + 2, lo + 40) : w.tick;
+    for (const n of asked.slice(0, 3)) {
+      lines.push(`Nhật ký engine của ${n.name}, lượt ${lo}–${hi} (dữ liệu):`);
+      const stats = new Map(this.store.nationStats(n.id, lo, hi + 1).map(r => [r.tick, r]));
+      for (const r of this.store.nationLog(n.id, lo, hi)) {
+        const st = stats.get(r.tick + 1);
+        lines.push(`  L${r.tick}${st ? ` (sau lượt: dân ${st.population}, lương thực ${st.food}, ổn định ${st.stability}, ${st.tiles} ô)` : ""}: ${r.events.slice(0, 12).map(e => e.slice(0, 160)).join(" | ")}${r.rejected.length ? ` | bị từ chối: ${r.rejected.slice(0, 4).map(e => e.slice(0, 100)).join("; ")}` : ""}`);
+      }
+      if (!this.store.nationLog(n.id, lo, hi).length) lines.push("  (chưa có nhật ký cho khoảng này: engine bắt đầu ghi từ bản v0.6)");
+    }
+    const factions = (w.schisms ?? []).filter(x => x.status === "pending" || x.status === "asking");
+    if (factions.length) {
+      lines.push("Phái xin ly khai (chờ Watcher, hoặc đang xin sang nước khác):");
+      for (const x of factions) lines.push(`- #${x.id} từ ${w.nations[x.from]?.name}, lượt ${x.tick}: ${x.people} người theo ${x.leader}, vì ${x.grievance}; ${x.status === "pending" ? `còn ${Math.max(0, SCHISM.waitTicks - (w.tick - x.tick))} lượt để Watcher quyết` : `đang xin sang ${w.nations[x.to!]?.name}`}`);
     }
     const pend = w.petitions.filter(p => p.status === "pending");
     if (pend.length) {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { createWorld, step, deltaE, ownedTiles, type NationSpec } from "../src/engine.ts";
+import { workers, createWorld, step, deltaE, ownedTiles, type NationSpec } from "../src/engine.ts";
 import { generateWorld } from "../src/worldgen.ts";
 import { botTurn } from "../src/ai/bot.ts";
 import { rngFor } from "../src/rng.ts";
@@ -117,8 +117,10 @@ test("over-assigned labour scales down without wiping small roles", () => {
   const w = createWorld("labor", bots(1));
   run(w, 1);
   const n = w.nations[0];
-  n.population = 19; // 13 workers
+  n.population = 19;
+  const hands = workers(n); // about 13: work is weighted by age (§4.2)
+  assert.ok(hands < 14);
   step(w, { 0: { kind: "ok", response: { labor: { hunt: 8, gather: 5, research: 1 } } } });
   assert.equal(n.labor.research, 1);
-  assert.equal(Object.values(n.labor).reduce((a, b) => a + b, 0), 13);
+  assert.equal(Object.values(n.labor).reduce((a, b) => a + b, 0), hands);
 });
