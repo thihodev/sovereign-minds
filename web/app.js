@@ -180,7 +180,7 @@
   const ROLE_ICON = { gather: "🌿", hunt: "🏹", fish: "🐟", wood: "🪓", stone: "⛏", flint: "⛏", clay: "🏺", mine: "⛏", farm: "🌾", craft: "🔨", build: "🧱", research: "📜", warrior: "🛡" };
   const CAUSE_ICON = { famine: "🍂", winter: "❄", plague: "🦠", beasts: "🐺", quake: "💥", raid: "🔥", battle: "⚔", explore: "🧭", horde: "⚔" };
   // Long enough to follow by eye; the strip above the map can replay any of them
-  const FX_DUR = { death: 4800, birth: 3600, explore: 6500, caravan: 6500, robbed: 6500, raid: 6500, repelled: 6500, clear: 6500, battle: 5500, migrate: 6000, settle: 5500, era: 6000, invention: 4800, winter: 5500, meteor: 3600 };
+  const FX_DUR = { contagion: 5500, death: 4800, birth: 3600, explore: 6500, caravan: 6500, robbed: 6500, raid: 6500, repelled: 6500, clear: 6500, battle: 5500, migrate: 6000, settle: 5500, era: 6000, invention: 4800, winter: 5500, meteor: 3600 };
   const FX_DEFAULT = 4200;
   const ANIM = {
     on: (() => { try { const v = localStorage.getItem("sm-anim"); return v === null ? !reduceMotion.matches : v === "1"; } catch { return !reduceMotion.matches; } })(),
@@ -208,6 +208,7 @@
     beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
     fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
     schism: f => `✊ ${f.n} người theo ${f.text} xin ly khai, chờ bạn duyệt`, road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
+    contagion: f => `🦠 dịch lan từ ${f.text} sang ${S.nations[f.nation] ? nationName(S.nations[f.nation]) : "?"}${{ border: " qua biên giới", caravan: " theo đoàn buôn", market: " qua chợ biên giới" }[f.cause] || ""}`,
     drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
   };
   const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun", "road"]);
@@ -216,7 +217,7 @@
     const items = list.filter(f => !QUIET_FX.has(f.kind)).slice(0, 14);
     box.replaceChildren(...items.map(f => {
       const b = document.createElement("button"); b.type = "button";
-      const who = f.nation !== undefined && S.nations[f.nation] ? `${nationName(S.nations[f.nation])}: ` : "";
+      const who = f.nation !== undefined && S.nations[f.nation] && f.kind !== "contagion" ? `${nationName(S.nations[f.nation])}: ` : "";
       b.textContent = who + (FX_WORD[f.kind]?.(f) ?? f.kind);
       if (f.nation !== undefined && S.nations[f.nation]) b.style.borderLeftColor = nationColor(f.nation);
       // fly there and play just this one again, leaving the strip as it is
@@ -439,6 +440,17 @@
             icon(g, sym, bx, by - unit * 1.4, big * 1.3);
           }
           if (f.kind === "migrate" && f.n) floatText(g, `${f.n} người bỏ đi`, a[0], a[1] - unit * 1.4, big * .8, "#ffd0a0", px);
+          break;
+        }
+        case "contagion": {
+          // §9.5 a line from the sick capital to the one it reaches; the germ travels along it
+          if (f.from === undefined) break;
+          const a = center(f.from), b = [x, y], [mx, my] = lerp(a, b, ease(Math.min(1, t / .6)));
+          g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(mx, my); g.lineCap = "round";
+          g.setLineDash([]); g.lineWidth = 5 * px; g.strokeStyle = "rgba(8,20,28,.6)"; g.stroke();
+          g.setLineDash([6 * px, 5 * px]); g.lineWidth = 2.6 * px; g.strokeStyle = "#9be06b"; g.stroke(); g.setLineDash([]);
+          icon(g, "🦠", mx, my - unit * .6, big * 1.1);
+          if (t > .6) { const k2 = (t - .6) / .4; g.beginPath(); g.arc(x, y, unit * (0.6 + k2 * 2.4), 0, 7); g.lineWidth = 3 * px * (1 - k2); g.strokeStyle = "#9be06b"; g.stroke(); }
           break;
         }
         case "beasts": {
@@ -1075,6 +1087,12 @@
   const MODEL_NAME = { haiku: "Haiku", sonnet: "Sonnet" };
   const modelLabel = n => n.provider === "claude" ? `Claude ${MODEL_NAME[n.model] ?? n.model}${n.effort ? ` · ${n.effort}` : ""}` : n.model;
   const traitTag = n => n.trait ? `<div class="trait" title="${esc(n.trait.lines.join(" · "))}">${esc(n.trait.icon)} <b>${esc(n.trait.name)}</b> · <span class="muted">${esc(n.trait.lines.join(", "))}</span></div>` : "";
+  /** §9.5 an outbreak that can still spread, a quarantine in force */
+  function healthPills(n) {
+    const h = n.health || {};
+    return (h.outbreak ? `<span class="pill bad" title="Còn lây được sang láng giềng và bạn hàng tới hết lượt ${h.outbreakUntil}">🦠 Đang có dịch</span> ` : "")
+      + (h.quarantine ? `<span class="pill warn" title="Đóng cửa biên giới tới hết lượt ${h.quarantineUntil}: không buôn bán, không chợ biên giới">🚧 Đang cách ly</span> ` : "");
+  }
   function statusPill(n) {
     if (!n.alive) return `<span class="pill bad">Diệt vong</span>`;
     if (n.controller === "bot") return `<span class="pill">Bot</span>`;
@@ -1129,7 +1147,7 @@
     const relations = Object.entries(n.relations || {}).filter(([, r]) => r !== "chưa biết");
     const threatsN = (n.threats || []).filter(t => t.level >= 2).length;
     $("#nation-detail").innerHTML = `
-      <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${statusPill(n)}<button id="dlg-close">Đóng</button></div>
+      <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${healthPills(n)}${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       <div class="subtabs" data-key="nation">
         <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
         <section data-sub="overview">
@@ -1161,7 +1179,7 @@
         </section>
         <section data-sub="threats">${threatList(n.threats || [], "Không có mối đe dọa nào.")}</section>
         <section data-sub="foreign">
-          <h3>Quan hệ</h3>${relations.length ? `<div class="chips">${relations.map(([oid, r]) => `<span class="rel ${relClass(r)}">${esc(nm(oid))} · ${esc(r)}</span>`).join("")}</div>` : `<p class="note">Chưa gặp ai.</p>`}
+          <h3>Quan hệ</h3>${relations.length ? `<div class="chips">${relations.map(([oid, r]) => `<span class="rel ${relClass(r)}">${esc(nm(oid))} · ${esc(r)}${S.nations[oid]?.health?.outbreak ? " · 🦠 có dịch" : ""}${S.nations[oid]?.health?.quarantine ? " · 🚧 cách ly" : ""}</span>`).join("")}</div>` : `<p class="note">Chưa gặp ai.</p>`}
           <h3>Hộp thư lượt này (do nước khác viết)</h3>${(n.inbox || []).map(m => `<div class="card2"><b>${esc(m.fromName)}${m.gesture ? " (cử chỉ)" : ""}</b><div>${esc(m.text)}</div></div>`).join("") || `<p class="note">—</p>`}
           <h3>Tình báo về nước khác</h3>${intel || `<p class="note">Chưa có tin tình báo.</p>`}
         </section>
@@ -1228,6 +1246,7 @@
     petition: "Thỉnh nguyện", propose_invention: "Đề xuất phát minh", found_settlement: "Lập điểm định cư", rename_nation: "Đổi tên", sabotage: "Phá hoại", steal_tech: "Đánh cắp công nghệ",
     incite: "Kích động", message: "Gửi tin", trade_offer: "Đề nghị trao đổi", accept_trade: "Nhận trao đổi", treaty: "Đề nghị hiệp ước", accept_treaty: "Nhận hiệp ước",
     break_treaty: "Phá ước", declare_war: "Tuyên chiến", declare_independence: "Tuyên bố độc lập", attack: "Tấn công", raid: "Đột kích", clear_wild: "Đánh man di",
+    quarantine: "Cách ly",
   };
   const KEY = { tile: "ô", target: "nhắm", to: "gửi", warriors: "chiến binh", people: "người", direction: "hướng", from: "từ", invention: "phát minh", type_: "loại", building: "công trình", name: "tên", text: "nội dung", kind: "loại", duration: "thời hạn", offer: "đề nghị", give: "đưa", get: "nhận", horde: "bộ lạc", title: "tiêu đề", reason: "lý do", category: "loại", capital: "thủ đô", people_: "dân tộc", tribute: "cống phẩm", payer: "bên nộp" };
   function val(v) {
@@ -1335,7 +1354,7 @@
     war: "war", battle: "war", fall: "war", raid: "war", horde: "war", spy: "war", deceit: "war",
     invention: "invent", proposal: "invent", lost: "invent", era: "invent", gate: "invent",
     event: "disaster", famine: "disaster", beasts: "disaster",
-    road: "nation", treaty: "diplo", trade: "diplo", contact: "diplo", petition: "diplo", decree: "diplo",
+    road: "nation", quarantine: "diplo", treaty: "diplo", trade: "diplo", contact: "diplo", petition: "diplo", decree: "diplo",
   };
   function addChronicle(items, prepend = true) {
     for (const c of items) {

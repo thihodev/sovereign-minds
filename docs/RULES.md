@@ -595,6 +595,7 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
   - Không có đường nào thì không đề nghị hay nhận trao đổi được (bị từ chối, nêu lý do).
 - **Đất người khác:** đường không bao giờ đi qua đất của nước đang chiến tranh với bên gửi, và chỉ đi qua đất nước thứ ba khi phải. Qua đất nước thứ ba không có hiệp ước đi lại hoặc liên minh với bên gửi thì nộp **phí 10%** mỗi loại hàng cho nước đó.
 - **Hư hỏng và rủi ro trên đường:** lương thực mất 30% mỗi lượt trên đường bộ, 15% trên đường thủy. Đi trong vòng 8 ô quanh trại man di: mỗi lượt 12% × sức mạnh/40 (tối đa 50%) bị cướp mất 50% hàng (và 1 người khuân vác). Thuyền trên biển nông gặp bão 4% mỗi lượt: chìm 1 thuyền và mất 30% hàng. Đoàn buôn đang ở trên đất của một nước vừa tuyên chiến với bên gửi thì bị tịch thu toàn bộ.
+- **Cách ly (mục 9.5):** nước đang cách ly không gửi, không nhận đề nghị trao đổi; trao đổi đã nhận mà tới lúc giao một bên đang cách ly thì thất bại; đoàn buôn tới nước đang cách ly phải chờ ngoài biên giới tới khi dỡ cách ly.
 - Mỗi trao đổi thành công tính 1 lần giao thương cho cả hai bên; số lần này quyết định ngôn ngữ chung (10), tình báo (1 và 5) và lan truyền tri thức (5).
 - **Chưa có tiền tệ:** thời đồ đá chỉ có hàng đổi hàng. Tiền xuất hiện khi có phát minh mang năng lực `trao-đổi-giá-trị` (chưa có trong engine).
 - **Chợ biên giới:** hai bên hòa ước cùng dựng một chợ trên ô biên giới để giao ngay (chưa có trong engine).
@@ -702,7 +703,7 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
 
   Bên bị săn trộm hoặc bị xô xát có **chính nghĩa** (tuyên chiến không mất uy tín) trong 6 lượt.
 - **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt.
-- **Chợ biên giới:** khi căng thẳng dưới 60, mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
+- **Chợ biên giới:** khi căng thẳng dưới 60 và không bên nào đang cách ly (mục 9.5), mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
 - **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
 - **Quà tặng:** `trade_offer` chỉ có "give" và "get" rỗng là một món quà.
 - Watcher chỉnh được độ căng thẳng mỗi ô, ngưỡng tranh chấp và chợ biên giới bằng sắc lệnh luật.
@@ -792,6 +793,7 @@ Trường chỉ xuất hiện khi có nội dung: `nation.former_names` (tên c�
 | `plant_spy` | 2 | mục 7.8 |
 | `petition` | 1 | mục 10.5 |
 | `rename_nation` | 3 | chỉ trong 5 lượt sau khi bước vào kỷ nguyên mới, một lần mỗi lần đổi kỷ nguyên; −10 ổn định (mục 2.2) |
+| `quarantine` | 1 | cách ly 1–5 lượt, hoặc `turns` 0 để dỡ (mục 9.5) |
 | `sabotage`, `steal_tech`, `incite` | 2 | mỗi lần; cần năng lực `ghi-chép` và gián điệp đang hoạt động ở nước đó (mục 7.8) |
 
 Mỗi lượt Engine xét tối đa 12 hành động, theo thứ tự AI gửi, trừ dần vào số AP.
@@ -824,7 +826,7 @@ Mỗi lượt, mỗi quốc gia bốc thăm sự kiện từ bảng dưới đâ
 | Mùa đông khắc nghiệt | 4% (×2 ở hàn đới, không có ở nhiệt đới); có đất trong vòng 4 ô của Tường Băng: ít nhất 3%, rồi ×1,5, kể cả ở nhiệt đới | mọi nơi | mất 30% lương thực làm ra trong lượt, 5% dân chết rét | mỗi thứ sau giảm một nửa số chết: Thuộc da, có công trình có chỗ ở (Lều), áo da đủ cho nửa dân số |
 | Hạn hán | 3% | không ở hàn đới | hái lượm và ruộng −50% trong 2 lượt | tưới tiêu (phải tự phát minh) |
 | Lũ lụt | 3% (×2 nếu có châu thổ) | có ô sông hoặc đầm lầy | nước cuốn 10% lương thực trong kho và 1 công trình trên ô sông/đầm; ruộng +20% trong 2 lượt sau | xây công trình xa nước |
-| Dịch bệnh | 2% (×2 nếu dân > 80, ×0,7 nếu có Suối Nước Nóng) | mọi nơi | 10–20% dân chết. Lây qua đường giao thương (chưa có trong engine) | thảo dược: có ≥ 1 thảo dược cho mỗi 10 dân thì số chết giảm một nửa (dùng hết số đó) |
+| Dịch bệnh | 2% (×2 nếu dân > 80, ×0,7 nếu có Suối Nước Nóng) | mọi nơi | 10–20% dân chết (× (1 − y học)). Nước có dịch lây được sang láng giềng và bạn hàng trong 2 lượt (mục 9.5); vừa qua dịch thì miễn dịch 3 lượt nữa | thảo dược: có ≥ 1 thảo dược cho mỗi 10 dân thì số chết giảm một nửa (dùng hết số đó) |
 | Đàn thú di cư | 5% | có ô đồng cỏ | +100 thú săn trên một ô đồng cỏ (một lần, không tái tạo) | — |
 | Mùa bội thu | 5% | mọi nơi | +30% lương thực làm ra trong lượt | — |
 | Cháy rừng | 2% | có ô rừng còn gỗ | ô rừng đó mất 50% gỗ. Lộ đất trồng (chưa có trong engine) | — |
@@ -850,6 +852,29 @@ Mỗi lượt, gói trạng thái (mục 8.2) có thêm:
 - `hordes`: các bộ lạc man di đã nhìn thấy, kèm khoảng cách.
 
 Watcher xem cùng báo cáo đó nhưng đầy đủ (kể cả bộ lạc và quặng mà quốc gia chưa thấy), cùng các lớp phủ bản đồ: mối đe dọa tổng hợp, thú dữ, man di, lũ lụt, giá rét, và trữ lượng từng loại tài nguyên.
+
+### 9.5 Dịch lây và cách ly
+
+Dịch bệnh không dừng ở biên giới. Code ở `src/contagion.ts`, chạy sau phần kinh tế của mọi nước trong lượt (pha 6b).
+
+- **Đang có dịch:** nước bị dịch (tự phát ở 9.2 hoặc bị lây) **lây được** trong 2 lượt: lượt dịch tới và lượt sau. Sau đó **miễn dịch** thêm 3 lượt: trong thời gian đó không bị dịch tự phát hay bị lây lại.
+- **Lây:** mỗi lượt còn lây, nước có dịch có thể truyền dịch sang:
+  - mỗi nước có đất giáp đất mình: 25%
+  - mỗi nước có đoàn buôn đang đi giữa hai bên (chiều nào cũng vậy, kể cả đoàn vừa tới nơi): 15%
+  - mỗi nước vừa họp chợ biên giới với mình trong lượt: 15%
+
+  Mỗi đường bốc thăm riêng (RNG có seed theo lượt và cặp nước); khả năng nhân (1 − y học của bên nhận), tức hiệu ứng `medicine` vừa làm dịch nhẹ hơn vừa che chắn trước dịch của láng giềng. Không đường nào đi qua một nước đang cách ly (bên truyền hay bên nhận). Chỉ những nước có dịch từ đầu pha mới truyền; nước vừa bị lây bắt đầu truyền từ lượt sau.
+- **Bị lây:** như dịch tự phát (9.2): 10–20% dân chết × (1 − y học), thảo dược đủ (1 cho mỗi 10 dân) thì chết một nửa; trẻ em và người già chết trước. Biên niên sử và bản đồ ghi "dịch lan từ X sang Y" (một đường nối hai thủ đô).
+- **`quarantine` (1 AP):** `{"type":"quarantine","turns":1–5}` đóng cửa biên giới từ lượt ra lệnh, trong ngần ấy lượt; `{"type":"quarantine","turns":0}` dỡ ngay. Trong khi cách ly:
+  - dịch không vào, không ra qua biên giới, đoàn buôn hay chợ
+  - chợ biên giới với mọi láng giềng ngừng họp
+  - không gửi, không nhận đề nghị trao đổi; trao đổi tới lúc giao thì thất bại; đoàn buôn tới nơi phải chờ ngoài biên giới
+  - căng thẳng với mỗi láng giềng giáp biên +2 mỗi lượt
+  - ổn định −1 mỗi lượt
+  - nước đang có dịch mà cách ly để giữ dịch trong nhà: uy tín +1 mỗi lượt còn lây
+- **Quan sát:** gói trạng thái có `health` (đang lây tới lượt nào, miễn dịch tới lượt nào, cách ly tới lượt nào) và `plague_nearby` (các nước đã biết đang có dịch, đường nào có thể lây sang mình: `border`, `caravan`, `market`, và họ có đang cách ly không). Cố vấn nhắc khi láng giềng hay bạn hàng có dịch, khi chính mình có dịch, và khi đang cách ly mà quanh mình không còn dịch.
+- Bot cách ly 1–2 lượt (tới khi nước kia hết lây) khi một nước giáp biên hoặc có đoàn buôn với mình đang có dịch và y học của mình dưới 40%; không bao giờ cách ly lâu hơn thế.
+- Watcher chỉnh được khả năng lây qua biên giới, qua đường buôn và căng thẳng mỗi lượt cách ly bằng sắc lệnh luật.
 
 ### 9.3 Kết thúc và xếp hạng
 

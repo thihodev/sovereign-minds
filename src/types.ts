@@ -146,6 +146,11 @@ export interface Nation {
   discontent?: number;
   /** §4.5 a nation founded by a faction that left another */
   origin?: { from: number; tick: number; leader: string };
+  /** §9.5 the last turn this people can pass on the plague it has, the last turn it cannot catch it again,
+   *  and the last turn of its quarantine (all inclusive). */
+  outbreakUntil?: number;
+  immuneUntil?: number;
+  quarantineUntil?: number;
 }
 
 /** §4.5 A faction that wants to leave its nation and found its own, waiting for the Watcher. */

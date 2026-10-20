@@ -12,6 +12,7 @@ import { activeWar, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
+import { quarantined } from "./contagion.ts";
 import type { Nation, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number }
@@ -72,8 +73,8 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     if (traded.has(pairKey(a.id, b.id))) t -= BORDER.tradeCalm;
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;
     const r = rngFor(world.seed, tick, "border", a.id, b.id);
-    // A small market at the border, while the peoples are not too wary of each other
-    if (t < BORDER.marketBelow) {
+    // A small market at the border, while the peoples are not too wary of each other (and neither is in quarantine, §9.5)
+    if (t < BORDER.marketBelow && !quarantined(a, tick) && !quarantined(b, tick)) {
       const sa = spare(world, a).find(([g]) => lacks(b, g)), sb = spare(world, b).find(([g]) => lacks(a, g));
       if (sa && sb) {
         const value = Math.min(BORDER.marketValue, sa[1] * GOOD_VALUE[sa[0]], sb[1] * GOOD_VALUE[sb[0]]);
