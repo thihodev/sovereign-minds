@@ -1674,7 +1674,7 @@
     // a few barycentre sweeps to untangle the edges
     for (let sweep = 0; sweep < 4; sweep++) {
       for (let d = 1; d < cols.length; d++) {
-        const bc = v => { const ps = v.prereqs.filter(p => byId[p]); return ps.length ? ps.reduce((a, p) => a + yOf[p], 0) / ps.length : yOf[v.id]; };
+        const bc = v => { const ps = [...v.prereqs, ...(v.links || [])].filter(p => byId[p]); return ps.length ? ps.reduce((a, p) => a + yOf[p], 0) / ps.length : yOf[v.id]; };
         const key = Object.fromEntries(cols[d].map(v => [v.id, bc(v)]));
         cols[d].sort((a, b) => key[a.id] - key[b.id] || a.id.localeCompare(b.id)); place(cols[d]);
       }
@@ -1682,10 +1682,10 @@
     const xOf = v => PAD + v.depth * (W + GX);
     const width = PAD * 2 + cols.length * W + (cols.length - 1) * GX, height = TOP + PAD + maxLen * (H + GY) - GY;
     let edges = "", nodes = "";
-    for (const v of list) for (const p of v.prereqs) {
-      const u = byId[p]; if (!u) continue;
+    for (const v of list) for (const [p, cap] of [...v.prereqs.map(p => [p, false]), ...(v.links || []).map(p => [p, true])]) {
+      const u = byId[p]; if (!u || u.depth >= v.depth && cap) continue;
       const x1 = xOf(u) + W, y1 = yOf[u.id] + H / 2, x2 = xOf(v), y2 = yOf[v.id] + H / 2, mx = (x1 + x2) / 2;
-      edges += `<path class="edge" data-from="${esc(u.id)}" data-to="${esc(v.id)}" d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}"/>`;
+      edges += `<path class="edge${cap ? " cap" : ""}" data-from="${esc(u.id)}" data-to="${esc(v.id)}" d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}"/>`;
     }
     const dotR = big ? 4.5 : 3.5, dotGap = dotR * 2 + 2.5, maxDots = Math.floor((W - 12) / dotGap);
     for (const v of list) {
@@ -1701,10 +1701,11 @@
       });
       const extra = own.length + res.length - maxDots;
       if (extra > 0) dots += `<text class="more" x="${x + W - 6}" y="${y + H - 6}" text-anchor="end">+${extra}</text>`;
-      nodes += `<g class="node${v.custom ? " custom" : ""}${own.length ? " owned" : ""}" data-id="${esc(v.id)}" tabindex="0" role="img" aria-label="${esc(aria)}">
+      nodes += `<g class="node${v.custom ? " custom" : ""}${v.frame ? " frame" : ""}${own.length ? " owned" : ""}" data-id="${esc(v.id)}" tabindex="0" role="img" aria-label="${esc(aria)}${v.frame ? ", phát minh khung" : ""}">
         <rect x="${x}" y="${y}" width="${W}" height="${H}" rx="6"/>
         ${lines.map((l, k) => `<text class="nm" x="${x + 6}" y="${(y + 4 + fontPx + k * fontPx * 1.25).toFixed(1)}" style="font-size:${fontPx}px">${esc(l)}</text>`).join("")}
         ${v.custom ? `<text class="star" x="${x + W - 5}" y="${y + fontPx + 3}" text-anchor="end" aria-hidden="true">★</text>` : ""}
+        ${v.frame && big ? `<text class="ftag" x="${x + W - 6}" y="${y + H - 7}" text-anchor="end" aria-hidden="true">khung</text>` : ""}
         ${dots}</g>`;
     }
     box.innerHTML = `<svg class="tree" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-label="Cây phát minh: ${list.length} phát minh, ${cols.length} tầng độ sâu">
@@ -1716,9 +1717,9 @@
   function lineage(byId, id) {
     // everything this invention needs, and everything that needs it
     const up = new Set([id]), down = new Set([id]), kids = {};
-    for (const v of Object.values(byId)) for (const p of v.prereqs) (kids[p] ||= []).push(v.id);
+    for (const v of Object.values(byId)) for (const p of [...v.prereqs, ...(v.links || [])]) (kids[p] ||= []).push(v.id);
     const walk = (set, next) => { const st = [id]; while (st.length) { const x = st.pop(); for (const y of next(x)) if (!set.has(y)) { set.add(y); st.push(y); } } };
-    walk(up, x => byId[x]?.prereqs || []); walk(down, x => kids[x] || []);
+    walk(up, x => [...(byId[x]?.prereqs || []), ...(byId[x]?.links || [])]); walk(down, x => kids[x] || []);
     return new Set([...up, ...down]);
   }
   function wireTree(box, byId, owners, researching) {
@@ -1730,10 +1731,11 @@
       for (const e of svg.querySelectorAll(".edge")) e.classList.toggle("hl", keep.has(e.dataset.from) && keep.has(e.dataset.to));
       g.classList.add("cur");
       const own = owners[id] || [], res = researching[id] || [], first = S.registry?.[id];
-      tip.innerHTML = `<b></b>${v.custom ? ` <span class="pill warn">do các nước tạo</span>` : ""}
+      tip.innerHTML = `<b></b>${v.custom ? ` <span class="pill warn">do các nước tạo</span>` : ""}${v.frame ? ` <span class="pill">khung kỷ nguyên</span>` : ""}
         <div class="meta">${esc(id)} · độ sâu ${v.depth}${v.rp ? ` · ${v.rp} RP` : " · khởi đầu"}${v.caps.length ? ` · năng lực ${esc(v.caps.join(", "))}` : ""}</div>
         <p class="desc"></p>
         ${v.prereqs.length ? `<div class="meta">Cần: ${esc(v.prereqs.map(p => byId[p]?.name ?? p).join(", "))}</div>` : ""}
+        ${v.needsCaps?.length ? `<div class="meta">Cần năng lực: ${esc(v.needsCaps.join(", "))}, từ bất kỳ phát minh nào (${esc((v.links || []).map(p => byId[p]?.name ?? p).join(", ") || "chưa ai có")}). Nước đã có mọi năng lực mà khung này mang lại thì không cần học nó.</div>` : ""}
         <div class="meta">${own.length ? `Đã có: ${own.map(n => `<span class="sw" style="background:${esc(n.flag.colors[0])}"></span>${esc(nationName(n))}`).join(", ")}` : "Chưa ai có"}</div>
         ${res.length ? `<div class="meta">Đang nghiên cứu: ${esc(res.map(nationName).join(", "))}</div>` : ""}
         ${v.custom && v.by !== null ? `<div class="meta">Phát minh bởi ${esc(nm(v.by))}</div>` : first ? `<div class="meta">Đầu tiên: ${esc(first.by.map(nm).join(", "))} · lượt ${first.tick}</div>` : ""}`;

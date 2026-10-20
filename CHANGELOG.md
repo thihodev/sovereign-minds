@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Khung bám theo tiến trình thật:**
+  - Tiên quyết của khung giờ là **năng lực**, có được từ bất kỳ phát minh nào. Nước đã tự phát minh ra luyện đồng thì học Rèn sắt ngay, không phải học lại khung.
+  - Khung mà một nước đã có đủ năng lực thì ẩn với nước đó.
+  - Hai khung đổi tên để khỏi trùng với phát minh các nước đã tạo: "Nấu đồng từ quặng", "Rèn sắt từ quặng".
+  - Cây phát minh vẽ khung bằng viền chấm, có nhãn "khung", và nối với phát minh cung cấp năng lực bằng nét đứt.
 - **Chỉ tiêu nhịp độ (`tools/pace.ts`):** chạy nhiều thế giới bot và báo ✓/✗ theo các chỉ tiêu:
   - lượt đầu tiên vào Đồ Đá Mới 50–160, vào Đồ Đồng 150–380
   - dân trung vị lượt 300: 100–300; điểm định cư trung vị 1–5

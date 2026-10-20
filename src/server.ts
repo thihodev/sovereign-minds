@@ -136,9 +136,12 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (path === "/api/state") return send(res, 200, statePayload());
       if (path === "/api/inventions") {
         const w = runner.world;
-        return send(res, 200, allInventions(w).map(v => ({
+        const all = allInventions(w), giving = (cap: string) => all.filter(x => x.caps.includes(cap)).map(x => x.id);
+        return send(res, 200, all.map(v => ({
           id: v.id, name: v.name, prereqs: v.prereqs, depth: depthOf(w, v.id), caps: v.caps, custom: !!v.custom, by: v.custom?.by ?? null,
           rp: v.rp, desc: v.custom?.description || v.desc,
+          // §5.6 a frame invention needs capabilities, from whichever invention gives them
+          frame: v.frameDepth !== undefined, needsCaps: v.needsCaps ?? [], links: [...new Set((v.needsCaps ?? []).flatMap(giving))].filter(id => id !== v.id),
         })));
       }
       if (path === "/api/tile") {

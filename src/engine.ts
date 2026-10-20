@@ -347,8 +347,22 @@ export function envOk(world: World, n: Nation, id: string): boolean {
   return true;
 }
 
+/** What still stands between a nation and studying an invention, in words; [] when it can (§5.5, §5.6). */
+export function missingFor(world: World, n: Nation, id: string, caps: Set<string> = mods(world, n).caps): string[] {
+  const v = inv(world, id); if (!v) return ["không có trong Sổ"];
+  return [...v.prereqs.filter(p => !n.inventions.includes(p)).map(p => invName(world, p)), ...(v.needsCaps ?? []).filter(c => !caps.has(c)).map(c => `năng lực ${c}`)];
+}
+/** A frame invention (§5.6) is no use to a nation that already holds every capability it gives. */
+function redundant(v: { caps: string[]; frameDepth?: number }, caps: Set<string>): boolean {
+  return v.frameDepth !== undefined && v.caps.length > 0 && v.caps.every(c => caps.has(c));
+}
+export function canStudy(world: World, n: Nation, id: string, caps: Set<string> = mods(world, n).caps): boolean {
+  const v = inv(world, id);
+  return !!v && !n.inventions.includes(id) && !redundant(v, caps) && !missingFor(world, n, id, caps).length && envOk(world, n, id);
+}
 export function researchOptions(world: World, n: Nation): string[] {
-  return allInventions(world).filter(v => !n.inventions.includes(v.id) && v.prereqs.every(p => n.inventions.includes(p)) && envOk(world, n, v.id)).map(v => v.id);
+  const caps = mods(world, n).caps;
+  return allInventions(world).filter(v => canStudy(world, n, v.id, caps)).map(v => v.id);
 }
 
 // ---------------------------------------------------------------- flags & names
@@ -522,7 +536,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       const v = inv(world, id)!;
       say(n.id, "invention", `Trọng tài công nhận phát minh "${v.name}" của ${n.name} (độ sâu ${v.custom!.depth}, ${baseCost(world, id)} RP). ${r.reason}`);
       n.lastEvents.push(`Đơn phát minh "${p.name}" được duyệt thành ${id}${v.prereqs.length > p.prereqs.length ? " (trọng tài thêm tiên quyết)" : ""}. ${n.research ? "Chọn research để bắt đầu." : "Bắt đầu nghiên cứu ngay, được giảm 20% RP."}`);
-      if (!n.research && v.prereqs.every(x => n.inventions.includes(x)) && envOk(world, n, id)) n.research = { id, progress: 0 };
+      if (!n.research && canStudy(world, n, id)) n.research = { id, progress: 0 };
     } else if (p.inventionId) { // applyRuling marked it a duplicate of an invention already in the book
       n.lastEvents.push(`Đơn "${p.name}" trùng với ${invName(world, p.inventionId!)} (${p.inventionId}) đã có trong Sổ.${studyInstead(world, n, p.inventionId!)}`);
     } else {
@@ -990,7 +1004,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
 function studyInstead(world: World, n: Nation, id: string): string {
   const v = inv(world, id); if (!v) return "";
   if (n.inventions.includes(id)) return " Bạn đã có nó.";
-  if (!v.prereqs.every(p => n.inventions.includes(p))) return ` Cần trước: ${v.prereqs.filter(p => !n.inventions.includes(p)).map(p => invName(world, p)).join(", ")}.`;
+  const missing = missingFor(world, n, id);
+  if (missing.length) return ` Cần trước: ${missing.join(", ")}.`;
   if (!envOk(world, n, id)) return " Đất của bạn chưa đủ điều kiện để làm nó.";
   if (n.research && n.research.id !== id) return ` Nghiên cứu nó bằng research ${id} khi xong dự án hiện tại.`;
   if (!n.research) n.research = { id, progress: 0 };
@@ -1317,8 +1332,9 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const v = inv(world, id);
       if (!v) return `Không có phát minh "${id}" trong Sổ`;
       if (n.inventions.includes(id)) return `Đã có ${v.name}`;
-      const missing = v.prereqs.filter(p => !n.inventions.includes(p));
-      if (missing.length) return `Thiếu tiên quyết: ${missing.map(p => invName(world, p)).join(", ")}`;
+      const missing = missingFor(world, n, id);
+      if (missing.length) return `Thiếu tiên quyết: ${missing.join(", ")}`;
+      if (redundant(v, mods(world, n).caps)) return `Bạn đã có mọi năng lực mà ${v.name} mang lại (${v.caps.join(", ")}) từ phát minh của mình`;
       if (!envOk(world, n, id)) return `Lãnh thổ chưa có điều kiện vật chất cho ${v.name}`;
       if (n.research?.id === id) return null;
       const kept = n.research ? n.research.progress * 0.5 : 0; // switching loses half (§5.5)
@@ -1332,7 +1348,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!check.ok) {
         if (check.duplicateOf) {
           const v = inv(world, check.duplicateOf)!;
-          if (!n.inventions.includes(v.id) && v.prereqs.every(p => n.inventions.includes(p)) && envOk(world, n, v.id) && !n.research) { n.research = { id: v.id, progress: 0 }; n.lastEvents.push(`${v.name} đã có trong Sổ; chuyển thành dự án nghiên cứu ${v.id}.`); return null; }
+          if (canStudy(world, n, v.id) && !n.research) { n.research = { id: v.id, progress: 0 }; n.lastEvents.push(`${v.name} đã có trong Sổ; chuyển thành dự án nghiên cứu ${v.id}.`); return null; }
         }
         return check.error;
       }

@@ -49,6 +49,7 @@ export function depthOf(world: World, id: string): number {
   if (memo.has(id)) return memo.get(id)!;
   const v = inv(world, id); if (!v) return 0;
   if (v.custom) { memo.set(id, v.custom.depth); return v.custom.depth; }
+  if (v.frameDepth !== undefined) { memo.set(id, v.frameDepth); return v.frameDepth; }
   const d = v.prereqs.length ? 1 + Math.max(...v.prereqs.map(p => depthOf(world, p))) : 0;
   memo.set(id, d); return d;
 }

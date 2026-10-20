@@ -477,7 +477,7 @@ Thế giới có 10 kỷ nguyên, từ đồ đá tới tên lửa. Kỷ nguyên
 
 **Giá phát minh mở** (mục 5.3): 15 × g(d) × (1 + sức mạnh/10), với g(d) = 1,4^d tới độ sâu 8, sau đó tăng tuyến tính 15% của 1,4^8 mỗi bậc. Nhờ vậy ý tưởng sâu vẫn đắt nhưng còn với tới được.
 
-- **Khung phát minh (K1–K24):** mỗi năng lực ở cổng kỷ nguyên có một phát minh sẵn trong Sổ, nối thành chuỗi từ Lò nung nhiệt cao (độ sâu 3), Luyện đồng, Chữ viết, Luật pháp, Thép, Thuốc súng, Hàng hải viễn dương, Máy hơi nước, Điện, tới Hàng không và Tên lửa (độ sâu 13). Giá gấp 1,5 lần một phát minh mở cùng độ sâu với 6 điểm sức mạnh; hiệu ứng nhỏ. Khung giữ cho thế giới không bao giờ kẹt; phát minh do quốc gia tự tạo mà đạt được năng lực đó vẫn rẻ hơn và mạnh hơn.
+- **Khung phát minh (K1–K24):** tiên quyết của khung là các **năng lực** (có được từ bất kỳ phát minh nào, kể cả phát minh tự tạo), cộng vài phát minh gốc. Khung mà quốc gia đã có đủ năng lực thì không hiện trong lựa chọn nghiên cứu của nước đó. Mỗi năng lực ở cổng kỷ nguyên có một phát minh sẵn trong Sổ, nối thành chuỗi từ Lò nung nhiệt cao (độ sâu 3), Luyện đồng, Chữ viết, Luật pháp, Thép, Thuốc súng, Hàng hải viễn dương, Máy hơi nước, Điện, tới Hàng không và Tên lửa (độ sâu 13). Giá gấp 1,5 lần một phát minh mở cùng độ sâu với 6 điểm sức mạnh; hiệu ứng nhỏ. Khung giữ cho thế giới không bao giờ kẹt; phát minh do quốc gia tự tạo mà đạt được năng lực đó vẫn rẻ hơn và mạnh hơn.
 
 ### 5.7 Chống lách luật phát minh
 

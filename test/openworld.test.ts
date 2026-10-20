@@ -130,3 +130,18 @@ test("the engine catches a duplicate invention by itself and studies the one in 
   assert.equal(p.ruling?.judge, "Engine");
   assert.equal(b.research?.id, id, "it studies the invention in the book");
 });
+
+test("the frame follows the world: capabilities from a nation's own inventions open it", async () => {
+  const { researchOptions, canStudy, missingFor } = await import("../src/engine.ts");
+  const w = founded("frame");
+  const n = w.nations[0];
+  assert.match(missingFor(w, n, "K4").join(" "), /luyện-đồng/);
+  // the nation smelts copper its own way
+  grant(w, n, ["luyện-đồng"]);
+  assert.ok(canStudy(w, n, "K4"), "iron is open to anyone who holds luyện-đồng");
+  assert.ok(!researchOptions(w, n).includes("K3"), "the frame's copper is no use to it");
+  turn(w, { actions: [{ type: "research", invention: "K3" }] });
+  assert.match(n.lastRejected[0].reason, /đã có mọi năng lực|Thiếu tiên quyết/);
+  turn(w, { actions: [{ type: "research", invention: "K4" }] });
+  assert.equal(n.research?.id, "K4", JSON.stringify(n.lastRejected));
+});
