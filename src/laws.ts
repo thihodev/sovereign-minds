@@ -3,7 +3,7 @@
 // numbers in its rules). The values live in the world (its decrees), so a replay or a restart gives the
 // same world; applyLaws() writes them into the rule tables before anything reads them.
 
-import { BORDER, CONNECT, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
+import { BORDER, CONNECT, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, PROVINCE, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR } from "./rules.ts";
 import type { World } from "./types.ts";
 
 export interface LawDef {
@@ -35,6 +35,9 @@ export const LAWS: LawDef[] = [
   { key: "tiles.perSettlement", group: "Đất đai", label: "Giới hạn ô thêm mỗi điểm định cư", desc: "", unit: "ô", min: 0, max: 20, step: 1, ...field(TILES, "perSettlement") },
   { key: "connect.isolatedYield", group: "Đất đai", label: "Đất của điểm định cư cô lập nộp về kho", desc: "Phần sản lượng về được kho khi điểm định cư không có đường bộ, đường thủy hay lối đi bộ về thủ đô.", unit: "", min: 0, max: 1, step: 0.05, ...field(CONNECT, "isolatedYield") },
   { key: "connect.walk", group: "Đất đai", label: "Lối đi bộ tối đa giữa hai trung tâm", desc: "Hai trung tâm cách nhau tối đa chừng này ô qua đất của mình thì coi như nối nhau.", unit: "ô", min: 1, max: 20, step: 1, ...field(CONNECT, "walk") },
+  { key: "province.far", group: "Đất đai", label: "Tỉnh xa thủ đô cần bá tước từ", desc: "Tỉnh có trung tâm cách thủ đô hơn chừng này ô mà không có bá tước trung thành thì bất ổn dần.", unit: "ô", min: 2, max: 20, step: 1, ...field(PROVINCE, "far") },
+  { key: "province.calm", group: "Đất đai", label: "Bá tước làm dịu tỉnh mỗi bậc tay nghề", desc: "Bất ổn của tỉnh giảm chừng này mỗi lượt cho mỗi bậc tay nghề của bá tước trung thành.", unit: "", min: 0, max: 5, step: 0.25, ...field(PROVINCE, "calm") },
+  { key: "province.yield", group: "Đất đai", label: "Sản lượng thêm của tỉnh có bá tước, mỗi bậc", desc: "Đất của tỉnh có bá tước trung thành cho thêm chừng này phần sản lượng mỗi bậc tay nghề.", unit: "", min: 0, max: 0.1, step: 0.01, ...field(PROVINCE, "yield") },
   { key: "sea.limitWeight", group: "Đất đai", label: "Ô biển tính bằng bao nhiêu ô đất", desc: "Trọng số của một ô lãnh hải trong giới hạn quản lý.", unit: "ô", min: 0, max: 1, step: 0.05, ...field(SEA, "limitWeight") },
   { key: "roads.tilesPerLimit", group: "Đất đai", label: "Số ô đường để thêm 1 ô quản lý", desc: "", unit: "ô đường", min: 1, max: 20, step: 1, ...field(ROADS, "tilesPerLimit") },
   { key: "growth.rate", group: "Dân số", label: "Tốc độ tăng dân", desc: "Phần tăng logistic mỗi lượt: dân × tốc độ × (1 − dân/chỗ ở).", unit: "", min: 0, max: 0.3, step: 0.01, ...field(GROWTH, "rate") },

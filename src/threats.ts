@@ -105,7 +105,9 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   if (held > limit) add("overreach", 2, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10). Đường nối các trung tâm nâng giới hạn.`);
   // §4.5 a faction may leave
   const faction = (world.schisms ?? []).find(x => x.from === n.id && (x.status === "pending" || x.status === "approved" || x.status === "asking"));
-  if (faction) add("schism", 3, "Ly khai", `${faction.people} người theo ${faction.leader} muốn bỏ đi lập quốc riêng vì ${faction.grievance}; nếu các vị thần cho phép, họ mang theo ~${Math.round(faction.share * 100)}% dân và kho.`);
+  if (faction) add("schism", 3, "Ly khai", faction.province !== undefined
+    ? `Tỉnh ${faction.provinceName} (${faction.people} người) theo ${faction.leader} muốn tách ra lập quốc riêng vì ${faction.grievance}; nếu các vị thần cho phép, tỉnh mang theo đất đai, công trình trên đó, người sống ở đó và phần kho tương ứng.`
+    : `${faction.people} người theo ${faction.leader} muốn bỏ đi lập quốc riêng vì ${faction.grievance}; nếu các vị thần cho phép, họ mang theo ~${Math.round(faction.share * 100)}% dân và kho.`);
   else if ((n.discontent ?? 0) >= 40) add("discontent", (n.discontent ?? 0) >= 75 ? 3 : 2, "Bất mãn", `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 (với ${SCHISM.minPop}+ dân) một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} để nó nguội đi; tránh nạn đói, nội loạn và đất quá rộng.`);
   if (n.stability < 30) add("unrest", n.stability < 15 ? 3 : 2, "Bất ổn", `Ổn định ${n.stability}: dưới 30 sản xuất −25%, dưới 15 dân bỏ đi, về 0 thì nội loạn.`);
   const roof = housing(world, n);

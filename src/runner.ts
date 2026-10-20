@@ -549,7 +549,7 @@ export class Runner {
     const factions = (w.schisms ?? []).filter(x => x.status === "pending" || x.status === "asking");
     if (factions.length) {
       lines.push("Phái xin ly khai (chờ Watcher, hoặc đang xin sang nước khác):");
-      for (const x of factions) lines.push(`- #${x.id} từ ${w.nations[x.from]?.name}, lượt ${x.tick}: ${x.people} người theo ${x.leader}, vì ${x.grievance}; ${x.status === "pending" ? `còn ${Math.max(0, SCHISM.waitTicks - (w.tick - x.tick))} lượt để Watcher quyết` : `đang xin sang ${w.nations[x.to!]?.name}`}`);
+      for (const x of factions) lines.push(`- #${x.id} từ ${w.nations[x.from]?.name}, lượt ${x.tick}: ${x.people} người theo ${x.leader}${x.province !== undefined ? ` (tỉnh ${x.provinceName}, đi cùng đất của tỉnh)` : ""}, vì ${x.grievance}; ${x.status === "pending" ? `còn ${Math.max(0, SCHISM.waitTicks - (w.tick - x.tick))} lượt để Watcher quyết` : `đang xin sang ${w.nations[x.to!]?.name}`}`);
     }
     const pend = w.petitions.filter(p => p.status === "pending");
     if (pend.length) {
