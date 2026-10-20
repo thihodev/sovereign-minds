@@ -324,6 +324,39 @@ export interface Invention {
   custom?: { by: number; tick: number; depth: number; power: number; description: string; judge: string };
 }
 
+/** The cost of a frame invention at its depth: 1.5 × a nation's own invention of that depth with 6 power points (catalog.costFor). */
+function frameRp(depth: number): number {
+  const g = depth <= 8 ? Math.pow(1.4, depth) : Math.pow(1.4, 8) * (1 + 0.15 * (depth - 8));
+  return Math.ceil(1.5 * 15 * g * 1.6 / 5) * 5;
+}
+// [id, name, prerequisites, depth (from the prerequisites), capabilities, effects, description]
+const FRAME: Array<[string, string, string[], number, string[], Invention["effects"], string]> = [
+  ["K1", "Lò nung nhiệt cao", ["P13", "P2"], 3, ["nhiệt-cao"], { role: { craft: 0.05 } }, "Lò đất có ống thổi đạt nhiệt đủ nung chảy quặng."],
+  ["K2", "Nhận biết quặng", ["P10", "P12"], 3, ["nhận-biết-khoáng"], {}, "Biết màu, vân và sức nặng của đá chứa kim loại; thấy được quặng đồng, thiếc, sắt."],
+  ["K3", "Luyện đồng", ["K1", "K2"], 4, ["luyện-đồng"], { role: { mine: 0.1 } }, "Nấu quặng đồng trong lò nhiệt cao, đúc công cụ đồng."],
+  ["K4", "Luyện sắt", ["K3"], 5, ["luyện-sắt"], { combat: 0.05 }, "Lò rèn đủ nóng để khử quặng sắt, rèn thành công cụ và vũ khí."],
+  ["K5", "Chữ viết", ["P12", "P18"], 4, ["chữ-viết"], { rp: 0.05 }, "Ký hiệu thành chữ ghi được lời nói, sổ sách và luật."],
+  ["K6", "Tiền tệ", ["P18", "K3"], 5, ["tiền-tệ"], { transport: 0.05 }, "Thỏi kim loại có dấu làm vật ngang giá cho mọi cuộc trao đổi."],
+  ["K7", "Luật pháp", ["K5", "P4"], 5, ["luật-pháp"], { stabilityPerTick: 0.5 }, "Luật thành văn và người phân xử chung."],
+  ["K8", "Thép", ["K4", "K1"], 6, ["thép"], { combat: 0.05 }, "Sắt nung với than và tôi trong nước, cứng và dẻo hơn."],
+  ["K9", "Cối xay nước", ["P14", "K4"], 6, ["cối-xay"], { role: { farm: 0.1 } }, "Bánh xe nước quay cối đá xay hạt."],
+  ["K10", "Thành lũy đá", ["K7", "K4"], 6, ["thành-lũy"], { combat: 0.05 }, "Tường đá dày có tháp canh quanh các trung tâm."],
+  ["K11", "Khoáng học", ["K2", "K5"], 5, [], { reveal: ["sulfur", "coal"] }, "Ghi chép các loại đá và mỏ; thấy được lưu huỳnh và than đá."],
+  ["K12", "In ấn", ["K5", "K8"], 7, ["in-ấn"], { rp: 0.1 }, "Khuôn chữ kim loại in sách hàng loạt."],
+  ["K13", "Thuốc súng", ["K8", "K11"], 7, ["thuốc-súng"], { combat: 0.1 }, "Lưu huỳnh, than và diêm tiêu trộn thành chất nổ."],
+  ["K14", "Hàng hải viễn dương", ["P16", "K8", "K5"], 7, ["hàng-hải-viễn-dương"], { move: ["ocean"] }, "Tàu thân gỗ khung thép, la bàn và hải đồ vượt biển sâu."],
+  ["K15", "Luyện cốc", ["K11", "K8"], 7, ["luyện-cốc"], { role: { mine: 0.05 } }, "Nung than đá thành than cốc cho lò cao."],
+  ["K16", "Máy hơi nước", ["K15", "K12"], 8, ["máy-hơi-nước"], { role: { craft: 0.1 } }, "Nồi hơi thép đốt than đẩy piston."],
+  ["K17", "Đường sắt", ["K16", "K8"], 9, ["đường-sắt"], { transport: 0.2 }, "Đầu máy hơi nước chạy trên ray thép."],
+  ["K18", "Điện", ["K16", "K3"], 9, ["điện"], { rp: 0.1 }, "Máy phát quay bằng hơi nước, dây đồng dẫn điện."],
+  ["K19", "Thăm dò dầu mỏ", ["K16", "K11"], 9, [], { reveal: ["oil"] }, "Khoan sâu tìm dầu dưới đất; thấy được dầu mỏ."],
+  ["K20", "Lọc dầu", ["K19", "K15"], 10, ["lọc-dầu"], {}, "Chưng cất dầu thô thành nhiên liệu."],
+  ["K21", "Động cơ đốt trong", ["K20", "K8"], 11, ["động-cơ-đốt-trong"], { transport: 0.1 }, "Nhiên liệu cháy trong xi lanh, nhỏ và mạnh hơn máy hơi nước."],
+  ["K22", "Vô tuyến", ["K18", "K12"], 10, ["vô-tuyến"], { explore: 4 }, "Sóng điện từ truyền tin không cần dây."],
+  ["K23", "Hàng không", ["K21", "K18"], 12, ["hàng-không"], { explore: 6, transport: 0.1 }, "Khung nhẹ, cánh và động cơ đưa người lên trời."],
+  ["K24", "Tên lửa", ["K23", "K13"], 13, ["tên-lửa"], { range: 2 }, "Nhiên liệu đẩy phản lực ra khỏi khí quyển."],
+];
+
 export const INVENTIONS: Invention[] = [
   { id: "fire", name: "Lửa", prereqs: [], rp: 0, caps: ["lửa"], effects: {}, desc: "Giữ và tạo lửa." },
   { id: "stone_tools", name: "Công cụ đá thô", prereqs: [], rp: 0, caps: ["ghè-đá"], effects: { unlocks: ["workshop", "pit", "stone_tool"] }, desc: "Ghè đá thành công cụ đơn giản." },
@@ -347,6 +380,10 @@ export const INVENTIONS: Invention[] = [
   { id: "P16", name: "Thuyền độc mộc", prereqs: ["P10", "fire"], rp: 90, caps: ["đi-nước"], effects: { role: { fish: 0.2 } }, desc: "Đi trên sông, biển ven bờ; đánh cá +20%." },
   { id: "P17", name: "Dệt", prereqs: ["P3", "P14"], rp: 100, caps: ["dệt"], effects: { unlocks: ["cloth"] }, desc: "Dệt vải." },
   { id: "P18", name: "Đếm", prereqs: ["P12", "P14"], rp: 100, caps: ["đếm"], effects: { ap: 1 }, desc: "+1 AP; sai số ước lượng tình báo giảm một nửa." },
+  // §5.6 The frame of the open world: one plain invention for each capability an era gate asks for, so the
+  // world can always go on. They cost half again what a nation's own invention of that depth would, and do
+  // little besides the capability: an invention of one's own is cheaper and stronger.
+  ...FRAME.map(([id, name, prereqs, depth, caps, effects, desc]) => ({ id, name, prereqs, rp: frameRp(depth), caps, effects, desc })),
 ];
 export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INVENTIONS.map(v => [v.id, v]));
 

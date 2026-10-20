@@ -277,7 +277,9 @@ export function nearDuplicate(world: World, p: { name: string; description: stri
     const vSig = effectKeys(v.effects as unknown as Record<string, unknown>), sameDoing = sig.size > 0 && sameSet(sig, vSig);
     const capsDoing = p.caps.length > 0 && sameSet(new Set(p.caps), new Set(v.caps)) && sameDoing;
     let why = "", score = 0;
+    const frame = /^K\d+$/.test(v.id); // a frame invention (§5.6) is only matched by name: a nation's own way to its capability is welcome
     if (nameMatch && (sameDoing || sig.size === 0 || textSim >= 0.4)) { why = `cùng tên gọi "${v.name}"`; score = 2 + textSim; }
+    else if (frame) continue;
     else if (capsDoing) { why = "cùng năng lực và cùng hiệu ứng"; score = 1.5 + textSim; }
     else if (sameDoing && textSim >= 0.6) { why = `cùng hiệu ứng, mô tả giống ${Math.round(textSim * 100)}%`; score = 1 + textSim; }
     if (score && (!best || score > best.score || (score === best.score && v.id < best.id))) best = { id: v.id, why, score };

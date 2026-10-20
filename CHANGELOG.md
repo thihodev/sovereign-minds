@@ -4,6 +4,9 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.6 (đang làm)
 
+- **Khung phát minh của thế giới mở (§5.6):** 24 phát minh sẵn có (K1–K24, từ Lò nung nhiệt cao, Luyện đồng, Chữ viết… tới Máy hơi nước, Điện, Hàng không, Tên lửa), mỗi cái cho một năng lực ở cổng kỷ nguyên.
+  - Giá gấp 1,5 lần một phát minh tự tạo cùng độ sâu, nên phát minh do các nước tự tạo vẫn rẻ và mạnh hơn. Nhưng thế giới không bao giờ kẹt hẳn.
+  - Bot giờ cũng lên được Đồ Đồng.
 - **Cố vấn (§8.2):** gói trạng thái của mỗi nước mở đầu bằng `advice`, do engine tính từ chính luật: điều gì đang chặn họ và làm gì được ngay, kèm con số.
   - Ví dụ: hết chỗ ở thì mở thêm bằng cách nào, thiếu gì để lập định cư hay sang kỷ nguyên mới, thiếu nước, vượt giới hạn đất, bất mãn, đang hạn chế sinh khi dân ít, chưa nghiên cứu gì.
   - Hồ sơ quốc gia hiện phần cố vấn này. Prompt rút gọn phần nguy hiểm vì `threats` đã có số liệu.
