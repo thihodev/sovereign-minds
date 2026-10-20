@@ -2,7 +2,25 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.7 (đang làm)
+## v0.8 (đang làm)
+
+- **Dịch lây giữa các nước, và cách ly (§9.5).**
+  - Một nước có dịch thì lây được trong 2 lượt:
+    - sang láng giềng giáp đất: 25%
+    - sang nước có đoàn buôn qua lại: 15%
+    - sang nước cùng họp chợ biên giới: 15%
+
+    Khả năng lây giảm theo y học của nước nhận. Sau đợt dịch có 3 lượt miễn nhiễm.
+  - **Hành động `quarantine` (1 AP, 1–5 lượt; 0 lượt để kết thúc sớm):**
+    - không nhận và không truyền dịch
+    - chợ biên giới tạm đóng, không buôn bán, đoàn buôn tới phải chờ ở biên giới
+    - căng thẳng với mọi láng giềng +2 mỗi lượt, ổn định −1 mỗi lượt
+    - nước đang có dịch mà tự cách ly được +1 uy tín mỗi lượt
+  - AI thấy tình trạng dịch của mình và dịch đang ở gần (`plague_nearby`); cố vấn gợi ý khi nào nên cách ly. Bot tự cách ly khi láng giềng có dịch mà mình ít y học.
+  - Bản đồ vẽ đường lây dịch 🦠, dải tin báo "dịch lan từ X sang Y". Hồ sơ quốc gia có nhãn đang có dịch / đang cách ly.
+  - Vắc-xin để các nước tự phát minh, qua hiệu ứng y học.
+
+## v0.7
 
 
 - **Lãnh thổ liên thông (§2.7):** hàng chỉ về được kho theo một lối: đi bộ qua đất của mình tối đa 6 ô, đường sá, hoặc đường thủy giữa hai bến thuyền.
