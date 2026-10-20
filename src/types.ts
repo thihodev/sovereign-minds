@@ -151,6 +151,8 @@ export interface Nation {
   outbreakUntil?: number;
   immuneUntil?: number;
   quarantineUntil?: number;
+  /** §2.8 each province's unrest 0–100, by its centre tile (absent = 0) */
+  provinceUnrest?: Record<string, number>;
 }
 
 /** §4.5 A faction that wants to leave its nation and found its own, waiting for the Watcher. */
@@ -161,8 +163,11 @@ export interface Schism {
   /** Share of the people that goes, and how many that was when it formed. */
   share: number;
   people: number;
-  /** Where they mean to settle. */
+  /** Where they mean to settle (a province faction: its centre). */
   site: number;
+  /** §2.8 a province that wants to leave with its land: its centre tile and name */
+  province?: number;
+  provinceName?: string;
   leader: string;
   grievance: string;
   /** pending → approved → done (a new nation); or refused/expired → asking another nation → emigrated, or returned home */

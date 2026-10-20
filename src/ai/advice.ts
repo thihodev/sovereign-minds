@@ -3,9 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, BORDER, CONNECT, CONTAGION, HAMLET, ROADS, SCHISM, SETTLEMENT } from "../rules.ts";
+import { AP_COST, BORDER, CONNECT, CONTAGION, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
+import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
@@ -80,6 +81,20 @@ export function advice(world: World, n: Nation): Advice[] {
     const st = n.settlements.find(x => x.tile === c); if (!st) continue;
     const path = roadPlan(world, n, c, 1);
     say(2, `Điểm định cư ${st.name} bị cô lập (không đường bộ, đường thủy hay lối đi bộ ≤ ${CONNECT.walk} ô về thủ đô): đất quanh đó chỉ nộp ${CONNECT.isolatedYield * 100}% về kho và bất mãn +${CONNECT.isolatedDiscontent} mỗi lượt. ${path.length ? `Làm đường: build_road ${path.length} ô, bắt đầu ${path.slice(0, 4).map(xy).join(" ")}` : "Không tìm được lối đất để làm đường: dùng Bến thuyền ở cả hai nơi, hoặc chiếm đất nối liền"}.`);
+  }
+
+  // Provinces (§2.8): the restless or ungoverned ones, the worst two
+  if (n.settlements.length) {
+    const court = n.officials ?? [], slots = maxOfficials(world, n);
+    const bad = provinces(world, n).filter(p => !p.capital && (p.mood >= 20 || p.causes.length)).sort((a, b) => b.mood - a.mood || b.people - a.people).slice(0, 2);
+    for (const p of bad) {
+      const fix: string[] = [];
+      if (!p.loyal) fix.push(p.governor ? `thưởng cho bá tước ${p.governor.name} (trung thành ${p.governor.loyalty}, dưới ${OFFICIALS.idle} thì không làm việc; reward_official)` : `bổ nhiệm bá tước giữ ${xy(p.centre)} (appoint_official governor, seat ${xy(p.centre)}${court.length >= slots ? "; đã đủ chỗ quan chức: bãi bớt một người" : ""}): mỗi bậc tay nghề −${PROVINCE.calm} bất ổn và +${PROVINCE.yield * 100}% sản lượng`);
+      if (p.causes.includes("cut_off")) fix.push("làm đường về thủ đô");
+      if (p.causes.includes("crowded")) fix.push("thêm chỗ ở");
+      const why = p.causes.map(c => CAUSE_VI[c]).join(", ");
+      say(p.mood >= PROVINCE.secede ? 3 : p.mood >= 20 ? 2 : 1, `Tỉnh ${p.name} (${p.people} dân, ${p.tiles.length} ô) bất ổn ${Math.round(p.mood)}/100${why ? `, đang tăng vì ${why}` : ""}.${p.mood >= PROVINCE.secede ? " Khi bất mãn cả nước tới 100, tỉnh này sẽ đòi tách ra cùng đất đai." : ""}${fix.length ? ` Nên ${fix.join("; ")}.` : ""}`);
+    }
   }
 
   // Neighbours (§7.9): the borders that need a decision

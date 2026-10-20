@@ -445,3 +445,5 @@ ul.advice li.lv1 { border-color: var(--accent); }
 .tension { font-weight: 700; color: var(--muted); }
 .tension.warm { color: var(--warn); }
 .tension.hot { color: var(--bad); }
+/* §2.8 provinces in the nation profile */
+.card2.province .bar.discontent { margin: 6px 0 2px; }

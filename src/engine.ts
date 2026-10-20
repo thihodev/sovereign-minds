@@ -17,6 +17,7 @@ import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
+import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
 import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
@@ -224,14 +225,16 @@ export function growthFor(pop: number, roof: number): number {
 /** §4.2 housing buildings allowed: HOUSING.perCentre per centre, plus what eras and inventions add per centre. */
 export function housingSlots(n: Nation, world?: World): number { return (HOUSING.perCentre + (world ? mods(world, n).housingSlots : 0)) * (1 + n.settlements.length); }
 export function isHousing(world: World, type: string): boolean { return (buildingOf(world, type)?.effect.housing || 0) > 0; }
+/** §4.2 The families a land tile (not a centre) houses: by terrain, one more on a river. */
+export function hamletRoom(t: Tile): number { return (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0); }
 /** §4.2 Where the people live: the capital's natural shelter, settlements, housing buildings, hamlets on the land, the cave. */
-export function housingParts(world: World, n: Nation): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number } {
+export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number } {
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
   const buildings = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
     .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
   const hubs = new Set(centres(n)), hamletMax = HAMLET.max + HAMLET.perEra * eraIndex(n);
   let hamlets = 0;
-  for (const t of world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0);
+  for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += hamletRoom(t);
   return { natural: START.naturalHousing, settlements: n.settlements.length * SETTLEMENT.housing, buildings, hamlets: Math.min(hamletMax, hamlets), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0 };
 }
 export function housing(world: World, n: Nation): number {
@@ -1010,6 +1013,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (over > 0) dis += over * SCHISM.overreach;
   const cutOff = isolated(world, n).length; // §2.7 settlements with no way to the capital
   if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
+  if (n.founded) dis += provinceTurn(world, n); // §2.8 restless provinces press on the nation
   if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
@@ -1061,15 +1065,23 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
     const open = mine.find(x => x.status === "pending" || x.status === "approved");
     // A faction forms
     if (!open && (n.discontent ?? 0) >= 100 && n.population >= SCHISM.minPop && !mine.some(x => tick - x.tick < SCHISM.cooldown)) {
-      const site = schismSite(world, n);
+      // §2.8 the unhappiest province (cut off, or far and ungoverned) is the faction; else they seek new land
+      const prov = restlessProvince(world, n);
+      const site = prov ? prov.centre : schismSite(world, n);
       if (site < 0) continue;
       const r = rngFor(world.seed, tick, "schism", n.id);
       const leader = `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
-      const share = SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
-      const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: Math.round(n.population * share), site, leader, grievance: grievance(world, n), status: "pending" };
+      const share = prov ? prov.people / n.population : SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
+      const why = prov ? `tỉnh ${prov.name} ${prov.causes.filter(c => c !== "crowded").map(c => CAUSE_VI[c]).join(" và ")}; ${grievance(world, n)}` : grievance(world, n);
+      const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: prov ? prov.people : Math.round(n.population * share), site, leader, grievance: why, status: "pending", ...(prov ? { province: prov.centre, provinceName: prov.name } : {}) };
       list.push(x);
-      n.lastEvents.push(`Một phái bất mãn (${x.people} người, thủ lĩnh ${leader}) muốn bỏ đi lập quốc riêng ở (${col(site)}, ${row(site)}) vì ${x.grievance}. Họ đang chờ các vị thần cho phép.`);
-      say(n.id, "schism", `Ở ${n.name}, ${x.people} người theo ${leader} muốn ra đi lập quốc riêng vì ${x.grievance}. Chờ các vị thần quyết trong mục Thỉnh nguyện.`);
+      if (prov) {
+        n.lastEvents.push(`Tỉnh ${prov.name} (${x.people} người, ${prov.tiles.length} ô, thủ lĩnh ${leader}) muốn tách khỏi ${n.name} cùng đất đai của tỉnh vì ${x.grievance}. Họ đang chờ các vị thần cho phép.`);
+        say(n.id, "schism", `Ở ${n.name}, tỉnh ${prov.name} (${x.people} người) theo ${leader} muốn tách ra lập quốc riêng cùng đất của tỉnh, vì ${x.grievance}. Chờ các vị thần quyết trong mục Thỉnh nguyện.`);
+      } else {
+        n.lastEvents.push(`Một phái bất mãn (${x.people} người, thủ lĩnh ${leader}) muốn bỏ đi lập quốc riêng ở (${col(site)}, ${row(site)}) vì ${x.grievance}. Họ đang chờ các vị thần cho phép.`);
+        say(n.id, "schism", `Ở ${n.name}, ${x.people} người theo ${leader} muốn ra đi lập quốc riêng vì ${x.grievance}. Chờ các vị thần quyết trong mục Thỉnh nguyện.`);
+      }
       fx({ kind: "schism", tile: n.capital, nation: n.id, n: x.people, to: site, text: leader });
       continue;
     }
@@ -1104,9 +1116,12 @@ function goHome(n: Nation, x: Schism, why: string): void {
 
 /** The faction leaves with its families, its share of the stores and all the knowledge it had. */
 function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): void {
-  if (world.tiles[x.site].owner !== -1) x.site = schismSite(world, parent);
+  // §2.8 a province leaves with its land, while its settlement is still the parent's; else to free land
+  const prov = x.province !== undefined && parent.settlements.some(s => s.tile === x.province) ? provinces(world, parent).find(p => p.centre === x.province) ?? null : null;
+  if (x.province !== undefined && !prov) { x.province = undefined; x.provinceName = undefined; x.site = schismSite(world, parent); }
+  else if (!prov && world.tiles[x.site].owner !== -1) x.site = schismSite(world, parent);
   if (x.site < 0 || parent.population < 20) { x.status = "refused"; x.verdict = (x.verdict ? x.verdict + " " : "") + "(không còn đất trống để đi)"; return; }
-  const share = x.share, k = Math.max(10, Math.min(parent.population - 10, Math.round(parent.population * share)));
+  const share = prov ? prov.people / parent.population : x.share, k = Math.max(10, Math.min(parent.population - 10, prov ? prov.people : Math.round(parent.population * share)));
   const gone = takePeople(parent, k, "migrate");
   const child = newNation(world.nations.length, { controller: x.controller ?? "bot", provider: x.provider ?? "bot", model: x.model ?? "bot", effort: x.effort, trait: parent.trait }, x.site);
   world.nations.push(child);
@@ -1119,15 +1134,24 @@ function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): v
   child.origin = { from: parent.id, tick: world.tick, leader: x.leader };
   child.met = [...new Set([parent.id, ...parent.met])].filter(id => world.nations[id]?.alive);
   for (const id of child.met) if (!world.nations[id].met.includes(child.id)) world.nations[id].met.push(child.id);
-  for (const j of within(x.site, 1)) if (world.tiles[j].owner === -1 && world.tiles[j].land && world.tiles[j].terrain !== "icewall") world.tiles[j].owner = child.id;
+  const land = prov ? cedeProvince(world, parent, child, prov) : [];
+  if (!prov) for (const j of within(x.site, 1)) if (world.tiles[j].owner === -1 && world.tiles[j].land && world.tiles[j].terrain !== "icewall") world.tiles[j].owner = child.id;
   child.seen = [...new Set([...parent.seen, ...within(x.site, START.sightRadius)])].sort((a, b) => a - b);
-  child.memory = `Chúng tôi là ${k} người đã rời bỏ ${parent.name} ở lượt ${world.tick}, theo thủ lĩnh ${x.leader}, vì ${x.grievance}. Chúng tôi mang theo mọi điều đã biết và một phần kho của họ, tới vùng đất mới quanh (${col(x.site)}, ${row(x.site)}). Lượt đầu: đặt tên, cờ và tuyên ngôn cho quốc gia mới (found_nation).`;
+  child.memory = prov
+    ? `Chúng tôi là ${k} người của tỉnh ${prov.name}, đã tách khỏi ${parent.name} ở lượt ${world.tick}, theo thủ lĩnh ${x.leader}, vì ${x.grievance}. Chúng tôi giữ đất của tỉnh (${land.length} ô quanh (${col(x.site)}, ${row(x.site)})), mọi điều đã biết và một phần kho của họ. Lượt đầu: đặt tên, cờ và tuyên ngôn cho quốc gia mới (found_nation).`
+    : `Chúng tôi là ${k} người đã rời bỏ ${parent.name} ở lượt ${world.tick}, theo thủ lĩnh ${x.leader}, vì ${x.grievance}. Chúng tôi mang theo mọi điều đã biết và một phần kho của họ, tới vùng đất mới quanh (${col(x.site)}, ${row(x.site)}). Lượt đầu: đặt tên, cờ và tuyên ngôn cho quốc gia mới (found_nation).`;
   x.status = "done"; x.nation = child.id;
   parent.stability = Math.min(100, parent.stability + SCHISM.calmAfter); parent.discontent = 0;
-  parent.lastEvents.push(`${k} người theo ${x.leader} đã bỏ đi lập quốc riêng, mang theo ${Math.round(share * 100)}% kho; những người ở lại nhẹ nhõm hơn (+${SCHISM.calmAfter} ổn định).`);
-  fx({ kind: "migrate", tile: parent.capital, nation: parent.id, n: k, to: x.site });
-  fx({ kind: "settle", tile: x.site, nation: child.id, text: `phái ${x.leader}` });
-  say(parent.id, "schism", `${k} người của ${parent.name} theo ${x.leader} ra đi, lập một quốc gia mới ở (${col(x.site)}, ${row(x.site)}).`);
+  if (prov) {
+    parent.lastEvents.push(`Tỉnh ${prov.name} theo ${x.leader} đã tách ra lập quốc riêng, mang theo ${k} người, ${land.length} ô đất và ${Math.round(k / (k + parent.population) * 100)}% kho; những người ở lại nhẹ nhõm hơn (+${SCHISM.calmAfter} ổn định).`);
+    fx({ kind: "settle", tile: x.site, nation: child.id, text: `tỉnh ${prov.name}` });
+    say(parent.id, "schism", `Tỉnh ${prov.name} (${k} người, ${land.length} ô) theo ${x.leader} tách khỏi ${parent.name}, lập một quốc gia mới.`);
+  } else {
+    parent.lastEvents.push(`${k} người theo ${x.leader} đã bỏ đi lập quốc riêng, mang theo ${Math.round(share * 100)}% kho; những người ở lại nhẹ nhõm hơn (+${SCHISM.calmAfter} ổn định).`);
+    fx({ kind: "migrate", tile: parent.capital, nation: parent.id, n: k, to: x.site });
+    fx({ kind: "settle", tile: x.site, nation: child.id, text: `phái ${x.leader}` });
+    say(parent.id, "schism", `${k} người của ${parent.name} theo ${x.leader} ra đi, lập một quốc gia mới ở (${col(x.site)}, ${row(x.site)}).`);
+  }
 }
 
 // ---------------------------------------------------------------- roads and sea lanes (§2.5)

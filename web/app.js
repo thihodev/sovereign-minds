@@ -584,6 +584,25 @@
       g.beginPath(); for (const i of tiles) edges(i, o); g.lineWidth = bw * 2.1; g.strokeStyle = contrastOf(c); g.globalAlpha = .9; g.stroke();
       g.globalAlpha = 1; g.lineWidth = bw; g.strokeStyle = c; g.stroke();
     }
+    // §2.8 provinces: a thin dashed line between the land of two centres of one nation, once zoomed in
+    if (s * z >= 9) {
+      const cs = new Map(), prov = new Map();
+      const centresOf = o => { if (!cs.has(o)) { const n = S.nations[o]; cs.set(o, n ? [n.capital, ...(n.settlements || []).map(x => x.tile)].filter(c => S.owners[c] === o) : []); } return cs.get(o); };
+      const provOf = i => { if (!prov.has(i)) { let b = -1, d = Infinity; for (const c of centresOf(S.owners[i])) { const k = hexDist(c, i); if (k < d || (k === d && c < b)) { d = k; b = c; } } prov.set(i, b); } return prov.get(i); };
+      g.save(); g.beginPath();
+      for (const [o, tiles] of byNation) {
+        if (centresOf(o).length < 2) continue;
+        for (const i of tiles) {
+          const [x, y] = center(i), nb = NB(i), p = provOf(i);
+          for (let k = 0; k < 6; k++) {
+            const j = nb[k]; if (j < 0 || j < i || S.owners[j] !== o || provOf(j) === p) continue;
+            const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
+            g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
+          }
+        }
+      }
+      g.setLineDash([3 * px, 3 * px]); g.lineWidth = 1.2 * px; g.strokeStyle = "rgba(255,255,255,.75)"; g.stroke(); g.restore();
+    }
     drawRoads(g, vis, s, z, px);
     // names of the quiet places, once there is room to read them
     const small = clamp(s * .95 * z, 9, 13) * px;
@@ -1137,6 +1156,15 @@
       <p class="note">${d.households} hộ · ${d.fighters} người có thể ra trận · ăn ${d.mouths} suất · lượt trước: +${d.born} trẻ, ${d.infants} trẻ sơ sinh mất, ${d.aged} người qua đời vì tuổi già hay lao lực</p>
       <div class="chips"><span>👪 ${esc(n.family.birthsName)}</span><span>⚔ ${esc(n.family.fightersName)}</span></div>`;
   }
+  // §2.8 the provinces: one per centre, its land, its people, its way home, its governor and its mood
+  const WAY = { capital: "thủ đô", road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" };
+  function provinceList(n) {
+    return `<p class="muted">Mỗi trung tâm là một tỉnh: đất là các ô gần nó nhất, dân chia theo chỗ ở. Tỉnh bị cô lập, xa thủ đô mà không có bá tước, hay chật chỗ ở thì bất ổn dần; tới 50 nó làm cả nước bất mãn thêm, và khi cả nước bất mãn tới 100 thì tỉnh bất ổn nhất có thể đòi tách ra cùng đất đai.</p>` + n.provinces.map(p => `<div class="card2 province">
+      <div class="row"><b>${p.capital ? "★ " : ""}${esc(p.name)}</b><button class="link" data-tile="${p.centre}" aria-label="Xem trên bản đồ">↗</button><span style="flex:1"></span><span class="meta">${p.people} dân · chỗ ở ${p.housing} · ${p.tiles} ô</span></div>
+      <div class="meta">${p.capital ? "Tỉnh thủ đô" : `${WAY[p.way] ?? "✗ cô lập"} · cách thủ đô ${p.distance} ô`} · ${p.governor ? `bá tước ${esc(p.governor.name)} (tay nghề ${p.governor.skill}, trung thành ${p.governor.loyalty}${p.loyal ? "" : ", bỏ bê"})` : "không có bá tước"}</div>
+      <div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.mood}" aria-label="Bất ổn của tỉnh ${esc(p.name)}"><i style="width:${p.mood}%"></i></div>
+      <div class="meta">Bất ổn ${p.mood}/100${p.causes.length ? ` · đang tăng vì ${esc(p.causes.join(", "))}` : ""}</div></div>`).join("");
+  }
   async function openNation(id) {
     const n = S.nations[id], d = $("#nation-dialog");
     const turns = await api(`/api/nation/${id}/turns?limit=5`).catch(() => []);
@@ -1149,7 +1177,7 @@
     $("#nation-detail").innerHTML = `
       <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${healthPills(n)}${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       <div class="subtabs" data-key="nation">
-        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
+        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button>${(n.provinces || []).length > 1 ? `<button data-sub="provinces">Tỉnh <span class="cnt${n.provinces.some(p => p.mood >= 50) ? " hot" : ""}">${n.provinces.length}</span></button>` : ""}<button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
         <section data-sub="overview">
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
@@ -1168,6 +1196,7 @@
           ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
         </section>
         <section data-sub="court"><p class="muted">${(n.officials || []).length}/${n.courtSlots ?? 0} chỗ quan chức.</p>${courtList(n)}</section>
+        ${(n.provinces || []).length > 1 ? `<section data-sub="provinces">${provinceList(n)}</section>` : ""}
         <section data-sub="economy">
           <h3>Lao động</h3>${chipsOf(labor)}
           <h3>Kho</h3>${chipsOf(stock)}
@@ -1190,6 +1219,7 @@
         </section>
       </div>`;
     initSubtabs($("#nation-detail"));
+    for (const b of $("#nation-detail").querySelectorAll(".province [data-tile]")) b.onclick = () => { d.close(); centerOn(Number(b.dataset.tile)); };
     $("#nation-detail .flagbig").replaceWith(flagCanvas(n.flag, 72, 48));
     $("#dlg-close").onclick = () => d.close();
     if ($("#dlg-model")) {
@@ -1396,9 +1426,9 @@
       const models = [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot (không tốn lượt Claude)</option>`].join("");
       const efforts = (S.claudeEfforts || []).map(e => `<option value="${esc(e)}"${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("");
       el.innerHTML = `<div class="row"><h3></h3><span style="flex:1"></span><span class="pill ${cls}">${st}</span></div>
-        <div class="meta">Ly khai #${x.id} · từ <b>${esc(from ? nationName(from) : "?")}</b> · lượt ${x.tick} · ${x.people} người (~${Math.round(x.share * 100)}% dân và kho) · đất mới (${x.site % 128}, ${(x.site / 128) | 0}) <button class="link" data-act="site">↗</button>${x.status === "pending" ? ` · còn ${x.waitLeft} lượt để quyết` : ""}</div>
+        <div class="meta">Ly khai #${x.id} · từ <b>${esc(from ? nationName(from) : "?")}</b> · lượt ${x.tick} · ${x.people} người (~${Math.round(x.share * 100)}% dân và kho) · ${x.province !== undefined ? `tỉnh ${esc(x.provinceName || "?")}, đi cùng đất của tỉnh` : "đất mới"} (${x.site % 128}, ${(x.site / 128) | 0}) <button class="link" data-act="site">↗</button>${x.status === "pending" ? ` · còn ${x.waitLeft} lượt để quyết` : ""}</div>
         <div class="body"></div>
-        ${x.status === "pending" ? `<p class="note">Nếu cho phép, họ mang theo gia đình, phần kho tương ứng và mọi phát minh của nước cũ, rồi tự đặt tên, cờ ở lượt đầu. Nếu không, họ sẽ xin sang định cư ở một nước quen biết, hoặc quay về trong uất ức. Chọn trí tuệ cho quốc gia mới:</p>
+        ${x.status === "pending" ? `<p class="note">${x.province !== undefined ? "Nếu cho phép, tỉnh tách khỏi nước cũ cùng điểm định cư, đất đai và công trình của tỉnh, người sống ở đó, phần kho tương ứng và mọi phát minh, rồi tự đặt tên, cờ ở lượt đầu." : "Nếu cho phép, họ mang theo gia đình, phần kho tương ứng và mọi phát minh của nước cũ, rồi tự đặt tên, cờ ở lượt đầu."} Nếu không, họ sẽ xin sang định cư ở một nước quen biết, hoặc quay về trong uất ức. Chọn trí tuệ cho quốc gia mới:</p>
         <div class="row"><label class="sr-only" for="sch-model-${x.id}">Model</label><select id="sch-model-${x.id}">${models}</select><label class="sr-only" for="sch-effort-${x.id}">Effort</label><select id="sch-effort-${x.id}">${efforts}</select></div>
         <textarea rows="2" placeholder="Lời phán của các vị thần (gửi cho nước cũ)"></textarea>
         <div class="row"><button data-s="approved" class="primary">Cho lập quốc</button><button data-s="refused">Không cho đi</button></div>`

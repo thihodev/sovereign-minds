@@ -18,6 +18,7 @@ import { riverWay } from "./prompt.ts";
 import { borderOf } from "../border.ts";
 import { immune, plagueNearby, quarantined } from "../contagion.ts";
 import { yieldShares } from "../connect.ts";
+import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
@@ -418,9 +419,13 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const court = n.officials ?? [], has = (d: string) => court.some(o => o.domain === d);
     const want = ["scholar", "governor", "agriculture", "builder", ...(atWar || liveHordes(world).length ? ["general"] : []), "explorer", "merchant"];
     const next = want.find(d => d === "governor" ? !court.some(o => o.seat === n.capital) : !has(d));
-    if (next && court.length < maxOfficials(world, n) && v.food >= v.need * 1.2) spend("appoint_official", { domain: next, ...(next === "governor" ? { seat: xy(n.capital) } : {}) });
-    // a second governor for each settlement once the capital has one
-    else if (court.length < maxOfficials(world, n)) { const st = n.settlements.find(x => !court.some(o => o.seat === x.tile)); if (st) spend("appoint_official", { domain: "governor", seat: xy(st.tile) }); }
+    // §2.8 the settlement provinces with no governor, the unhappiest then the largest first; a restless one comes right after the four core officials
+    const needy = n.settlements.length && court.length < maxOfficials(world, n) && n.settlements.some(s => !court.some(o => o.seat === s.tile)) ? provinces(world, n).filter(p => !p.capital && !p.governor).sort((a, b) => b.mood - a.mood || b.people - a.people || a.centre - b.centre) : [];
+    const core = next !== undefined && want.indexOf(next) < 4, urgent = core ? undefined : needy.find(p => p.mood >= 20 || p.causes.includes("cut_off"));
+    if (urgent && court.length < maxOfficials(world, n)) spend("appoint_official", { domain: "governor", seat: xy(urgent.centre) });
+    else if (next && court.length < maxOfficials(world, n) && v.food >= v.need * 1.2) spend("appoint_official", { domain: next, ...(next === "governor" ? { seat: xy(n.capital) } : {}) });
+    // then a governor for each settlement province once the capital has one
+    else if (court.length < maxOfficials(world, n) && needy.length) spend("appoint_official", { domain: "governor", seat: xy(needy[0].centre) });
     const sulky = court.find(o => o.loyalty < 45);
     if (sulky && v.food >= v.need * 2 + 20) spend("reward_official", { official: sulky.id, goods: { food: 20 } });
   }

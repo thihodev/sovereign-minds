@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.8";
+export const RULES_VERSION = "0.9";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -112,6 +112,14 @@ export const SCHISM = {
  *  `isolatedDiscontent` a turn, once `grace` turns have passed since it was founded (time to build its road);
  *  land more than `reach` tiles from any centre with no road on or beside it yields `farYield`. */
 export const CONNECT = { walk: 6, reach: 4, isolatedYield: 0.7, farYield: 0.9, isolatedDiscontent: 2, grace: 10 };
+/** §2.8 Provinces: one per centre (the capital's, each settlement's), its land the nation's tiles nearest to it,
+ *  its people a share of the nation's in proportion to its housing. Unrest (0–100) a turn: +cutOff when it has no way
+ *  to the capital (§2.7, past its grace), +ungoverned with no loyal governor farther than `far` tiles from the capital,
+ *  +crowded when its people outnumber its housing; −fade, and −calm × skill with a loyal governor (loyalty ≥
+ *  OFFICIALS.idle), whose land also yields ×(1 + yield × skill). A province at `restless`+ adds `pressure` to the
+ *  nation's discontent a turn. When a faction forms (§4.5), the unhappiest settlement province at `secede`+ unrest,
+ *  cut off or far and ungoverned, with `minPeople`+ people, is the faction: it leaves with its land. */
+export const PROVINCE = { cutOff: 4, ungoverned: 2, far: 6, crowded: 2, fade: 1, calm: 1, yield: 0.02, restless: 50, pressure: 1, secede: 40, minPeople: 12 };
 /** §7.9 Living borders between nations whose lands touch (or lie within `near` tiles). */
 export const BORDER = {
   near: 3,

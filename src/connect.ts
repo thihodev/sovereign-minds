@@ -8,6 +8,7 @@ import { CONNECT, RIVER } from "./rules.ts";
 import { mods, roadNet } from "./engine.ts";
 import { activeWar } from "./diplomacy.ts";
 import { piers } from "./routes.ts";
+import { governorYield } from "./provinces.ts";
 import type { Nation, World } from "./types.ts";
 
 export type Link = "capital" | "road" | "water" | "walk" | null;
@@ -75,17 +76,24 @@ export function links(world: World, n: Nation): Map<number, Link> {
   return out;
 }
 
-/** The share of what a tile yields that reaches the nation's stores (§2.7). */
+/** The centre nearest a tile, ties to the lower tile: whose land it is (§2.7) and whose province (§2.8). */
+export function nearestCentre(cs: number[], i: number): { c: number; d: number } {
+  let c = cs[0], d = Infinity;
+  for (const x of cs) { const k = dist(x, i); if (k < d || (k === d && x < c)) { d = k; c = x; } }
+  return { c, d };
+}
+
+/** The share of what a tile yields that reaches the nation's stores (§2.7), more where a loyal governor sits (§2.8). */
 export function yieldShares(world: World, n: Nation): (tile: number) => number {
   const ls = links(world, n), cs = [...ls.keys()], young = new Set(n.settlements.filter(s => world.tick - s.tick < CONNECT.grace).map(s => s.tile));
   const roadNear = (i: number) => (world.tiles[i].road || 0) > 0 || NEIGHBORS[i].some(j => (world.tiles[j].road || 0) > 0 && world.tiles[j].land);
-  const memo = new Map<number, number>();
+  const memo = new Map<number, number>(), gov = governorYield(n);
   return (i: number) => {
     const hit = memo.get(i); if (hit !== undefined) return hit;
-    let best = cs[0], d = Infinity;
-    for (const c of cs) { const x = dist(c, i); if (x < d || (x === d && c < best)) { d = x; best = c; } }
+    const { c: best, d } = nearestCentre(cs, i);
     let share = ls.get(best) || young.has(best) ? 1 : CONNECT.isolatedYield;
     if (d > CONNECT.reach && !roadNear(i)) share *= CONNECT.farYield;
+    share *= gov.get(best) ?? 1;
     memo.set(i, share);
     return share;
   };

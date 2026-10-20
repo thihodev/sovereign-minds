@@ -2,7 +2,20 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.8 (đang làm)
+## v0.9 (đang làm)
+
+- **Tỉnh (§2.8):** mỗi trung tâm (thủ đô, mỗi điểm định cư) là một tỉnh.
+  - **Đất và dân:** đất của tỉnh là các ô gần trung tâm đó nhất. Dân chia theo chỗ ở của từng tỉnh.
+  - **Lòng dân 0–100:**
+    - tăng khi tỉnh cô lập (+4), xa thủ đô quá 6 ô mà không có bá tước trung thành (+2), hoặc dân đông hơn chỗ ở (+2)
+    - giảm 1 mỗi lượt, giảm thêm theo tay nghề của bá tước
+  - **Bá tước trung thành:** đất tỉnh làm ra thêm 2% mỗi bậc tay nghề (tối đa +10%).
+  - Mỗi tỉnh có lòng dân từ 50 trở lên làm bất mãn cả nước +1 mỗi lượt.
+  - **Ly khai theo tỉnh:** tỉnh bất mãn nhất (cô lập, hoặc xa mà không có bá tước) thành phái ly khai. Được duyệt thì nó tách ra làm nước mới, mang theo điểm định cư, đất, công trình, dân sống ở đó và phần kho tương ứng. Không có tỉnh nào hợp thì phái ly khai đi tìm đất mới như trước.
+  - AI thấy danh sách tỉnh và lý do lòng dân xấu đi. Cố vấn gợi ý bổ nhiệm bá tước hoặc làm đường. Bot đặt bá tước vào tỉnh bất ổn nhất.
+  - Hồ sơ quốc gia có tab **Tỉnh**. Khi phóng to, bản đồ vẽ ranh giới tỉnh bằng nét đứt mảnh.
+
+## v0.8
 
 - **Dịch lây giữa các nước, và cách ly (§9.5).**
   - Một nước có dịch thì lây được trong 2 lượt:

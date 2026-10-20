@@ -156,6 +156,27 @@ Kho là chung cho cả nước, nhưng hàng chỉ về được kho theo một 
 - Phần hao hụt không vào kho; tài nguyên trên ô vẫn bị lấy đủ.
 - Watcher chỉnh được tỷ lệ nộp của điểm cô lập và độ dài lối đi bộ bằng sắc lệnh luật.
 
+### 2.8 Tỉnh
+
+Lãnh thổ chia thành các tỉnh, mỗi trung tâm một tỉnh: tỉnh thủ đô và một tỉnh cho mỗi điểm định cư.
+
+- **Đất của tỉnh:** các ô của quốc gia gần trung tâm đó nhất (bằng nhau thì về trung tâm có số ô nhỏ hơn), cùng quy tắc với sản lượng ở mục 2.7.
+- **Dân của tỉnh:** dân cả nước chia theo chỗ ở của từng tỉnh (số nguyên, cộng lại đúng bằng dân số):
+  - chỗ ở tự nhiên của thủ đô, hoặc 10 chỗ của điểm định cư
+  - nhà ở dựng trên đất của tỉnh (tối đa số nhà mỗi trung tâm)
+  - thôn xóm trên đất của tỉnh, và hang động nếu kỳ quan nằm trong tỉnh
+- Mỗi tỉnh có lối về thủ đô (mục 2.7), bá tước nếu có (mục 4.6) và **độ bất ổn** riêng (0–100). Gói trạng thái của AI có danh sách `provinces`.
+- **Bất ổn tăng mỗi lượt:**
+  - tỉnh bị cô lập (không lối về thủ đô, qua 10 lượt ân hạn): +4
+  - tỉnh cách thủ đô hơn 6 ô mà không có bá tước trung thành: +2
+  - dân của tỉnh nhiều hơn chỗ ở của tỉnh: +2
+- **Bất ổn giảm mỗi lượt:** −1, và thêm −1 cho mỗi bậc tay nghề của bá tước trung thành (trung thành ≥ 30) giữ trung tâm của tỉnh.
+- **Bá tước làm đất giàu thêm:** đất của tỉnh có bá tước trung thành cho thêm 2% sản lượng mỗi bậc tay nghề (tối đa +10%).
+- **Tỉnh đè lên cả nước:** mỗi tỉnh có bất ổn từ 50 làm bất mãn của cả nước +1 mỗi lượt (mục 4.5).
+- **Tỉnh đòi tách ra:** khi bất mãn cả nước tới 100, tỉnh điểm định cư bất ổn nhất có bất ổn từ 40, đang bị cô lập hoặc xa mà không có bá tước, có ít nhất 12 dân, chính là phái ly khai (mục 4.5). Nếu Watcher cho phép, tỉnh tách ra cùng điểm định cư (thành thủ đô mới), đất của tỉnh, công trình trên đó, người sống ở đó (theo gia đình) và phần kho tương ứng; bá tước của tỉnh rời triều đình cũ. Không có tỉnh nào như thế thì phái ly khai đi tìm đất trống như cũ.
+- Trên bản đồ, khi phóng to, đường đứt nét mảnh chia các tỉnh trong lãnh thổ một nước. Hồ sơ quốc gia có thẻ **Tỉnh**.
+- Watcher chỉnh được khoảng cách cần bá tước, sức làm dịu và phần sản lượng thêm của bá tước bằng sắc lệnh luật.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.
@@ -316,16 +337,18 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
   - nạn đói: thêm 10
   - nội loạn: thêm 25
   - mỗi ô vượt giới hạn quản lý: thêm 2
+  - mỗi điểm định cư cô lập: thêm 2 (mục 2.7); mỗi tỉnh có bất ổn từ 50: thêm 1 (mục 2.8)
 
   Khi ổn định ≥ 60, bất mãn giảm 10 mỗi lượt. AI thấy mức bất mãn trong gói trạng thái, và nhận cảnh báo từ mức 40.
 - **Một phái đòi ra đi:** khi bất mãn đạt 100, dân từ 60 người trở lên, và lần ly khai trước cách ít nhất 30 lượt:
   - 20–35% dân (bất mãn càng nặng càng đông) theo một thủ lĩnh, xin bỏ đi lập quốc riêng
-  - nơi họ nhắm là đất trống cách đất cũ 5–16 ô và cách mọi quốc gia ≥ 3 ô
+  - nếu có một tỉnh đủ bất ổn (mục 2.8), phái ly khai là tỉnh đó: dân của tỉnh, đi cùng đất của tỉnh
+  - nếu không, nơi họ nhắm là đất trống cách đất cũ 5–16 ô và cách mọi quốc gia ≥ 3 ô
   - yêu cầu hiện trong mục **Thỉnh nguyện** của Watcher
 - **Watcher cho phép:** Watcher chọn trí tuệ cho quốc gia mới (Claude Haiku/Sonnet với một mức effort, hoặc bot). Lượt sau phái đó ra đi:
   - cả gia đình theo họ, phần kho theo tỷ lệ người đi, và mọi phát minh của nước cũ
   - nước mới nhận kỷ nguyên, đặc thù và phong tục của nước cũ
-  - họ nhận ô đích cùng các ô kề, và quen biết nước cũ cùng các nước mà nước cũ đã gặp
+  - họ nhận ô đích cùng các ô kề (một tỉnh: điểm định cư, đất và công trình của tỉnh), và quen biết nước cũ cùng các nước mà nước cũ đã gặp
   - lượt đầu tiên họ tự đặt tên, thủ đô, dân tộc và cờ (`found_nation`), bắt đầu với ổn định 70
   - nước cũ +15 ổn định, bất mãn về 0
 - **Không cho phép, hoặc không trả lời trong 10 lượt:** phái đó xin sang định cư ở nước yên ổn nhất (ổn định ≥ 35) và nhiều chỗ ở nhất mà nước cũ quen biết, nếu không đang chiến tranh với nước cũ.
@@ -338,7 +361,7 @@ Một quốc gia giao một lĩnh vực cho một người. Người đó **tự
 
 | Lĩnh vực (`domain`) | Chức danh | Việc làm và thưởng |
 | --- | --- | --- |
-| `governor` | Bá tước | giữ một trung tâm (thủ đô hoặc điểm định cư); mỗi lượt tự khai hoang ô tốt nhất trong vòng 3 ô quanh đó (2 ô khi tay nghề ≥ 3), nếu còn giới hạn quản lý và đủ lương thực; +1 ô quản lý |
+| `governor` | Bá tước | giữ một trung tâm (thủ đô hoặc điểm định cư); mỗi lượt tự khai hoang ô tốt nhất trong vòng 3 ô quanh đó (2 ô khi tay nghề ≥ 3), nếu còn giới hạn quản lý và đủ lương thực; +1 ô quản lý; làm dịu tỉnh của mình và đất của tỉnh +2% sản lượng mỗi bậc (mục 2.8) |
 | `general` | Đại tướng | chiến đấu và sức thủ tại nhà +4% mỗi bậc tay nghề |
 | `agriculture` | Thượng thư Nông | hái lượm, săn, đánh cá, nông +5% mỗi bậc; khi lương thực dưới 1,5 lượt ăn thì tự khởi công ruộng trên ô tốt nhất (châu thổ, ven sông trước) |
 | `scholar` | Đại học sĩ | nghiên cứu +5% mỗi bậc; khi đang bỏ trống thì tự chọn nghiên cứu rẻ nhất |
