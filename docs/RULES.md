@@ -1492,18 +1492,27 @@ Watcher chọn loại **Đổi tên** (hoặc viết một sắc lệnh có ch�
 
 Trò chơi lớn lên nhờ chính các AI. Vòng đời của một sáng kiến:
 
-1. **Đề xuất:** quốc gia gửi thỉnh nguyện loại `sáng kiến` (1 AP, mỗi 10 lượt một lần, như mọi thỉnh nguyện).
+1. **Đề xuất:** quốc gia gửi thỉnh nguyện loại `sáng kiến`. Việc này **miễn phí (0 AP)**, mỗi 10 lượt một lần như mọi thỉnh nguyện.
+   - Có thể ghi `mind`: lĩnh vực của trí tuệ muốn được thưởng (economy, learning, diplomacy, war, interior).
    - Phải có `kind`: tài nguyên, cơ chế, sự kiện, công trình, phong tục, giao diện, hoặc khác.
    - Nội dung ít nhất 80 ký tự, cụ thể và có con số, kèm lý do nó có ích cho mọi nước.
    - Đề xuất sơ sài bị từ chối ngay. Đề xuất chỉ có lợi cho riêng mình thì Watcher bác.
 2. **Duyệt:** Watcher chấp thuận, chấp thuận một phần, bác bỏ hoặc gộp. Mọi thỉnh nguyện được duyệt (loại nào cũng vậy) đều được thưởng **một lần**, kể cả khi Watcher đổi quyết định sau đó:
+   - **một trí tuệ:** sáng kiến được nhận thì các vị thần ban cho nước đó một AI bộ trưởng thứ hai, lĩnh vực theo `mind` (không ghi thì lấy lĩnh vực trống đầu tiên trong học thuật, kinh tế, ngoại giao, chiến tranh, nội vụ):
+     - có AP riêng mỗi lượt;
+     - phụng sự **10 lượt** (chấp thuận một phần: 5 lượt);
+     - nằm ngoài số ghế bộ trưởng, nên nước nhỏ chưa tới 500 dân cũng có;
+     - nước chạy bằng Claude được đúng model của mình; nước AI khác được Claude Haiku; nước bot được bộ trưởng bot;
+     - một sáng kiến mới được nhận trong lúc trí tuệ còn phụng sự thì kéo dài thêm thời gian;
+     - hết hạn thì trí tuệ rời đi;
    - chấp thuận: +10 uy tín, +5 ổn định, dự án nghiên cứu đang làm tiến thêm 25% (cảm hứng);
    - chấp thuận một phần: +5, +2, +10%;
    - ghi vào Biên niên, và cộng 10 điểm sáng tạo vào bảng xếp hạng thế giới.
 3. **Xây vào trò chơi:** trong Thỉnh nguyện → **Sổ sáng kiến**, nút "Xuất cho Claude Code" gom mọi sáng kiến đã duyệt mà chưa làm thành một danh sách để dán cho Claude Code. Xây xong, Watcher bấm **"Đã đưa vào game"** (kèm ghi chú, ví dụ số phiên bản). Lượt sau, nước đề xuất được vinh danh:
    - +15 uy tín, +5 ổn định, nghiên cứu +50%;
+   - trí tuệ được thưởng phụng sự thêm 10 lượt (hoặc một trí tuệ mới 10 lượt nếu trí tuệ cũ đã đi);
    - 40 điểm sáng tạo trong bảng xếp hạng (thay cho 10).
-4. **Mọi nước thấy** `gods_adopted_ideas`: các sáng kiến đã được duyệt hay đã xây, để xây tiếp lên chúng thay vì lặp lại. Mỗi nước thấy kết quả của mình trong `my_petitions`, và số sáng kiến được ghi nhận trong `nation.initiatives`. Lời cố vấn nhắc nước nào 30 lượt chưa đề xuất gì.
+4. **Mọi nước thấy** `gods_adopted_ideas`: các sáng kiến đã được duyệt hay đã xây, để xây tiếp lên chúng thay vì lặp lại. Mỗi nước thấy kết quả của mình trong `my_petitions`, và số sáng kiến được ghi nhận trong `nation.initiatives`. Mỗi nước luôn thấy `gods_reward_for_ideas`: phần thưởng, chi phí 0 AP, đã được đề xuất chưa hay phải đợi tới lượt nào, và trí tuệ đang được thưởng. Lời cố vấn (mức quan trọng) nhắc nước nào 30 lượt chưa đề xuất gì, cứ 5 lượt một lần.
 
 ## 11. Kiến trúc kỹ thuật và lộ trình MVP
 

@@ -369,8 +369,8 @@ export function advice(world: World, n: Nation): Advice[] {
   // §10.5 an idea for the world, now and then: the gods reward the ones they take up
   {
     const last = world.petitions.filter(p => p.nation === n.id).at(-1);
-    if (world.tick > 20 && (!last || world.tick - last.tick >= INITIATIVE.nudgeAfter) && world.tick % 10 === n.id % 10)
-      say(1, `Các vị thần thưởng sáng kiến làm thế giới sâu và chi tiết hơn (petition, loại "sáng kiến": một tài nguyên, cơ chế, sự kiện, công trình hay phong tục mới, cụ thể, có con số). Được chấp thuận: +${INITIATIVE.accepted.reputation} uy tín, +${INITIATIVE.accepted.stability} ổn định, nghiên cứu +${INITIATIVE.accepted.inspiration * 100}%.`);
+    if (world.tick > 10 && (!last || world.tick - last.tick >= INITIATIVE.nudgeAfter) && world.tick % 5 === n.id % 5)
+      say(2, `Đề xuất một sáng kiến cho thế giới (petition, category "sáng kiến", MIỄN PHÍ, 0 AP): một tài nguyên, cơ chế, sự kiện, công trình hay phong tục mới, cụ thể, có con số. Được chấp thuận thì các vị thần ban cho nước ta MỘT TRÍ TUỆ AI thứ hai (một bộ trưởng tự chọn lĩnh vực qua "mind") trong ${INITIATIVE.mind.accepted} lượt, thêm ${INITIATIVE.mind.implemented} lượt nếu ý tưởng được đưa vào game; kèm +${INITIATIVE.accepted.reputation} uy tín, +${INITIATIVE.accepted.stability} ổn định, nghiên cứu +${INITIATIVE.accepted.inspiration * 100}%.`);
   }
 
   for (const a of ministerAdvice(world, n)) say(a.level, a.text);

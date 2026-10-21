@@ -1729,13 +1729,13 @@
   const MINISTER_ICON = { economy: "⚒", war: "⚔", diplomacy: "🕊", learning: "📚", interior: "🏛" };
   function ministerList(n) {
     const c = n.ministers || [];
-    const head = `<h3>Bộ trưởng AI</h3><p class="muted">${c.length}/${n.ministerSeats ?? 0} ghế · mỗi bộ trưởng ${n.ministerAp ?? 0} AP riêng mỗi lượt${n.ministerNext ? ` · ghế tiếp theo từ ${n.ministerNext} dân (đang có ${n.population})` : ""}.</p>`;
+    const head = `<h3>Bộ trưởng AI</h3><p class="muted">${c.filter(m => m.until === undefined).length}/${n.ministerSeats ?? 0} ghế${c.some(m => m.until !== undefined) ? " + 1 trí tuệ thưởng sáng kiến" : ""} · mỗi bộ trưởng ${n.ministerAp ?? 0} AP riêng mỗi lượt${n.ministerNext ? ` · ghế tiếp theo từ ${n.ministerNext} dân (đang có ${n.population})` : ""}.</p>`;
     // the Watcher may grant one unasked while a seat is free
     const f = n.ministerFree, models = [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot</option>`].join("");
     const grant = f?.seats > 0 && f.domains.length ? `<div class="grant row"><b>Ban bộ trưởng (${f.seats} ghế trống):</b><select data-grant="domain">${f.domains.map(d => `<option value="${esc(d.id)}" title="${esc(d.desc)}">${esc(d.title)}</option>`).join("")}</select><select data-grant="model">${models}</select><select data-grant="effort">${(S.claudeEfforts || []).map(e => `<option${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("")}</select><button type="button" class="primary" data-grant-go>Ban</button><span class="meta" data-grant-msg></span></div>` : "";
     if (!c.length) return `${head}${grant}<p class="note">Chưa có bộ trưởng nào. Quốc gia từ 500 dân tự xin các vị thần (request_minister, hiện trong Thỉnh nguyện), hoặc bạn ban thẳng ở đây (thêm ghế ở 1000, 2000, 4000 dân).</p>`;
     return `${head}${grant}<ul class="court">${c.map(m => `<li><span class="i">${MINISTER_ICON[m.domain] || "👤"}</span><div style="flex:1"><b>${esc(titled(m.title, m.name))}</b> <span class="muted">${esc(m.controller === "bot" ? "bot" : `Claude ${m.model}${m.effort ? ` · ${m.effort}` : ""}`)}</span>
-      <div class="meta">từ lượt ${m.since}${m.lastTick !== undefined ? ` · lần cuối ra lệnh lượt ${m.lastTick}` : ""}</div>
+      <div class="meta">${m.until !== undefined ? `<span class="pill ok">🎁 thưởng sáng kiến, tới lượt ${m.until}</span> · ` : ""}từ lượt ${m.since}${m.lastTick !== undefined ? ` · lần cuối ra lệnh lượt ${m.lastTick}` : ""}</div>
       ${m.lastThought ? `<div class="meta">Suy nghĩ: “${esc(m.lastThought)}”</div>` : ""}
       <div class="meta">Lượt trước: ${esc((m.lastOrders || []).join(" · ") || "chưa ra lệnh")}</div></div>
       <button type="button" data-dismiss-minister="${m.id}">Bãi nhiệm</button></li>`).join("")}</ul>`;

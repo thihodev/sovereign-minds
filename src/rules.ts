@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.34";
+export const RULES_VERSION = "0.35";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -246,7 +246,10 @@ export const INITIATIVE = { accepted: { reputation: 10, stability: 5, inspiratio
   /** when the idea is built into the world: a bigger honour, and world-ranking points (`rank` each; `rankTaken` for one only taken up) */
   implemented: { reputation: 15, stability: 5, inspiration: 0.5 }, rank: 40, rankTaken: 10,
   /** a "sáng kiến" names its kind and is concrete: at least `minText` characters */
-  kinds: ["tài nguyên", "cơ chế", "sự kiện", "công trình", "phong tục", "giao diện", "khác"], minText: 80, nudgeAfter: 30 } as const;
+  kinds: ["tài nguyên", "cơ chế", "sự kiện", "công trình", "phong tục", "giao diện", "khác"], minText: 80, nudgeAfter: 30,
+  /** the gift of a mind: a minister of the nation's choosing for this many turns (taken up / partly / built in), outside the seats;
+   *  a nation run by Claude gets its own model, any other AI nation `model`, a bot nation a bot; `order`: the field when none is named */
+  mind: { accepted: 10, partial: 5, implemented: 10, model: "haiku", order: ["learning", "economy", "diplomacy", "war", "interior"] } } as const;
 export const PETITION = { categories: ["sáng kiến", "luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
 // Actions written in the rulebook that this engine version does not run yet.
 export const NOT_YET: Record<string, string> = {

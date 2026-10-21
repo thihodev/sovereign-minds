@@ -2,6 +2,19 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.35
+
+- **Phần thưởng sáng kiến là một trí tuệ (§10.7):** sáng kiến được các vị thần nhận thì nước đề xuất có thêm một AI bộ trưởng.
+  - Nước tự chọn lĩnh vực qua `mind`; bộ trưởng có AP riêng mỗi lượt.
+  - Phụng sự 10 lượt (nhận một phần: 5 lượt), thêm 10 lượt khi ý tưởng được đưa vào game.
+  - Nằm ngoài số ghế bộ trưởng, nên nước nhỏ cũng có.
+- **Đề xuất sáng kiến miễn phí (0 AP).**
+- **AI dễ thấy hơn:**
+  - mục `gods_reward_for_ideas` luôn có trong quan sát: phần thưởng, chi phí, khi nào được đề xuất;
+  - luật nói rõ phần thưởng trí tuệ;
+  - lời cố vấn nhắc ở mức quan trọng, cứ 5 lượt một lần, với nước 30 lượt chưa đề xuất.
+- Tab Triều đình đánh dấu trí tuệ thưởng sáng kiến và lượt nó rời đi.
+
 ## v0.34
 
 - **0.34.2, bản đồ 3D dễ nhìn hơn:**

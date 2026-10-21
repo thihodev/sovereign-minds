@@ -208,6 +208,8 @@ export interface Minister {
   model: string;
   effort?: string;
   since: number;
+  /** §10.5 a mind the gods gave for an idea: it serves until this turn, outside the seats */
+  until?: number;
   /** The request it was granted by. */
   request: number;
   /** Last turn: what it thought and what it ordered (✓/✗), and the tick. */
@@ -369,6 +371,8 @@ export type PetitionStatus = "pending" | "accepted" | "partial" | "rejected" | "
 /** A nation's request to the gods (the Watcher) to change the world (§10.5). */
 export interface Petition {
   id: number;
+  /** §10.5 the field the nation wants the gift of a mind in, should the idea be taken up */
+  mind?: string;
   nation: number;
   tick: number;
   category: string;

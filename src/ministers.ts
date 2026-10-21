@@ -4,7 +4,7 @@
 // the Watcher's answer is written into the world, and the engine acts on it at the start of the next step().
 
 import { vietPerson } from "./names.ts";
-import { AP_COST, INJECTION, MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
+import { AP_COST, INITIATIVE, INJECTION, MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
 import { rngFor, pickOne } from "./rng.ts";
 import { recipeOf } from "./catalog.ts";
 import { fx } from "./fx.ts";
@@ -28,13 +28,35 @@ export function openRequests(world: World, n: Nation): MinisterRequest[] {
   return (world.ministerRequests ?? []).filter(x => x.nation === n.id && (x.status === "pending" || x.status === "approved"));
 }
 /** Fields with no minister and no open request. */
+/** The ministers in the seats (a mind the gods gave for an idea sits outside them). */
+const seated = (n: Nation) => (n.ministers ?? []).filter(m => m.until === undefined);
+/** §10.5 The gift of a mind for an idea taken up: a minister of the nation's choosing for `turns` turns, outside the seats.
+ *  A nation that already has such a gift keeps it longer. Returns a line for the nation, or "" when every field is filled. */
+export function giftMind(world: World, n: Nation, turns: number, prefer: string | undefined, say: Say): string {
+  const court = (n.ministers ??= []), tick = world.tick;
+  const gift = court.find(m => m.until !== undefined);
+  if (gift) {
+    gift.until = Math.max(gift.until!, tick + 1) + turns;
+    return `${MINISTER_DOMAINS[gift.domain]?.title ?? gift.domain} ${gift.name} phụng sự thêm ${turns} lượt (tới lượt ${gift.until})`;
+  }
+  const free = Object.keys(MINISTER_DOMAINS).filter(d => !court.some(m => m.domain === d));
+  const domain = prefer && free.includes(prefer) ? prefer : INITIATIVE.mind.order.find(d => free.includes(d)) ?? free[0];
+  if (!domain) return "";
+  const def = MINISTER_DOMAINS[domain], name = vietPerson(rngFor(world.seed, tick, "gift-mind", n.id));
+  const ai = n.controller === "ai", model = !ai ? "bot" : n.provider === "claude" && ["haiku", "sonnet"].includes(n.model) ? n.model : INITIATIVE.mind.model;
+  const m: Minister = { id: world.nextId++, domain, name, controller: ai ? "ai" : "bot", model, effort: ai ? n.effort : undefined, since: tick, request: 0, lastOrders: [], until: tick + 1 + turns };
+  court.push(m);
+  say(n.id, "minister", `Các vị thần ban cho ${n.name} một trí tuệ: ${def.title} ${name}, ${turns} lượt, vì sáng kiến của họ.`);
+  fx({ kind: "minister", tile: n.capital, nation: n.id, text: def.title });
+  return `${def.title} ${name} (một trí tuệ riêng lo ${def.desc}, ${ministerAp(n)} AP riêng mỗi lượt) phụng sự ${turns} lượt, tới lượt ${m.until}`;
+}
 export function freeDomains(world: World, n: Nation): string[] {
   const taken = new Set([...(n.ministers ?? []).map(m => m.domain), ...openRequests(world, n).map(x => x.domain)]);
   return Object.keys(MINISTER_DOMAINS).filter(d => !taken.has(d));
 }
 /** Seats still free to ask for (seats − ministers − open requests). */
 export function freeSeats(world: World, n: Nation): number {
-  return Math.max(0, ministerSeats(n.population) - (n.ministers ?? []).length - openRequests(world, n).length);
+  return Math.max(0, ministerSeats(n.population) - seated(n).length - openRequests(world, n).length);
 }
 
 // ---------------------------------------------------------------- asking (action request_minister)
@@ -90,11 +112,20 @@ export function ministerPhase(world: World, say: Say): void {
       n.lastEvents.push(x.status === "refused" ? `Các vị thần không ban ${def.title}${x.verdict ? `: ${x.verdict}` : ""}. Xin lại được từ lượt ${(x.decidedTick ?? tick) + MINISTERS.retryTicks}.` : `Các vị thần đã bãi nhiệm ${def.title}${x.verdict ? `: ${x.verdict}` : ""}.`);
     }
   }
-  // A people that shrank below its milestones loses its newest ministers
+  // §10.5 a mind given for an idea leaves when its turns are done
+  for (const n of world.nations) {
+    if (!n.ministers?.length) continue;
+    for (const m of n.ministers.filter(x => x.until !== undefined && x.until <= tick)) {
+      n.ministers = n.ministers.filter(x => x !== m);
+      if (n.alive) n.lastEvents.push(`${MINISTER_DOMAINS[m.domain]?.title ?? m.domain} ${m.name}, trí tuệ các vị thần ban cho sáng kiến của ta, đã hết hạn phụng sự. Một sáng kiến mới được nhận sẽ mang về một trí tuệ khác.`);
+    }
+  }
+  // A people that shrank below its milestones loses its newest ministers (not the gifts of the gods)
   for (const n of world.nations) {
     if (!n.alive || !n.founded || !n.ministers?.length) continue;
-    while (n.ministers.length > keptSeats(n.population)) {
-      const m = n.ministers.pop()!, def = MINISTER_DOMAINS[m.domain];
+    while (seated(n).length > keptSeats(n.population)) {
+      const m = seated(n).at(-1)!, def = MINISTER_DOMAINS[m.domain];
+      n.ministers = n.ministers.filter(x => x !== m);
       const x = (world.ministerRequests ?? []).find(r => r.id === m.request);
       if (x) { x.status = "ended"; x.decidedTick = tick; x.verdict = "dân giảm dưới mốc"; x.delivered = true; }
       n.lastEvents.push(`Dân chỉ còn ${n.population}, dưới mốc giữ ghế: ${def?.title ?? m.domain} ${m.name} từ nhiệm. Lớn lại tới mốc thì có thể xin lại.`);

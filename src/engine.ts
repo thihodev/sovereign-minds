@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY,
+  TREASURY, MINISTER_DOMAINS,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -35,7 +35,7 @@ import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } fro
 import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
-import { ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
+import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -635,7 +635,8 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       n.reputation = Math.min(100, n.reputation + prize.reputation); n.stability = Math.min(100, n.stability + prize.stability);
       let rp = 0;
       if (n.research && inv(world, n.research.id)) { rp = Math.round(inventionCost(world, n, n.research.id) * prize.inspiration); n.research.progress += rp; }
-      n.lastEvents.push(`Sáng kiến được các vị thần ghi nhận: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP cho ${invName(world, n.research!.id)}` : ""}. Đây là sáng kiến thứ ${n.initiatives} của ${n.name}.`);
+      const mind = giftMind(world, n, p.status === "accepted" ? INITIATIVE.mind.accepted : INITIATIVE.mind.partial, p.mind, say); // §10.5 the gift of a mind
+      n.lastEvents.push(`Sáng kiến được các vị thần ghi nhận: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP cho ${invName(world, n.research!.id)}` : ""}${mind ? `, và một trí tuệ: ${mind}` : ""}. Đây là sáng kiến thứ ${n.initiatives} của ${n.name}.`);
       say(n.id, "petition", `Các vị thần ghi nhận sáng kiến "${p.title}" của ${n.name}.`);
     }
   }
@@ -648,7 +649,8 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     n.reputation = Math.min(100, n.reputation + prize.reputation); n.stability = Math.min(100, n.stability + prize.stability);
     let rp = 0;
     if (n.research && inv(world, n.research.id)) { rp = Math.round(inventionCost(world, n, n.research.id) * prize.inspiration); n.research.progress += rp; }
-    n.lastEvents.push(`Sáng kiến "${p.title}" của ta đã được các vị thần đưa vào thế giới${p.implementedNote ? ` (${p.implementedNote})` : ""}: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP` : ""}, và tên ta được ghi vào sử sách.`);
+    const mind = giftMind(world, n, INITIATIVE.mind.implemented, p.mind, say);
+    n.lastEvents.push(`Sáng kiến "${p.title}" của ta đã được các vị thần đưa vào thế giới${p.implementedNote ? ` (${p.implementedNote})` : ""}: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP` : ""}${mind ? `, một trí tuệ: ${mind}` : ""}, và tên ta được ghi vào sử sách.`);
     say(n.id, "petition", `Sáng kiến "${p.title}" của ${n.name} trở thành một phần của thế giới.`);
   }
   ministerPhase(world, say); // §4.9 ministers granted, refused or dismissed by the Watcher; seats lost to a shrinking people
@@ -700,7 +702,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       if (type === "found_nation") continue;
       const reject = (reason: string) => { n.lastRejected.push({ action: type || "?", reason }); n.stats.invalid++; n.turnOrders!.push(`${orderLabel(a)} ✗ ${reason.slice(0, 90)}`); };
       if (NOT_YET[type]) { reject(`Chưa có trong phiên bản engine này (luật ${NOT_YET[type]})`); continue; }
-      const cost = AP_COST[type];
+      const cost = type === "petition" && String(a?.category ?? "") === "sáng kiến" ? 0 : AP_COST[type]; // §10.5 ideas for the world are free
       if (cost === undefined) { reject("Không có hành động này"); continue; }
       if (cost > ap) { reject(`Không đủ AP (cần ${cost}, còn ${ap})`); continue; }
       const err = ENGINE_ACTIONS.has(type) ? doAction(world, n, type, a, L, claims, explorers, ctx.strikes, say) : doDiplomacy(ctx, n, type, a);
@@ -2049,6 +2051,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         id: world.petitions.length + 1, nation: n.id, tick: world.tick, category: cat, title, text, reason,
         context: { population: n.population, stability: n.stability, food: Math.round(n.stock.food || 0), tiles: ownedTiles(world, n.id).length, era: n.era },
         status: "pending", verdict: "", decidedTick: null, mergedInto: null, delivered: false, ...(kind ? { kind } : {}),
+        ...(kind && MINISTER_DOMAINS[String(a.mind ?? "")] ? { mind: String(a.mind) } : {}),
       });
       say(n.id, "petition", `${n.name} dâng thỉnh nguyện lên các vị thần: "${title}".`);
       return null;
