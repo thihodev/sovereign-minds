@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.26";
+export const RULES_VERSION = "0.27";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -621,6 +621,12 @@ export const LAND_COLORS: Record<string, string> = {
 export const FLAG_LAND_DELTA_E = 15;
 /** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
 export const RENAME = { windowTicks: 5, stability: 10 };
+/** §4.11 The standard of living (0–100: the share of the needs of the people's era and the next that are met).
+ *  Research ×(1 + `rp` × score/100); at `content`+ stability +1 a turn, below `restless` discontent +`unrest` a turn.
+ *  `gate[k]`: the score era k's gate asks for (from the Iron Age on). The thresholds of each need: one per `perX` people. */
+export const LIVING = { rp: 0.08, content: 75, restless: 40, unrest: 1,
+  gate: { 3: 40, 4: 50, 5: 55, 6: 60, 7: 65, 8: 70, 9: 75 } as Record<number, number>,
+  perClothes: 10, perTools: 10, perPots: 20, perSalt: 50, perHerbs: 20, perMetal: 20, perFuel: 20, roadShare: 0.5, researchShare: 0.05, kinds: 15, medicine: 0.3 };
 /** §2.3 Moving the capital to one of the nation's settlements (to richer land or a better crossroads): `materials` wood
  *  and/or stone, −`stability` (the court and its people uprooted), once every `every` turns. The old capital becomes a
  *  settlement. */

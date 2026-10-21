@@ -1,4 +1,5 @@
 // The open world (§5.6 eras, §5.3 era effects, §2.1 deep resources) and the court (§4.6). No AI is called.
+import { LIVING } from "../src/rules.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canSeeRes, createWorld, housingSlots, maxOfficials, mods, nextEraNeeds, ownedTiles, step, type NationSpec } from "../src/engine.ts";
@@ -35,8 +36,15 @@ test("eras: gates open with capabilities, people and resource; each era brings p
   grant(w, n, ["mài", "trồng-trọt", "nhiệt-cao", "nhận-biết-khoáng", "chứa", "luyện-đồng", "luyện-sắt"]);
   ownedTiles(w, n.id)[1].cap.copper = 50; ownedTiles(w, n.id)[2].cap.iron = 50; n.population = 160; // the old and the worn die each turn (§4.2)
   assert.equal(nextEraNeeds(w, n)?.era, "Đồ Đá Mới");
+  // §4.11 the Iron Age asks for a standard of living: a poor people stops at Bronze
+  n.living = 0;
+  const gate = LIVING.gate[3];
   turn(w);
-  assert.equal(n.era, "Đồ Sắt", "three gates in one turn when all are met");
+  assert.equal(n.era, "Đồ Đồng", "two gates, then the Iron Age waits for a better life");
+  assert.ok(nextEraNeeds(w, n)!.missing.some(x => /mức sống/.test(x)) || (n.living ?? 0) >= gate);
+  LIVING.gate[3] = 0; n.population = 160;
+  try { turn(w); } finally { LIVING.gate[3] = gate; }
+  assert.equal(n.era, "Đồ Sắt", "every gate open once the life is there too");
   assert.equal(n.eraTick, w.tick - 1);
   assert.equal(mods(w, n).tiles, tiles0 + 6, "+2 tiles to govern an era");
   assert.equal(mods(w, n).roleCap, cap0 + 1.5, "+50 points of ceiling an era");

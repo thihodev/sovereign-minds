@@ -3,6 +3,7 @@
 
 import { seaView } from "./sea.ts";
 import { herdView } from "./herds.ts";
+import { livingStandard } from "./living.ts";
 import { shortages, specialtiesOf, surpluses, techEdge } from "./market.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -121,6 +122,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         // §2.11 the sea around it, and the luxuries its people enjoy
         sea: n.alive && n.founded ? seaView(w, n) : null,
         herds: n.alive && n.founded ? herdView(w, n) ?? null : null, // §6.4
+        living: n.alive && n.founded ? livingStandard(w, n) : null, // §4.11
         // §4.10 missions out and the last festival
         missions: (n.missions ?? []).filter(x => x.until >= w.tick).map(x => ({ ...x, place: x.where < 0 ? "trong nước" : w.nations[x.where]?.name })),
         festival: n.festival ?? null,

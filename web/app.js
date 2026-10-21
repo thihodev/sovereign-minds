@@ -1504,6 +1504,7 @@
           ${n.exodus && n.exodus.recent ? `<h3>Dân bỏ đi</h3><p class="note ${n.exodus.alarm ? "warn" : ""}">${n.exodus.recent} người trong ${10} lượt qua (${Math.round(n.exodus.share * 100)}% dân)${n.exodus.lastTurn ? `, ${n.exodus.lastTurn} người lượt vừa rồi` : ""} · ${esc(Object.entries(n.exodus.why).map(([w, k]) => `${k} vì ${w}`).join(", "))}${Object.keys(n.exodus.to).length ? ` · sang ${esc(Object.entries(n.exodus.to).map(([o, k]) => `${o} ${k}`).join(", "))}` : ""}${n.exodus.alarm ? " · quá 3%: ổn định, uy tín và hạng đang giảm" : ""}</p>` : ""}
           ${n.recent?.length ? `<h3>Các lượt gần đây (AI thấy mục này)</h3><ul class="plain recent">${n.recent.slice().reverse().map(r => `<li><b>L${r.tick}</b> · dân ${r.pop} · lương thực ${r.food} · ổn định ${r.stab}<div class="meta">Lệnh: ${esc(r.orders.join(" · ") || "(không ra lệnh)")}</div></li>`).join("")}</ul>` : ""}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${livingBlock(n)}
           ${prosperityBlock(n)}
           ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
           ${n.advice?.length ? `<h3>Cố vấn (engine gửi cho AI lượt này)</h3><ul class="advice">${n.advice.map(a => `<li class="lv${a.level}">${esc(a.text)}</li>`).join("")}</ul>` : ""}
@@ -1577,6 +1578,15 @@
   const DOMAIN_ICON = { governor: "🏰", general: "⚔", agriculture: "🌾", scholar: "📜", merchant: "🪙", builder: "🔨", explorer: "🧭" };
   // ---------------------------------------------------------------- prosperity and pride (§4.7)
   const PROSP_PARTS = [["food", "Lương thực", "#c9a227"], ["goods", "Hàng hóa", "#3fb3cf"], ["room", "Chỗ ở", "#4cc283"], ["health", "Sức khỏe & yên bình", "#ff8f6b"]];
+  // §4.11 the standard of living: each need of the people's era (and the next), met or not
+  const ERA_NAMES = ["Đồ Đá Cũ", "Đồ Đá Mới", "Đồ Đồng", "Đồ Sắt", "Cổ Đại", "Trung Đại", "Cận Đại", "Công Nghiệp", "Hiện Đại", "Nguyên Tử"];
+  function livingBlock(n) {
+    const l = n.living; if (!l) return "";
+    const color = l.score >= 75 ? "var(--good)" : l.score >= 40 ? "var(--warn)" : "var(--bad)";
+    return `<h3>Mức sống: ${l.score}/100</h3><div class="bar"><i style="width:${l.score}%;background:${color}"></i></div>
+      <ul class="needs">${l.expected.map(x => `<li class="${x.met ? "ok" : "no"}" title="${esc(x.met ? "" : `Cách đáp ứng: ${x.how}`)}"><span>${x.met ? "✓" : "✗"}</span><b>${esc(x.name)}</b><span class="meta">${esc(ERA_NAMES[x.era] || "")} · có ${esc(x.have)}${x.met ? "" : ` · cần ${esc(x.want)}`}</span></li>`).join("")}</ul>
+      <p class="note">Mức sống cao: nghiên cứu nhanh hơn, dân yên. Thấp: bất mãn tăng. Từ thời Đồ Sắt, cổng kỷ nguyên cần mức sống tối thiểu.</p>`;
+  }
   function prosperityBlock(n) {
     const p = n.prosperity;
     if (!p || !n.alive || !n.founded) return "";

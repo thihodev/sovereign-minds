@@ -532,6 +532,28 @@ Dân bỏ đi vì bất ổn, ganh tị hay đất rộng quản không xuể th
 - **AI thấy** `faith` trong gói quan sát: có truyền giáo được không, các đoàn đang đi, lễ hội đã sẵn sàng chưa, sinh nở đang được nhân bao nhiêu, và nước nào đang truyền giáo trên đất mình.
 - **Lời cố vấn** gợi ý truyền giáo và lễ hội khi dân bỏ đi hoặc bất mãn từ 60 trở lên. Bot truyền giáo trong nước khi bất mãn từ 40, và mở lễ hội khi ổn định dưới 35 mà kho đầy.
 
+### 4.11 Tiêu chuẩn sống: động lực tiến tới thời hiện đại
+
+Mỗi kỷ nguyên, dân đòi hỏi nhiều hơn. Một nước tính theo nhu cầu của kỷ nguyên mình **và kỷ nguyên kế tiếp**, vì dân luôn mong hơn hiện tại:
+
+| Kỷ nguyên | Nhu cầu (đáp ứng khi có) |
+| --- | --- |
+| Đồ Đá Cũ | Đủ ăn (kho đủ một lượt ăn), Chỗ ở (chỗ ≥ dân), Nước ngọt |
+| Đồ Đá Mới | Quần áo (áo da, vải, lông thú: 1 cho 10 người), Công cụ (1 cho 10 người lao động), Đồ đựng (gốm: 1 cho 20 người), Muối hoặc gia vị (1 cho 50 người) |
+| Đồ Đồng | Xa xỉ phẩm (2 loại), Đền thờ và nghi lễ (năng lực tín-ngưỡng cùng Bàn thờ hay Đền), Thuốc men (thảo dược 1 cho 20 người, hoặc y thuật) |
+| Đồ Sắt | Đường sá (một nửa đất có đường), Đồ kim loại (hàng làm từ đồng, thiếc, sắt: 1 cho 20 người) |
+| Cổ Đại | Chữ viết và học hành (năng lực ghi chép và 5% người lao động nghiên cứu), Buôn bán (2 bạn hàng) |
+| Trung Đại | Hàng hóa đa dạng (15 loại trong kho) |
+| Công Nghiệp | Ánh sáng và năng lượng (than, dầu hay dầu cá voi: 1 cho 20 người) |
+| Hiện Đại | Y tế (30% y thuật) |
+
+- **Mức sống** (0–100) là tỉ lệ nhu cầu được đáp ứng.
+- **Mức sống cao:** dân có thời gian sáng tạo, nghiên cứu tối đa +8%. Từ 75 trở lên, ổn định +1 mỗi lượt.
+- **Mức sống thấp:** dưới 40, bất mãn +1 mỗi lượt.
+- **Cổng kỷ nguyên:** từ Đồ Sắt trở đi phải đạt mức sống tối thiểu: Đồ Sắt 40, Cổ Đại 50, Trung Đại 55, Cận Đại 60, Công Nghiệp 65, Hiện Đại 70, Nguyên Tử 75.
+- **AI thấy** `living_standard`: từng nhu cầu với có gì, cần gì, cách đáp ứng. Nhu cầu chưa đáp ứng là lý do tốt nhất để phát minh: một công thức hay công trình làm ra thứ dân đang thiếu.
+- **Watcher thấy** mục "Mức sống" trong hồ sơ quốc gia, kèm danh sách nhu cầu ✓ hay ✗.
+
 ### 4.7 Thịnh vượng và tự tôn
 
 Của cải của một nước là của dân nước ấy: lương thực trong kho, hàng hóa trong tay, chỗ ở rộng rãi, sức khỏe và yên bình. Dân đánh giá triều đình bằng cuộc sống của mình, và so với mọi nước mình quen biết.

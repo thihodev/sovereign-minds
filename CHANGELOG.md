@@ -2,7 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.26 (đang làm)
+## v0.27 (đang làm)
+
+- **Tiêu chuẩn sống (§4.11):** mỗi kỷ nguyên dân đòi hỏi thêm nhu cầu, từ đủ ăn, chỗ ở, nước ngọt tới quần áo, công cụ, gốm, muối, rồi xa xỉ phẩm, đền thờ, thuốc, đường sá, đồ kim loại, chữ viết, buôn bán, hàng đa dạng, năng lượng, y tế.
+  - Mức sống cao: nghiên cứu tối đa +8%, ổn định +1. Mức sống thấp: bất mãn +1.
+  - Từ Đồ Sắt, cổng kỷ nguyên cần mức sống tối thiểu.
+  - AI thấy từng nhu cầu và cách đáp ứng; lời cố vấn nêu những thứ còn thiếu; hồ sơ quốc gia có mục Mức sống.
+
+## v0.26
 
 - **Tổng kết chiến tranh đúng hơn:**
   - mỗi nước khi chết được ghi số phận (bị nước nào chiếm, nhập lại nước gốc, hay tự sụp đổ vì đói và dân bỏ đi);

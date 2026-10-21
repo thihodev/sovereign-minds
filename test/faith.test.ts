@@ -5,7 +5,7 @@ import { createWorld, step, type NationSpec } from "../src/engine.ts";
 import { NEIGHBORS } from "../src/hex.ts";
 import { blessing, priestsAway } from "../src/faith.ts";
 import { exodusOf } from "../src/exodus.ts";
-import { FESTIVAL, MISSION } from "../src/rules.ts";
+import { FESTIVAL, LIVING, MISSION } from "../src/rules.ts";
 import { buildObservation } from "../src/ai/prompt.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
 
@@ -34,7 +34,7 @@ test("a mission at home calms the people, blesses the families and keeps its pri
   assert.deepEqual(n.lastRejected, []);
   assert.equal(priestsAway(n, w.tick - 1), 3);
   assert.equal(blessing(n, w.tick - 1), MISSION.births);
-  assert.ok((n.discontent ?? 0) <= 60 - MISSION.calm, `discontent ${n.discontent}`);
+  assert.ok((n.discontent ?? 0) <= 60 - MISSION.calm + LIVING.unrest, `discontent ${n.discontent}`); // a poor people's life adds its unrest (§4.11)
   // a second one at home is refused; and without the rites there is none
   turn(w, { 0: { actions: [{ type: "mission", where: "home", priests: 2 }] } });
   assert.ok(n.lastRejected.some(r => /Đã có một đoàn/.test(r.reason)));
@@ -72,7 +72,7 @@ test("a festival: stability, less discontent, a season of weddings, once in a wh
   turn(w, { 0: { actions: [{ type: "festival", luxury: "honey" }] } });
   assert.deepEqual(n.lastRejected, []);
   assert.ok(n.stock.food! < food - 60 * FESTIVAL.food + 1);
-  assert.ok((n.discontent ?? 0) <= 40 - FESTIVAL.calm);
+  assert.ok((n.discontent ?? 0) <= 40 - FESTIVAL.calm + LIVING.unrest);
   assert.equal(blessing(n, w.tick - 1), FESTIVAL.births);
   turn(w, { 0: { actions: [{ type: "festival" }] } });
   assert.ok(n.lastRejected.some(r => /chỉ một lễ hội/.test(r.reason)));

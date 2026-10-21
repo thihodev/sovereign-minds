@@ -113,6 +113,8 @@ export interface Nation {
   renameTick: number | null;
   /** How the nation ended, when it has: taken by another, returned to the nation it split from, or perished on its own. */
   fate?: { tick: number; cause: "conquest" | "reunited" | "perished"; by?: number; why?: string };
+  /** §4.11 the standard of living, worked out each turn (0–100) */
+  living?: number;
   /** §2.3 the turn the capital last moved (it may move again CAPITAL_MOVE.every turns later) */
   capitalMoved?: number;
   /** Names the nation used before rename_nation, oldest first (§2.2). */

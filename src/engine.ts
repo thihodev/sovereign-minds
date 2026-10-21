@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -21,6 +21,7 @@ import { discoveryReport } from "./sea.ts";
 import { blessing, holdFestival, missionPhase, priestsAway, startMission } from "./faith.ts";
 import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
 import { vietError, vietPerson, vietPlace } from "./names.ts";
+import { eraLivingNeed, leisure, livingStandard } from "./living.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -815,7 +816,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     // Eras only move forward (§5.6): a shrinking people keeps its era.
     let era = n.era;
     // §5.6 cross every gate whose conditions hold, in order (ERA_TABLE)
-    for (let k = eraIndex(n) + 1; k < ERA_TABLE.length && eraReady(n, ERA_TABLE[k], caps, owned); k++) era = ERA_TABLE[k].name;
+    for (let k = eraIndex(n) + 1; k < ERA_TABLE.length && eraReady(n, ERA_TABLE[k], caps, owned) && (n.living ?? 100) >= eraLivingNeed(k); k++) era = ERA_TABLE[k].name; // §4.11
     if (era !== n.era) {
       n.era = era; n.eraTick = tick;
       fx({ kind: "era", tile: n.capital, nation: n.id, text: era });
@@ -1105,7 +1106,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
 
   // Research (§5.5)
   const teach = n.population ? Math.min(DEMO.rpMax, elders(n) / n.population * DEMO.rpPerShare) : 0; // §4.2 elders teach
-  const rp = researchPoints(labor.research) * (1 + m.rp + teach) * mult("research");
+  const rp = researchPoints(labor.research) * (1 + m.rp + teach + leisure(n.living ?? 0)) * mult("research"); // §4.11 leisure to think
   if (n.research) {
     if (!inv(world, n.research.id) || n.inventions.includes(n.research.id)) n.research = null;
     else {
@@ -1125,6 +1126,10 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     }
   }
 
+  // §4.11 the standard of living: content people are calm, deprived ones restless
+  const life = livingStandard(world, n).score; n.living = life;
+  if (life >= LIVING.content) n.stability += 1;
+  if (life < LIVING.restless && n.founded) n.discontent = Math.min(100, (n.discontent ?? 0) + LIVING.unrest);
   // Stability (§4.4)
   n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
   if (ownsWonder(world, n, "spring")) n.stability += 2;
@@ -1442,6 +1447,7 @@ export function nextEraNeeds(world: World, n: Nation): { era: string; missing: s
   if (n.population < def.pop) missing.push(`${def.pop} dân (có ${n.population})`);
   if (n.settlements.length < (def.settlements ?? 0)) missing.push(`${def.settlements} điểm định cư`);
   if (def.res && !owned.some(t => (t.cap[def.res as ResKey] || 0) > 0) && (n.stock[def.res] || 0) < ERA_RES_STOCK) missing.push(`đất có ${goodName(world, def.res)} hoặc ${ERA_RES_STOCK} trong kho`);
+  if ((n.living ?? 100) < eraLivingNeed(k)) missing.push(`mức sống ${eraLivingNeed(k)} (đang ${n.living})`); // §4.11
   return { era: def.name, missing };
 }
 

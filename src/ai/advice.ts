@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -19,6 +19,7 @@ import { ministerAdvice } from "../ministers.ts";
 import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
 import { seaAdvice } from "../sea.ts";
 import { herdView } from "../herds.ts";
+import { livingStandard } from "../living.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -272,6 +273,12 @@ export function advice(world: World, n: Nation): Advice[] {
     const grazers = ["goat", "cattle", "horse"].reduce((s2, k) => s2 + (hv.animals[k] || 0), 0);
     if (grazers > hv.room_grazers) say(1, `Đàn ăn cỏ (${grazers}) vượt sức chứa ${hv.room_grazers}: mỗi lượt một phần bị giết thịt. Dựng Chuồng (+${HERDS.pen}) hoặc giữ thêm đồng cỏ.`);
     if (food < need && Object.keys(hv.animals).length) say(3, `Đang thiếu ăn: có thể giết thịt gia súc ngay (cull), ví dụ ${Object.entries(hv.animals).slice(0, 2).map(([k, c]) => `${c} ${goodVi(world, k)} = ${c * ANIMALS[k].meat} lương thực`).join(", ")}.`);
+  }
+
+  // §4.11 the standard of living: what the people of this age expect and lack
+  {
+    const l = livingStandard(world, n), next = nextEraNeeds(world, n);
+    if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
   }
 
   // §2.11 the sea, and the fine things that calm a people
