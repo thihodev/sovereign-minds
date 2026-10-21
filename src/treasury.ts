@@ -9,6 +9,7 @@ import { buildingWorks, researchPoints, roadNet, type Ledger } from "./engine.ts
 import { price } from "./market.ts";
 import { inLaws } from "./royals.ts";
 import { urbanCoin } from "./urban.ts";
+import { striking } from "./classes.ts";
 import type { Nation, World } from "./types.ts";
 
 type Say = (nation: number | null, kind: string, text: string) => void;
@@ -19,7 +20,7 @@ export interface Treasury { tax: number; tariff: number; now: { in: Book; out: B
 /** The words for each line of the treasury's books. */
 export const LINE_VI: Record<string, string> = {
   tax: "thuế sản xuất", market: "thuế chợ biên giới", tariff: "thuế quan hàng nhập", toll: "phí qua đất", works: "công trình công cộng", roads: "phí đường",
-  cities: "thuế thị trấn, thành phố", trade: "nhận qua buôn bán, quà", officials: "lương quan lại", buy: "mua vật liệu", hire: "thuê nhân công", study: "nuôi học giả", duty: "thuế quan nộp nước khác", start: "vốn lập quốc", leak: "thất thoát (kho đầy, quan lại tham ô)",
+  cities: "thuế thị trấn, thành phố", trade: "nhận qua buôn bán, quà", officials: "lương quan lại", buy: "mua vật liệu", hire: "thuê nhân công", study: "nuôi học giả", duty: "thuế quan nộp nước khác", grant: "ban ơn các tầng lớp", start: "vốn lập quốc", leak: "thất thoát (kho đầy, quan lại tham ô)",
 };
 
 export const coin = (n: Nation) => n.stock.coin || 0;
@@ -166,7 +167,7 @@ export function treasuryPhase(world: World, L: Ledger): void {
     const made = L.byNation.get(n.id) ?? {};
     let base = 0;
     for (const [g, [m]] of Object.entries(made)) if (g !== "coin" && m > 0) base += m * price(world, g);
-    earn(L, n, base * t.tax, "tax");
+    earn(L, n, base * t.tax * (striking(world, n, "officials") ? 0.5 : 1), "tax"); // §4.15 striking officials collect half
     earn(L, n, workIncome(world, n), "works");
     earn(L, n, urbanCoin(n), "cities"); // §2.13 towns and cities pay their dues
     if ((n.roadWorks?.length ?? 0) || world.tiles.some(x => x.owner === n.id && (x.road || 0) > 0)) {

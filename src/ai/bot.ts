@@ -266,7 +266,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       const tilesLost = warSide(w, enemy.id).tiles + warSide(w, enemy.id).centres;
       const losing = lead <= -WAR.losingBy || tilesLost >= 1;
       // a people gives in early only when clearly beaten: land lost, or nearly the lead that makes it pay reparations
-      const beaten = lead <= -(WAR.decisive - 2) || tilesLost >= 1;
+      // (a people holds out a few turns first, unless routed)
+      const beaten = (age >= WAR.peaceAfter - 1 && (lead <= -(WAR.decisive - 2) || tilesLost >= 1)) || lead <= -2 * WAR.decisive;
       const white = age >= WAR.peaceAfter;
       // the aggressor stops once it has won enough (the loser pays at once), lost too often, or tired;
       // the defender asks once a white peace is allowed, or buys it earlier when losing
@@ -474,6 +475,11 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // §4.13 coin beyond a reserve hires hands for the work in progress
   const purse = v.stock("coin");
   if (n.founded && tick > 0 && purse > 80 && pending.length) spend("invest", { in: "building", building: pending[0].id, amount: Math.min(24, Math.floor(purse - 60)) });
+  // §4.15 a full treasury wins over the unhappiest order
+  else if (n.founded && tick > 0 && purse > 150 && n.classes) {
+    const sore = Object.entries(n.classes).filter(([, v]) => v < 50).sort((a, b) => a[1] - b[1])[0];
+    if (sore) spend("grant", { class: sore[0], coin: Math.min(40, Math.floor(purse - 120)) });
+  }
 
   // §3.2 never a turn without an order: study something, or send a scout out (the labour plan keeps a hand for it)
   if (n.founded && !actions.length && ap >= 1) {

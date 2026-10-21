@@ -630,3 +630,11 @@ ul.needs li.no b { color: var(--ink); }
 .court-sum li { display: flex; gap: 8px; align-items: baseline; }
 .court-sum .i { width: 1.2em; text-align: center; flex: none; }
 .court-sum .up { color: var(--good); } .court-sum .down { color: var(--bad); }
+
+/* §4.15 the orders of society */
+.orders { list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 6px; }
+.orders li { display: grid; grid-template-columns: 1.4em minmax(90px, auto) 1fr; align-items: center; column-gap: 8px; font-size: 13px; }
+.orders .meta { grid-column: 2; grid-row: 2; font-size: 11.5px; }
+.orders .bar { grid-column: 3; grid-row: 1; margin: 0; }
+.orders .mono { grid-column: 3; grid-row: 2; font-size: 11.5px; color: var(--muted); }
+.orders .pill { grid-column: 3; grid-row: 2; justify-self: end; }

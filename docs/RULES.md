@@ -712,6 +712,47 @@ Người trị vì là chính AI quản lý quốc gia. **Hoàng tộc** là h�
 
 Bộ trưởng Ngoại giao được cầu hôn và nhận lời.
 
+### 4.15 Các tầng lớp xã hội
+
+Dân không phải một khối. Mỗi tầng lớp muốn những thứ riêng, và hài lòng hay bất bình theo cách triều đình (AI) trị nước.
+
+| Tầng lớp | Gồm | Muốn |
+|---|---|---|
+| Nông dân | hái lượm, săn, đánh cá, làm ruộng | đủ ăn, thuế nhẹ, ít bị bắt lính, mức sống cao |
+| Thợ thủ công | đốn gỗ, đá, đá lửa, đất sét, đào mỏ, chế tác, xây dựng | có việc xây dựng (công trình, đường), mức sống khá |
+| Thương nhân | 2 mỗi bạn hàng + 3 mỗi chợ | bạn hàng, chợ, hòa bình, thông gia (buôn không thuế quan) |
+| Tăng lữ, học giả | người nghiên cứu + 2 mỗi bàn thờ hay đền | đền thờ, lễ hội, có nghiên cứu, xã hội yên ổn |
+| Quan lại | các quan chức | lương trả bằng tiền (ngân khố cạn thì giận), triều chính yên |
+| Binh lính | chiến binh | đủ ăn, thắng trận, ngân khố đủ trả lương (≥ 30 tiền) |
+
+Mức hài lòng (0–100):
+- bắt đầu từ 60;
+- mỗi lượt đi 20% quãng đường tới mức tầng lớp đó mong.
+
+| Mức hài lòng | Hệ quả |
+|---|---|
+| ≥ 70 | tầng lớp làm việc tốt hơn 5% |
+| < 30 | mỗi tầng lớp bất bình −1 ổn định và +1 bất mãn mỗi lượt (tối đa 2) |
+| < 15 | **đình công**: việc của họ giảm 30% (xem dưới) |
+
+Việc bị giảm khi đình công:
+
+| Tầng lớp | Việc giảm |
+|---|---|
+| Nông dân | lương thực |
+| Thợ thủ công | vật liệu, chế tác, xây dựng |
+| Tăng lữ, học giả | nghiên cứu |
+| Binh lính | sức chiến đấu |
+| Thương nhân | vận tải |
+| Quan lại | chỉ thu được nửa thuế sản xuất |
+
+**Ban ơn (`grant`, 1 AP):** `{"type":"grant","class":"farmers|artisans|merchants|clergy|officials|soldiers","coin":n}` chi tiền ngân khố cho một tầng lớp.
+- Mỗi tiền trên một người làm mức hài lòng +5.
+- Mỗi lần tối đa +40.
+- Tầng lớp nhỏ được tính ít nhất 3 người.
+
+Bộ trưởng Nội vụ được ban ơn.
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.

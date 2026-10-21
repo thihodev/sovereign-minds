@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.33";
+export const RULES_VERSION = "0.34";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -233,7 +233,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, city_focus: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, city_focus: 1, grant: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -845,7 +845,7 @@ export const MINISTER_DOMAINS: Record<string, MinisterDomain> = {
   war: { title: "Bộ trưởng Chiến tranh", short: "chiến tranh", desc: "số chiến binh, tấn công, đột kích, đánh man di (tuyên chiến và giảng hòa vẫn là việc của người trị vì)", en: "the number of warriors (\"warriors\"), attack, raid, clear_wild (never declare_war or peace)", actions: ["attack", "raid", "clear_wild"] },
   diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly, hôn nhân hoàng tộc", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine, royal_marriage, accept_marriage", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine", "royal_marriage", "accept_marriage"] },
   learning: { title: "Bộ trưởng Học thuật", short: "học thuật", desc: "chọn nghiên cứu, đề xuất phát minh", en: "research, propose_invention", actions: ["research", "propose_invention"] },
-  interior: { title: "Bộ trưởng Nội vụ", short: "nội vụ", desc: "bổ nhiệm, cách chức, ban thưởng quan chức; phong tục gia đình", en: "appoint_official, dismiss_official, reward_official, family_policy", actions: ["appoint_official", "dismiss_official", "reward_official", "family_policy"] },
+  interior: { title: "Bộ trưởng Nội vụ", short: "nội vụ", desc: "bổ nhiệm, cách chức, ban thưởng quan chức; phong tục gia đình; ban ơn các tầng lớp", en: "appoint_official, dismiss_official, reward_official, family_policy, grant", actions: ["appoint_official", "dismiss_official", "reward_official", "family_policy", "grant"] },
 };
 export const MINISTERS = {
   /** Milestones: a founded nation may hold one minister at at[0] people, two at at[1], and so on. */
@@ -1004,4 +1004,16 @@ export const URBAN = {
     faith: { field: "stability", mult: 1, town: 1, city: 2 },
     garrison: { field: "calm", mult: 1, town: 3, city: 6 },
   } as Record<string, { field: string; mult: number; town: number; city: number }>,
+};
+
+// §4.15 The orders of society: each order's mood (0–100) moves `pace` of the way to what it wants each turn
+export const CLASSES = {
+  start: 60, pace: 0.2,
+  /** at or above `content` an order works `bonus` better; below `restless` each such order costs 1 stability and adds 1 discontent
+   *  (at most `maxStability` a turn); below `strike` it downs tools and its work falls by `strikeCut` */
+  content: 70, bonus: 0.05, restless: 30, maxStability: 2, strike: 15, strikeCut: 0.3,
+  /** soldiers are glad of a treasury that can pay them */
+  soldierPurse: 30,
+  /** a grant: each coin per member raises the mood `grantPer`, at most `grantMax` at once (an order counts at least `grantMinSize`) */
+  grantPer: 5, grantMax: 40, grantMinSize: 3,
 };

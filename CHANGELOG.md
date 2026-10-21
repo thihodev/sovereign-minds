@@ -2,6 +2,16 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.34
+
+- **Các tầng lớp xã hội (§4.15):** nông dân, thợ thủ công, thương nhân, tăng lữ và học giả, quan lại, binh lính.
+  - Mỗi tầng lớp có mức hài lòng đi theo điều họ muốn: đủ ăn, thuế, việc làm, buôn bán, đền thờ, lương bằng tiền, thắng trận.
+  - Hài lòng thì làm việc tốt hơn. Bất bình thì mất ổn định. Dưới 15 thì đình công (việc của họ giảm 30%; quan lại đình công thì chỉ thu được nửa thuế).
+  - Lệnh `grant` chi tiền ngân khố để ban ơn một tầng lớp.
+  - AI thấy `classes`: quy mô, mức hài lòng, mức đang hướng tới và lý do.
+  - Hồ sơ quốc gia có mục Các tầng lớp; khung Chi tiết báo tầng lớp đang bất bình hay đình công.
+- Bot dùng ngân khố đầy để ban ơn tầng lớp kém hài lòng nhất. Bot thua trận cầm cự vài lượt rồi mới xin hòa, trừ khi bị đánh tan.
+
 ## v0.33
 
 - **Làng, thị trấn, thành phố (§2.13):** mỗi trung tâm lớn lên theo dân, công trình và đường về thủ đô của tỉnh nó.

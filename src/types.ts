@@ -121,6 +121,8 @@ export interface Nation {
   house?: string; royals?: import("./royals.ts").Royal[];
   /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */
   urban?: Record<string, import("./urban.ts").Urban>;
+  /** §4.15 each order of society's mood, 0–100 */
+  classes?: Record<string, number>;
   /** §10.5 petitions the gods took up: the nation's honoured ideas */
   initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */

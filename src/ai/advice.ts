@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -23,6 +23,7 @@ import { livingStandard } from "../living.ts";
 import { greatsView } from "../greats.ts";
 import { inLaws, royalsView } from "../royals.ts";
 import { urbanView } from "../urban.ts";
+import { classView } from "../classes.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -319,6 +320,15 @@ export function advice(world: World, n: Nation): Advice[] {
     if (purse > TREASURY.safe) say(1, `Ngân khố ${Math.round(purse)} tiền: quá ${TREASURY.safe} thì mỗi lượt thất thoát ${TREASURY.leak * 100}% phần dư. Hãy chi: thuê thợ cho công trình đang xây (invest building, ${TREASURY.coinPerWork} tiền/công), nuôi học giả (invest research, ${TREASURY.coinPerRP} tiền/RP), xây chợ, làm đường (ngân khố tự mua gỗ, đá còn thiếu), hoặc mua hàng của nước khác bằng tiền (trade_offer give coin).`);
     else if (purse < 10 && net < 0) say(2, `Ngân khố cạn (${Math.round(purse)} tiền, lượt trước hụt ${Math.round(-net)}): lương quan lại sẽ phải trả bằng lương thực. Xây công trình sinh lợi (chợ, bến thuyền, cảng), làm đường, hoặc tăng thuế một chút.`);
     if (canMarket) say(1, `Xây Chợ (build market): công trình công cộng thu ${BUILDING_BY_TYPE.market?.effect.income ?? 2} tiền/lượt, thêm 1 tiền mỗi 50 dân và mỗi bạn hàng.`);
+  }
+
+  // §4.15 the orders of society: the bitter and the restless, and what they want
+  if (n.founded) {
+    const cv = classView(world, n).filter(c => c.mood < CLASSES.restless || c.heading_to < CLASSES.restless).sort((a, b) => a.mood - b.mood);
+    for (const c of cv.slice(0, 2)) {
+      const want = c.because.filter(x => x.startsWith("−")).join(", ");
+      say(c.strike ? 3 : 2, `${c.name[0].toUpperCase()}${c.name.slice(1)} ${c.strike ? "đang đình công" : "bất bình"} (hài lòng ${c.mood}/100, đang hướng tới ${c.heading_to}${want ? `: ${want}` : ""}). ${c.strike ? `Việc của họ giảm ${CLASSES.strikeCut * 100}%. ` : ""}Sửa điều họ cần, hoặc ban ơn từ ngân khố (grant, ${c.class}: mỗi tiền một người +${CLASSES.grantPer} hài lòng, ~${Math.ceil(Math.max(CLASSES.grantMinSize, c.size) * (CLASSES.restless + 10 - c.mood) / CLASSES.grantPer)} tiền để qua mức ${CLASSES.restless + 10}).`);
+    }
   }
 
   // §2.13 towns and cities: a focus for each, and what the next tier lacks

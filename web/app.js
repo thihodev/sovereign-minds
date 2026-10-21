@@ -1391,10 +1391,12 @@
     const t = n.treasury;
     if (t) {
       const sum = b => Object.values(b || {}).reduce((s, v) => s + v, 0), net = t.last ? sum(t.last.in) - sum(t.last.out) : 0;
-      rows.push(`<li><span class="i">💰</span><span>Ngân khố <b>${Math.round(t.coin).toLocaleString("vi-VN")}</b> tiền${t.last ? ` <span class="${net >= 0 ? "up" : "down"}">(${net >= 0 ? "+" : "−"}${Math.abs(Math.round(net * 10) / 10)}/lượt)</span>` : ""} · thuế ${Math.round(t.tax * 100)}% · thuế quan ${Math.round(t.tariff * 100)}%</span></li>`);
+      rows.push(`<li><span class="i">💰</span><span>Ngân khố <b>${Math.round(t.coin).toLocaleString("vi-VN")}</b> tiền${t.last ? ` <span class="${net >= 0 ? "up" : "down"}">(${Math.abs(net) < 0.05 ? "±0" : `${net > 0 ? "+" : "−"}${Math.abs(Math.round(net * 10) / 10)}`}/lượt)</span>` : ""} · thuế ${Math.round(t.tax * 100)}% · thuế quan ${Math.round(t.tariff * 100)}%</span></li>`);
     }
     const r = n.royals;
     if (r?.house) rows.push(`<li><span class="i">👑</span><span>Hoàng tộc <b>${esc(r.house)}</b> · ${(r.unwed || []).length} hoàng thân chưa thành hôn${(r.in_laws || []).length ? ` · thông gia: ${r.in_laws.map(x => esc(x.nation)).join(", ")}` : ""}</span></li>`);
+    const sour = (n.classes || []).filter(c => c.mood < 30);
+    if (sour.length) rows.push(`<li><span class="i">⚠</span><span class="down">${sour.map(c => `${esc(c.name)} ${c.strike ? "đình công" : "bất bình"} (${c.mood})`).join(", ")}</span></li>`);
     const towns = (n.provinces || []).filter(p => p.tier > 0);
     if (towns.length) rows.push(`<li><span class="i">🏙</span><span>${towns.map(p => `${esc(p.name)} (${p.tierName.toLowerCase()}${p.focus ? `, ${p.focus}` : ""})`).join(", ")}</span></li>`);
     return rows.length ? `<ul class="court-sum">${rows.join("")}</ul>` : "";
@@ -1573,6 +1575,7 @@
           ${n.exodus && n.exodus.recent ? `<h3>Dân bỏ đi</h3><p class="note ${n.exodus.alarm ? "warn" : ""}">${n.exodus.recent} người trong ${10} lượt qua (${Math.round(n.exodus.share * 100)}% dân)${n.exodus.lastTurn ? `, ${n.exodus.lastTurn} người lượt vừa rồi` : ""} · ${esc(Object.entries(n.exodus.why).map(([w, k]) => `${k} vì ${w}`).join(", "))}${Object.keys(n.exodus.to).length ? ` · sang ${esc(Object.entries(n.exodus.to).map(([o, k]) => `${o} ${k}`).join(", "))}` : ""}${n.exodus.alarm ? " · quá 3%: ổn định, uy tín và hạng đang giảm" : ""}</p>` : ""}
           ${n.recent?.length ? `<h3>Các lượt gần đây (AI thấy mục này)</h3><ul class="plain recent">${n.recent.slice().reverse().map(r => `<li><b>L${r.tick}</b> · dân ${r.pop} · lương thực ${r.food} · ổn định ${r.stab}<div class="meta">Lệnh: ${esc(r.orders.join(" · ") || "(không ra lệnh)")}</div></li>`).join("")}</ul>` : ""}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${classesBlock(n)}
           ${treasuryBlock(n)}
           ${greatsBlock(n)}
           ${royalsBlock(n)}
@@ -1654,6 +1657,14 @@
   const ERA_NAMES = ["Đồ Đá Cũ", "Đồ Đá Mới", "Đồ Đồng", "Đồ Sắt", "Cổ Đại", "Trung Đại", "Cận Đại", "Công Nghiệp", "Hiện Đại", "Nguyên Tử"];
   // §4.12 great people
   const GREAT_ICON = { scholar: "📚", general: "⚔", merchant: "🪙", artisan: "🔨", prophet: "🔥", explorer: "🧭" };
+  const ORDER_ICON = { farmers: "🌾", artisans: "🔨", merchants: "⚖", clergy: "📜", officials: "🏛", soldiers: "🛡" };
+  function classesBlock(n) {
+    const cs = n.classes || []; if (!cs.length) return "";
+    const color = v => v >= 70 ? "var(--good)" : v >= 30 ? "var(--warn)" : "var(--bad)";
+    return `<h3>Các tầng lớp</h3><ul class="orders">${cs.map(c => `<li title="${esc(c.because.join("; ") || "")}"><span class="i">${ORDER_ICON[c.class] || "•"}</span><b>${esc(c.name)}</b><span class="meta">${c.size} người</span>
+      <div class="bar"><i style="width:${c.mood}%;background:${color(c.mood)}"></i></div><span class="mono">${c.mood}${c.heading_to !== c.mood ? ` → ${c.heading_to}` : ""}</span>${c.strike ? ` <span class="pill bad">đình công</span>` : ""}</li>`).join("")}</ul>
+      <p class="note">Hài lòng ≥ 70: làm việc tốt hơn 5%. Dưới 30: mất ổn định. Dưới 15: đình công. Rê chuột vào một tầng lớp để xem họ muốn gì.</p>`;
+  }
   function treasuryBlock(n) {
     const t = n.treasury; if (!t) return "";
     const pct = x => `${Math.round(x * 100)}%`, f = x => (Math.round(x * 10) / 10).toLocaleString("vi-VN");
