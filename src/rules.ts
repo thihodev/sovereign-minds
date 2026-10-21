@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.21";
+export const RULES_VERSION = "0.22";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -346,6 +346,9 @@ export const WAR = {
   reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.5,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
   weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10, unprovokedPenalty: 5,
+  /** §7.4 a nation that falls: `fallFlee` of its survivors flee to the calmest nation they know, the rest live on under
+   *  the victor with its land, buildings and stores; the victor's stability −`fallStability` (a people not yet won over). */
+  fallFlee: 0.2, fallStability: 3,
   /** Defenders fight at home: strength × (1 + home + terrain + walls + river). */
   home: 0.5,
   /** Front: one attacker sends at most frontBase + frontPerTile × (its tiles next to the target) warriors at one tile per tick. */

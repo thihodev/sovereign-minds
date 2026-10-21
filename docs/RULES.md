@@ -839,6 +839,13 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Tù binh:** khi bên công thắng, 50% số người bên thủ tử trận trở thành dân của bên thắng, ổn định bên thắng −1 mỗi 5 tù binh.
 - **Kết thúc:** hiệp ước hòa bình (có thể kèm nhượng ô và cống nạp), hoặc diệt vong. Đầu hàng thành chư hầu ngay giữa chiến tranh (chưa có trong engine: phải ký hòa bình trước rồi mới ký chư hầu). Từ lượt thứ 5 tính từ khi giao tranh bắt đầu, chiến tranh gây −1 ổn định mỗi lượt cho cả hai bên.
 
+**Một nước sụp đổ (v0.22):** khi thủ đô thất thủ mà không còn điểm định cư nào, quốc gia diệt vong.
+- **Dân:** 1/5 số người còn sống chạy nạn sang nước yên ổn nhất mà họ quen (tính vào số dân bỏ đi của nước sụp đổ). Số còn lại thành dân của nước thắng.
+- **Tài sản:** đất, công trình và kho còn lại về tay nước thắng. Đất vượt giới hạn quản lý của nước thắng sẽ thành đất hoang dần (mục 2.3).
+- **Nước thắng:** −3 ổn định, vì dân mới chưa phục.
+- **AI của nước sụp đổ được giải phóng:** Engine không gọi model đó nữa, kể cả các bộ trưởng.
+- Nếu nước thắng là nước gốc chiếm lại nước tách ra từ nó, cả nước nhập lại trọn vẹn, không ai chạy nạn (mục 4.5).
+
 ### 7.5 Lan truyền tri thức
 
 | Cách tiếp xúc | Giảm RP khi nghiên cứu phát minh mà bên kia đã có |

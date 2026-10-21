@@ -65,3 +65,25 @@ test("a peace treaty ends the hostility: trade opens again", () => {
   assert.equal(relation(w, a.id, b.id), "hòa bình");
   assert.ok(!a.lastRejected.some(r => r.action === "trade_offer"), JSON.stringify(a.lastRejected));
 });
+
+test("a nation that falls: its people live on under the victor, a fifth flee, its land and stores pass over", async () => {
+  const { fallTo } = await import("../src/diplomacy.ts");
+  const { Ledger } = await import("../src/engine.ts");
+  const { WAR } = await import("../src/rules.ts");
+  const w = createWorld("fall", bots(3));
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocThang", capital: "DoThang", people: "DanThang", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocMat", capital: "DoMat", people: "DanMat", flag: flag("#3355ff") }] } },
+    2: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocLanh", capital: "DoLanh", people: "DanLanh", flag: flag("#22aa44") }] } } });
+  const [a, d, c] = w.nations;
+  d.met.push(a.id, c.id); c.stability = 90; a.stability = 60;
+  d.population = 50; d.stock.wood = 40;
+  const popA = a.population, popC = c.population, tilesD = w.tiles.filter(t => t.owner === d.id).length, woodA = a.stock.wood || 0;
+  const L = new Ledger(w);
+  fallTo(w, a, d, L, () => { });
+  assert.deepEqual(L.audit(w), [], "nothing lost unrecorded");
+  assert.equal(d.alive, false);
+  assert.equal(c.population - popC, Math.floor(50 * WAR.fallFlee), "a fifth fled to the calmest nation they knew");
+  assert.equal(a.population - popA, 50 - Math.floor(50 * WAR.fallFlee), "the rest live on under the victor");
+  assert.equal(w.tiles.filter(t => t.owner === a.id).length >= tilesD, true, "the land passed to the victor");
+  assert.ok((a.stock.wood || 0) >= woodA + 40, "and the stores");
+});

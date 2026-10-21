@@ -2,7 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.21 (đang làm)
+## v0.22 (đang làm)
+
+- **Một nước sụp đổ (§7.4):**
+  - trước đây dân còn sống biến mất và đất thành đất hoang;
+  - giờ 1/5 chạy nạn sang nước yên ổn nhất mà họ quen, số còn lại thành dân của nước thắng;
+  - đất, công trình và kho còn lại về tay nước thắng; nước thắng −3 ổn định;
+  - AI của nước sụp đổ không còn được gọi.
+
+## v0.21
 
 - **Dân số và ổn định:**
   - không mở được lễ hội khi kho dưới 1,5 lượt ăn;

@@ -578,9 +578,7 @@ function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say,
         D.alive = false; D.status = "dead"; D.population = 0;
         say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} trở về với ${A.name}: đất, dân và kho nhập lại như xưa.`);
       } else {
-        D.alive = false; D.status = "dead"; D.population = 0;
-        say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} diệt vong dưới tay ${A.name}.`);
-        for (const t of world.tiles) if (t.owner === D.id) t.owner = -1;
+        fallTo(world, A, D, L, say);
       }
     } else {
       D.settlements = D.settlements.filter(s => s.tile !== tile);
@@ -629,6 +627,22 @@ export function betrayalPhase(world: World, say: Say): void {
   }
 }
 
+/** §7.4 A nation falls to another: its people live on (a fifth flee), its land, buildings and stores pass to the victor. */
+export function fallTo(world: World, A: Nation, D: Nation, L: Ledger, say: Say): void {
+  const flee = Math.floor(D.population * WAR.fallFlee);
+  const refuge = D.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded && o.id !== A.id && o.id !== D.id).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
+  let fled = 0;
+  if (refuge && flee > 0) { fled = flee; addPeople(refuge, takePeople(D, flee, "migrate")); noteExodus(D, world.tick, flee, refuge.id, "conquest"); refuge.lastEvents.push(`${flee} người ${D.name} chạy nạn sang nước ta khi nước họ sụp đổ.`); }
+  const stay = D.population;
+  if (stay > 0) addPeople(A, takePeople(D, stay, "migrate"));
+  let land = 0;
+  for (const t of world.tiles) if (t.owner === D.id) { t.owner = A.id; moveBuildings(D, A, t.i); land++; }
+  for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "loot"); L.stock(A, g, q, "loot"); }
+  D.alive = false; D.status = "dead"; D.population = 0;
+  A.stability = Math.max(0, A.stability - WAR.fallStability);
+  A.lastEvents.push(`${D.name} sụp đổ: ${stay} người của họ trở thành dân ta, ${land} ô đất và kho của họ về tay ta. Dân mới chưa phục (−${WAR.fallStability} ổn định).`);
+  say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} diệt vong dưới tay ${A.name}: ${stay} người sống dưới quyền ${A.name}${fled ? `, ${fled} người chạy sang ${refuge!.name}` : ""}.`);
+}
 function moveBuildings(from: Nation, to: Nation, tile: number): void {
   const taken = from.buildings.filter(b => b.tile === tile);
   from.buildings = from.buildings.filter(b => b.tile !== tile);
