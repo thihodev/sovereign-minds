@@ -199,3 +199,21 @@ test("transport is the lifeblood: roads raise yields, bring help, widen markets;
   assert.equal(far.road, 2, "a level lost after untended turns");
   if (kept.owner === -1) assert.equal(kept.road, 2, "a road that joins the capital is kept up");
 });
+
+test("the railway: level 4, opened by the capability đường-sắt, paid in iron, wood and coal, laid by the builders", async () => {
+  const { roadLevelMax } = await import("../src/engine.ts");
+  const w = founded(1, "railway"), n = w.nations[0];
+  const near = NEIGHBORS[n.capital].find(i => w.tiles[i].owner === n.id && flat(w, i))!;
+  Object.assign(n.stock, { iron: 20, wood: 20, coal: 20, stone: 20 });
+  turn(w, { 0: { actions: [{ type: "build_road", path: [xy(near)], level: 4 }] } });
+  assert.match(n.lastRejected[0].reason, /đường-sắt/);
+  assert.equal(roadLevelMax(n, w) < 4, true);
+  grant(w, n, ["đường-sắt"]);
+  assert.equal(roadLevelMax(n, w), 4, "the railway opens with its capability, whatever the era");
+  turn(w, { 0: { labor: builders(20), actions: [{ type: "build_road", path: [xy(near)], level: 4 }] } });
+  assert.deepEqual(n.lastRejected, []);
+  assert.equal(n.stock.iron, 20 - ROADS.levels[3].cost.iron!);
+  for (let k = 0; k < 3 && (w.tiles[near].road || 0) < 4; k++) turn(w, { 0: { labor: builders(20) } });
+  assert.equal(w.tiles[near].road, 4, "laid");
+  assert.equal(ROADS.yield[4] > ROADS.yield[3], true);
+});

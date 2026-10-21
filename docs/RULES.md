@@ -122,6 +122,7 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
 | 1 | Đường mòn | Luồng lạch cắm sào | Đồ Đá Cũ | 1 gỗ | 2 gỗ | 2 | 60% | −15% |
 | 2 | Đường đất nện | Hải đạo có phao tiêu | Đồ Đồng | 1 gỗ + 2 đá | 3 gỗ + 1 dây | 4 | 40% | −30% |
 | 3 | Đường lát đá | Hải đạo có hải đăng | Cổ Đại | 5 đá | 6 đá + 2 gỗ | 8 | 25% | −50% |
+| 4 | **Đường sắt** | Tuyến tàu hơi nước | có năng lực `đường-sắt` (phát minh Đường sắt), không phụ thuộc thời | 2 sắt + 2 gỗ + 1 than | 2 than + 1 sắt + 1 gỗ | 12 | 10% | −70% |
 
 - **Làm đường:** vật liệu trả ngay khi ra lệnh. Thợ xây làm các công trình trước, công còn thừa thì làm đường theo thứ tự đã ra lệnh.
 - **Làm ở đâu:**
@@ -139,6 +140,8 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
   - Điểm định cư nối với thủ đô bằng đường thì không bị tính vào phạt ổn định vì quá nhiều điểm định cư (mục 4.4). Đường nối có thể đi qua đất mình, vùng hoang hay đất nước có hiệp ước.
 - **Hư hại:** lũ lụt làm tối đa 3 ô đường trên đất ngập mất một cấp. Động đất làm mọi đường trong bán kính tâm chấn mất một cấp.
 - **Quan sát:** gói trạng thái có trường `roads`, gồm số ô đường, các điểm định cư đã nối hay chưa nối, và một đường gợi ý tới điểm định cư gần nhất chưa nối. Các ô lãnh thổ có trường `road`.
+
+Đất có đường sắt ở trên hay kề bên nộp thêm 15% sản lượng (đường cấp 1–3: 3%, 6%, 10%). Trên bản đồ, đường sắt vẽ thành ray thép trên tà vẹt. Đoàn buôn đi phần lớn trên ray hiện thành đoàn tàu. Mỗi nước có tuyến ray nối thủ đô với một điểm định cư có một đoàn tàu chạy qua lại.
 
 ### 2.5b Giao thông là mạch máu
 

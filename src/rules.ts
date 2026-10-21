@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.38";
+export const RULES_VERSION = "0.39";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -322,12 +322,16 @@ export interface RoadLevel {
   move: number;
   /** Robbers and storms strike this much less often on it. */
   safety: number;
+  /** a capability it needs besides the era (the railway: "đường-sắt") */
+  cap?: string;
 }
 export const ROADS = {
   levels: [
     { name: "Đường mòn", lane: "Luồng lạch cắm sào", era: 0, work: 2, cost: { wood: 1 }, laneCost: { wood: 2 }, move: 0.6, safety: 0.15 },
     { name: "Đường đất nện", lane: "Hải đạo có phao tiêu", era: 2, work: 4, cost: { wood: 1, stone: 2 }, laneCost: { wood: 3, rope: 1 }, move: 0.4, safety: 0.3 },
     { name: "Đường lát đá", lane: "Hải đạo có hải đăng", era: 4, work: 8, cost: { stone: 5 }, laneCost: { stone: 6, wood: 2 }, move: 0.25, safety: 0.5 },
+    // §2.5 the railway: iron rails on wooden sleepers, steamers on the water; opened by the railway itself, not by an era
+    { name: "Đường sắt", lane: "Tuyến tàu hơi nước", era: 0, cap: "đường-sắt", work: 12, cost: { iron: 2, wood: 2, coal: 1 }, laneCost: { coal: 2, iron: 1, wood: 1 }, move: 0.1, safety: 0.7 },
   ] as RoadLevel[],
   /** Tiles one build_road order may lay. */
   maxPerOrder: 12,
@@ -344,7 +348,7 @@ export const ROADS = {
    *  of what it gives (fresher, faster); a tile of its own on a road joined to its capital is held `reinforce` harder
    *  (help arrives in time); a border market with a road at the border trades `market` more; a road on land no one holds
    *  joined to no living nation's centre loses a level every `decayTicks` turns, until it is gone. */
-  yield: [0, 0.03, 0.06, 0.1], reinforce: 0.15, market: 0.5, decayTicks: 20,
+  yield: [0, 0.03, 0.06, 0.1, 0.15], reinforce: 0.15, market: 0.5, decayTicks: 20,
 };
 
 // §2.6 Territorial waters: shallow and deep sea are held like land.

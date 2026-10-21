@@ -330,10 +330,12 @@ export function roadNet(world: World, n: Nation): { tiles: number; linked: numbe
 function roadLimit(world: World, n: Nation): number {
   return Math.min(ROADS.maxLimit, Math.floor(roadNet(world, n).tiles / ROADS.tilesPerLimit));
 }
-/** §2.5 The best road level this nation may lay now (its era). */
-export function roadLevelMax(n: Nation): number {
-  const era = eraIndex(n);
-  return ROADS.levels.filter(l => l.era <= era).length;
+/** §2.5 The best road level this nation may lay now: its era, and for the railway the capability (with `world`). */
+export function roadLevelMax(n: Nation, world?: World): number {
+  const era = eraIndex(n), caps = world ? mods(world, n).caps : null;
+  let top = 0;
+  ROADS.levels.forEach((l, k) => { if (l.era <= era && (!l.cap || caps?.has(l.cap))) top = k + 1; });
+  return top;
 }
 /** §2.5 Why this nation cannot lay a road (on land) or a sea lane (on water) on this tile, or null. */
 export function roadError(world: World, n: Nation, i: number, m: Mods = mods(world, n)): string | null {
@@ -346,7 +348,7 @@ export function roadError(world: World, n: Nation, i: number, m: Mods = mods(wor
   return m.move.has("shallow") ? null : "hải đạo cần năng lực đi-nước (thuyền)";
 }
 /** §2.5 Tiles still to lay for a road from the network (or the capital) to `to`, through the nation's own land; [] when none is needed or there is no way. */
-export function roadPlan(world: World, n: Nation, to: number, level = roadLevelMax(n)): number[] {
+export function roadPlan(world: World, n: Nation, to: number, level = roadLevelMax(n, world)): number[] {
   const m = mods(world, n), ok = (i: number) => world.tiles[i].land && (world.tiles[i].owner === n.id || world.tiles[i].owner === -1) && !roadError(world, n, i, m);
   const hubs = new Set(centres(n)), prev = new Map<number, number>(), starts = [...roadWalk(world, n, [n.capital])];
   const queue = [...starts]; for (const i of starts) prev.set(i, -1);
@@ -1726,10 +1728,10 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const tiles = raw.map(parseTile);
       if (!tiles.length || tiles.some(i => i < 0)) return "Cần path: danh sách ô [[cột, hàng], ...]";
       if (tiles.length > ROADS.maxPerOrder) return `Mỗi lệnh làm tối đa ${ROADS.maxPerOrder} ô`;
-      const top = roadLevelMax(n), level = a.level === undefined ? top : Math.floor(Number(a.level));
+      const top = roadLevelMax(n, world), level = a.level === undefined ? top : Math.floor(Number(a.level));
       if (!(level >= 1 && level <= ROADS.levels.length)) return `level phải từ 1 tới ${ROADS.levels.length}`;
       const def = ROADS.levels[level - 1];
-      if (level > top) return `${def.name} / ${def.lane} cần thời ${ERA_TABLE[def.era].name}`;
+      if (level > top) return def.cap ? `${def.name} / ${def.lane} cần năng lực ${def.cap} (phát minh Đường sắt)` : `${def.name} / ${def.lane} cần thời ${ERA_TABLE[def.era].name}`;
       const works = (n.roadWorks ??= []), queued = new Set(works.map(w => w.tile)), todo: number[] = [], cost: Record<string, number> = {};
       for (const i of tiles) {
         const err = roadError(world, n, i, m);

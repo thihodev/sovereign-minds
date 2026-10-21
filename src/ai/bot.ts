@@ -351,7 +351,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     for (const b of builds) spend("build", { building: b.type, ...(b.tile !== undefined ? { tile: xy(b.tile) } : {}) });
     // §2.5 a road to every settlement, one stretch at a time, once the buildings are under way
     if (!n.roadWorks?.length && !atWar && n.settlements.length && v.food >= v.need) {
-      const linked = roadNet(world, n).linked, level = roadLevelMax(n);
+      const linked = roadNet(world, n).linked, level = roadLevelMax(n, world);
       const shortest = (lv: number, sts: typeof n.settlements) => sts.map(st => roadPlan(world, n, st.tile, lv)).filter(p => p.length).sort((a, b) => a.length - b.length)[0];
       // join the settlements first with a track, then raise the roads to the best level of the era
       const join = shortest(1, n.settlements.filter(st => !linked.includes(st.tile)));

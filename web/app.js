@@ -655,7 +655,7 @@
   }
 
   // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
-  const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
+  const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }, { c: "#d4dae0", w: .07, rail: true }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
   // the nation picked on the board or in the inspector: the rest of the map dims, its border glows
   function drawSelectedNation(g, s, z, px, byNation, edges) {
@@ -768,7 +768,7 @@
     const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
     // a road network drawn as branches from the centres, not as a mesh of every touching pair
     // roads on land no one holds any more (abandoned, gone wild) are drawn faint
-    const segs = { land: [[], [], [], []], wild: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links, loose } = roadTree(hubs);
+    const segs = { land: [[], [], [], [], []], wild: [[], [], [], [], []], sea: [[], [], [], [], []] }, dots = [], { parent, links, loose } = roadTree(hubs);
     const kind = (i, j) => isWater(i) ? "sea" : loose.has(i) && S.owners[i] < 0 && S.owners[j] < 0 ? "wild" : "land";
     S.roads.forEach((lv, i) => {
       if (!lv || !vis(i)) return;
@@ -784,11 +784,17 @@
       g.setLineDash(dash ? dash.map(d => d * s) : []); g.lineWidth = width; g.strokeStyle = color; g.stroke();
     };
     g.save(); g.lineCap = "round";
-    for (let lv = 1; lv <= 3; lv++) {
+    for (let lv = 1; lv < ROAD_STYLE.length; lv++) {
       const st = ROAD_STYLE[lv], w = Math.max(1.1 * px, s * st.w * (s * z < 8 ? .7 : 1));
       g.globalAlpha = .38; line(segs.wild[lv], w * .7, st.c, [.3, .25]); g.globalAlpha = 1;
-      line(segs.land[lv], w + 1.6 * px, "rgba(30,20,10,.45)");
-      line(segs.land[lv], w, st.c, st.dash);
+      if (st.rail) { // §2.5 a railway: dark ballast, wooden sleepers across, a steel rail along
+        line(segs.land[lv], Math.max(3 * px, s * .3), "rgba(40,36,34,.75)");
+        line(segs.land[lv], Math.max(2.6 * px, s * .26), "#6b4b33", [.06, .12]);
+        line(segs.land[lv], w, st.c);
+      } else {
+        line(segs.land[lv], w + 1.6 * px, "rgba(30,20,10,.45)");
+        line(segs.land[lv], w, st.c, st.dash);
+      }
       line(segs.sea[lv], Math.max(1 * px, s * .07) + 2 * px, "rgba(10,40,70,.5)");
       line(segs.sea[lv], Math.max(1 * px, s * .07), lv >= 2 ? "#ffffff" : "#cfeeff", [.35, .25]);
     }
@@ -2600,7 +2606,7 @@
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
       `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span><span><i style="height:4px;background:repeating-linear-gradient(90deg,#ffc828 0 5px,#16120a 5px 9px);border-radius:0"></i>Mặt trận (nước đang chiến tranh)</span>` +
       `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>` +
-      `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (đất vô chủ, không nối trung tâm nào; xuống cấp dần)</span>`;
+      `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:5px;background:repeating-linear-gradient(90deg,#6b4b33 0 2px,#2a2624 2px 5px);border-top:1px solid #d4dae0;border-radius:0"></i>Đường sắt</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (đất vô chủ, không nối trung tâm nào; xuống cấp dần)</span>`;
   }
   for (const b of document.querySelectorAll("#chron-filter button")) b.onclick = () => {
     for (const x of document.querySelectorAll("#chron-filter button")) x.classList.toggle("on", x === b);

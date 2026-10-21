@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.39
+
+- **Đường sắt (§2.5):** cấp đường thứ 4.
+  - **Mở khóa:** cần năng lực `đường-sắt` (phát minh Đường sắt), không phụ thuộc thời. Trước đây phát minh này chỉ cho +20% vận tải, không có đường ray nào trên bản đồ.
+  - **Xây:** mỗi ô 2 sắt, 2 gỗ, 1 than, 12 công. Đi trên ray chỉ tốn 10% địa hình, cướp và bão ít hơn 70%. Đất có ray nộp thêm 15%. Trên nước là Tuyến tàu hơi nước.
+  - **AI:** biết luật mới; lời cố vấn gợi ý nâng đường chính lên ray khi đã biết làm.
+  - **Bản đồ 2D:** ray thép trên tà vẹt; chú giải có "Đường sắt".
+  - **Bản đồ 3D:** nền đá dăm, tà vẹt, hai thanh ray; đoàn tàu hơi nước (đầu máy, hai toa màu cờ, khói) chạy giữa thủ đô và điểm định cư xa nhất trên tuyến; đoàn buôn đi trên ray hiện thành tàu.
+
 ## v0.38
 
 - **Chợ cửa khẩu (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**

@@ -8,8 +8,9 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/CSS2DRenderer.js";
 const SQ3 = Math.sqrt(3);
 const WATER = new Set(["ocean", "shallow"]);
 const TREES = { forest: "blob", jungle: "blob", taiga: "cone" };
-const ROAD_COLOR = [null, "#8a5a2e", "#a08a68", "#b9b9b4"];
+const ROAD_COLOR = [null, "#8a5a2e", "#a08a68", "#b9b9b4", "#4f4a46"];
 const TONE = { good: "#4cc283", bad: "#ef6b60", "": "#ffd84a" };
+const BALLAST = new THREE.Color("#4f4a46"), SLEEPER = new THREE.Color("#6b4b33"), RAIL = new THREE.Color("#d4dae0"), STEAMER = new THREE.Color("#ffe8a8");
 const hash = (...k) => { let h = 2166136261; for (const x of k) { h ^= x; h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; };
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -261,7 +262,15 @@ export function create(container, hooks) {
       const w = isWater(i) && isWater(j), wild = loose.has(i) && owners[i] < 0 && owners[j] < 0;
       if (wild) return; // roads gone wild are left off the 3D map: they only clutter it
       const [x, z] = pos(i), [x2, z2] = pos(j);
-      R.band([x, top(i) + 0.05, z], [x2, top(j) + 0.05, z2], w ? 0.07 : 0.1 + lv * 0.03, w ? lane : new THREE.Color(ROAD_COLOR[lv] || ROAD_COLOR[1]));
+      if (lv >= 4 && !w) { // §2.5 a railway: ballast, sleepers, two steel rails
+        const A = [x, top(i) + 0.05, z], B = [x2, top(j) + 0.05, z2], dx = x2 - x, dz = z2 - z, L = Math.hypot(dx, dz) || 1, ox = -dz / L * 0.07, oz = dx / L * 0.07;
+        R.band(A, B, 0.3, BALLAST);
+        for (let k = 1; k < 6; k++) { const t = k / 6, cx = x + dx * t, cz = z + dz * t, cy = A[1] + (B[1] - A[1]) * t + 0.008; R.band([cx - dx / L * 0.03, cy, cz - dz / L * 0.03], [cx + dx / L * 0.03, cy, cz + dz / L * 0.03], 0.26, SLEEPER); }
+        R.band([x + ox, A[1] + 0.016, z + oz], [x2 + ox, B[1] + 0.016, z2 + oz], 0.025, RAIL);
+        R.band([x - ox, A[1] + 0.016, z - oz], [x2 - ox, B[1] + 0.016, z2 - oz], 0.025, RAIL);
+        return;
+      }
+      R.band([x, top(i) + 0.05, z], [x2, top(j) + 0.05, z2], w ? (lv >= 4 ? 0.1 : 0.07) : 0.1 + lv * 0.03, w ? (lv >= 4 ? STEAMER : lane) : new THREE.Color(ROAD_COLOR[lv] || ROAD_COLOR[1]));
     };
     for (let i = 0; i < N * N; i++) { const lv = roads[i] || 0, j = parent.get(i); if (lv && j !== undefined && j >= 0) seg(i, j, Math.min(lv, roads[j] || lv)); }
     for (const [i, h] of links) seg(i, h, roads[i] || 1);
@@ -381,7 +390,18 @@ export function create(container, hooks) {
   function buildMovers() {
     if (movers) { scene.remove(movers.group); disposeTree(movers.group); }
     const list = [];
-    for (const c of S.caravans || []) if (c.path?.length > 1) list.push({ kind: c.mode === "water" ? "boat" : "cart", c, color: hooks.nationColor(c.from) });
+    const rail = i => (S.roads?.[i] || 0) >= 4 && !isWater(i);
+    for (const c of S.caravans || []) if (c.path?.length > 1) list.push({ kind: c.mode === "water" ? "boat" : c.path.filter(rail).length * 2 >= c.path.length ? "train" : "cart", c, color: hooks.nationColor(c.from) });
+    // §2.5 a train for each railway network: from the capital to the farthest centre the rails reach, and back
+    for (const n of S.nations) {
+      if (!n.alive || !n.founded || n.capital < 0) continue;
+      const centres = new Set((n.settlements || []).map(s => s.tile)), prev = new Map([[n.capital, -1]]), queue = [n.capital];
+      let far = -1;
+      for (let q = 0; q < queue.length; q++) for (const j of NB(queue[q])) if (j >= 0 && !prev.has(j) && (rail(j) || centres.has(j))) { prev.set(j, queue[q]); queue.push(j); if (centres.has(j)) far = j; }
+      if (far < 0) continue;
+      const path = []; for (let k = far; k >= 0; k = prev.get(k)) path.unshift(k);
+      if (path.length >= 3) list.push({ kind: "train", path, color: hooks.nationColor(n.id), ph: hash(n.id, 77) });
+    }
     for (const n of S.nations) {
       if (!n.alive || !n.founded) continue;
       const color = hooks.nationColor(n.id), unit = Math.max(1, Math.ceil(n.population / 120)), centres = [n.capital, ...(n.settlements || []).map(s => s.tile)];
@@ -401,8 +421,8 @@ export function create(container, hooks) {
       }
     }
     // one instanced mesh per shape, rewritten each frame
-    const counts = { hull: 0, sail: 0, box: 0, blob: 0, person: 0 };
-    for (const m of list) { if (m.kind === "walker") counts.person++; else if (m.kind === "cart") { counts.box++; counts.blob += 2; } else { counts.hull++; if (m.kind !== "moored") counts.sail++; } }
+    const counts = { hull: 0, sail: 0, box: 0, blob: 0, person: 0, cyl: 0 };
+    for (const m of list) { if (m.kind === "walker") counts.person++; else if (m.kind === "cart") { counts.box++; counts.blob += 2; } else if (m.kind === "train") { counts.box += 3; counts.cyl++; } else { counts.hull++; if (m.kind !== "moored") counts.sail++; } }
     const group = new THREE.Group(), meshes = {};
     for (const [k, c] of Object.entries(counts)) { if (!c) continue; const m = new THREE.InstancedMesh(geo(k), new THREE.MeshLambertMaterial({ flatShading: true }), c); m.frustumCulled = false; meshes[k] = m; group.add(m); }
     movers = { list, group, meshes }; scene.add(group); moveT0 = performance.now();
@@ -418,11 +438,23 @@ export function create(container, hooks) {
   const pointOnPath = (path, f) => { const L = path.length - 1, p = clamp(f, 0, 1) * L, k = Math.min(L - 1, Math.floor(p)), t = p - k, A = at(path[k], 0.02), B = at(path[k + 1], 0.02); return [A.lerp(B, t), Math.atan2(-(B.z - A.z), B.x - A.x)]; };
   function updateMovers(now) {
     if (!movers) return;
-    const near = camera.position.distanceTo(controls.target) < 140, M = movers.meshes, idx = { hull: 0, sail: 0, box: 0, blob: 0, person: 0 };
+    const near = camera.position.distanceTo(controls.target) < 140, M = movers.meshes, idx = { hull: 0, sail: 0, box: 0, blob: 0, person: 0, cyl: 0 };
     const put = (k, x, y, z, sx, sy, sz, ry, color) => { const m = M[k]; if (!m) return; tmpQ.setFromAxisAngle(Y_AXIS, ry); tmpM.compose(tmpP.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz)); m.setMatrixAt(idx[k], tmpM); m.setColorAt(idx[k]++, tmpC.set(color)); };
     const hide = k => { const m = M[k]; if (!m) return; tmpM.makeScale(0, 0, 0); m.setMatrixAt(idx[k]++, tmpM); };
     const turnPhase = Math.min(1, (now - moveT0) / 30000);
     for (const m of movers.list) {
+      if (m.kind === "train") {
+        // a steam engine and two wagons in the nation's colour, a puff of smoke now and then
+        const path = m.c ? m.c.path : m.path, L = path.length - 1;
+        let f;
+        if (m.c) { const span = Math.max(1, m.c.arrive - (m.c.depart ?? m.c.arrive - 1)); f = ((S.tick - (m.c.depart ?? S.tick)) + turnPhase) / span; }
+        else { const t = ((now / (6000 + L * 900)) + m.ph) % 1; f = ease(t < 0.5 ? t * 2 : 2 - t * 2); }
+        const back = 0.45 / Math.max(1, L), [p, a] = pointOnPath(path, f), dir = m.c || (((now / (6000 + L * 900)) + m.ph) % 1) < 0.5 ? 1 : -1;
+        put("box", p.x, p.y, p.z, 0.42, 0.2, 0.18, a, "#2b2b30"); put("cyl", p.x + Math.cos(a) * 0.12 * dir, p.y + 0.2, p.z - Math.sin(a) * 0.12 * dir, 0.07, 0.14, 0.07, 0, "#1d1d20");
+        for (let k = 1; k <= 2; k++) { const [q, b] = pointOnPath(path, f - k * back * dir); put("box", q.x, q.y, q.z, 0.38, 0.17, 0.17, b, m.color); }
+        if (near && now - (m.smoke || 0) > 650) { m.smoke = now; smoke.push(puff(new THREE.Vector3(p.x + Math.cos(a) * 0.12 * dir, p.y + 0.4, p.z - Math.sin(a) * 0.12 * dir), Math.floor(now / 650) % 97, "#d8d8d8", 0)); }
+        continue;
+      }
       if (m.kind === "cart" || (m.kind === "boat" && m.c)) {
         const c = m.c, span = Math.max(1, c.arrive - (c.depart ?? c.arrive - 1)), f = ((S.tick - (c.depart ?? S.tick)) + turnPhase) / span;
         const [p, a] = pointOnPath(c.path, f);
@@ -474,11 +506,11 @@ export function create(container, hooks) {
     q.g = g; q.ring = ring; q.label = label; q.el = el; q.started = true;
     q.done = () => { groups.fx.remove(g); disposeTree(g, true); el.remove(); };
   }
-  function puff(p, k, color) {
+  function puff(p, k, color, delay = k * 180) {
     const m = new THREE.Mesh(geo("blob"), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
     m.position.copy(p).add(new THREE.Vector3((hash(k, 1) - 0.5) * 0.6, 0, (hash(k, 2) - 0.5) * 0.6)); m.scale.setScalar(0.2);
     groups.fx.add(m);
-    return { m, t0: performance.now() + k * 180, dur: 2600, base: m.position.clone() };
+    return { m, t0: performance.now() + delay, dur: 2600, base: m.position.clone() };
   }
   function updateFx(now) {
     for (const q of fxQueue) {

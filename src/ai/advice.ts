@@ -6,7 +6,7 @@ import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
 import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
+import { roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, neighbours } from "../border.ts";
@@ -144,7 +144,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const land = owned.filter(t => t.land), served = (t: { i: number; road?: number }) => (t.road || 0) > 0 || NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id && world.tiles[j].land && (world.tiles[j].road || 0) > 0);
     const off = land.filter(t => !served(t));
     if (land.length >= 10 && off.length / land.length > 0.5 && (n.stock.wood || 0) >= 6)
-      say(1, `${off.length}/${land.length} ô đất chưa có đường ở trên hay bên cạnh. Mỗi ô có đường của bạn ở trên hoặc kề bên nộp về kho thêm ${ROADS.yield.slice(1).map(x => x * 100 + "%").join("/")} (đường cấp 1/2/3); ô có đường nối về thủ đô được thủ thêm ${ROADS.reinforce * 100}%. Làm đường (build_road) xuyên qua vùng đất giàu nhất (roads.land_without_road).`);
+      say(1, `${off.length}/${land.length} ô đất chưa có đường ở trên hay bên cạnh. Mỗi ô có đường của bạn ở trên hoặc kề bên nộp về kho thêm ${ROADS.yield.slice(1).map(x => x * 100 + "%").join("/")} (đường cấp ${ROADS.levels.map((_, k) => k + 1).join("/")}); ô có đường nối về thủ đô được thủ thêm ${ROADS.reinforce * 100}%. Làm đường (build_road) xuyên qua vùng đất giàu nhất (roads.land_without_road).`);
   }
 
   // A connected realm (§2.7): settlements with no way home
@@ -309,6 +309,13 @@ export function advice(world: World, n: Nation): Advice[] {
   {
     const l = livingStandard(world, n), next = nextEraNeeds(world, n);
     if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
+  }
+
+  // §2.5 the railway: once the nation can lay it, the roads that carry the most should become rails
+  if (n.founded && roadLevelMax(n, world) >= 4) {
+    const rails = ownedTiles(world, n.id).filter(t => (t.road || 0) >= 4).length, roads = ownedTiles(world, n.id).filter(t => t.land && (t.road || 0) > 0 && (t.road || 0) < 4).length;
+    const def = ROADS.levels[3];
+    if (roads > 0 && rails < roads) say(1, `Đã biết làm Đường sắt: nâng các đường chính lên ray (build_road level 4, mỗi ô ${Object.entries(def.cost).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}, ${def.work} công): đất có đường sắt nộp thêm ${ROADS.yield[4] * 100}%, đoàn buôn đi nhanh gấp ${Math.round(ROADS.levels[2].move / def.move * 10) / 10} lần đường lát đá và an toàn hơn. Đang có ${rails} ô ray, ${roads} ô đường thường.`);
   }
 
   // §6.6 herb gardens: medicine grown at home

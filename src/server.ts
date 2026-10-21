@@ -105,7 +105,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
-        roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n), works: (n.roadWorks ?? []).length } : null,
+        roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n, w), works: (n.roadWorks ?? []).length } : null,
         links: n.alive && n.founded ? Object.fromEntries(links(w, n)) : {},
         health: { outbreak: n.alive && contagious(n, w.tick), outbreakUntil: n.outbreakUntil ?? null, quarantine: n.alive && quarantined(n, w.tick), quarantineUntil: n.quarantineUntil ?? null },
         provinces: n.alive && n.founded ? provinces(w, n).map(p => ({ centre: p.centre, name: p.name, capital: p.capital, tiles: p.tiles.length, people: p.people, housing: Math.round(p.housing), way: p.way, distance: p.distance, governor: p.governor ? { name: p.governor.name, skill: p.governor.skill, loyalty: p.governor.loyalty } : null, loyal: p.loyal, mood: Math.round(p.mood), causes: p.causes.map(c => CAUSE_VI[c]), ...urbanOf(w, n, p) })) : [],
