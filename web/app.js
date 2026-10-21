@@ -18,7 +18,7 @@
   const ZONE = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" };
   const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải", coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa hoang", boat: "thuyền",
     honey: "mật ong", spice: "gia vị", fur: "lông thú", amber: "hổ phách", ochre: "đất son", marble: "cẩm thạch", gold: "vàng", silver: "bạc", gems: "đá quý",
-    shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi",
+    shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi", coin: "tiền", food_reserve: "lương dự trữ",
     wolf: "sói hoang", wild_goat: "dê núi hoang", aurochs: "bò rừng", boar: "lợn rừng", junglefowl: "gà rừng", dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà" };
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 

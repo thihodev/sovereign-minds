@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.35";
+export const RULES_VERSION = "0.36";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -44,7 +44,7 @@ export const RES_NAME: Record<string, string> = {
   dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
-  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền",
+  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền", food_reserve: "lương dự trữ (kho làng)",
 };
 
 // §4 Population and production
@@ -529,10 +529,14 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §6.4 animals a pen holds */
   herd?: number;
   /** §4.13 coin a public work earns the treasury each turn while it stands (a market also takes a share of the people and of each trading partner) */
-  income?: number; market?: number }
+  income?: number; market?: number;
+  /** §6.5 a village granary: food it keeps aside, unspoiled, against famine */
+  reserve?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
+  /** at most one on each centre (capital, settlement), built on the centre itself */
+  perCentre?: boolean;
   effect: BuildingEffect;
 }
 export const BUILDINGS: BuildingDef[] = [
@@ -551,6 +555,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
   { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "granary", name: "Kho làng", needs: "stone_tools", cost: { wood: 10, stone: 6 }, work: 5, perCentre: true, desc: "Mỗi trung tâm một kho: mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư; tự mở cứu đói khi cả nước thiếu ăn. Điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa.", effect: { reserve: 100 } },
   { type: "market", name: "Chợ", needs: "P12", cost: { wood: 10, stone: 6 }, work: 6, max: 3, desc: "Công trình công cộng: dân họp chợ, ngân khố thu 2 tiền/lượt, thêm 1 tiền mỗi 50 dân và 1 tiền mỗi bạn hàng.", effect: { income: 2, market: 1 } },
   { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
 ];
@@ -1020,3 +1025,6 @@ export const CLASSES = {
   /** a grant: each coin per member raises the mood `grantPer`, at most `grantMax` at once (an order counts at least `grantMinSize`) */
   grantPer: 5, grantMax: 40, grantMinSize: 3,
 };
+
+// §6.5 Village granaries (an idea of Văn Phong, turn 888): a share of the spare food set aside, unspoiled, opened in famine
+export const GRANARY = { share: 0.1, isolatedCalm: 0.5 };

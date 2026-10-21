@@ -1005,6 +1005,15 @@ Mỗi loại hàng có một **giá thế giới**, tính bằng đơn vị lư�
 - **Giết thịt** (`cull`, 0 AP): đổi thú lấy lương thực ngay. Chó 2, dê cừu 3, bò 6, lợn 4, gà 1, ngựa 5 lương thực mỗi con.
 - **AI thấy** `herds`: đàn của mình, sức chứa, và thú hoang trên đất mình (bắt được hay chưa). Lời cố vấn nhắc khi có thú để thuần hóa, khi đàn vượt sức chứa, và khi đói thì có thể giết thịt.
 
+### 6.5 Kho làng (sáng kiến của Văn Phong, lượt 888)
+
+**Kho làng** (`granary`) là kho dự trữ chống đói.
+- **Xây:** cần công cụ đá; 10 gỗ, 6 đá, 5 công. Xây ngay trên thủ đô hoặc một điểm định cư, mỗi trung tâm một kho.
+- **Cất:** mỗi lượt, sau bữa ăn, kho cất 10% lương thực còn dư vào phần **lương dự trữ** (`food_reserve`), tối đa 100 mỗi kho. Lương dự trữ không hư, không đem buôn bán được.
+- **Cứu đói:** khi lương thực không đủ một bữa, kho tự mở, đưa dự trữ ra trước khi có người chết đói.
+- **Tỉnh bị cắt đường:** điểm định cư bị cắt đường về thủ đô mà có kho riêng thì bất mãn tăng chậm một nửa.
+- Kho không giảm hư hỏng (việc của Hố trữ). Lương thực vẫn là kho chung của cả nước.
+
 ## 7. Quan hệ quốc gia: ngoại giao, giao thương, chiến tranh
 
 Một quốc gia chỉ có thể nhắn tin, đề nghị trao đổi, ký ước hay tuyên chiến với nước khác sau khi **đã gặp** nước đó, tức là đã thấy ít nhất một ô lãnh thổ của họ (hoặc bắt được người thám hiểm của họ, hoặc bị kéo vào chiến tranh với họ). "Đã gặp" là một chiều: A thấy B chưa chắc B đã thấy A. Mọi cam kết có hiệu lực đều là điều khoản máy đọc được, do Engine thi hành. Lời nói suông không ràng buộc ai.

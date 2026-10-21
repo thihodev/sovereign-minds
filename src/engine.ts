@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS,
+  TREASURY, MINISTER_DOMAINS, GRANARY,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -1095,7 +1095,18 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
 
   // Eating, starvation, growth, spoilage (§4.2)
   const need = mouths(n) * m.foodPerPerson;
+  // §6.5 the village granaries open before anyone starves
+  if ((n.stock.food || 0) < need && (n.stock.food_reserve || 0) > 0) {
+    const out = Math.min(n.stock.food_reserve!, need - (n.stock.food || 0));
+    L.stock(n, "food_reserve", -out, "granary"); L.stock(n, "food", out, "granary");
+    n.lastEvents.push(`Kho làng mở cứu đói: ${fmt(out)} lương thực dự trữ (còn ${fmt(n.stock.food_reserve || 0)}).`);
+  }
   const eaten = Math.min(n.stock.food || 0, need); L.stock(n, "food", -eaten, "eat");
+  { // and set aside a share of what is left over, up to their room
+    const room = n.buildings.reduce((s2, b) => s2 + (buildingWorks(world, b) ? buildingOf(world, b.type)?.effect.reserve || 0 : 0), 0) - (n.stock.food_reserve || 0);
+    const spare = (n.stock.food || 0) - need, put = Math.min(room, spare * GRANARY.share);
+    if (put > 0.05) { L.stock(n, "food", -put, "granary"); L.stock(n, "food_reserve", put, "granary"); }
+  }
   const shortage = need - eaten, prand = rngFor(world.seed, tick, "people", n.id);
   const d = demo(n);
   d.born = 0; d.infants = 0;
@@ -1201,7 +1212,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (n.stability < SCHISM.threshold) dis += (SCHISM.threshold - n.stability) / SCHISM.divisor;
   if (shortage > 1e-9) dis += SCHISM.famine;
   if (n.riot) dis += SCHISM.riot;
-  const cutOff = isolated(world, n).length; // §2.7 settlements with no way to the capital
+  const cut = isolated(world, n); // §2.7 settlements with no way to the capital; §6.5 a granary of their own halves it
+  const cutOff = cut.reduce((s2, c) => s2 + (n.buildings.some(b => b.tile === c && buildingWorks(world, b) && buildingOf(world, b.type)?.effect.reserve) ? GRANARY.isolatedCalm : 1), 0);
   if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
   if (n.founded) dis += provinceTurn(world, n, say); // §2.8 restless provinces press on the nation
   if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
@@ -1627,6 +1639,11 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
+      if (def.perCentre) { // §6.5 one on each centre, on the centre itself
+        const cs = [n.capital, ...n.settlements.map(s2 => s2.tile)];
+        if (!cs.includes(tile)) return `${def.name} phải xây ngay trên thủ đô hay một điểm định cư (tile của trung tâm đó)`;
+        if (n.buildings.some(b => b.type === def.type && b.tile === tile)) return `Trung tâm này đã có ${def.name}`;
+      }
       const t = world.tiles[tile];
       if (!t.land) return "Không xây được trên biển";
       if (def.perTile) {

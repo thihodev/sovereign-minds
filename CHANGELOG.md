@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.36
+
+- **Kho làng (§6.5), sáng kiến đầu tiên của các AI được đưa vào game** (Văn Phong, lượt 888, chấp thuận một phần):
+  - mỗi trung tâm một kho;
+  - cất 10% lương thực dư, tối đa 100 mỗi kho, không hư;
+  - tự mở cứu đói khi thiếu ăn;
+  - điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa;
+  - AI biết luật mới; lời cố vấn gợi ý xây kho khi lương thực ít hay có điểm định cư bị cắt đường.
+
 ## v0.35
 
 - **Phần thưởng sáng kiến là một trí tuệ (§10.7):** sáng kiến được các vị thần nhận thì nước đề xuất có thêm một AI bộ trưởng.

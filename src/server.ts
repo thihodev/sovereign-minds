@@ -79,7 +79,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
 
   /** A building's purpose, for its map icon (§6.1). */
   function buildingKind(e: Record<string, unknown>): string {
-    return e.housing ? "housing" : e.farmSlots || e.seaSalt ? "farm" : e.craftSlots ? "craft" : e.port || e.fish ? "port" : e.water ? "water" : e.defense ? "defense" : e.stability ? "sacred" : e.spoilage ? "store" : "other";
+    return e.housing ? "housing" : e.farmSlots || e.seaSalt ? "farm" : e.craftSlots ? "craft" : e.port || e.fish ? "port" : e.water ? "water" : e.defense ? "defense" : e.stability ? "sacred" : e.spoilage || e.reserve ? "store" : "other";
   }
 
   function statePayload() {

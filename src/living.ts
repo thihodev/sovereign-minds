@@ -24,7 +24,7 @@ function metalGoods(world: World): string[] {
 export function needs(world: World, n: Nation): Need[] {
   const m = mods(world, n), pop = Math.max(1, n.population), eat = pop * m.foodPerPerson, owned = ownedTiles(world, n.id);
   const land = owned.filter(t => t.land), roaded = land.filter(t => (t.road || 0) > 0 || NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id && (world.tiles[j].road || 0) > 0)).length;
-  const lux = LUXURY.goods.filter(g => (n.stock[g] || 0) >= 1).length, metal = metalGoods(world), kinds = Object.entries(n.stock).filter(([g, q]) => q >= 1 && g !== "coin").length;
+  const lux = LUXURY.goods.filter(g => (n.stock[g] || 0) >= 1).length, metal = metalGoods(world), kinds = Object.entries(n.stock).filter(([g, q]) => q >= 1 && g !== "coin" && g !== "food_reserve").length;
   const r = (x: number) => Math.round(x * 10) / 10;
   const list: Need[] = [
     { id: "food", name: "Đủ ăn", era: 0, met: (n.stock.food || 0) >= eat, have: `${r(n.stock.food || 0)}`, want: `${r(eat)} (một lượt ăn)`, how: "hái lượm, săn, đánh cá, ruộng, gia súc" },

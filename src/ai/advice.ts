@@ -311,6 +311,14 @@ export function advice(world: World, n: Nation): Advice[] {
     if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
   }
 
+  // §6.5 village granaries: food set aside against famine
+  if (n.founded && n.inventions.includes("stone_tools")) {
+    const cs = [n.capital, ...n.settlements.map(s => s.tile)], have = new Set(n.buildings.filter(b => b.type === "granary").map(b => b.tile));
+    const bare = cs.filter(c => !have.has(c)), reserve = Math.round(n.stock.food_reserve || 0);
+    if (bare.length && (food < need * 3 || isolated(world, n).some(c => !have.has(c))))
+      say(food < need * 1.5 ? 2 : 1, `Kho làng (build granary, tile = một trung tâm: 10 gỗ, 6 đá): mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư, tự mở cứu đói khi thiếu ăn; điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa. Còn ${bare.length}/${cs.length} trung tâm chưa có kho${reserve ? `; đang dự trữ ${reserve}` : ""}.`);
+  }
+
   // §4.13 the treasury: spend it, keep the tax fair, build what earns
   if (n.founded && n.treasury) {
     const t = n.treasury, purse = n.stock.coin || 0, last = t.last;

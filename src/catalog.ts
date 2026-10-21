@@ -236,6 +236,7 @@ export function buildingEffectText(e: BuildingDef["effect"]): string {
   if (e.seaSalt) p.push(`+${e.seaSalt} muối/lượt`);
   if (e.harbor) p.push(`lãnh hải xa thêm ${e.harbor} ô`);
   if (e.income) p.push(`thu ${e.income} tiền/lượt${e.market ? " + theo dân và bạn hàng" : ""}`);
+  if (e.reserve) p.push(`dự trữ tới ${e.reserve} lương thực chống đói`);
   return p.join(", ");
 }
 export function describeEffects(world: World, e: Invention["effects"]): string {
