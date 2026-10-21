@@ -149,6 +149,8 @@ export interface Nation {
   recent?: Array<{ tick: number; pop: number; food: number; stab: number; orders: string[]; events: string[] }>;
   /** §8.2 what it ordered this turn and what came of it */
   turnOrders?: string[];
+  /** §2.9 the turn of the last land given up, and the stability it has cost that turn */
+  abandoned?: { tick: number; cost: number };
   /** §3.2 turns in a row with no order given */
   idleStreak?: number;
   /** §4.5 discontent 0–100: at 100 a faction wants to leave */

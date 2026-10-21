@@ -2,7 +2,7 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, ANNALS, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, ANNALS, LAND, KIN, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, buildingOf, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
@@ -31,6 +31,10 @@ function rulesText(): string {
   return `You are the mind that governs one nation in "Sovereign Minds", a shared world where every nation is led by its own AI. The world starts in the stone age. A neutral World Engine enforces every rule in code: you only PROPOSE actions; illegal actions are rejected and still cost their action points (AP). Nothing appears from nothing; every invention needs its prerequisites.
 
 GOAL: there is no single winner. Let your people survive, grow and advance; build a culture with its own character. The world ranking scores inventions by depth (being first in the world and inventing new things count most), people, land, reputation (public to everyone who has met you), how well your people lives (prosperity) and longevity.
+
+LAND IS YOUR PEOPLE'S LIFE: it feeds them and their homes stand on it. Never give it up lightly: abandoning a lived-in tile (a hamlet of 2+ people or a building) costs ${LAND.abandonStability} stability (double with buildings on it) and discontent, an empty one ${LAND.abandonEmpty}; land cut off until it goes wild costs ${LAND.wildStability}. A tile taken by an enemy takes its hamlet's families with it and costs ${LAND.lostStability} stability and ${LAND.lostDiscontent} discontent — and gives you a just cause to win it back for ${LAND.reclaimTicks} turns. Your people fight ${LAND.homeGuard * 100}% harder for a lived-in tile (a hamlet or a building). Keep warriors where your land is threatened, and be ready to fight for it.
+
+A NATION THAT SPLIT FROM ANOTHER (see "nation.origin" and "known_nations[].split"): the two can never make common cause — no ${KIN.noTreaty.join(", ")} between them (only peace to end a war, or vassalage): the old nation always hopes to take it back and always has a just cause against it; their border grows ${KIN.friction}× as tense; if the new nation's capital falls to the old one, it returns to it whole — land, people and stores.
 
 YOUR FIRST DUTY IS TO KEEP YOUR PEOPLE. Every family that leaves — for a richer neighbour, across the border, with a discontented faction, or away from unrest — is a verdict on your rule. "people_leaving" counts who left, where to and why; when more than ${EXODUS.alarm * 100}% of your people leave within ${EXODUS.window} turns you lose ${EXODUS.stability} stability a turn and reputation, and the world ranking takes ${EXODUS.rankPerPerson} point for each one who left. Watch it every turn and fix its causes (food, room, stability, prosperity against your neighbours, roads to cut-off provinces).
 
@@ -255,7 +259,8 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
       const road = planRoute(world, n, o, { food: 15 });
       const trade_road = typeof road === "string" ? { none: road } : road.mode === "near" ? { by: "border", turns: 0 }
         : { by: road.mode, turns: road.ticks, carriers: road.mode === "water" ? `${road.boats} boat` : `${road.porters} porters`, tolls: road.tolls.length ? road.tolls.map(i => world.nations[i].name) : undefined };
-      return { id: o.id, trade_road, relation: relation(world, n.id, o.id), shared_language: sharedLanguage(world, n, o), trades: n.trades[String(o.id)] || 0, intel_level: intel?.level, intel_as_of: intel?.asOf, ...(intel?.report || {}) };
+      const split = o.origin?.from === n.id ? "split from you: you may always seek to take it back" : n.origin?.from === o.id ? "you split from it: it wants you back" : undefined;
+      return { id: o.id, split, trade_road, relation: relation(world, n.id, o.id), shared_language: sharedLanguage(world, n, o), trades: n.trades[String(o.id)] || 0, intel_level: intel?.level, intel_as_of: intel?.asOf, ...(intel?.report || {}) };
     }),
     era: (() => { const next = nextEraNeeds(world, n); return { now: n.era, next: next?.era, still_needed: next?.missing }; })(),
     court: { slots: maxOfficials(world, n), officials: (n.officials ?? []).map(o => ({ id: o.id, title: OFFICIAL_DOMAINS[o.domain]?.title, domain: o.domain, name: o.name, seat: o.seat !== null ? xy(o.seat) : undefined, skill: o.skill, loyalty: o.loyalty, last_turn: o.lastAct })) },

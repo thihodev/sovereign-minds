@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, ANNALS, CONNECT, DEMO, EXODUS, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -694,7 +694,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       const key = String(t.i);
       if (reach.has(t.i)) { delete world.cutoff[key]; continue; }
       world.cutoff[key] = (world.cutoff[key] || 0) + 1;
-      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; fx({ kind: "lost_tile", tile: t.i, nation: n.id }); n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên bỏ hoang.`); }
+      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; n.stability = Math.max(0, n.stability - LAND.wildStability); fx({ kind: "lost_tile", tile: t.i, nation: n.id }); n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên thành đất hoang (−${LAND.wildStability} ổn định).`); }
     }
   }
 
@@ -1539,9 +1539,16 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô không thuộc lãnh thổ của bạn";
       if (centres(n).includes(tile)) return "Không bỏ được thủ đô hay điểm định cư";
       world.tiles[tile].owner = -1;
+      const hadHomes = n.buildings.some(b => b.tile === tile), lived = hadHomes || (HAMLET.people[world.tiles[tile].terrain] || 0) >= 2;
       n.buildings = n.buildings.filter(b => b.tile !== tile);
       if (n.roadWorks) n.roadWorks = n.roadWorks.filter(w => w.tile !== tile);
-      n.lastEvents.push(`Bỏ ô (${col(tile)}, ${row(tile)}).`);
+      // §2.9 land is the people's food and homes: giving up a lived-in tile shakes them
+      const shock = n.abandoned?.tick === world.tick ? n.abandoned : (n.abandoned = { tick: world.tick, cost: 0 });
+      const cost = Math.min(lived ? LAND.abandonStability * (hadHomes ? 2 : 1) : LAND.abandonEmpty, LAND.abandonTurnCap - shock.cost);
+      n.stability = Math.max(0, n.stability - cost);
+      if (lived && !shock.cost) n.discontent = Math.min(100, (n.discontent ?? 0) + LAND.abandonDiscontent);
+      shock.cost += cost;
+      n.lastEvents.push(lived ? `Bỏ ô (${col(tile)}, ${row(tile)}): dân không muốn rời đất cha ông (−${cost} ổn định${hadHomes ? ", mất cả công trình trên đó" : ""}).` : `Bỏ ô trống (${col(tile)}, ${row(tile)}) (−${cost} ổn định).`);
       return null;
     }
     case "appoint_official": {

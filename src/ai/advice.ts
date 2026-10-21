@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, BORDER, CONNECT, CONTAGION, EXODUS, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
@@ -86,7 +86,7 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Land over the limit
   const held = governed(world, n), limit = tileLimit(world, n);
-  if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: mỗi ô thừa −2 ổn định mỗi lượt và làm tăng bất mãn. Bỏ ô kém (abandon_tile), hoặc làm đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1 giới hạn).`);
+  if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: mỗi ô thừa −2 ổn định mỗi lượt và làm tăng bất mãn. Nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1) hoặc lập điểm định cư; nếu phải bỏ thì bỏ ô trống không người ở (−${LAND.abandonEmpty} ổn định; ô có người ở −${LAND.abandonStability}).`);
 
   // Discontent
   if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, không vượt giới hạn đất, có nghi lễ/công trình ổn định) để nó nguội đi.`);
@@ -110,6 +110,13 @@ export function advice(world: World, n: Nation): Advice[] {
       const why = p.causes.map(c => CAUSE_VI[c]).join(", ");
       say(p.mood >= PROVINCE.secede ? 3 : p.mood >= 20 ? 2 : 1, `Tỉnh ${p.name} (${p.people} dân, ${p.tiles.length} ô) bất ổn ${Math.round(p.mood)}/100${why ? `, đang tăng vì ${why}` : ""}.${p.mood >= PROVINCE.secede ? " Khi bất mãn cả nước tới 100, tỉnh này sẽ đòi tách ra cùng đất đai." : ""}${fix.length ? ` Nên ${fix.join("; ")}.` : ""}`);
     }
+  }
+
+  // §4.5 the nation it split from, or the ones that split from it
+  for (const o of world.nations) {
+    if (!o.alive || o.id === n.id) continue;
+    if (n.origin?.from === o.id) say(2, `${o.name} là nước cũ của ta và luôn mong thâu tóm lại: không thể liên minh, thông hành hay bất tương xâm với họ; họ luôn có chính nghĩa đánh ta, và nếu thủ đô ta rơi vào tay họ, cả nước sẽ nhập về họ. Giữ chiến binh ở biên giới với họ.`);
+    else if (o.origin?.from === n.id) say(1, `${o.name} là phần đất đã tách khỏi ta (lượt ${o.origin.tick}): ta luôn có chính nghĩa để đòi lại; chiếm được thủ đô của họ thì đất, dân và kho của họ trở về với ta.`);
   }
 
   // Neighbours (§7.9): the borders that need a decision

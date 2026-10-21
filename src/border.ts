@@ -7,8 +7,8 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GOOD_VALUE } from "./rules.ts";
-import { activeWar, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
+import { BORDER, GOOD_VALUE, KIN } from "./rules.ts";
+import { activeWar, kin, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
@@ -69,7 +69,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     if (!a.met.includes(b.id)) a.met.push(b.id);
     if (!b.met.includes(a.id)) b.met.push(a.id);
     if (activeWar(world, a.id, b.id)) { st.tension = 100; continue; }
-    let t = st.tension + Math.min(BORDER.frictionMax, len * BORDER.friction) - BORDER.fade;
+    let t = st.tension + Math.min(BORDER.frictionMax, len * BORDER.friction) * (kin(a, b) ? KIN.friction : 1) - BORDER.fade; // §4.5 old wounds
     for (const tr of treatiesBetween(world, a.id, b.id)) t -= BORDER.treatyCalm[tr.type] ?? 0;
     if (traded.has(pairKey(a.id, b.id))) t -= BORDER.tradeCalm;
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;

@@ -1090,7 +1090,16 @@
       ${n.research ? `<div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
       ${n.thought ? `<div class="thought"></div>` : ""}
       <h4>${tile === null ? "Công trình" : "Công trình trên ô này"}</h4>
-      <div class="chips">${blds.map(b => `<span>${bIcon(b)} ${esc(b.name)}${b.done ? (b.off ? " (bị phá hoại, tạm ngừng)" : "") : ` (đang xây ${b.progress}/${b.work} công)`}</span>`).join("") || `<span class="none">không có</span>`}</div>
+      <div class="chips">${(() => {
+        // one chip a kind, with how many; the ones going up and the sabotaged ones on their own
+        const done = new Map(), out = [];
+        for (const b of blds) {
+          if (!b.done) out.push(`<span>${bIcon(b)} ${esc(b.name)} (đang xây ${b.progress}/${b.work} công)</span>`);
+          else if (b.off) out.push(`<span>${bIcon(b)} ${esc(b.name)} (bị phá hoại, tạm ngừng)</span>`);
+          else { const k = done.get(b.type); if (k) k.n++; else done.set(b.type, { b, n: 1 }); }
+        }
+        return [...[...done.values()].map(({ b, n }) => `<span>${bIcon(b)} ${esc(b.name)}${n > 1 ? ` <b>×${n}</b>` : ""}</span>`), ...out].join("") || `<span class="none">không có</span>`;
+      })()}</div>
       ${tile === null && (n.settlements || []).length ? `<h4>Điểm định cư</h4><div class="chips">${n.settlements.map(x => `<span>${esc(x.name)}</span>`).join("")}</div>` : ""}
       ${wars.length ? `<h4>Đang chiến tranh</h4><div class="meta">${wars.map(w => esc(w.a === n.id ? w.bName : w.aName)).join(", ")}</div>` : ""}
       ${tile === null && n.alive ? `<h4>Mối đe dọa</h4>${threatList((n.threats || []).filter(t => t.level >= 1).slice(0, 5), "Không có mối đe dọa đáng kể.")}<h4>Tài nguyên trên lãnh thổ</h4>${resChips(n)}` : ""}

@@ -2,7 +2,20 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.13 (đang làm)
+## v0.14 (đang làm)
+
+- **Đất là sự sống (§2.9):**
+  - Bỏ ô có người ở làm dân mất lòng; đất bị chiếm mang theo các gia đình sống trên đó, và cho bên mất chính nghĩa đòi lại trong 10 lượt.
+  - Ô có người ở được phòng thủ mạnh hơn 25%.
+  - Prompt dặn AI giữ đất và sẵn sàng đánh để giữ.
+- **Nước tách ra không thể hợp tác với nước gốc (§4.5):** không liên minh, thông hành hay bất tương xâm; nước gốc luôn có chính nghĩa để đòi lại; biên giới căng gấp 1,5 lần; thủ đô nước tách ra rơi vào tay nước gốc thì cả nước nhập trở lại.
+- **Cân bằng:**
+  - Người đi theo phái ly khai hoặc mất theo đất bị chiếm không tính vào ngưỡng cảnh báo "dân bỏ đi". Trước đây điều này gây vòng xoáy: ly khai, rồi bất mãn, rồi lại ly khai.
+  - Bot không còn đổi đất có người ở mỗi lượt.
+  - Mục tiêu "lượt vào Đồ Đồng" trong `tools/pace.ts` nới thành 140–420, vì phụ thuộc may rủi có mỏ đồng.
+- **Bảng Chi tiết:** công trình gộp theo loại, kèm số lượng (Ruộng ×17).
+
+## v0.13
 
 - **AI thấy toàn bộ lịch sử nước mình (§8.2):**
   - **Biên niên quốc gia:** do Engine tự ghi từ ngày lập quốc, không tốn lượt AI. Mỗi 10 lượt là một chương một dòng: dân, lương thực, ổn định, đất, và 5 sự kiện quan trọng nhất. Chương cũ được gộp dần, nên 1.000 lượt vẫn gọn trong khoảng 20 dòng.

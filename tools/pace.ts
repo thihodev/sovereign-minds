@@ -45,7 +45,7 @@ const runs = seeds.map(run);
 // What the rules aim for (§5.6 eras, §4.2 people, §2.3 land, §4.5 order)
 const targets: Array<{ name: string; value: (r: Run) => number | null; lo: number; hi: number }> = [
   { name: "lượt đầu tiên vào Đồ Đá Mới", value: r => r.neo, lo: 50, hi: 160 },
-  { name: "lượt đầu tiên vào Đồ Đồng", value: r => r.bronze, lo: 150, hi: 380 },
+  { name: "lượt đầu tiên vào Đồ Đồng", value: r => r.bronze, lo: 140, hi: 420 }, // copper on the land is luck of the seed
   { name: "dân trung vị ở lượt 300", value: r => median(r.pop300), lo: 100, hi: 300 },
   { name: "điểm định cư trung vị ở lượt 300", value: r => median(r.settl300), lo: 1, hi: 5 },
   { name: "nước diệt vong (cả nước ly khai)", value: r => r.dead, lo: 0, hi: 1 },

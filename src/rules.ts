@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.13";
+export const RULES_VERSION = "0.14";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -162,6 +162,17 @@ export const PROSPERITY = {
  *  `noteLength` characters); past `maxChapters`, the shortest two neighbouring chapters older than the last `keepFine`
  *  merge, so the further back, the longer the chapters. `recent` turns are also kept in detail. */
 export const ANNALS = { chapter: 10, notes: 5, noteLength: 120, maxChapters: 20, keepFine: 10, recent: 10 };
+/** §2.9 Land is the people's food and homes. Abandoning a lived-in tile (a hamlet of 2+ or a building) costs
+ *  `abandonStability` (double with buildings) and `abandonDiscontent`; an empty one only `abandonEmpty`; in all at
+ *  most `abandonTurnCap` stability and one `abandonDiscontent` a turn (the shock of giving land up);
+ *  a tile lost to an enemy costs `lostStability` and `lostDiscontent`, takes its hamlet's families with it, and gives
+ *  a just cause to win it back for `reclaimTicks`; a tile gone wild for being cut off costs `wildStability`.
+ *  Defenders of a lived-in tile (a hamlet or a building) fight `homeGuard` harder. */
+export const LAND = { abandonStability: 3, abandonDiscontent: 2, abandonEmpty: 0, abandonTurnCap: 4, lostStability: 2, lostDiscontent: 3, reclaimTicks: 10, wildStability: 1, homeGuard: 0.25 };
+/** §4.5 A nation that split from another cannot make common cause with it: the old nation wants it back. Treaties of
+ *  these kinds are refused between them; the old nation always has a just cause against the new; their border is
+ *  `friction` times as tense; a new nation whose capital falls to its old nation returns to it, land, people and stores. */
+export const KIN = { noTreaty: ["alliance", "passage", "non_aggression"], friction: 1.5 };
 /** §4.8 People who leave: counted for `keep` turns. When more than `alarm` of the people left in the last
  *  `window` turns, the rulers lose `stability` a turn and `reputation` every `repEvery` turns; the ranking
  *  takes `rankPerPerson` points for each one who left in the window. */

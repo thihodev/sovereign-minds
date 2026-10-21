@@ -177,6 +177,18 @@ Lãnh thổ chia thành các tỉnh, mỗi trung tâm một tỉnh: tỉnh thủ
 - Trên bản đồ, khi phóng to, đường đứt nét mảnh chia các tỉnh trong lãnh thổ một nước. Hồ sơ quốc gia có thẻ **Tỉnh**.
 - Watcher chỉnh được khoảng cách cần bá tước, sức làm dịu và phần sản lượng thêm của bá tước bằng sắc lệnh luật.
 
+### 2.9 Đất là sự sống của dân
+
+Đất cho dân cái ăn và là nơi họ ở, nên cần được giữ gìn và bảo vệ.
+
+- **Bỏ ô có người ở** (thôn xóm từ 2 người, hoặc có công trình): −3 ổn định (có công trình thì gấp đôi), bất mãn +2. Mỗi lượt mất tối đa 4 ổn định và một lần bất mãn vì bỏ đất. Bỏ ô trống thì không mất gì.
+- **Ô bị địch chiếm:**
+  - các gia đình thôn xóm trên ô (1–3 người tùy địa hình) ở lại dưới quyền bên chiếm, và được ghi vào số người mất (§4.8)
+  - bên mất đất −2 ổn định, bất mãn +3
+  - bên mất đất có chính nghĩa đòi lại đất trong 10 lượt
+- **Ô bị cắt rời quá lâu mà thành đất hoang:** −1 ổn định.
+- **Dân giữ nhà:** khi phòng thủ một ô có người ở (thôn xóm từ 2 người, hoặc có công trình), bên phòng thủ mạnh hơn 25%.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.
@@ -355,6 +367,12 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - **Không cho phép, hoặc không trả lời trong 10 lượt:** phái đó xin sang định cư ở nước yên ổn nhất (ổn định ≥ 35) và nhiều chỗ ở nhất mà nước cũ quen biết, nếu không đang chiến tranh với nước cũ.
   - Nước được xin có 2 lượt để nhận, bằng hành động `accept_migrants` (1 AP). Nếu nhận, cả gia đình sang ngay; nước cũ +7 ổn định, bất mãn về 0.
   - Nếu không ai nhận, họ quay về nước cũ trong uất ức: −5 ổn định, bất mãn còn một nửa.
+
+**Nước tách ra và nước gốc:**
+- Hai nước không bao giờ hợp tác chính trị: không được ký liên minh, thông hành hay bất tương xâm. Chỉ có hòa bình (để dừng chiến tranh) hoặc chư hầu.
+- Nước gốc luôn mong thâu tóm lại, nên luôn có chính nghĩa để đánh nước tách ra.
+- Căng thẳng biên giới giữa hai nước tăng nhanh gấp 1,5 lần.
+- Nếu thủ đô của nước tách ra rơi vào tay nước gốc, cả nước nhập trở lại: đất, công trình, dân và kho.
 
 ### 4.6 Triều đình: phân quyền cho quan chức
 

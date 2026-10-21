@@ -199,7 +199,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     && !world.wars.some(w => w.a === n.id && tick - w.declared < 80);
   const prey = canWage ? others.filter(o => weakNeighbour(v, o)).sort((a, b) => a.id - b.id)[0] : undefined;
 
-  // 0. Too much land: give up the poorest, far from any centre (free)
+  // 0. Too much land: give up the poorest, far from any centre — §2.9 an empty one first: giving up a lived-in tile shakes the people
   const extra = Math.ceil(Math.max(v.held - v.limit, settleNow ? v.held + ring - (v.limit + 3) : 0));
   if (n.founded && extra > 0) {
     const centreSet = new Set(v.centres);
@@ -207,7 +207,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     // Never give up ground that faces an enemy we fight, or the one we mean to fight
     const foes = new Set([...v.wars.map(w => w.a === n.id ? w.b : w.a), ...(prey ? [prey.id] : [])]);
     const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i) && !NEIGHBORS[t.i].some(j => foes.has(world.tiles[j].owner)) && (!foes.size || !atWarFront(v, t.i, foes)))
-      .sort((a, b) => tileWorth(v, a) - far(a) * 2 - (tileWorth(v, b) - far(b) * 2) || a.i - b.i).slice(0, extra);
+      .sort((a, b) => (HAMLET.people[a.terrain] || 0) - (HAMLET.people[b.terrain] || 0) || tileWorth(v, a) - far(a) * 2 - (tileWorth(v, b) - far(b) * 2) || a.i - b.i).slice(0, extra);
     for (const t of poor) spend("abandon_tile", { tile: xy(t.i) });
   }
 
@@ -340,7 +340,8 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     else if (best.tile >= 0 && best.fills && ap >= (AP_COST.claim_tile ?? 2)) {
       // At the limit but missing stone, wood, flint or farmland: swap our poorest tile for it
       const centreSet = new Set(v.centres);
-      const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i) && !NEIGHBORS[best.tile].includes(t.i))
+      // §2.9 swap an empty tile; a lived-in one (it shakes the people) at most once in ten turns
+      const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i) && !NEIGHBORS[best.tile].includes(t.i) && ((HAMLET.people[t.terrain] || 0) < 2 || tick % 10 === n.id % 10))
         .sort((a, b) => tileWorth(v, a) - tileWorth(v, b) || a.i - b.i)[0];
       if (poor) { spend("abandon_tile", { tile: xy(poor.i) }); spend("claim_tile", { tile: xy(best.tile) }); }
     }

@@ -5,12 +5,13 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
-  GESTURES, INJECTION, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
+  GESTURES, HAMLET, INJECTION, KIN, LAND, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
 import { quarantined } from "./contagion.ts";
-import { add, part, take } from "./people.ts";
+import { add, part, take, add as addPeople, take as takePeople } from "./people.ts";
+import { noteExodus } from "./exodus.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
 import { buildingWorks, mods, ownedTiles, parseTile, workers } from "./engine.ts";
@@ -150,6 +151,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       if (!TREATY_TYPES.includes(t)) return `Loại hiệp ước phải là: ${TREATY_TYPES.join(", ")}`;
       if (t !== "peace" && pendingOrActiveWar(world, n.id, o.id)) return "Đang chiến tranh: chỉ đề nghị được hiệp ước hòa bình (peace)";
       if (t === "peace" && !pendingOrActiveWar(world, n.id, o.id)) return "Hai nước không có chiến tranh";
+      if (kin(n, o) && KIN.noTreaty.includes(t)) return `${n.origin?.from === o.id ? `${o.name} là nước bạn đã tách ra` : `${o.name} đã tách ra từ nước bạn`}: hai nước không thể ${TREATY_NAME[t]} — nước gốc còn mong thâu tóm lại (chỉ hòa bình hoặc chư hầu)`;
       const dur = a.duration === null || a.duration === undefined ? null : Math.floor(Number(a.duration));
       if (dur !== null && !(dur >= TREATY.minDuration && dur <= TREATY.maxDuration)) return `Thời hạn ${TREATY.minDuration}–${TREATY.maxDuration} lượt, hoặc bỏ trống là vĩnh viễn`;
       let tribute: Record<string, number> = {};
@@ -204,7 +206,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
         const blocking = treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace", "vassal"]).filter(t => t.end === null || t.end > tick);
         if (blocking.length) return `Đang có hiệp ước ${blocking.map(t => `${TREATY_NAME[t.type]} #${t.id}`).join(", ")}; phải phá ước trước`;
       }
-      const free = (n.casusBelli[String(o.id)] ?? -1) >= tick || type === "declare_independence";
+      const free = (n.casusBelli[String(o.id)] ?? -1) >= tick || type === "declare_independence" || o.origin?.from === n.id; // §4.5 the old nation may always seek its lost land
       if (!free) n.reputation = Math.max(0, n.reputation - WAR.unprovokedPenalty);
       startWar(world, n, o, tick, free ? "có chính nghĩa" : "", say);
       return null;
@@ -475,7 +477,8 @@ export function resolveBattles(ctx: DiploCtx): void {
       if (defending) {
         const t = world.tiles[s.tile];
         const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
-        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river && !crossesWater(world, A, s.tile) ? 0.25 : 0); // a river guards, unless they come with boats
+        const lived = n.buildings.some(b => b.tile === s.tile) || (HAMLET.people[t.terrain] || 0) >= 2; // §2.9 people guard their homes
+        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river && !crossesWater(world, A, s.tile) ? 0.25 : 0) + (lived ? LAND.homeGuard : 0); // a river guards, unless they come with boats
       }
       return v;
     };
@@ -517,7 +520,7 @@ export function resolveBattles(ctx: DiploCtx): void {
       note = Object.keys(loot).length ? `cướp ${fmtGoods(world, loot)}` : "không cướp được gì";
     } else if (won && s.kind === "attack") {
       const centre = s.tile === D.capital || D.settlements.some(x => x.tile === s.tile);
-      note = captureTile(world, A, D, s.tile, say);
+      note = captureTile(world, A, D, s.tile, say, L);
       // Spoils (§7.4): a taken tile yields a share of the loser's stores, a fallen centre half of them
       if (world.tiles[s.tile].owner === A.id) { // taken (a centre that did not fall stays theirs)
         let carry = centre ? Infinity : s.warriors * WAR.carryPerWarrior;
@@ -549,8 +552,9 @@ export function resolveBattles(ctx: DiploCtx): void {
 }
 
 /** Take a tile. A capital or settlement falls only when the attacker holds WAR.centreFallsAt of its land neighbours. */
-function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say): string {
+function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say, L: Ledger): string {
   const centres = [D.capital, ...D.settlements.map(s => s.tile)];
+  loseLand(world, A, D, tile);
   if (centres.includes(tile)) {
     const held = NEIGHBORS[tile].filter(j => world.tiles[j].land && world.tiles[j].owner === A.id).length, need = centreFallNeed(world, tile);
     if (held < need) return `trung tâm chưa bị vây đủ (${held}/${need} ô kề) nên không thất thủ`;
@@ -561,6 +565,13 @@ function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say)
         D.capital = next.tile;
         say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ; ${D.name} dời đô về ${next.name}.`);
         D.capitalName = next.name;
+      } else if (D.origin?.from === A.id) {
+        // §4.5 the old nation takes back what split from it: land, people and stores
+        for (const t of world.tiles) if (t.owner === D.id) { t.owner = A.id; moveBuildings(D, A, t.i); }
+        addPeople(A, takePeople(D, D.population, "migrate"));
+        for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "reunite"); L.stock(A, g, q, "reunite"); }
+        D.alive = false; D.status = "dead"; D.population = 0;
+        say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} trở về với ${A.name}: đất, dân và kho nhập lại như xưa.`);
       } else {
         D.alive = false; D.status = "dead"; D.population = 0;
         say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} diệt vong dưới tay ${A.name}.`);
@@ -577,6 +588,19 @@ function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say)
   moveBuildings(D, A, tile);
   return "chiếm được ô";
 }
+/** §2.9 A tile lost to an enemy: its hamlet's families stay under the new ruler, the loser's people are shaken and
+ *  may win it back with a just cause. */
+function loseLand(world: World, A: Nation, D: Nation, tile: number): void {
+  const t = world.tiles[tile], k = Math.min(Math.max(0, D.population - 5), t.land ? (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0) : 0);
+  if (k > 0) { addPeople(A, takePeople(D, k, "migrate")); noteExodus(D, world.tick, k, A.id, "conquest"); }
+  D.stability = Math.max(0, D.stability - LAND.lostStability);
+  D.discontent = Math.min(100, (D.discontent ?? 0) + LAND.lostDiscontent);
+  D.casusBelli[String(A.id)] = Math.max(D.casusBelli[String(A.id)] ?? -1, world.tick + LAND.reclaimTicks);
+  D.lastEvents.push(`Mất ô (${col(tile)}, ${row(tile)}) vào tay ${A.name}${k ? `, cùng ${k} người sống ở đó` : ""}: −${LAND.lostStability} ổn định. Có chính nghĩa đòi lại đất tới lượt ${world.tick + LAND.reclaimTicks}.`);
+}
+/** §4.5 Two nations, one of which split from the other. */
+export function kin(a: Nation, b: Nation): boolean { return a.origin?.from === b.id || b.origin?.from === a.id; }
+
 function moveBuildings(from: Nation, to: Nation, tile: number): void {
   const taken = from.buildings.filter(b => b.tile === tile);
   from.buildings = from.buildings.filter(b => b.tile !== tile);
