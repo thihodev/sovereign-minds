@@ -1235,24 +1235,8 @@
   $("#btn-step").onclick = stepTick;
   $("#tick-seconds").onchange = e => api("/api/control", { method: "POST", body: { action: "tick_seconds", value: +e.target.value } }).then(applyStatus);
 
-  // ---------------------------------------------------------------- theme
-  const darkMq = matchMedia("(prefers-color-scheme: dark)");
-  const effectiveTheme = () => document.documentElement.dataset.theme || (darkMq.matches ? "dark" : "light");
-  function syncThemeButton() {
-    const dark = effectiveTheme() === "dark", b = $("#btn-theme");
-    b.setAttribute("aria-label", dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối");
-    b.title = b.getAttribute("aria-label");
-    b.querySelector(".ico-sun").hidden = !dark; b.querySelector(".ico-moon").hidden = dark;
-  }
-  function themeChanged() { syncThemeButton(); M3?.theme(); if (DOCKS.right.open && curTab === "stats" && statsCache) drawChart(); }
-  $("#btn-theme").onclick = () => {
-    const next = effectiveTheme() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem("sm-theme", next); } catch { }
-    themeChanged();
-  };
-  darkMq.addEventListener?.("change", themeChanged);
-  syncThemeButton();
+  // ---------------------------------------------------------------- theme: dark only
+  const effectiveTheme = () => "dark";
 
   // ---------------------------------------------------------------- docks
   // Left dock = Claude chat. Right dock = the inspector and every Watcher panel.
@@ -2584,7 +2568,9 @@
           terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor, roadTree,
           onPick: i => pinTile(i), onHover: (i, ev) => hoverCard(i, ev),
           fxWord: f => FX_WORD[f.kind]?.(f) ?? f.kind, fxTone, fxDur: f => FX_DUR[f.kind] || FX_DEFAULT,
-          isDark: () => effectiveTheme() === "dark", anim: () => ANIM.on,
+          isDark: () => true, anim: () => ANIM.on,
+          visibleRect: () => geo ? visibleRect() : null,
+          onZoom: rel => { $("#zoom-level").textContent = `${rel < 9.95 ? rel.toFixed(1) : Math.round(rel)}×`; },
         }));
         const m = await M3loading;
         if (!M3) { M3 = m; M3.setStatic(ST); }
@@ -2598,6 +2584,8 @@
     document.body.classList.toggle("view-3d", on);
   }
   btn3d.onclick = () => set3D(!is3D);
+  $("#view-north").onclick = () => M3?.faceNorth(false);
+  $("#view-top").onclick = () => M3?.faceNorth(true);
 
   // ---------------------------------------------------------------- data flow
   async function refresh() {

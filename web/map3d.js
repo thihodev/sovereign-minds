@@ -356,10 +356,23 @@ export function create(container, hooks) {
     return o;
   }
   const SHOW_AT = { capital: 400, town: 120, wonder: 70, horde: 80, fx: 1e9 };
+  const RANK = { capital: 0, town: 1, horde: 2, wonder: 3 }, tmpV = new THREE.Vector3();
   function cullLabels() {
     const d = camera.position.distanceTo(controls.target);
     if (decor?.userData.trees) decor.userData.trees.visible = d < 110;
     for (const o of allLabels) if (o.parent) o.visible = d < (SHOW_AT[o.userData.kind] ?? 100);
+    // a label that would cover one more important (or one placed before it) steps aside
+    const W = container.clientWidth, H = container.clientHeight, placed = [];
+    const list = allLabels.filter(o => o.parent && o.visible).sort((a, b) => (RANK[a.userData.kind] ?? 9) - (RANK[b.userData.kind] ?? 9));
+    for (const o of list) {
+      o.getWorldPosition(tmpV).project(camera);
+      if (tmpV.z > 1 || tmpV.x < -1.2 || tmpV.x > 1.2 || tmpV.y < -1.2 || tmpV.y > 1.2) { o.visible = false; continue; }
+      const x = (tmpV.x + 1) / 2 * W, y = (1 - tmpV.y) / 2 * H, el = o.element;
+      if (el.offsetWidth) { o.userData.w = el.offsetWidth; o.userData.h = el.offsetHeight; }
+      const w = (o.userData.w ?? el.textContent.length * 7 + 14) / 2 + 2, h = (o.userData.h ?? 20) / 2 + 1;
+      if (placed.some(r => x - w < r[2] && x + w > r[0] && y - h < r[3] && y + h > r[1])) { o.visible = false; continue; }
+      placed.push([x - w, y - h, x + w, y + h]);
+    }
   }
 
   // ------------------------------------------------------------------ what moves: caravans, boats, people at work
@@ -494,6 +507,18 @@ export function create(container, hooks) {
   }
 
   // ------------------------------------------------------------------ the pinned tile's outline
+  let hoverMesh = null, hovered = -1;
+  function outline(i, color, lift) {
+    const pts = []; for (let k = 0; k <= 6; k++) { const [x, z] = corner(i, k % 6); pts.push(new THREE.Vector3(x, top(i) + lift, z)); }
+    return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9, depthTest: false }));
+  }
+  function setHover(i) {
+    if (i === hovered) return;
+    hovered = i;
+    if (hoverMesh) { scene.remove(hoverMesh); hoverMesh.geometry.dispose(); hoverMesh.material.dispose(); hoverMesh = null; }
+    if (i >= 0 && i !== pinned && H) { hoverMesh = outline(i, 0xffffff, 0.05); hoverMesh.renderOrder = 6; scene.add(hoverMesh); }
+    need = true;
+  }
   let pinMesh = null;
   function updatePin() {
     if (pinMesh) { scene.remove(pinMesh); pinMesh.geometry.dispose(); pinMesh = null; }
@@ -518,8 +543,21 @@ export function create(container, hooks) {
   const el = renderer.domElement;
   el.addEventListener("pointerdown", ev => { down = { x: ev.clientX, y: ev.clientY }; });
   el.addEventListener("pointerup", ev => { if (down && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 6 && ev.button === 0) hooks.onPick(tileAt(ev)); down = null; });
-  el.addEventListener("pointermove", ev => { if (ev.buttons) { hooks.onHover(-1); return; } const now = performance.now(); if (now - hoverAt < 60) return; hoverAt = now; hooks.onHover(tileAt(ev), ev); });
-  el.addEventListener("pointerleave", () => hooks.onHover(-1));
+  el.addEventListener("pointermove", ev => { if (ev.buttons) { hooks.onHover(-1); setHover(-1); return; } const now = performance.now(); if (now - hoverAt < 60) return; hoverAt = now; const i = tileAt(ev); setHover(i); hooks.onHover(i, ev); });
+  el.addEventListener("pointerleave", () => { hooks.onHover(-1); setHover(-1); });
+  // keys: arrows or WASD to move, Q/E to turn, R to face north, T to look straight down, Enter to pick the tile in the middle
+  el.addEventListener("keydown", ev => {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const k = ev.key.toLowerCase(), d = camera.position.distanceTo(controls.target), step = Math.max(1.5, d * 0.08);
+    const fwd = controls.target.clone().sub(camera.position).setY(0); if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    const move = { arrowup: fwd, w: fwd, arrowdown: fwd.clone().negate(), s: fwd.clone().negate(), arrowleft: right.clone().negate(), a: right.clone().negate(), arrowright: right, d: right }[k];
+    if (move) { ev.preventDefault(); const v = move.clone().multiplyScalar(step); controls.target.add(v); camera.position.add(v); need = true; return; }
+    if (k === "q" || k === "e") { ev.preventDefault(); turn(k === "q" ? 0.2 : -0.2); return; }
+    if (k === "r") { ev.preventDefault(); faceNorth(false); return; }
+    if (k === "t") { ev.preventDefault(); faceNorth(true); return; }
+    if (k === "enter") { ev.preventDefault(); const r = el.getBoundingClientRect(), R = view(); hooks.onPick(tileAt({ clientX: r.left + R.x + R.w / 2, clientY: r.top + R.y + R.h / 2 })); }
+  });
   el.addEventListener("dblclick", ev => { const i = tileAt(ev); if (i >= 0) focus(i, true); });
   el.addEventListener("contextmenu", ev => ev.preventDefault());
 
@@ -532,14 +570,39 @@ export function create(container, hooks) {
     if (close || dir.y > 0.9) { const flat = Math.hypot(dir.x, dir.z) || 1; dir.set(dir.x / flat * 0.55, 0.83, dir.z / flat * 0.55); if (!Number.isFinite(dir.x) || (dir.x === 0 && dir.z === 0)) dir.set(0, 0.69, 0.72); dir.normalize(); }
     fly = { t0: performance.now(), dur: 700, fromT: controls.target.clone(), toT: p, fromC: camera.position.clone(), toC: p.clone().add(dir.multiplyScalar(d)) };
   }
+  function turn(a) {
+    const off = camera.position.clone().sub(controls.target).applyAxisAngle(Y_AXIS, a);
+    fly = { t0: performance.now(), dur: 250, fromT: controls.target.clone(), toT: controls.target.clone(), fromC: camera.position.clone(), toC: controls.target.clone().add(off) };
+  }
+  /** North up again; `down`: look straight down (or back to the usual tilt if already). */
+  function faceNorth(down) {
+    const d = camera.position.distanceTo(controls.target), off = camera.position.clone().sub(controls.target).normalize();
+    const flat = down && off.y < 0.97 ? new THREE.Vector3(0, 0.999, 0.045) : new THREE.Vector3(0, 0.86, 0.5);
+    fly = { t0: performance.now(), dur: 500, fromT: controls.target.clone(), toT: controls.target.clone(), fromC: camera.position.clone(), toC: controls.target.clone().add(flat.normalize().multiplyScalar(d)) };
+  }
   function zoom(f) {
     const dir = camera.position.clone().sub(controls.target), d = clamp(dir.length() / f, controls.minDistance, controls.maxDistance);
     fly = { t0: performance.now(), dur: 300, fromT: controls.target.clone(), toT: controls.target.clone(), fromC: camera.position.clone(), toC: controls.target.clone().add(dir.setLength(d)) };
   }
   /** Where the camera sees the whole world: far enough for its width and its depth at this screen's shape. */
+  /** The part of the screen the docks leave free (container pixels). */
+  function view() {
+    const W = container.clientWidth, H = container.clientHeight, R = hooks.visibleRect?.();
+    return R && R.w > 120 && R.h > 120 ? R : { x: 0, y: 0, w: W, h: H };
+  }
+  let lastView = "";
+  /** Shift the picture so the camera's centre falls in the middle of the free part of the screen. */
+  function aim() {
+    const W = container.clientWidth, H = container.clientHeight, R = view(), key = `${W}x${H}:${R.x},${R.y},${R.w},${R.h}`;
+    if (key === lastView) return;
+    lastView = key;
+    const dx = R.x + R.w / 2 - W / 2, dy = R.y + R.h / 2 - H / 2;
+    camera.setViewOffset(W, H, -dx, -dy, W, H); camera.updateProjectionMatrix(); need = true;
+  }
   function home() {
-    const half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), w = X0 + 4, d = Z0 + 6;
-    const dist = Math.max(w / (half * camera.aspect), d / half * 0.95) * 1.02;
+    // the free part of the screen sees tan(fov/2) × its share of the height, up and across
+    const R = view(), H = Math.max(1, container.clientHeight), half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), w = X0 + 4, d = Z0 + 6;
+    const dist = Math.max(w / (half * R.w / H), d / (half * R.h / H) * 0.95) * 1.15; // the near edge looks wider: a little more room
     return new THREE.Vector3(0, dist * 0.86, dist * 0.5);
   }
   function fit() { fly = { t0: performance.now(), dur: 700, fromT: controls.target.clone(), toT: new THREE.Vector3(0, 0, 0), fromC: camera.position.clone(), toC: home() }; }
@@ -549,7 +612,7 @@ export function create(container, hooks) {
   controls.addEventListener("change", () => { need = true; });
   function resize() {
     const w = Math.max(100, container.clientWidth), h = Math.max(100, container.clientHeight);
-    renderer.setSize(w, h, false); labels.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); need = true;
+    renderer.setSize(w, h, false); labels.setSize(w, h); camera.aspect = w / h; lastView = ""; aim(); camera.updateProjectionMatrix(); need = true;
   }
   new ResizeObserver(resize).observe(container);
   function theme() {
@@ -570,7 +633,11 @@ export function create(container, hooks) {
       for (const f of flags) { const p = f.cloth.geometry.attributes.position, a = p.array; for (let k = 0; k < a.length; k += 3) a[k + 2] = f.base[k + 2] + Math.sin(now / 260 + f.phase + f.base[k] * 6) * 0.05 * f.base[k] * 2.2; p.needsUpdate = true; }
       need = true;
     }
-    if (need) { cullLabels(); renderer.render(scene, camera); labels.render(scene, camera); need = false; }
+    if (now - (frame.aimed || 0) > 300) { frame.aimed = now; aim(); } // the docks open and close
+    if (need) {
+      cullLabels(); renderer.render(scene, camera); labels.render(scene, camera); need = false;
+      hooks.onZoom?.(home().length() / Math.max(1e-6, camera.position.distanceTo(controls.target)));
+    }
     raf = requestAnimationFrame(frame);
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && running && !raf) raf = requestAnimationFrame(frame); });
@@ -583,22 +650,29 @@ export function create(container, hooks) {
     });
   }
 
+  // the first view of the whole world, once the container has a size to frame it in
+  let placed = false;
+  function placeCamera() {
+    if (!ST || container.hidden || container.clientHeight < 50) return;
+    resize(); camera.position.copy(home()); controls.target.set(0, 0, 0); placed = true; need = true;
+  }
+
   // ------------------------------------------------------------------ the module's face
   const api3 = {
     setStatic(st) {
       ST = st; N = st.n; X0 = SQ3 * N / 2; Z0 = 0.75 * N;
       heights(); buildTerrain(); buildDecor(); theme();
       sun.target.position.set(0, 0, 0);
-      resize(); camera.position.copy(home()); controls.target.set(0, 0, 0);
+      placeCamera();
       if (S) api3.setState(S);
     },
     setState(s) { S = s; if (!ST) return; paint(); buildDynamic(); buildMovers(); updatePin(); },
     setSelected(id) { if (selected === id) return; selected = id; paint(); },
     setPinned(i) { if (pinned === i) return; pinned = i; paint(); updatePin(); },
     setLayer(values, max, threat) { layer = values ? { values, max, threat } : null; paint(); },
-    playFx, focus, zoom, fit, theme,
+    playFx, focus, zoom, fit, theme, faceNorth, turn,
     setAnim(on) { animOn = on; need = true; },
-    show(on) { running = on; container.hidden = !on; if (on) { resize(); if (!raf) raf = requestAnimationFrame(frame); } },
+    show(on) { running = on; container.hidden = !on; if (on) { resize(); if (!placed) placeCamera(); if (!raf) raf = requestAnimationFrame(frame); } },
     distance: () => camera.position.distanceTo(controls.target),
   };
   raf = requestAnimationFrame(frame);

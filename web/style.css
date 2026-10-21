@@ -9,7 +9,7 @@
   --top: 92px; --left-w: 360px; --right-w: 440px; --gap: 10px;
   color-scheme: light;
 }
-/* Theme: follows the system unless the Watcher picked one (data-theme, saved in localStorage). */
+/* Theme: dark only (index.html sets data-theme="dark"). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --bg: #0d1412; --panel: #141d1a; --ink: #e4ebe8; --muted: #98a7a1; --line: #26332e;
     --accent: #3fb3cf; --accent-ink: #06191f; --good: #4cc283; --warn: #e0a03a; --bad: #ef6b60; --frame: #0b2433;
@@ -643,7 +643,7 @@ ul.needs li.no b { color: var(--ink); }
 .map3d { position: absolute; inset: 0; }
 .map3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .map3d-canvas:active { cursor: grabbing; }
-.map3d-canvas:focus-visible { outline: 3px solid #ffd84a; outline-offset: -3px; }
+.map3d-canvas:focus-visible { outline: 1.5px solid rgba(255,216,74,.55); outline-offset: -2px; }
 .map3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .m3-label { font: 600 12.5px "Be Vietnam Pro", system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px #08141c; white-space: nowrap; text-align: center; line-height: 1.2;
   background: rgba(8,20,28,.62); padding: 1px 7px; border-radius: 99px; }
@@ -664,3 +664,6 @@ ul.needs li.no b { color: var(--ink); }
 .war-tally .talks summary { cursor: pointer; font-size: 12.5px; color: var(--accent); margin-top: 4px; }
 .war-tally .talks li { font-size: 12.5px; padding: 2px 0; }
 .war-tally .talks .t { color: var(--muted); margin-right: 4px; }
+
+.mapctl .only-3d { display: none; font-weight: 800; font-size: 12px; }
+body.view-3d .mapctl .only-3d { display: grid; }

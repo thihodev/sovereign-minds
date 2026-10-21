@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/style.css">
-<script>try { const t = localStorage.getItem("sm-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch { }</script>
 </head>
 <body>
 <a class="skip" href="#map">Tới bản đồ</a>
@@ -64,10 +63,6 @@
         <option value="3600">1 giờ</option>
       </select>
       <button type="button" id="btn-new-world" title="Chọn đặc thù, model và effort cho từng quốc gia rồi bắt đầu thế giới mới">Thế giới mới</button>
-      <button class="icon" id="btn-theme" type="button" aria-label="Đổi giao diện sáng/tối">
-        <svg class="ico-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
-        <svg class="ico-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" hidden><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
       <button class="icon" id="btn-help" type="button" aria-label="Phím tắt" title="Phím tắt (?)" aria-keyshortcuts="?">?</button>
       <span class="mono muted" id="version"></span>
     </div>
@@ -79,6 +74,8 @@
 
 <div class="mapctl" role="toolbar" aria-label="Điều khiển bản đồ">
   <button type="button" id="view-3d" class="v3d" aria-pressed="false" title="Xem bản đồ 3D">3D</button>
+  <button type="button" id="view-north" class="only-3d" aria-label="Quay về hướng Bắc" title="Quay về hướng Bắc (R)">N</button>
+  <button type="button" id="view-top" class="only-3d" aria-label="Nhìn thẳng từ trên xuống" title="Nhìn thẳng từ trên xuống / nghiêng lại (T)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   <button type="button" id="zoom-in" aria-label="Phóng to bản đồ" title="Phóng to (+)" aria-keyshortcuts="+">+</button>
   <span class="zl mono" id="zoom-level" aria-live="polite">1.0×</span>
   <button type="button" id="zoom-out" aria-label="Thu nhỏ bản đồ" title="Thu nhỏ (−)" aria-keyshortcuts="-">−</button>

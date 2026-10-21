@@ -4,6 +4,15 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.37
 
+- **0.37.1, bản đồ 3D dễ dùng hơn:**
+  - **Khung nhìn:** toàn cảnh căn giữa và vừa khít phần màn hình không bị bảng che, như bản 2D. Camera chỉ đặt vị trí khi khung 3D đã hiện, trước đây có lúc bắt đầu sát mặt đất.
+  - **Tên:** tên các nước, điểm định cư, trại man di, kỳ quan không còn đè lên nhau. Tên quan trọng hơn (thủ đô) được giữ, tên đè lên thì tạm ẩn.
+  - **Rê chuột:** ô dưới con trỏ có viền trắng.
+  - **Nút mới:** **N** quay về hướng Bắc; **⤓** nhìn thẳng từ trên xuống, bấm lần nữa để nghiêng lại.
+  - **Phím tắt:** mũi tên hay WASD để di chuyển, Q/E để xoay, R về hướng Bắc, T nhìn từ trên xuống, Enter chọn ô giữa màn hình, +/−/0 để phóng to, thu nhỏ, xem toàn cảnh.
+  - **Mức phóng to** hiện đúng trong chế độ 3D.
+  - **Chỉ còn giao diện tối:** bỏ nút đổi sáng/tối; trang luôn dùng giao diện tối.
+
 - **Hai sáng kiến của các quốc gia được đưa vào game (§6.6):**
   - **Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt; người hái lượm mang về; thế giới cũ được thêm khi tải. Dân thảo nguyên có thuốc mà không cần rừng.
   - **Vườn thảo dược:** cần Trồng trọt, 5 sợi, 6 công; xây trên đất ấm cách trung tâm tối đa 2 ô, tối đa 2 vườn mỗi trung tâm; mỗi vườn tự cho 0,5 thảo dược mỗi lượt.
