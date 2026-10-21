@@ -47,7 +47,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const why = Object.entries(ex.why).map(([w, k]) => `${k} vì ${WHY_VI[w as keyof typeof WHY_VI]}`).join(", ");
     const fix: string[] = [];
     if (ex.why.envy) fix.push("nâng thịnh vượng (lương thực dự trữ, hàng hóa, chỗ ở)");
-    if (ex.why.unrest || ex.why.border) fix.push("nâng ổn định (đủ ăn, không vượt giới hạn đất, bàn thờ, hạ căng thẳng biên giới)");
+    if (ex.why.unrest || ex.why.border) fix.push("nâng ổn định (đủ ăn, có chỗ ở, bàn thờ, hạ căng thẳng biên giới)");
     if (ex.why.faction || ex.why.schism) fix.push("hạ bất mãn (đường tới tỉnh cô lập, bá tước, ổn định ≥ 60)");
     // §4.10 the ruler's own way to win hearts back
     const faithful = m.caps.has(MISSION.cap), homeMission = (n.missions ?? []).some(x => x.where < 0 && x.until >= world.tick);
@@ -61,7 +61,7 @@ export function advice(world: World, n: Nation): Advice[] {
   // §4.10 discontent climbing: faith and feasts calm a people before it splits
   if ((n.discontent ?? 0) >= 60 && !ex.recent) {
     const faithful = m.caps.has(MISSION.cap);
-    say((n.discontent ?? 0) >= 85 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 thì một phái đòi ly khai. ${faithful ? `Truyền giáo trong nước (mission home, −${MISSION.calm}/lượt trong ${MISSION.turns} lượt) và lễ hội (festival, −${FESTIVAL.calm}, +${FESTIVAL.stability} ổn định)` : "Nghiên cứu Nghi lễ (P5) để truyền giáo"}; bỏ bớt ô vượt giới hạn; bổ nhiệm bá tước và làm đường cho tỉnh xa.`);
+    say((n.discontent ?? 0) >= 85 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 thì một phái đòi ly khai. ${faithful ? `Truyền giáo trong nước (mission home, −${MISSION.calm}/lượt trong ${MISSION.turns} lượt) và lễ hội (festival, −${FESTIVAL.calm}, +${FESTIVAL.stability} ổn định)` : "Nghiên cứu Nghi lễ (P5) để truyền giáo"}; bổ nhiệm bá tước và làm đường cho tỉnh xa.`);
   }
 
   // Food
@@ -111,10 +111,10 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Land over the limit
   const held = governed(world, n), limit = tileLimit(world, n);
-  if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: mỗi ô thừa −2 ổn định mỗi lượt và làm tăng bất mãn. Nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1) hoặc lập điểm định cư; nếu phải bỏ thì bỏ ô trống không người ở (−${LAND.abandonEmpty} ổn định; ô có người ở −${LAND.abandonStability}).`);
+  if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) tự thành đất hoang. Muốn giữ đất: nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1), lập điểm định cư hoặc tăng dân; hoặc tự chọn ô bỏ (abandon_tile) để giữ ô tốt.`);
 
   // Discontent
-  if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, không vượt giới hạn đất, có nghi lễ/công trình ổn định) để nó nguội đi.`);
+  if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, có chỗ ở, có nghi lễ/công trình ổn định) để nó nguội đi.`);
 
   // A connected realm (§2.7): settlements with no way home
   for (const c of isolated(world, n)) {
@@ -220,6 +220,15 @@ export function advice(world: World, n: Nation): Advice[] {
   const mine = specialtiesOf(world, n).filter(x => x.veins.length);
   const exposed = mine.flatMap(x => x.veins.map(i => ({ good: x.good, i }))).find(v => world.nations.some(o => o.alive && o.founded && o.id !== n.id && activeWar(world, n.id, o.id) && world.tiles.some(t => t.owner === o.id && Math.abs(col(t.i) - col(v.i)) + Math.abs(row(t.i) - row(v.i)) <= 3)));
   if (exposed) say(3, `Mạch ${goodVi(world, exposed.good)} của bạn ở ${xy(exposed.i)} nằm sát quân thù: đặt chiến binh, dựng hàng rào, đừng để mất nó.`);
+
+  // §7.9 brawl after brawl: one more and the border goes to war
+  for (const o of world.nations) {
+    if (o.id === n.id || !o.alive || !o.founded) continue;
+    const st = world.borders?.[n.id < o.id ? `${n.id}-${o.id}` : `${o.id}-${n.id}`];
+    const recent = (st?.brawls ?? []).filter(x => world.tick - x.tick < BORDER.brawlWindow);
+    if (recent.length >= BORDER.brawlsToWar - 1 && !activeWar(world, n.id, o.id))
+      say(3, `Biên giới với ${o.name} đã có ${recent.length} vụ xô xát chết người trong ${BORDER.brawlWindow} lượt: thêm một vụ nữa là chiến tranh. Hạ căng thẳng ngay (hiệp ước, buôn bán, quà tặng) hoặc chuẩn bị chiến binh ở biên giới.`);
+  }
 
   // §4.5 betrayal: the old nation and the traitors
   for (const o of world.nations) {

@@ -278,7 +278,7 @@ export function fmtGoods(world: World, g: Record<string, number>): string {
   return Object.entries(g).map(([k, q]) => `${Math.round(q * 10) / 10} ${goodName(world, k)}`).join(", ");
 }
 
-function startWar(world: World, n: Nation, o: Nation, tick: number, reason: string, say: Say): void {
+export function startWar(world: World, n: Nation, o: Nation, tick: number, reason: string, say: Say): void {
   world.wars.push({ id: world.nextId++, a: n.id, b: o.id, declared: tick, start: tick + 1, end: null, reason });
   say(n.id, "war", `${n.name} tuyên chiến với ${o.name}${reason ? ` (${reason})` : ""}. Chiến sự bắt đầu từ lượt sau.`);
   o.lastEvents.push(`${n.name} tuyên chiến với chúng ta! Chiến sự bắt đầu từ lượt sau.`);

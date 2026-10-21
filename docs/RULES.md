@@ -68,7 +68,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
 - **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó.
-- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. Vượt giới hạn thì mỗi ô thừa gây −2 ổn định mỗi lượt, **tổng phạt tối đa −10 mỗi lượt**.
+- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. **Vượt giới hạn** (ví dụ khi dân giảm): không đủ người làm, nên mỗi lượt 1 ô thừa tự thành đất hoang. Engine chọn ô trống, không công trình, ít người ở, xa trung tâm và nghèo nhất trước. Việc này **không làm mất ổn định và không làm dân bất mãn**: đất rộng không phải lý do để dân bỏ đi, vì phái ra đi lập quốc cũng sẽ giữ chừng ấy đất. Muốn giữ ô tốt thì tự chọn ô bỏ (`abandon_tile`) hoặc nâng giới hạn.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
@@ -414,7 +414,7 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 ### 4.4 Ổn định
 
 - **Tăng:** còn lương thực trong kho sau khi ăn (+1/lượt), công trình ổn định như Bàn thờ (tổng từ mọi công trình tối đa +1/lượt), hiệu ứng ổn định của phát minh mở, Suối Nước Nóng (+2/lượt), thắng trận (+1), hoàn thành một nghiên cứu (+2 một lần, cộng thưởng một lần của phát minh như Nghi lễ +5), dân tung hô vì sống sung túc hơn các nước quen biết (+1/lượt, §4.7).
-- **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), vượt giới hạn ô (−2 mỗi ô thừa, tối đa −10), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh), lập điểm định cư (−5 một lần, vì dời dân), **mỗi điểm định cư vượt quá 3: −1 mỗi lượt** (một bộ máy bộ lạc khó cai quản quá nhiều trung tâm; Bàn thờ, Suối Nước Nóng và hiệu ứng ổn định của phát minh mở bù lại được).
+- **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh), lập điểm định cư (−5 một lần, vì dời dân), **mỗi điểm định cư vượt quá 3: −1 mỗi lượt** (một bộ máy bộ lạc khó cai quản quá nhiều trung tâm; Bàn thờ, Suối Nước Nóng và hiệu ứng ổn định của phát minh mở bù lại được).
 - Ổn định được làm tròn và giữ trong 0–100 cuối mỗi lượt.
 - **Dưới 30:** mọi năng suất −25%.
 - **Dưới 15:** mỗi lượt 5% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang.
@@ -426,7 +426,6 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
   - ổn định dưới 35: thêm (35 − ổn định) / 3
   - nạn đói: thêm 10
   - nội loạn: thêm 25
-  - mỗi ô vượt giới hạn quản lý: thêm 2
   - mỗi điểm định cư cô lập: thêm 2 (mục 2.7); mỗi tỉnh có bất ổn từ 50: thêm 1 (mục 2.8)
   - dân ganh tị vì nghèo hơn các nước quen biết: thêm tới 3 (§4.7); dân tung hô thì bớt 2
 
@@ -916,6 +915,12 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
   - dân vượt biên: vài gia đình từ nước kém ổn định sang nước ổn định hơn; căng thẳng +5
 
   Bên bị săn trộm hoặc bị xô xát có **chính nghĩa** (tuyên chiến không mất uy tín) trong 6 lượt.
+- **Máu đòi máu:** 3 vụ xô xát chết người trong 10 lượt thì biên giới thành chiến tranh.
+  - Bên chôn nhiều người hơn tự tuyên chiến, với chính nghĩa và không mất uy tín. Hòa thì bên ổn định thấp hơn tuyên chiến.
+  - Hiệp ước bất tương xâm và đi lại giữa hai bên tan vỡ.
+  - Hiệp ước hòa bình, liên minh hoặc chư hầu ngăn được điều này.
+  - Lời cố vấn báo khẩn khi đã có 2 vụ.
+  - Trên bản đồ, một vụ xô xát hiện là "🤜 xô xát biên giới", không phải trận đánh, và người chết vì xô xát có nguyên nhân riêng.
 - **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt. Tranh chấp liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ (liên minh và chư hầu vẫn giữ). Có chính nghĩa thì tự xé hiệp ước (`break_treaty`) không mất uy tín.
 - **Chợ biên giới:** khi căng thẳng dưới 60 và không bên nào đang cách ly (mục 9.5), mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
 - **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
@@ -1139,7 +1144,17 @@ Watcher thấy mọi thứ và có một quyền tác động chính: ban hành 
 
 ### 10.1 Watcher nhìn thấy gì
 
-- **Bản đồ sống:** toàn bộ thế giới, không sương mù. Lãnh thổ tô màu cờ, thủ đô, điểm định cư, kỳ quan, sông, các trận đánh.
+- **Bản đồ sống:** toàn bộ thế giới, không sương mù.
+  - Lãnh thổ tô màu cờ. Thủ đô có tên trên nền tối và chấm màu cờ.
+  - Điểm định cư, kỳ quan, mạch giàu, man di, sông, trận đánh.
+  - Nhãn tự tránh nhau, thủ đô được ưu tiên.
+  - Đường sá vẽ thành nhánh từ các trung tâm. Công trình chỉ hiện khi phóng gần.
+- **Bố cục (v0.20):**
+  - **Thanh điều hướng dọc** bên trái: Chat, Chi tiết, Quốc gia, Biên niên, Phát minh, Cây phát minh, Ngoại giao, Thống kê, Thỉnh nguyện, Sắc lệnh.
+  - **Thanh trên một dòng:** lượt, trạng thái, tóm tắt thế giới, điều khiển.
+  - **Bảng quốc gia** nổi góc trái: mỗi nước một dòng với dân số, thanh ổn định và biểu tượng cảnh báo (⚔ chiến tranh, 🦠 dịch, 🍂 thiếu ăn, 🚶 dân bỏ đi, ✊ sắp ly khai, 💤 lỗi key hoặc đang ngủ). Bấm vào một nước là bay tới đó và mở hồ sơ.
+  - **Bản tin lượt** nổi góc phải: tin của lượt vừa rồi gom theo quốc gia, nơi nhiều tin xấu lên trước, tin xấu tô đỏ và tin tốt tô xanh. Bấm một tin là bay tới chỗ đó và phát lại.
+  - Hai thẻ nổi tự gập khi khung bên cạnh mở, và gập hay mở được bằng tay.
 - **Hồ sơ quốc gia:** tên, cờ, tuyên ngôn, model đang chạy, trạng thái (hoạt động, ngủ đông, lỗi key), dân số, kho, phát minh, quan hệ, bản ghi nhớ hiện tại, 5 câu trả lời nguyên văn gần nhất.
 - **Dòng suy nghĩ:** trường `thought` của từng AI mỗi lượt, và hộp thư ngoại giao của mỗi quốc gia trong lượt.
 - **Phát minh:** danh sách Sổ Phát Minh, ai phát minh gì đầu tiên, đơn đang chờ, đơn nào bị trọng tài bác và lý do; nút chấm tay.

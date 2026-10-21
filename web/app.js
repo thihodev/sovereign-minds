@@ -93,6 +93,24 @@
     g.font = `${weight} ${size}px "Be Vietnam Pro", system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
     g.lineWidth = Math.max(2 * px, size / 3.5); g.strokeStyle = "rgba(8,20,28,.85)"; g.strokeText(text, x, y); g.fillStyle = color; g.fillText(text, x, y);
   }
+  // labels that would cover one already on the map are left out (capitals first, then settlements, then the rest)
+  let placed = [];
+  function fits(x0, y0, x1, y1) { for (const r of placed) if (x0 < r[2] && x1 > r[0] && y0 < r[3] && y1 > r[1]) return false; return true; }
+  function reserve(g, text, x, y, size, weight, px) {
+    g.font = `${weight} ${size}px "Be Vietnam Pro", system-ui, sans-serif`;
+    const w = g.measureText(text).width / 2 + 4 * px, h = size * .7;
+    placed.push([x - w, y - h, x + w, y + h]);
+  }
+  /** A label that steps aside: drawn only where it covers nothing drawn before it. `pill`: on a dark backing. */
+  function tag(g, text, x, y, size, color, weight, px, pill = false) {
+    g.font = `${weight} ${size}px "Be Vietnam Pro", system-ui, sans-serif`;
+    const w = g.measureText(text).width / 2 + 4 * px, h = size * .7;
+    if (!fits(x - w, y - h, x + w, y + h)) return false;
+    placed.push([x - w, y - h, x + w, y + h]);
+    if (pill) { g.beginPath(); g.roundRect?.(x - w - 2 * px, y - h, 2 * w + 4 * px, 2 * h, h); g.fillStyle = "rgba(8,20,28,.62)"; g.fill(); }
+    label(g, text, x, y, size, color, weight, px);
+    return true;
+  }
   const NB = (i) => { const N = geo.N, c = i % N, r = (i / N) | 0, D = r & 1 ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]] : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]; return D.map(([dc, dr]) => [c + dc, r + dr]).map(([cc, rr]) => cc >= 0 && cc < N && rr >= 0 && rr < N ? rr * N + cc : -1); };
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -216,25 +234,85 @@
     drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
   };
   const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun", "road"]);
+  // §10 the turn's news: grouped by nation, the worst first, each item a button that flies there
+  const FX_BAD = new Set(["death", "raid", "plague", "famine", "winter", "migrate", "brawl", "robbed", "storm", "seized", "contagion", "drought", "fire", "eruption", "riot", "beasts", "flood", "quake", "lost_tile", "horde_back", "schism"]);
+  const FX_GOOD = new Set(["invention", "era", "build", "settle", "repelled", "road", "minister", "bounty"]);
+  const fxTone = f => f.kind === "battle" ? (String(f.text).startsWith("won") ? "good" : "bad") : f.kind === "clear" ? (f.text === "won" ? "good" : "bad") : FX_BAD.has(f.kind) ? "bad" : FX_GOOD.has(f.kind) ? "good" : "";
+  let newsMin = false, newsAll = false, newsList = [], newsPinned = false, boardPinned = false;
+  try { newsMin = localStorage.getItem("sm-news-min") === "1"; } catch { }
+  function flyTo(f) {
+    const focus = f.path?.length ? f.path[Math.floor(f.path.length / 2)] : f.tile; // a journey: look at its middle
+    if (focus === undefined) return;
+    centerOn(focus, Math.max(view.z, (f.path?.length > 8 ? 18 : 28) / geo.s)); ANIM.queue.push({ ...f, t0: performance.now() + 350, dur: FX_DUR[f.kind] || FX_DEFAULT }); ensureAnim();
+  }
   function showTicker(list) {
-    const box = $("#fx-ticker"); if (!box) return;
-    const items = list.filter(f => !QUIET_FX.has(f.kind)).slice(0, 14);
-    box.replaceChildren(...items.map(f => {
-      const b = document.createElement("button"); b.type = "button";
-      const who = f.nation !== undefined && S.nations[f.nation] && f.kind !== "contagion" ? `${nationName(S.nations[f.nation])}: ` : "";
-      b.textContent = who + (FX_WORD[f.kind]?.(f) ?? f.kind);
-      if (f.nation !== undefined && S.nations[f.nation]) b.style.borderLeftColor = nationColor(f.nation);
-      // fly there and play just this one again, leaving the strip as it is
-      const focus = f.path?.length ? f.path[Math.floor(f.path.length / 2)] : f.tile; // a journey: look at its middle
-      b.onclick = () => { centerOn(focus, Math.max(view.z, (f.path?.length > 8 ? 18 : 28) / geo.s)); ANIM.queue.push({ ...f, t0: performance.now() + 350, dur: FX_DUR[f.kind] || FX_DEFAULT }); ensureAnim(); };
-      return b;
-    }));
-    if (items.length) {
-      const x = document.createElement("button"); x.type = "button"; x.className = "close"; x.textContent = "×"; x.title = "Ẩn (hiện lại khi có lượt mới)";
-      x.setAttribute("aria-label", "Ẩn dải tin"); x.onclick = () => { box.hidden = true; };
-      box.append(x);
+    newsList = list.filter(f => !QUIET_FX.has(f.kind));
+    newsAll = false;
+    renderNews();
+  }
+  function renderNews() {
+    const box = $("#fx-ticker"); if (!box || !S) return;
+    if (!newsList.length) { box.hidden = true; return; }
+    // one group per nation; the world's own events (no nation) last
+    const groups = new Map();
+    for (const f of newsList) { const k = f.nation !== undefined && S.nations[f.nation] && f.kind !== "contagion" ? f.nation : -1; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); }
+    const weight = fs => fs.filter(f => fxTone(f) === "bad").length * 3 + fs.length;
+    const ordered = [...groups.entries()].sort((a, b) => (a[0] < 0) - (b[0] < 0) || weight(b[1]) - weight(a[1]));
+    const bad = newsList.filter(f => fxTone(f) === "bad").length, shown = newsAll ? ordered : ordered.slice(0, 5);
+    box.hidden = false; box.classList.toggle("min", newsMin);
+    box.innerHTML = `<header><span>📰 Bản tin lượt ${S.lastFx?.tick >= 0 ? S.lastFx.tick : S.tick}</span><span class="count${bad ? " bad" : ""}" title="${bad} tin xấu trên ${newsList.length} tin">${newsList.length}${bad ? ` · ${bad} xấu` : ""}</span><span class="grow"></span>
+        <button type="button" data-act="min" aria-label="${newsMin ? "Mở" : "Thu gọn"} bản tin" title="${newsMin ? "Mở" : "Thu gọn"}">${newsMin ? "▾" : "▴"}</button><button type="button" data-act="close" aria-label="Ẩn bản tin tới lượt sau" title="Ẩn tới lượt sau">×</button></header>
+      <div class="news-body">${shown.map(([id, fs]) => {
+        const n = id >= 0 ? S.nations[id] : null, sorted = fs.slice().sort((a, b) => (fxTone(b) === "bad") - (fxTone(a) === "bad"));
+        return `<div class="grp">${n ? `<div class="who" data-nation="${id}"><i class="sw" style="background:${esc(nationColor(id))}"></i>${esc(nationName(n))}</div>` : `<div class="who">🌍 Thế giới</div>`}
+          <div class="items">${sorted.map(f => `<button type="button" class="${fxTone(f)}" data-fx="${newsList.indexOf(f)}">${esc(FX_WORD[f.kind]?.(f) ?? f.kind)}</button>`).join("")}</div></div>`;
+      }).join("")}${ordered.length > shown.length ? `<button type="button" class="more" data-act="all">+ ${ordered.length - shown.length} nơi khác…</button>` : ""}</div>`;
+    // with the right dock open the news folds by itself; the button then pins it open instead
+    box.classList.toggle("pinned", newsPinned);
+    box.querySelector("[data-act=min]").onclick = () => {
+      if (document.body.classList.contains("right-open")) { newsPinned = !newsPinned; newsMin = false; }
+      else { newsMin = !newsMin; try { localStorage.setItem("sm-news-min", newsMin ? "1" : "0"); } catch { } }
+      renderNews();
+    };
+    box.querySelector("[data-act=close]").onclick = () => { box.hidden = true; };
+    box.querySelector("[data-act=all]")?.addEventListener("click", () => { newsAll = true; renderNews(); });
+    for (const b of box.querySelectorAll("[data-fx]")) b.onclick = () => flyTo(newsList[+b.dataset.fx]);
+    for (const w of box.querySelectorAll("[data-nation]")) w.onclick = () => inspectNation(+w.dataset.nation);
+  }
+
+  // §10 every nation at a glance: people, stability, alarms; click to fly there and open it
+  let boardMin = false;
+  try { boardMin = localStorage.getItem("sm-board-min") === "1"; } catch { }
+  function alarmsOf(n) {
+    const out = [];
+    if ((S.wars || []).some(w => w.a === n.id || w.b === n.id)) out.push(["⚔", "Đang có chiến tranh"]);
+    if (n.health?.outbreak) out.push(["🦠", "Đang có dịch"]);
+    if ((n.threats || []).some(t => t.kind === "famine" && t.level >= 3)) out.push(["🍂", "Lương thực không đủ một lượt ăn"]);
+    if (n.exodus?.alarm) out.push(["🚶", `Dân bỏ đi: ${n.exodus.recent} người trong 10 lượt`]);
+    if ((n.discontent ?? 0) >= 70) out.push(["✊", `Bất mãn ${n.discontent}/100: sắp có phái ly khai`]);
+    if (n.status === "error" || n.status === "asleep") out.push(["💤", n.status === "error" ? "Lỗi key" : "Đang ngủ"]);
+    return out;
+  }
+  function renderBoard() {
+    const box = $("#board"); if (!box || !S) return;
+    const list = S.nations.filter(n => n.founded || n.alive).sort((a, b) => (b.alive - a.alive) || b.population - a.population || a.id - b.id);
+    const sel = inspect?.kind === "nation" ? inspect.id : -1;
+    const stabColor = v => v >= 60 ? "var(--good)" : v >= 30 ? "var(--warn)" : "var(--bad)";
+    box.classList.toggle("min", boardMin);
+    box.innerHTML = `<header><span>Quốc gia</span><span class="count">${list.filter(n => n.alive).length}</span><span class="grow"></span><button type="button" data-act="min" aria-label="${boardMin ? "Mở" : "Thu gọn"} bảng quốc gia" title="${boardMin ? "Mở" : "Thu gọn"}">${boardMin ? "▾" : "▴"}</button></header>
+      <ol>${list.map(n => { const al = n.alive ? alarmsOf(n) : []; return `<li tabindex="0" data-id="${n.id}" class="${n.alive ? "" : "dead"}${n.id === sel ? " sel" : ""}" title="${esc(nationName(n))}: ${n.population} dân, ổn định ${n.stability}, ${n.era}">
+        <i class="sw" style="background:${esc(nationColor(n.id))}"></i><span class="nm">${esc(nationName(n))}</span><span class="pop">${n.alive ? `${n.population}👤` : "đã mất"}</span>
+        <span class="line2"><span class="stab" aria-label="Ổn định ${n.stability}"><i style="width:${n.alive ? n.stability : 0}%;background:${stabColor(n.stability)}"></i></span><span class="alarms">${al.map(([i, t]) => `<span title="${esc(t)}">${i}</span>`).join("")}</span></span></li>`; }).join("")}</ol>`;
+    box.classList.toggle("pinned", boardPinned);
+    box.querySelector("[data-act=min]").onclick = () => {
+      if (document.body.classList.contains("left-open")) { boardPinned = !boardPinned; boardMin = false; }
+      else { boardMin = !boardMin; try { localStorage.setItem("sm-board-min", boardMin ? "1" : "0"); } catch { } }
+      renderBoard();
+    };
+    for (const li of box.querySelectorAll("li")) {
+      li.onclick = () => inspectNation(+li.dataset.id);
+      li.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inspectNation(+li.dataset.id); } };
     }
-    box.hidden = !items.length; // stays until the next tick or until closed
   }
   function ensureAnim() { if (!ANIM.raf) ANIM.raf = requestAnimationFrame(animFrame); }
   function animFrame(now) {
@@ -493,7 +571,7 @@
   const BKIND = { housing: "🏠", farm: "🌾", craft: "🔨", port: "⚓", water: "🪣", defense: "🛡", sacred: "⛩", store: "🏺", other: "🏛" };
   const bIcon = b => BTYPE[b.type] || BKIND[b.kind] || "🏛";
   function drawBuildings(g, vis, s, z, px) {
-    if (s * z < 7) return;
+    if (s * z < 11) return;
     const size = clamp(s * .42 * z, 10, 26) * px;
     for (const n of S.nations) {
       if (!n.alive) continue;
@@ -522,22 +600,38 @@
   // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
   const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
+  let treeMemo = null;
+  /** Each road tile's step toward the nearest centre (breadth first over road tiles of one kind, land or water). */
+  function roadTree(hubs) {
+    const key = S.tick + ":" + S.roads.length;
+    if (treeMemo?.key === key) return treeMemo.parent;
+    const parent = new Map(), queue = [];
+    for (const h of hubs) { parent.set(h, -1); queue.push(h); }
+    // water lanes grow from the piers' shores too: any water road next to land with a road or a centre
+    for (let q = 0; q < queue.length; q++) {
+      const i = queue[q];
+      for (const j of NB(i)) {
+        if (j < 0 || parent.has(j) || !(S.roads[j] || 0)) continue;
+        if (isWater(j) !== isWater(i) && !hubs.has(i)) continue;
+        parent.set(j, isWater(j) !== isWater(i) ? -1 : i); queue.push(j);
+      }
+    }
+    // roads cut off from every centre: link each to one road neighbour so they still read as a road
+    S.roads.forEach((lv, i) => { if (!lv || parent.has(i)) return; const j = NB(i).find(k => k >= 0 && (S.roads[k] || 0) && isWater(k) === isWater(i) && k < i); parent.set(i, j ?? -1); });
+    treeMemo = { key, parent };
+    return parent;
+  }
   function drawRoads(g, vis, s, z, px) {
     if (!S.roads || s * z < 3) return;
     const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
-    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [];
+    // a road network drawn as branches from the centres, not as a mesh of every touching pair
+    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [], parent = roadTree(hubs);
     S.roads.forEach((lv, i) => {
       if (!lv || !vis(i)) return;
-      const water = isWater(i); let linked = false;
-      for (const j of NB(i)) {
-        if (j < 0) continue;
-        const lj = S.roads[j] || 0, hub = !water && hubs.has(j) && !isWater(j);
-        if (isWater(j) !== water || (!lj && !hub)) continue;
-        linked = true;
-        if (lj && j < i) continue; // each pair once
-        segs[water ? "sea" : "land"][lj ? Math.min(lv, lj) : lv].push([i, j]);
-      }
-      if (!linked) dots.push([i, lv, water]);
+      const water = isWater(i), j = parent.get(i);
+      if (j === undefined || j < 0) { if (!hubs.has(i)) dots.push([i, lv, water]); return; }
+      const lj = S.roads[j] || 0;
+      segs[water ? "sea" : "land"][lj ? Math.min(lv, lj) : lv].push([i, j]);
     });
     const line = (list, width, color, dash) => {
       if (!list.length) return;
@@ -547,8 +641,8 @@
     };
     g.save(); g.lineCap = "round";
     for (let lv = 1; lv <= 3; lv++) {
-      const st = ROAD_STYLE[lv], w = Math.max(1.2 * px, s * st.w);
-      line(segs.land[lv], w + 2.2 * px, "rgba(30,20,10,.55)");
+      const st = ROAD_STYLE[lv], w = Math.max(1.1 * px, s * st.w * (s * z < 8 ? .7 : 1));
+      line(segs.land[lv], w + 1.6 * px, "rgba(30,20,10,.45)");
       line(segs.land[lv], w, st.c, st.dash);
       line(segs.sea[lv], Math.max(1 * px, s * .07) + 2 * px, "rgba(10,40,70,.5)");
       line(segs.sea[lv], Math.max(1 * px, s * .07), lv >= 2 ? "#ffffff" : "#cfeeff", [.35, .25]);
@@ -586,11 +680,11 @@
     // territory: a tint, a hatch and a two-layer border, so a flag colour that matches the land
     // (dark green on forest, sand on desert) still reads: the hatch and the outer edge use a contrast colour
     const owned = []; S.owners.forEach((o, i) => { if (o >= 0 && vis(i)) owned.push(i); });
-    g.globalAlpha = .42;
+    g.globalAlpha = .34;
     for (const i of owned) { const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = nationColor(S.owners[i]); g.fill(); }
     g.globalAlpha = 1;
-    if (s * z >= 5) {
-      g.save(); g.lineWidth = Math.max(px, s * .07); g.globalAlpha = .28;
+    if (s * z >= 8) {
+      g.save(); g.lineWidth = Math.max(px, s * .05); g.globalAlpha = .14;
       for (const i of owned) {
         const [x, y] = center(i), o = S.owners[i];
         g.save(); hexPath(g, x, y, s); g.clip();
@@ -639,25 +733,28 @@
       g.setLineDash([3 * px, 3 * px]); g.lineWidth = 1.2 * px; g.strokeStyle = "rgba(255,255,255,.75)"; g.stroke(); g.restore();
     }
     drawRoads(g, vis, s, z, px);
+    // the capitals' names come first: every other label steps around them
+    placed = [];
+    const small = clamp(s * .95 * z, 9, 13) * px, fs = clamp(s * 1.1 * z, 11, 16) * px;
+    for (const n of S.nations) if (n.alive) { const [x, y] = center(n.capital); reserve(g, nationName(n), x, y + fs * 1.15, fs, 700, px); }
     // names of the quiet places, once there is room to read them
-    const small = clamp(s * .95 * z, 9, 13) * px;
     if (s * z >= 5) {
-      for (const w of ST.wild || []) { const [x, y] = center(w); label(g, "Vùng hoang", x, y - (WILD_R + .6) * s * SQ3 - 8 * px, small, "#eef6e6", 500, px); }
-      if (ST.herd) { const [x1, y1] = center(ST.herd[0]), [x2, y2] = center(ST.herd[1]); label(g, "Tuyến bò rừng", (x1 + x2) / 2 - (y2 - y1) * .09, (y1 + y2) / 2 + (x2 - x1) * .09, small, "#f6d696", 500, px); }
+      for (const w of ST.wild || []) { const [x, y] = center(w); tag(g, "Vùng hoang", x, y - (WILD_R + .6) * s * SQ3 - 8 * px, small, "#eef6e6", 500, px); }
+      if (ST.herd) { const [x1, y1] = center(ST.herd[0]), [x2, y2] = center(ST.herd[1]); tag(g, "Tuyến bò rừng", (x1 + x2) / 2 - (y2 - y1) * .09, (y1 + y2) / 2 + (x2 - x1) * .09, small, "#f6d696", 500, px); }
     }
     // wonders
     for (const w of ST.wonders) {
       const [x, y] = center(w.i), R = clamp(s * .8 * z, 5, 14) * px; g.beginPath();
       for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? R * .45 : R; g.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); }
       g.closePath(); g.fillStyle = "#ffd84a"; g.fill(); g.lineWidth = px; g.strokeStyle = "#3a2a00"; g.stroke();
-      if (s * z >= 14) label(g, w.name, x, y + R + 8 * px, small, "#ffe9a0", 500, px);
+      if (s * z >= 14) tag(g, w.name, x, y + R + 8 * px, small, "#ffe9a0", 500, px);
     }
     // §2.10 rich veins: a small diamond in the good's colour
-    if (s * z >= 3) for (const v of ST.veins || []) {
+    if (s * z >= 4.5) for (const v of ST.veins || []) {
       const [x, y] = center(v.i), R = clamp(s * .45 * z, 3, 8) * px;
       g.beginPath(); g.moveTo(x, y - R); g.lineTo(x + R * .75, y); g.lineTo(x, y + R); g.lineTo(x - R * .75, y); g.closePath();
       g.fillStyle = VEIN_COLOR[v.good] || "#ddd"; g.fill(); g.lineWidth = px; g.strokeStyle = "#1a1a1a"; g.stroke();
-      if (s * z >= 16) label(g, `Mạch ${v.name}`, x, y + R + 7 * px, small, "#f0e6d0", 500, px);
+      if (s * z >= 16) tag(g, `Mạch ${v.name}`, x, y + R + 7 * px, small, "#f0e6d0", 500, px);
     }
     // barbarian hordes (§9.4): a dark camp-fire marker with their strength
     for (const h of S.hordes || []) {
@@ -666,7 +763,7 @@
       g.beginPath(); g.arc(x, y, R, 0, 7); g.fillStyle = "#2a0d0a"; g.fill(); g.lineWidth = 2 * px; g.strokeStyle = h.alive ? "#ff6b3d" : "#b9a69e"; g.stroke();
       g.beginPath(); g.moveTo(x - R * .45, y + R * .4); g.lineTo(x + R * .45, y - R * .5); g.moveTo(x + R * .45, y + R * .4); g.lineTo(x - R * .45, y - R * .5);
       g.strokeStyle = "#ffd2b8"; g.lineWidth = Math.max(1.5 * px, R * .16); g.stroke();
-      if (s * z >= 4) label(g, h.alive ? `${h.name} · ${h.strength}` : `${h.name} (đã tan)`, x, y + R + 9 * px, small, h.alive ? "#ffb59a" : "#cbbab3", 600, px);
+      if (s * z >= 4 && (h.alive || s * z >= 10)) tag(g, h.alive ? `${h.name} · ${h.strength}` : `${h.name} (đã tan)`, x, y + R + 9 * px, small, h.alive ? "#ffb59a" : "#cbbab3", 600, px);
       g.globalAlpha = 1;
     }
     // caravans (§7.3): along their real road, sliding between ticks; ⛵ by water, 🐂 overland
@@ -690,20 +787,6 @@
       g.beginPath(); g.rect(x + off - r, y - r * .8, r * 2, r * 1.6); g.fill(); g.stroke();
       g.beginPath(); g.moveTo(x + off - r, y - r * .8); g.lineTo(x + off, y); g.lineTo(x + off + r, y - r * .8); g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = px; g.stroke();
     });
-    // capitals with flags
-    const fs = clamp(s * 1.1 * z, 10, 15) * px;
-    for (const n of S.nations) {
-      if (!n.alive) continue;
-      const [x, y] = center(n.capital), fw = clamp(s * 3 * z, 18, 44) * px, fh = fw * 2 / 3, lift = clamp(s * z, 6, 14) * px;
-      g.strokeStyle = "#0b1a22"; g.lineWidth = 1.5 * px; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - fh - lift); g.stroke();
-      drawFlag(g, x, y - fh - lift, fw, fh, n.flag, px);
-      label(g, nationName(n), x, y + fs * 1.1, fs, "#fff", 600, px);
-      if (n.status === "asleep" || n.status === "error") label(g, n.status === "asleep" ? "đang ngủ" : "lỗi key", x, y + fs * 2.3, fs * .85, "#ffd0a0", 500, px);
-    }
-    for (const n of S.nations) for (const st of n.settlements || []) {
-      const [x, y] = center(st.tile); g.beginPath(); g.arc(x, y, clamp(s * .7 * z, 4, 10) * px, 0, 7); g.fillStyle = n.flag.colors[0]; g.fill(); g.lineWidth = 1.5 * px; g.strokeStyle = "#0b1a22"; g.stroke();
-      label(g, st.name, x, y + small * 1.5, small, "#fff", 500, px);
-    }
     for (const b of (S.battles || []).filter(b => b.tick >= S.tick - 3)) {
       const [x, y] = center(b.tile), r = clamp(s * .8 * z, 5, 12) * px; g.strokeStyle = "#ff4d3d"; g.lineWidth = clamp(s * .25 * z, 2, 4) * px;
       g.beginPath(); g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); g.stroke();
@@ -711,6 +794,24 @@
     const now = performance.now();
     drawAmbient(g, now, s, z, px, vis);
     drawBuildings(g, vis, s, z, px); // above the people, so the capital's buildings are not lost in the crowd
+    // capitals with flags (their names were reserved first)
+    for (const n of S.nations) {
+      if (!n.alive) continue;
+      const [x, y] = center(n.capital), fw = clamp(s * 3 * z, 18, 44) * px, fh = fw * 2 / 3, lift = clamp(s * z, 6, 14) * px;
+      g.strokeStyle = "#0b1a22"; g.lineWidth = 1.5 * px; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - fh - lift); g.stroke();
+      drawFlag(g, x, y - fh - lift, fw, fh, n.flag, px);
+      g.font = `700 ${fs}px "Be Vietnam Pro", system-ui, sans-serif`;
+      const tw = g.measureText(nationName(n)).width / 2 + fs * .75;
+      g.beginPath(); g.roundRect?.(x - tw, y + fs * .45, tw * 2, fs * 1.4, fs * .7); g.fillStyle = "rgba(8,20,28,.7)"; g.fill();
+      g.beginPath(); g.arc(x - tw + fs * .55, y + fs * 1.15, fs * .24, 0, 7); g.fillStyle = nationColor(n.id); g.fill();
+      label(g, nationName(n), x + fs * .22, y + fs * 1.15, fs, "#fff", 700, px);
+      if (n.status === "asleep" || n.status === "error") label(g, n.status === "asleep" ? "đang ngủ" : "lỗi key", x, y + fs * 2.3, fs * .85, "#ffd0a0", 500, px);
+    }
+    for (const n of S.nations) for (const st of n.settlements || []) {
+      const [x, y] = center(st.tile); g.beginPath(); g.arc(x, y, clamp(s * .7 * z, 4, 10) * px, 0, 7); g.fillStyle = n.flag.colors[0]; g.fill(); g.lineWidth = 1.5 * px; g.strokeStyle = "#0b1a22"; g.stroke();
+      if (s * z >= 4) tag(g, st.name, x, y + small * 1.5, small, "#fff", 500, px);
+    }
+
     drawEvents(g, now, s, z, px);
     if (hoverI >= 0 && hoverI !== pinnedI) { const [x, y] = center(hoverI); hexPath(g, x, y, s * 1.05); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
     if (pinnedI >= 0) {
@@ -953,7 +1054,7 @@
     const latest = gates[gates.length - 1];
     $("#world-summary").innerHTML =
       `<span class="stat" title="Quốc gia còn sống / tổng số"><b>${alive}</b>/${S.nations.length} quốc gia</span>` +
-      `<span class="stat" title="${esc(gates.length ? gates.map(([e, t]) => `${e}: lượt ${t}`).join(" · ") : "Chưa quốc gia nào qua cổng kỷ nguyên")}">${latest ? `Cổng <b>${esc(latest[0])}</b> · lượt ${latest[1]}` : "Chưa qua cổng kỷ nguyên"}</span>` +
+      `<span class="stat gate" title="${esc(gates.length ? gates.map(([e, t]) => `${e}: lượt ${t}`).join(" · ") : "Chưa quốc gia nào qua cổng kỷ nguyên")}">${latest ? `Cổng <b>${esc(latest[0])}</b> · lượt ${latest[1]}` : "Chưa qua cổng kỷ nguyên"}</span>` +
       `<span class="stat${wars ? " hot" : ""}"><b>${wars}</b> cuộc chiến</span>`;
   }
   const togglePause = () => api("/api/control", { method: "POST", body: { action: window.__status?.paused ? "resume" : "pause" } }).then(applyStatus).catch(() => { });
@@ -1004,7 +1105,7 @@
     try { localStorage.setItem("sm-docks", JSON.stringify({ left: { open: DOCKS.left.open, w: DOCKS.left.w }, right: { open: DOCKS.right.open, w: DOCKS.right.w } })); } catch { }
   }
   const tabButtons = [...document.querySelectorAll(".tabs button")];
-  const tabTitle = b => b.firstChild.textContent.trim();
+  const tabTitle = b => b.title || b.textContent.trim();
   function applyDocks() {
     for (const side of ["left", "right"]) {
       const d = DOCKS[side];
@@ -1049,7 +1150,7 @@
   }
   $(".tabs").addEventListener("keydown", e => {
     const k = tabButtons.indexOf(document.activeElement); if (k < 0) return;
-    const to = { ArrowRight: k + 1, ArrowLeft: k - 1, Home: 0, End: tabButtons.length - 1 }[e.key];
+    const to = { ArrowRight: k + 1, ArrowLeft: k - 1, ArrowDown: k + 1, ArrowUp: k - 1, Home: 0, End: tabButtons.length - 1 }[e.key];
     if (to === undefined) return;
     e.preventDefault(); openRight(tabButtons[(to + tabButtons.length) % tabButtons.length].dataset.tab, true);
   });
@@ -1086,7 +1187,7 @@
   const HIDDEN_RES = new Set(["copper", "tin", "iron", "gold", "silver", "gems"]);
   function inspectNation(id) {
     const n = S.nations[id]; if (!n) return;
-    pinnedI = -1; inspect = { kind: "nation", id };
+    pinnedI = -1; inspect = { kind: "nation", id }; renderBoard();
     openRight("inspect"); renderInspector();
     if (n.alive) centerOn(n.capital); else scheduleRender();
   }
@@ -1658,7 +1759,7 @@
       const dec = el.querySelector("button[data-act=decree]");
       if (dec) dec.onclick = () => { $("#decree-text").value = p.text.slice(0, 1000); $("#decree-from").value = p.id; document.querySelector('.tabs button[data-tab="decrees"]').click(); };
       const ask = el.querySelector("button[data-act=ask]");
-      if (ask) ask.onclick = () => { document.querySelector('.tabs button[data-tab="chat"]').click(); $("#chat-input").value = `Phân tích thỉnh nguyện #${p.id} "${p.title}": có nên chấp thuận không, tác động lên cân bằng và công bằng ra sao, và nếu chấp thuận thì Sắc lệnh nên viết thế nào?`; $("#chat-input").focus(); };
+      if (ask) ask.onclick = () => { setDock("left", true); $("#chat-input").value = `Phân tích thỉnh nguyện #${p.id} "${p.title}": có nên chấp thuận không, tác động lên cân bằng và công bằng ra sao, và nếu chấp thuận thì Sắc lệnh nên viết thế nào?`; $("#chat-input").focus(); };
       box.append(el);
     }
   }
@@ -2141,7 +2242,7 @@
   // ---------------------------------------------------------------- data flow
   async function refresh() {
     S = await api("/api/state");
-    applyStatus(S); render(); renderSummary(); renderNations(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
+    applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
     if (DOCKS.right.open && curTab === "stats") renderStats();
     renderTrees();
     if (DOCKS.right.open && curTab === "inspect") renderInspector();
@@ -2160,6 +2261,7 @@
     ST = await api("/api/static");
     layout(); drawBase(); legend(); updateZoomUi();
     await refresh();
+    if (S.lastFx?.fx?.length && S.lastFx.tick >= S.tick - 1) showTicker(S.lastFx.fx); // the last turn's news, after a reload
     addChronicle(await api("/api/chronicle?limit=200"), false);
     ensureAnim();
     const es = new EventSource("/api/events");

@@ -19,11 +19,30 @@
   <p class="sr-only" id="map-help">Kéo để di chuyển, cuộn chuột hoặc chụm hai ngón để phóng to, nhấp vào một ô để xem chi tiết ở khung bên phải (nhấp lại hoặc Esc để bỏ chọn). Khi bản đồ đang được chọn: phím mũi tên để di chuyển, Enter để chọn ô ở giữa.</p>
 </main>
 <div class="tileinfo" id="tileinfo" hidden></div>
-<div class="fx-ticker" id="fx-ticker" aria-label="Chuyện vừa xảy ra trong lượt (bấm để xem trên bản đồ)" hidden></div>
+<!-- What happened this turn, grouped by nation, worst first (§10) -->
+<section class="news glass" id="fx-ticker" aria-label="Bản tin lượt vừa rồi (bấm một tin để xem trên bản đồ)" hidden></section>
+<!-- Every nation at a glance: people, stability, alarms; click to fly there -->
+<section class="board glass" id="board" aria-label="Bảng theo dõi quốc gia"></section>
+
+<nav class="rail" aria-label="Bảng của Watcher">
+  <button type="button" class="chat-toggle" id="btn-chat" aria-controls="dock-left" aria-expanded="false" title="Mở / thu gọn Chat Claude (phím C)" aria-keyshortcuts="C"><i aria-hidden="true">💬</i><span>Chat</span></button>
+  <div class="tabs" role="tablist" aria-orientation="vertical">
+    <button role="tab" data-tab="inspect" title="Chi tiết"><i aria-hidden="true">🔍</i><span>Chi tiết</span></button>
+    <button role="tab" data-tab="nations" title="Quốc gia"><i aria-hidden="true">🏛</i><span>Quốc gia</span></button>
+    <button role="tab" data-tab="chronicle" title="Biên niên"><i aria-hidden="true">📜</i><span>Biên niên</span></button>
+    <button role="tab" data-tab="inventions" title="Phát minh"><i aria-hidden="true">💡</i><span>Phát minh</span><span class="badge" id="prop-count" hidden></span></button>
+    <button role="tab" data-tab="tree" title="Cây phát minh"><i aria-hidden="true">🌳</i><span>Cây PM</span></button>
+    <button role="tab" data-tab="diplomacy" title="Ngoại giao"><i aria-hidden="true">🤝</i><span>Ngoại giao</span></button>
+    <button role="tab" data-tab="stats" title="Thống kê"><i aria-hidden="true">📈</i><span>Thống kê</span></button>
+    <button role="tab" data-tab="petitions" title="Thỉnh nguyện"><i aria-hidden="true">🙏</i><span>Thỉnh nguyện</span><span class="badge" id="pet-count" hidden></span></button>
+    <button role="tab" data-tab="decrees" title="Sắc lệnh"><i aria-hidden="true">⚖</i><span>Sắc lệnh</span></button>
+  </div>
+</nav>
 
 <header class="topbar" id="topbar">
   <div class="bar-row">
     <div class="brand"><h1>Sovereign Minds</h1><span class="world">Nguyên Địa</span></div>
+    <span class="sep" aria-hidden="true"></span>
     <div class="clock">
       <span class="tick mono" id="tick">Lượt —</span>
       <span class="pill" id="run-state">…</span>
@@ -51,20 +70,6 @@
       <button class="icon" id="btn-help" type="button" aria-label="Phím tắt" title="Phím tắt (?)" aria-keyshortcuts="?">?</button>
       <span class="mono muted" id="version"></span>
     </div>
-  </div>
-  <div class="bar-row nav-row">
-    <button type="button" class="chat-toggle" id="btn-chat" aria-controls="dock-left" aria-expanded="false" title="Mở / thu gọn Chat Claude (phím C)" aria-keyshortcuts="C">Chat Claude</button>
-    <nav class="tabs" role="tablist" aria-label="Bảng của Watcher (mở ở khung bên phải)">
-      <button role="tab" data-tab="inspect">Chi tiết</button>
-      <button role="tab" data-tab="nations">Quốc gia</button>
-      <button role="tab" data-tab="chronicle">Biên niên</button>
-      <button role="tab" data-tab="inventions">Phát minh <span class="badge" id="prop-count" hidden></span></button>
-      <button role="tab" data-tab="tree">Cây phát minh</button>
-      <button role="tab" data-tab="diplomacy">Ngoại giao</button>
-      <button role="tab" data-tab="stats">Thống kê</button>
-      <button role="tab" data-tab="petitions">Thỉnh nguyện <span class="badge" id="pet-count" hidden></span></button>
-      <button role="tab" data-tab="decrees">Sắc lệnh</button>
-    </nav>
   </div>
 </header>
 

@@ -5,6 +5,7 @@ import { createWorld, step, type NationSpec } from "../src/engine.ts";
 import { borderLength, borderOf } from "../src/border.ts";
 import { NEIGHBORS } from "../src/hex.ts";
 import { BORDER } from "../src/rules.ts";
+import { advice } from "../src/ai/advice.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
@@ -89,4 +90,20 @@ test("a long dispute tears up a non-aggression pact; a just cause breaks a treat
   turn(w, { 0: { actions: [{ type: "declare_war", target: b.name }] } });
   assert.ok(w.wars.some(x => x.a === a.id && x.b === b.id), JSON.stringify(a.lastRejected));
   assert.equal(a.reputation, rep, "a just war");
+});
+
+test("blood for blood: brawl after brawl and the border goes to war, declared by the side that lost more", () => {
+  const w = touching("brawls");
+  const [a, b] = w.nations;
+  const st = borderOf(w, a.id, b.id);
+  st.brawls = [{ tick: w.tick - 2, dead: { [a.id]: 2, [b.id]: 1 } }, { tick: w.tick - 1, dead: { [a.id]: 1, [b.id]: 0 } }];
+  assert.ok(advice(w, b).some(x => /thêm một vụ nữa là chiến tranh/.test(x.text)));
+  st.brawls.push({ tick: w.tick, dead: { [a.id]: 1, [b.id]: 1 } });
+  const max = BORDER.incidentMax;
+  BORDER.incidentMax = 0;
+  try { turn(w); } finally { BORDER.incidentMax = max; }
+  const war = w.wars.find(x => (x.a === a.id && x.b === b.id) || (x.a === b.id && x.b === a.id));
+  assert.ok(war, "a war broke out");
+  assert.equal(war!.a, a.id, "the side that buried more declares it");
+  assert.match(war!.reason ?? "", /xô xát/);
 });

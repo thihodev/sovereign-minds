@@ -2,7 +2,22 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.19 (đang làm)
+## v0.20 (đang làm)
+
+- **Cải tổ giao diện:**
+  - **Thanh điều hướng dọc** bên trái thay hàng tab, và thanh trên gọn còn một dòng, nên bản đồ rộng hơn.
+  - **Bảng quốc gia** luôn hiện: dân số, thanh ổn định, biểu tượng cảnh báo (chiến tranh, dịch, thiếu ăn, dân bỏ đi, sắp ly khai). Bấm vào là bay tới nước đó và mở hồ sơ.
+  - **Bản tin lượt** thay cho bức tường chip phủ bản đồ: gom theo quốc gia, tin xấu lên trước, có màu, bấm là bay tới. Bản tin vẫn còn sau khi tải lại trang.
+  - Hai thẻ nổi tự gập khi khung bên cạnh mở.
+  - **Bản đồ dễ đọc hơn:**
+    - nhãn không đè nhau, tên thủ đô trên nền tối và vẽ trên người đi lại;
+    - đường sá thành nhánh thay cho lưới tam giác;
+    - lãnh thổ ít gạch chéo hơn;
+    - công trình và mạch giàu chỉ hiện khi phóng gần.
+- **Đất rộng không còn là lý do bỏ đi (§2.3, §4.5).** Ô vượt giới hạn quản lý không còn trừ ổn định hay tăng bất mãn, và phái ly khai không còn kêu "đất quá rộng". Thay vào đó, mỗi lượt 1 ô thừa (trống, xa, nghèo nhất) tự thành đất hoang.
+- **Máu đòi máu (§7.9):** 3 vụ xô xát chết người trong 10 lượt thì biên giới thành chiến tranh. Bên mất nhiều người hơn tuyên chiến, với chính nghĩa. Hòa bình, liên minh hoặc chư hầu ngăn được. Lời cố vấn báo trước một vụ.
+
+## v0.19
 
 - **Phản bội và thù địch (§4.5).** Nước tách ra là kẻ phản bội.
   - Cho tới khi ký hòa bình hoặc làm chư hầu, hai nước **thù địch**: không buôn bán, không chợ biên giới, căng thẳng biên giới không dưới 40.

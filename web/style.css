@@ -485,3 +485,100 @@ table.prices td.good { color: var(--good, #3a9a5a); }
 /* §4.6 the old nation and the traitors */
 .rel.hostile { color: #e67e22; font-weight: 600; }
 .chips span.rel.hostile { border-color: #e67e22; color: #e67e22; border-style: dashed; }
+
+/* ================================================================ UI reform (v0.20)
+   A rail of panels on the left, a one-line bar on top, a board of every nation and the turn's news over the map. */
+:root { --rail: 74px; --top: 62px; }
+.rail { position: fixed; z-index: 21; top: 8px; bottom: 8px; left: 8px; width: var(--rail); display: flex; flex-direction: column; gap: 4px; padding: 8px 6px;
+  border-radius: 14px; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); box-shadow: var(--shadow);
+  background: var(--glass); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); overflow-y: auto; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail .tabs { display: flex; flex-direction: column; gap: 2px; overflow: visible; flex: none; }
+.rail button { position: relative; display: grid; justify-items: center; gap: 2px; width: 100%; padding: 7px 2px 6px; border: 0; border-radius: 10px; background: none;
+  color: var(--muted); font-size: 10.5px; font-weight: 600; line-height: 1.15; text-align: center; white-space: normal; }
+.rail button i { font-style: normal; font-size: 19px; line-height: 1; filter: saturate(.85); }
+.rail button:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.rail button[aria-selected=true], .rail .chat-toggle.on { color: var(--ink); background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.rail .chat-toggle { margin-bottom: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); border-radius: 10px 10px 4px 4px; }
+.rail .badge { position: absolute; top: 3px; right: 6px; margin: 0; font-size: 10px; padding: 0 5px; }
+.dock-tab-left { display: none !important; }
+
+.topbar { left: calc(var(--rail) + 16px); padding: 6px 12px; border-radius: 14px; }
+.topbar .bar-row { flex-wrap: nowrap; gap: 10px; }
+.topbar .sep { width: 1px; height: 22px; background: var(--line); flex: none; }
+.topbar .brand h1 { font-size: 16px; }
+.topbar .summary { flex-wrap: nowrap; overflow: hidden; min-width: 0; }
+.topbar .controls { flex-wrap: nowrap; }
+.tick { font-size: 15px; font-weight: 600; }
+
+.dock-left { left: calc(var(--rail) + 16px); }
+.legend-box, .layer-box { left: calc(var(--rail) + 16px); }
+body.left-open .legend-box, body.left-open .layer-box { left: calc(var(--rail) + var(--left-w) + 2 * var(--gap) + 16px); }
+
+/* the board of nations */
+.board { position: fixed; z-index: 13; top: calc(var(--top) + 8px); left: calc(var(--rail) + 16px); width: 292px; max-height: min(58vh, calc(100dvh - var(--top) - 140px));
+  display: flex; flex-direction: column; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); box-shadow: var(--shadow); overflow: hidden; transition: left .18s; }
+body.left-open .board { left: calc(var(--rail) + var(--left-w) + 2 * var(--gap) + 16px); }
+.board > header, .news > header { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.board > header .grow, .news > header .grow { flex: 1; }
+.board > header button, .news > header button { border: 0; background: none; padding: 0 4px; font-size: 14px; color: var(--muted); }
+.board.min > ol, .news.min > .news-body { display: none; }
+.board.min > header, .news.min > header { border-bottom: 0; }
+.board ol { list-style: none; margin: 0; padding: 4px; overflow-y: auto; display: grid; gap: 1px; }
+.board li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 5px 7px; border-radius: 8px; cursor: pointer; }
+.board li:hover, .board li:focus-visible { background: color-mix(in srgb, var(--accent) 12%, transparent); outline: none; }
+.board li.sel { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.board .sw { width: 10px; height: 10px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.board .nm { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board .pop { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.board .line2 { grid-column: 2 / 4; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.board .stab { flex: 1; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; min-width: 40px; }
+.board .stab i { display: block; height: 100%; }
+.board .alarms { display: flex; gap: 2px; font-size: 12px; flex: none; }
+.board .alarms span { cursor: help; }
+.board li.dead { opacity: .45; }
+
+/* the turn's news */
+.news { position: fixed; z-index: 13; top: calc(var(--top) + 8px); right: 16px; width: 360px; max-height: min(52vh, calc(100dvh - var(--top) - 150px));
+  display: flex; flex-direction: column; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); box-shadow: var(--shadow); overflow: hidden; transition: right .18s; }
+body.right-open .news { right: calc(var(--right-w) + 2 * var(--gap) + 6px); }
+.news-body { overflow-y: auto; padding: 4px 6px 6px; display: grid; gap: 2px; }
+.news .grp { display: grid; gap: 3px; padding: 6px 6px 7px; border-bottom: 1px dashed var(--line); }
+.news .grp:last-child { border-bottom: 0; }
+.news .who { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.news .who:hover { color: var(--accent); }
+.news .who .sw { width: 9px; height: 9px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.news .items { display: flex; flex-wrap: wrap; gap: 3px; }
+.news .items button { font-size: 11.5px; font-weight: 500; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.news .items button.bad { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); }
+.news .items button.good { border-color: color-mix(in srgb, var(--good) 55%, var(--line)); background: color-mix(in srgb, var(--good) 10%, var(--panel)); }
+.news .more { justify-self: start; font-size: 12px; border: 0; background: none; color: var(--accent); padding: 4px 6px; }
+.news .count { font-family: var(--f-mono); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.news .count.bad { color: var(--bad); }
+
+@media (max-width: 1100px) { .board { width: 240px; } .news { width: 300px; } .topbar .summary { display: none; } }
+@media (max-width: 700px) {
+  :root { --rail: 0px; }
+  .rail { top: auto; bottom: 0; left: 0; right: 0; width: auto; height: 58px; flex-direction: row; padding: 4px; border-radius: 12px 12px 0 0; overflow-x: auto; overflow-y: hidden; z-index: 22; }
+  .rail .tabs { flex-direction: row; }
+  .rail button { width: 62px; flex: none; padding: 4px 2px; }
+  .rail .chat-toggle { margin: 0 4px 0 0; border-bottom: 0; border-right: 1px solid var(--line); }
+  .topbar { left: 0; }
+  .topbar .bar-row { flex-wrap: wrap; }
+  .board, .news { display: none; }
+  .mapctl, .legend-box, .layer-box { bottom: 66px !important; }
+}
+.topbar button, .topbar select, .topbar .tick, .topbar .pill { white-space: nowrap; }
+.topbar .brand { flex: none; }
+.topbar .clock { flex-wrap: nowrap; flex: none; }
+.topbar .summary { flex: 1 1 auto; }
+@media (max-width: 1600px) { .topbar .world, .topbar #version, .topbar .controls label { display: none; } }
+@media (max-width: 1350px) { .topbar .brand h1 { display: none; } .topbar .sep { display: none; } }
+.topbar .summary .stat { flex: none; }
+@media (max-width: 1500px) { .topbar .summary .stat.gate { display: none; } }
+/* with a dock open, the floating cards fold to their headers so the map stays visible */
+body.right-open .news:not(.pinned) > .news-body { display: none; }
+body.right-open .news:not(.pinned) > header { border-bottom: 0; }
+body.left-open .board:not(.pinned) > ol { display: none; }
+body.left-open .board:not(.pinned) > header { border-bottom: 0; }
+body.right-open .news:not(.pinned):not(.min) [data-act=min], body.left-open .board:not(.pinned):not(.min) [data-act=min] { transform: rotate(180deg); }

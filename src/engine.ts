@@ -1104,7 +1104,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
   if (ownsWonder(world, n, "spring")) n.stability += 2;
   const over = Math.ceil(governed(world, n) - tileLimit(world, n) - 1e-9);
-  if (over > 0) { const pen = Math.min(OVER_LIMIT_MAX, 2 * over); n.stability -= pen; n.lastEvents.push(`Vượt giới hạn quản lý ${over} ô: −${pen} ổn định (bỏ bớt ô bằng abandon_tile).`); }
+  if (over > 0) releaseOver(world, n, over); // §2.3 too few hands: the land beyond the limit goes wild, no one leaves over it
   if (n.silentStreak >= 3) n.stability -= 5;
   // Too many centres to govern from one hearth (§4.4)
   const sprawl = n.settlements.length - roadNet(world, n).linked.length - SETTLEMENT.freeCentres; // §2.5 a road to the capital holds a settlement close
@@ -1132,7 +1132,6 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (n.stability < SCHISM.threshold) dis += (SCHISM.threshold - n.stability) / SCHISM.divisor;
   if (shortage > 1e-9) dis += SCHISM.famine;
   if (n.riot) dis += SCHISM.riot;
-  if (over > 0) dis += over * SCHISM.overreach;
   const cutOff = isolated(world, n).length; // §2.7 settlements with no way to the capital
   if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
   if (n.founded) dis += provinceTurn(world, n); // §2.8 restless provinces press on the nation
@@ -1173,7 +1172,6 @@ function grievance(world: World, n: Nation): string {
   const why: string[] = [];
   if (n.stability < SCHISM.threshold) why.push(`ổn định chỉ còn ${n.stability}`);
   if (n.lastEvents.some(e => /chết đói|Thiếu .* lương thực/.test(e))) why.push("nạn đói");
-  if (governed(world, n) > tileLimit(world, n)) why.push("đất đai quá rộng, cai quản không xuể");
   if (world.wars.some(w => w.end === null && (w.a === n.id || w.b === n.id))) why.push("chiến tranh kéo dài");
   if (n.population >= housing(world, n)) why.push("không còn chỗ ở");
   return why.join(", ") || "bất mãn với triều đình";
@@ -1483,7 +1481,21 @@ const ENGINE_ACTIONS = new Set([
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
-const OVER_LIMIT_MAX = 10;
+/** §2.3 Land beyond the limit: the poorest, farthest empty tiles go wild, a few a turn. */
+function releaseOver(world: World, n: Nation, over: number): void {
+  const centres = [n.capital, ...n.settlements.map(s => s.tile)];
+  const busyTiles = new Set(n.buildings.map(b => b.tile));
+  const far = (i: number) => Math.min(...centres.map(c => dist(c, i)));
+  const loose = ownedTiles(world, n.id).filter(t => !centres.includes(t.i) && !busyTiles.has(t.i))
+    .sort((a, b) => (HAMLET.people[a.terrain] || 0) - (HAMLET.people[b.terrain] || 0) || far(b.i) - far(a.i) || tileValue(a) - tileValue(b) || a.i - b.i);
+  const gone: string[] = [];
+  for (const t of loose.slice(0, Math.min(over, LAND.overRelease))) {
+    t.owner = -1; delete world.cutoff[String(t.i)];
+    fx({ kind: "lost_tile", tile: t.i, nation: n.id });
+    gone.push(`(${col(t.i)}, ${row(t.i)})`);
+  }
+  if (gone.length) n.lastEvents.push(`Giữ ${over} ô quá giới hạn quản lý: không đủ người làm, ô ${gone.join(", ")} trở thành đất hoang (không mất ổn định). Nâng giới hạn bằng dân số, điểm định cư hoặc đường sá.`);
+}
 /** §7.6: an expedition walks up to 16 tiles out and back within one turn (10 years). */
 const EXPLORE_RANGE = 16;
 

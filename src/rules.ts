@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.19";
+export const RULES_VERSION = "0.20";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -94,8 +94,9 @@ export const DEMO = {
  *  once the Watcher grants it a mind (an AI model) of its own. */
 export const SCHISM = {
   /** Discontent (0–100) grows each turn by (threshold − stability) / divisor while stability is below threshold,
-   *  and by `famine` in a famine, `riot` in a riot, `overreach` per tile over the limit; it fades by `fade` at stability ≥ calm. */
-  threshold: 35, divisor: 3, famine: 10, riot: 25, overreach: 2, calm: 60, fade: 10,
+   *  and by `famine` in a famine, `riot` in a riot; it fades by `fade` at stability ≥ calm. (Land beyond the limit is no
+   *  grievance: a faction that left would hold as much land; that land goes wild instead, §2.3.) */
+  threshold: 35, divisor: 3, famine: 10, riot: 25, calm: 60, fade: 10,
   /** A faction forms at 100, in a people of at least `minPop`, `cooldown` turns after the last one. */
   minPop: 60, cooldown: 30,
   /** The share of the people that goes: from share[0] to share[1] as discontent ran higher. */
@@ -133,6 +134,9 @@ export const BORDER = {
   tradeCalm: 3, marketCalm: 1, languageCalm: 1,
   /** Incidents: chance a turn = tension / incidentDiv (at most incidentMax); each raises the tension and may give the victim a just cause for `causeTicks` turns. */
   incidentDiv: 250, incidentMax: 0.3, causeTicks: 6, poach: 30, crossers: 4,
+  /** `brawlsToWar` deadly brawls within `brawlWindow` turns and blood calls for blood: the side that buried more
+   *  declares war (a just cause), unless a peace, alliance or vassalage binds the two. */
+  brawlsToWar: 3, brawlWindow: 10,
   rise: { poach: 8, brawl: 15, crossing: 5 } as Record<string, number>,
   /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn; after
    *  `treatyBreakAfter` turns of dispute in a row their non-aggression, peace and passage treaties fall apart. */
@@ -171,7 +175,9 @@ export const ANNALS = { chapter: 10, notes: 5, noteLength: 120, maxChapters: 20,
  *  a tile lost to an enemy costs `lostStability` and `lostDiscontent`, takes its hamlet's families with it, and gives
  *  a just cause to win it back for `reclaimTicks`; a tile gone wild for being cut off costs `wildStability`.
  *  Defenders of a lived-in tile (a hamlet or a building) fight `homeGuard` harder. */
-export const LAND = { abandonStability: 3, abandonDiscontent: 2, abandonEmpty: 0, abandonTurnCap: 4, lostStability: 2, lostDiscontent: 3, reclaimTicks: 10, wildStability: 1, homeGuard: 0.25 };
+/** §2.3 + §2.9: `overRelease` tiles a turn of land beyond the limit go wild (too few hands to work them), with no cost
+ *  to stability: the poorest, farthest, empty ones first. */
+export const LAND = { overRelease: 1, abandonStability: 3, abandonDiscontent: 2, abandonEmpty: 0, abandonTurnCap: 4, lostStability: 2, lostDiscontent: 3, reclaimTicks: 10, wildStability: 1, homeGuard: 0.25 };
 /** §4.5 A nation that split from another cannot make common cause with it: the old nation wants it back. Treaties of
  *  these kinds are refused between them; the old nation always has a just cause against the new; their border is
  *  `friction` times as tense; a new nation whose capital falls to its old nation returns to it, land, people and stores. */

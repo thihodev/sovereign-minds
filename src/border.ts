@@ -8,7 +8,7 @@ import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
 import { BORDER, GOOD_VALUE, KIN } from "./rules.ts";
-import { activeWar, hostile, kin, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
+import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
@@ -17,7 +17,9 @@ import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
 import type { Nation, World } from "./types.ts";
 
-export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number }
+export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number;
+  /** deadly brawls lately: who lost how many */
+  brawls?: Array<{ tick: number; dead: Record<string, number> }> }
 export const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 export function borderOf(world: World, a: number, b: number): BorderState {
   const all = (world.borders ??= {}), k = pairKey(a, b);
@@ -99,6 +101,17 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     // Incidents: the more tension, the more often
     if (r() < Math.min(BORDER.incidentMax, t / BORDER.incidentDiv)) t += incident(world, a, b, st, r, L, say);
     st.tension = Math.max(0, Math.min(100, Math.round(t * 10) / 10));
+    // Blood for blood: brawl after brawl and the border goes to war
+    const recent = (st.brawls ?? []).filter(x => tick - x.tick < BORDER.brawlWindow);
+    if (recent.length >= BORDER.brawlsToWar && !pendingOrActiveWar(world, a.id, b.id) && !treatiesBetween(world, a.id, b.id, ["peace", "alliance", "vassal"]).length) {
+      const lost = (x: Nation) => recent.reduce((s, y) => s + (y.dead[String(x.id)] ?? 0), 0);
+      const [avenger, foe] = lost(a) > lost(b) || (lost(a) === lost(b) && a.stability <= b.stability) ? [a, b] : [b, a];
+      for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "passage"])) { tr.active = false; tr.end = tick; }
+      avenger.casusBelli[String(foe.id)] = Math.max(avenger.casusBelli[String(foe.id)] ?? -1, tick + BORDER.causeTicks);
+      startWar(world, avenger, foe, tick, `${recent.length} vụ xô xát biên giới trong ${BORDER.brawlWindow} lượt, ${lost(avenger)} người ${avenger.name} đã chết`, say);
+      avenger.lastEvents.push(`Máu đổ ở biên giới quá nhiều lần (${recent.length} vụ xô xát, ${lost(avenger)} người ta chết): dân đòi báo thù, ${avenger.name} tuyên chiến với ${foe.name} (có chính nghĩa). Muốn dừng: ký hòa bình (treaty peace).`);
+      st.brawls = [];
+    }
     // A dispute: both sides may fight with a just cause, and both peoples are uneasy
     if (st.tension >= BORDER.dispute) {
       st.dispute = (st.dispute ?? 0) + 1;
@@ -140,6 +153,7 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
     takePeople(victim, Math.min(da, Math.max(0, victim.population - 5)), "brawl");
     takePeople(culprit, Math.min(db, Math.max(0, culprit.population - 5)), "brawl");
     text = `Xô xát ở biên giới giữa người ${culprit.name} và ${victim.name}: ${da} người ${victim.name} và ${db} người ${culprit.name} chết`;
+    st.brawls = [...(st.brawls ?? []).filter(x => tick - x.tick < BORDER.brawlWindow), { tick, dead: { [victim.id]: da, [culprit.id]: db } }];
     rise = BORDER.rise.brawl;
     victim.casusBelli[String(culprit.id)] = Math.max(victim.casusBelli[String(culprit.id)] ?? -1, tick + BORDER.causeTicks);
     // a brawl, not a battle: no war, no winner (the Watcher's strip says so)

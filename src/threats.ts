@@ -6,7 +6,7 @@ import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
 import { mouths } from "./people.ts";
 import { canSeeRes, freshWater, governed, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { SCHISM } from "./rules.ts";
+import { LAND, SCHISM } from "./rules.ts";
 import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
@@ -102,7 +102,7 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   }
   // Governance
   const limit = tileLimit(world, n), held = governed(world, n);
-  if (held > limit) add("overreach", 2, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): mỗi ô thừa −2 ổn định mỗi lượt (tối đa −10). Đường nối các trung tâm nâng giới hạn.`);
+  if (held > limit) add("overreach", 1, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) thành đất hoang. Dân số, điểm định cư và đường nối các trung tâm nâng giới hạn.`);
   // §4.5 a faction may leave
   const faction = (world.schisms ?? []).find(x => x.from === n.id && (x.status === "pending" || x.status === "approved" || x.status === "asking"));
   if (faction) add("schism", 3, "Ly khai", faction.province !== undefined
