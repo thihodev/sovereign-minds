@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.32";
+export const RULES_VERSION = "0.33";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -233,7 +233,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, city_focus: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -841,7 +841,7 @@ export interface MinisterDomain {
   actions: string[];
 }
 export const MINISTER_DOMAINS: Record<string, MinisterDomain> = {
-  economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang, thuế và đầu tư từ ngân khố", en: "labor, crafts, mine_target, build, build_road, claim_tile, tax, invest", actions: ["build", "build_road", "claim_tile", "tax", "invest"] },
+  economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang, thuế và đầu tư từ ngân khố", en: "labor, crafts, mine_target, build, build_road, claim_tile, tax, invest, city_focus", actions: ["build", "build_road", "claim_tile", "tax", "invest", "city_focus"] },
   war: { title: "Bộ trưởng Chiến tranh", short: "chiến tranh", desc: "số chiến binh, tấn công, đột kích, đánh man di (tuyên chiến và giảng hòa vẫn là việc của người trị vì)", en: "the number of warriors (\"warriors\"), attack, raid, clear_wild (never declare_war or peace)", actions: ["attack", "raid", "clear_wild"] },
   diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly, hôn nhân hoàng tộc", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine, royal_marriage, accept_marriage", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine", "royal_marriage", "accept_marriage"] },
   learning: { title: "Bộ trưởng Học thuật", short: "học thuật", desc: "chọn nghiên cứu, đề xuất phát minh", en: "research, propose_invention", actions: ["research", "propose_invention"] },
@@ -988,4 +988,20 @@ export const ROYALS = {
   houses: ["Lạc", "Hùng", "Âu", "Thục", "Triệu", "Khúc", "Ngô", "Đinh", "Lý", "Trần", "Lê", "Mạc", "Hồ", "Nguyễn", "Trịnh", "Tây Sơn"],
   sons: ["Lang", "Tuấn", "Khải", "Quang", "Thành", "Đức", "Nhân", "Tông", "Hoảng", "Kiên", "Vũ", "Phong"],
   daughters: ["Ngọc Hân", "Huyền Trân", "Mỵ Châu", "Thiều Hoa", "Lan Anh", "Thục Nương", "An Tư", "Ngọc Hoa", "Diệu Linh", "Thanh Thảo", "Bích Châu", "Mỵ Nương"],
+};
+
+// §2.13 Towns and cities: a centre grows with its province's people, working buildings and way home
+export const URBAN = {
+  town: { people: 60, buildings: 3, gives: { coin: 2, rp: 0.02, craft: 0.05 } as Record<string, number> },
+  city: { people: 150, buildings: 6, era: 2, gives: { coin: 6, rp: 0.08, craft: 0.12 } as Record<string, number> },
+  /** a grown place keeps its tier down to this share of the people it needed */
+  keep: 0.8,
+  /** a focus multiplies its field (mult), or gives what a village gives none of (town / city) */
+  focus: {
+    trade: { field: "coin", mult: 2.5, town: 0, city: 0 },
+    learning: { field: "rp", mult: 2, town: 0, city: 0 },
+    craft: { field: "craft", mult: 2, town: 0, city: 0 },
+    faith: { field: "stability", mult: 1, town: 1, city: 2 },
+    garrison: { field: "calm", mult: 1, town: 3, city: 6 },
+  } as Record<string, { field: string; mult: number; town: number; city: number }>,
 };

@@ -10,6 +10,7 @@ import { CONNECT, HOUSING, OFFICIALS, PROVINCE, SETTLEMENT } from "./rules.ts";
 import { buildingWorks, hamletRoom, housingParts, mods } from "./engine.ts";
 import { buildingOf } from "./catalog.ts";
 import { links, nearestCentre, type Link } from "./connect.ts";
+import { urbanCalm, urbanTurn } from "./urban.ts";
 import type { Nation, Official, Tile, World } from "./types.ts";
 
 export type Cause = "cut_off" | "ungoverned" | "crowded";
@@ -84,11 +85,13 @@ export function provinces(world: World, n: Nation, ls: Map<number, Link> = links
 }
 
 /** One turn of the provinces' moods; returns what the restless ones add to the nation's discontent (§2.8). */
-export function provinceTurn(world: World, n: Nation): number {
+export function provinceTurn(world: World, n: Nation, say: (nation: number | null, kind: string, text: string) => void = () => {}): number {
   const next: Record<string, number> = {};
   let pressure = 0;
-  for (const p of provinces(world, n)) {
-    let u = p.mood - PROVINCE.fade - (p.loyal ? PROVINCE.calm * p.governor!.skill : 0);
+  const provs = provinces(world, n);
+  urbanTurn(world, n, provs, say); // §2.13 villages grow into towns and cities
+  for (const p of provs) {
+    let u = p.mood - PROVINCE.fade - (p.loyal ? PROVINCE.calm * p.governor!.skill : 0) - urbanCalm(n, p.centre); // §2.13 a garrison
     for (const c of p.causes) u += { cut_off: PROVINCE.cutOff, ungoverned: PROVINCE.ungoverned, crowded: PROVINCE.crowded }[c];
     u = Math.max(0, Math.min(100, Math.round(u * 10) / 10));
     if (u > 0) next[String(p.centre)] = u;

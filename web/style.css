@@ -624,3 +624,9 @@ ul.needs li.no b { color: var(--ink); }
 .books li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid var(--line, rgba(127,127,127,.15)); font-size: 13px; }
 .books .up { color: var(--good); } .books .down { color: var(--bad); }
 @media (max-width: 520px) { .books { grid-template-columns: 1fr; } }
+
+/* the side panel's treasury / royal house / towns summary */
+.court-sum { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.court-sum li { display: flex; gap: 8px; align-items: baseline; }
+.court-sum .i { width: 1.2em; text-align: center; flex: none; }
+.court-sum .up { color: var(--good); } .court-sum .down { color: var(--bad); }

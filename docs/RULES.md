@@ -293,6 +293,30 @@ Lời cố vấn nhắc về biển giàu cá chưa khai thác, ngư trường v
 - biển nông (lượng cá, lượng cá hồi), biển sâu (có cá voi không);
 - đất bên kia biển, đất của các nước khác, trại man di.
 
+### 2.13 Làng, thị trấn, thành phố
+
+Mỗi trung tâm (thủ đô, điểm định cư) ban đầu là **làng**. Nó lớn lên theo tỉnh của nó (§2.8).
+
+| Cấp | Điều kiện | Mang lại |
+|---|---|---|
+| **Thị trấn** | tỉnh có ≥ 60 dân, ≥ 3 công trình đang hoạt động trên đất tỉnh, có lối về thủ đô | +2 tiền/lượt cho ngân khố, nghiên cứu +2%, chế tác +5% |
+| **Thành phố** | ≥ 150 dân, ≥ 6 công trình gồm một Chợ, đường bộ nối về thủ đô (hoặc là thủ đô), từ thời Đồ Đồng | +6 tiền/lượt, nghiên cứu +8%, chế tác +12% |
+
+- Nơi đã lên cấp giữ cấp đó cho tới khi dân giảm dưới 80% mức cần.
+- Thiếu các điều kiện khác thì nơi đó xuống cấp.
+
+**Trọng tâm (`city_focus`, 1 AP):** `{"type":"city_focus","centre":"tên","focus":"..."}`. Chỉ thị trấn hay thành phố mới đặt được.
+
+| Trọng tâm | Tác dụng |
+|---|---|
+| `trade` (thương mại) | tiền ×2,5 |
+| `learning` (học thuật) | nghiên cứu ×2 |
+| `craft` (thủ công) | chế tác ×2 |
+| `faith` (tín ngưỡng) | +1 ổn định/lượt (thị trấn), +2 (thành phố) |
+| `garrison` (đồn trú) | bất ổn của tỉnh −3/lượt (thị trấn), −6 (thành phố) |
+
+Bộ trưởng Kinh tế được đặt trọng tâm.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.

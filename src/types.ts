@@ -119,6 +119,8 @@ export interface Nation {
   treasury?: import("./treasury.ts").Treasury;
   /** §4.14 the royal house: its name and its princes and princesses (those married in carry `from`) */
   house?: string; royals?: import("./royals.ts").Royal[];
+  /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */
+  urban?: Record<string, import("./urban.ts").Urban>;
   /** §10.5 petitions the gods took up: the nation's honoured ideas */
   initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */

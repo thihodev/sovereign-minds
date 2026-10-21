@@ -1383,6 +1383,22 @@
     }
     return out.join("");
   }
+  const TIER_ICON = ["", "🏘", "🏙"];
+  /** The treasury, the royal house and the towns in a few lines, for the side panel. */
+  function courtSummary(n) {
+    if (!n.alive || !n.founded) return "";
+    const rows = [];
+    const t = n.treasury;
+    if (t) {
+      const sum = b => Object.values(b || {}).reduce((s, v) => s + v, 0), net = t.last ? sum(t.last.in) - sum(t.last.out) : 0;
+      rows.push(`<li><span class="i">💰</span><span>Ngân khố <b>${Math.round(t.coin).toLocaleString("vi-VN")}</b> tiền${t.last ? ` <span class="${net >= 0 ? "up" : "down"}">(${net >= 0 ? "+" : "−"}${Math.abs(Math.round(net * 10) / 10)}/lượt)</span>` : ""} · thuế ${Math.round(t.tax * 100)}% · thuế quan ${Math.round(t.tariff * 100)}%</span></li>`);
+    }
+    const r = n.royals;
+    if (r?.house) rows.push(`<li><span class="i">👑</span><span>Hoàng tộc <b>${esc(r.house)}</b> · ${(r.unwed || []).length} hoàng thân chưa thành hôn${(r.in_laws || []).length ? ` · thông gia: ${r.in_laws.map(x => esc(x.nation)).join(", ")}` : ""}</span></li>`);
+    const towns = (n.provinces || []).filter(p => p.tier > 0);
+    if (towns.length) rows.push(`<li><span class="i">🏙</span><span>${towns.map(p => `${esc(p.name)} (${p.tierName.toLowerCase()}${p.focus ? `, ${p.focus}` : ""})`).join(", ")}</span></li>`);
+    return rows.length ? `<ul class="court-sum">${rows.join("")}</ul>` : "";
+  }
   function nationBlock(n, tile) {
     const el = document.createElement("section"); el.className = "insp-nation";
     const pct = n.research ? Math.min(100, n.research.progress / n.research.cost * 100) : 0;
@@ -1393,6 +1409,7 @@
       <div class="meta">Kỷ nguyên <b>${esc(n.era)}</b>${n.research ? ` · nghiên cứu ${esc(n.research.name)} ${n.research.progress}/${n.research.cost} RP` : ""}</div>
       ${n.research ? `<div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
       ${n.thought ? `<div class="thought"></div>` : ""}
+      ${tile === null ? courtSummary(n) : ""}
       <h4>${tile === null ? "Công trình" : "Công trình trên ô này"}</h4>
       <div class="chips">${(() => {
         // one chip a kind, with how many; the ones going up and the sabotaged ones on their own
@@ -1404,7 +1421,7 @@
         }
         return [...[...done.values()].map(({ b, n }) => `<span>${bIcon(b)} ${esc(b.name)}${n > 1 ? ` <b>×${n}</b>` : ""}</span>`), ...out].join("") || `<span class="none">không có</span>`;
       })()}</div>
-      ${tile === null && (n.settlements || []).length ? `<h4>Điểm định cư</h4><div class="chips">${n.settlements.map(x => `<span>${esc(x.name)}</span>`).join("")}</div>` : ""}
+      ${tile === null && (n.settlements || []).length ? `<h4>Điểm định cư</h4><div class="chips">${n.settlements.map(x => { const p = (n.provinces || []).find(q => q.centre === x.tile); return `<span title="${esc(p ? `${p.tierName}${p.focus ? `, trọng tâm ${p.focus}` : ""} · ${p.people} dân${p.next ? ` · ${p.next}` : ""}` : "")}">${p?.tier ? `${TIER_ICON[p.tier]} ` : ""}${esc(x.name)}</span>`; }).join("")}</div>` : ""}
       ${wars.length ? `<h4>Đang chiến tranh</h4><div class="meta">${wars.map(w => esc(w.a === n.id ? w.bName : w.aName)).join(", ")}</div>` : ""}
       ${tile === null && n.alive ? `<h4>Mối đe dọa</h4>${threatList((n.threats || []).filter(t => t.level >= 1).slice(0, 5), "Không có mối đe dọa đáng kể.")}<h4>Tài nguyên trên lãnh thổ</h4>${resChips(n)}` : ""}
       <div class="row"><button type="button" class="primary" data-act="detail">Mở hồ sơ đầy đủ</button>${n.alive ? `<button type="button" data-act="locate">Xem trên bản đồ</button>` : ""}${tile === null ? `<button type="button" data-act="list">Danh sách quốc gia</button>` : ""}</div>`;
@@ -1531,10 +1548,10 @@
   }
   function provinceList(n) {
     return `<p class="muted">Mỗi trung tâm là một tỉnh: đất là các ô gần nó nhất, dân chia theo chỗ ở. Tỉnh bị cô lập, xa thủ đô mà không có bá tước, hay chật chỗ ở thì bất ổn dần; tới 50 nó làm cả nước bất mãn thêm, và khi cả nước bất mãn tới 100 thì tỉnh bất ổn nhất có thể đòi tách ra cùng đất đai.</p>` + n.provinces.map(p => `<div class="card2 province">
-      <div class="row"><b>${p.capital ? "★ " : ""}${esc(p.name)}</b><button class="link" data-tile="${p.centre}" aria-label="Xem trên bản đồ">↗</button><span style="flex:1"></span><span class="meta">${p.people} dân · chỗ ở ${p.housing} · ${p.tiles} ô</span></div>
+      <div class="row"><b>${p.capital ? "★ " : ""}${p.tier ? `${TIER_ICON[p.tier]} ` : ""}${esc(p.name)}</b>${p.tier ? ` <span class="pill">${esc(p.tierName)}${p.focus ? ` · ${esc(p.focus)}` : ""}</span>` : ""}<button class="link" data-tile="${p.centre}" aria-label="Xem trên bản đồ">↗</button><span style="flex:1"></span><span class="meta">${p.people} dân · chỗ ở ${p.housing} · ${p.tiles} ô</span></div>
       <div class="meta">${p.capital ? "Tỉnh thủ đô" : `${WAY[p.way] ?? "✗ cô lập"} · cách thủ đô ${p.distance} ô`} · ${p.governor ? `bá tước ${esc(p.governor.name)} (tay nghề ${p.governor.skill}, trung thành ${p.governor.loyalty}${p.loyal ? "" : ", bỏ bê"})` : "không có bá tước"}</div>
       <div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.mood}" aria-label="Bất ổn của tỉnh ${esc(p.name)}"><i style="width:${p.mood}%"></i></div>
-      <div class="meta">Bất ổn ${p.mood}/100${p.causes.length ? ` · đang tăng vì ${esc(p.causes.join(", "))}` : ""}</div></div>`).join("");
+      <div class="meta">Bất ổn ${p.mood}/100${p.causes.length ? ` · đang tăng vì ${esc(p.causes.join(", "))}` : ""}</div>${p.next ? `<div class="meta">${esc(p.next)}</div>` : ""}</div>`).join("");
   }
   async function openNation(id) {
     const n = S.nations[id], d = $("#nation-dialog");

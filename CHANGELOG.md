@@ -2,6 +2,16 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.33
+
+- **Làng, thị trấn, thành phố (§2.13):** mỗi trung tâm lớn lên theo dân, công trình và đường về thủ đô của tỉnh nó.
+  - Thị trấn và thành phố nộp tiền cho ngân khố, đẩy nhanh nghiên cứu và chế tác.
+  - Lệnh `city_focus` đặt trọng tâm cho từng nơi: thương mại, học thuật, thủ công, tín ngưỡng, đồn trú.
+  - AI thấy `towns`: cấp, trọng tâm, điều còn thiếu để lên cấp.
+- **Khung Chi tiết của Watcher** có dòng tóm tắt ngân khố (tiền, thu chi mỗi lượt, thuế), hoàng tộc (thông gia) và các thị trấn, thành phố. Không cần mở hồ sơ.
+  - Điểm định cư mang biểu tượng 🏘/🏙.
+  - Tab Tỉnh ghi cấp và điều kiện lên cấp.
+
 ## v0.32
 
 - **Chiến tranh thật (§7.4b):** trước đây chiến tranh bùng ra (thường do 3 vụ xô xát biên giới) rồi kết thúc bằng hòa ước sau 1–2 lượt: không trận nào, không ai chết, không ai thắng. Giờ chiến tranh có giá.

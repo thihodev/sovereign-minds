@@ -24,6 +24,7 @@ import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
 import { vietError, vietPerson, vietPlace } from "./names.ts";
 import { eraLivingNeed, leisure, livingStandard } from "./living.ts";
 import { greatMods, greatPhase, inviteGreat } from "./greats.ts";
+import { setFocus, urbanMods } from "./urban.ts";
 import { acceptMarriage, offerMarriage, royalPhase } from "./royals.ts";
 import { buyCost, buyShortfall, invest, setTax, spend, treasuryPhase } from "./treasury.ts";
 import { writeAnnals } from "./annals.ts";
@@ -208,6 +209,7 @@ export function mods(world: World, n: Nation): Mods {
     else if (o.domain === "governor") m.tiles += 1;
   }
   greatMods(n, m, world.tick); // §4.12 the great people serving it
+  urbanMods(n, m); // §2.13 its towns and cities
   m.medicine = Math.min(0.8, m.medicine);
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
@@ -1196,7 +1198,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (n.riot) dis += SCHISM.riot;
   const cutOff = isolated(world, n).length; // §2.7 settlements with no way to the capital
   if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
-  if (n.founded) dis += provinceTurn(world, n); // §2.8 restless provinces press on the nation
+  if (n.founded) dis += provinceTurn(world, n, say); // §2.8 restless provinces press on the nation
   if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
@@ -1541,7 +1543,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital", "invite_great", "tax", "invest", "royal_marriage", "accept_marriage",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital", "invite_great", "tax", "invest", "royal_marriage", "accept_marriage", "city_focus",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1886,6 +1888,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     case "festival": return holdFestival(world, n, a, L);
     case "cull": return cull(n, a, L); // §6.4
     case "tax": return setTax(n, a); // §4.13
+    case "city_focus": return setFocus(n, a, parseTile); // §2.13
     case "royal_marriage": return offerMarriage(world, n, a, to => findTarget(world, n, to), (x, y) => !!pendingOrActiveWar(world, x, y)); // §4.14
     case "accept_marriage": return acceptMarriage(world, n, a, L, (x, y) => !!pendingOrActiveWar(world, x, y), say);
     case "invest": return invest(world, L, n, a, () => n.research && inv(world, n.research.id) ? inventionCost(world, n, n.research.id) : null, say);
