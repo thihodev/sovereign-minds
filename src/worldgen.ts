@@ -5,7 +5,7 @@
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
 import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
-import { RIVER, VEIN, WONDER_DEFS } from "./rules.ts";
+import { MEADOW_HERBS, RIVER, VEIN, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
 const AX = Math.sqrt(3) / 1.5;
@@ -284,6 +284,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   seedRiches(seedStr, tiles); // §2.11 and §2.10 after the spawns: fair starts are weighed without them
   seedAnimals(seedStr, tiles); // §6.4
   seedRiverPlenty(seedStr, tiles); // §2.1
+  seedMeadowHerbs(seedStr, tiles); // §2.11 a nation's idea
   seedVeins(seedStr, tiles);
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
@@ -364,6 +365,16 @@ export function seedRiverPlenty(seed: string, tiles: Tile[]): void {
   for (const t of tiles) {
     if (!t.river || !t.land) continue;
     for (const [k, v] of Object.entries(RIVER.plenty) as Array<[ResKey, number]>) { const x = jit(v); t.res[k] = (t.res[k] || 0) + x; t.cap[k] = (t.cap[k] || 0) + x; }
+  }
+}
+
+/** §2.11 Meadow herbs (a nation's idea): every grass and hill tile holds a few healing plants, so steppe peoples have medicine too. */
+export function seedMeadowHerbs(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "meadow-herbs");
+  for (const t of tiles) {
+    if (!MEADOW_HERBS.terrains.includes(t.terrain)) continue;
+    const x = MEADOW_HERBS.min + Math.floor(rand() * (MEADOW_HERBS.max - MEADOW_HERBS.min + 1));
+    t.res.herbs = (t.res.herbs || 0) + x; t.cap.herbs = (t.cap.herbs || 0) + x;
   }
 }
 

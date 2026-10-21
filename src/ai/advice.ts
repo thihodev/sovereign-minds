@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -309,6 +309,13 @@ export function advice(world: World, n: Nation): Advice[] {
   {
     const l = livingStandard(world, n), next = nextEraNeeds(world, n);
     if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
+  }
+
+  // §6.6 herb gardens: medicine grown at home
+  if (n.founded && n.inventions.includes("P14")) {
+    const want = Math.ceil(n.population / HERBS.perPeople), herbs = n.stock.herbs || 0, gardens = n.buildings.filter(b => b.type === "herb_garden").length;
+    const room = (1 + n.settlements.length) * HERB_GARDEN.perCentre - gardens;
+    if (herbs < want && room > 0) say(plagueNearby(world, n).length || contagious(n, world.tick) ? 2 : 1, `Thảo dược ${Math.floor(herbs)}/${want} (1 cho mỗi ${HERBS.perPeople} dân để dịch chết ít đi một nửa). Trồng Vườn thảo dược (build herb_garden, tile: ô đất ấm cách trung tâm ≤ ${HERB_GARDEN.near}; 5 sợi, 6 công): mỗi vườn 0,5 thảo dược mỗi lượt, không cần người làm; còn chỗ cho ${room} vườn.`);
   }
 
   // §6.5 village granaries: food set aside against famine

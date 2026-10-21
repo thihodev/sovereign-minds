@@ -2,6 +2,13 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.37
+
+- **Hai sáng kiến của các quốc gia được đưa vào game (§6.6):**
+  - **Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt; người hái lượm mang về; thế giới cũ được thêm khi tải. Dân thảo nguyên có thuốc mà không cần rừng.
+  - **Vườn thảo dược:** cần Trồng trọt, 5 sợi, 6 công; xây trên đất ấm cách trung tâm tối đa 2 ô, tối đa 2 vườn mỗi trung tâm; mỗi vườn tự cho 0,5 thảo dược mỗi lượt.
+  - AI biết luật mới; lời cố vấn gợi ý trồng vườn khi thiếu thuốc, mức quan trọng khi có dịch gần.
+
 ## v0.36
 
 - **Kho làng (§6.5), sáng kiến đầu tiên của các AI được đưa vào game** (Văn Phong, lượt 888, chấp thuận một phần):

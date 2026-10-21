@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS, GRANARY,
+  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -121,7 +121,7 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
     version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, hordes: newHordes(seed, gen.wild), registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
-    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 3,
+    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 4,
   };
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
@@ -811,7 +811,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   // 9. Regrowth of renewable reserves
   for (const t of world.tiles) {
     for (const k in t.cap) { // only the reserves this tile has
-      const share = REGEN[k as ResKey]; if (!share) continue;
+      const share = k === "herbs" && MEADOW_HERBS.terrains.includes(t.terrain) ? MEADOW_HERBS.regen : REGEN[k as ResKey]; if (!share) continue; // §2.11 meadow herbs regrow slowly
       const cap = t.cap[k as ResKey] || 0, cur = t.res[k as ResKey] || 0;
       if (cap > 0 && cur < cap) L.tile(t, k as ResKey, Math.min(cap - cur, cap * share), "regen");
     }
@@ -957,6 +957,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   // §2.11 salt pans on the shore
   const pans = doneEffect(world, n, "seaSalt"); if (pans) L.stock(n, "salt", pans, "extract");
+  const gardens = doneEffect(world, n, "herbs" as never); if (gardens) L.stock(n, "herbs", gardens, "gather"); // §6.6 herb gardens
   for (const r of ["wood", "stone", "flint", "clay"] as Role[]) {
     if (!labor[r]) continue;
     let effort = labor[r];
@@ -1639,6 +1640,12 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
+      if (def.type === "herb_garden") { // §6.6 on warm land near a centre, two to each centre
+        const cs = [n.capital, ...n.settlements.map(s2 => s2.tile)], home = (i: number) => cs.reduce((b2, c) => dist(c, i) < dist(b2, i) || (dist(c, i) === dist(b2, i) && c < b2) ? c : b2, cs[0]);
+        if (!HERB_GARDEN.zones.includes(world.tiles[tile].zone)) return `${def.name} cần đất ấm (ôn đới hay nhiệt đới)`;
+        if (dist(home(tile), tile) > HERB_GARDEN.near) return `${def.name} phải cách thủ đô hay một điểm định cư tối đa ${HERB_GARDEN.near} ô`;
+        if (n.buildings.filter(b => b.type === def.type && home(b.tile) === home(tile)).length >= HERB_GARDEN.perCentre) return `Mỗi trung tâm tối đa ${HERB_GARDEN.perCentre} ${def.name}`;
+      }
       if (def.perCentre) { // §6.5 one on each centre, on the centre itself
         const cs = [n.capital, ...n.settlements.map(s2 => s2.tile)];
         if (!cs.includes(tile)) return `${def.name} phải xây ngay trên thủ đô hay một điểm định cư (tile của trung tâm đó)`;

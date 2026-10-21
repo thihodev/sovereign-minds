@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.36";
+export const RULES_VERSION = "0.37";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -531,7 +531,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §4.13 coin a public work earns the treasury each turn while it stands (a market also takes a share of the people and of each trading partner) */
   income?: number; market?: number;
   /** §6.5 a village granary: food it keeps aside, unspoiled, against famine */
-  reserve?: number }
+  reserve?: number;
+  /** §6.6 herbs a garden grows each turn, with no hands */
+  herbs?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -555,6 +557,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
   { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "herb_garden", name: "Vườn thảo dược", needs: "P14", cost: { fiber: 5 }, work: 6, perTile: true, terrains: ["grass", "hill", "forest", "jungle", "swamp", "coast"], desc: "Trồng cây thuốc trên đất ấm (ôn đới, nhiệt đới) cách thủ đô hay điểm định cư tối đa 2 ô, tối đa 2 vườn mỗi trung tâm: tự cho 0,5 thảo dược mỗi lượt, không cần người làm.", effect: { herbs: 0.5 } },
   { type: "granary", name: "Kho làng", needs: "stone_tools", cost: { wood: 10, stone: 6 }, work: 5, perCentre: true, desc: "Mỗi trung tâm một kho: mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư; tự mở cứu đói khi cả nước thiếu ăn. Điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa.", effect: { reserve: 100 } },
   { type: "market", name: "Chợ", needs: "P12", cost: { wood: 10, stone: 6 }, work: 6, max: 3, desc: "Công trình công cộng: dân họp chợ, ngân khố thu 2 tiền/lượt, thêm 1 tiền mỗi 50 dân và 1 tiền mỗi bạn hàng.", effect: { income: 2, market: 1 } },
   { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
@@ -1028,3 +1031,8 @@ export const CLASSES = {
 
 // §6.5 Village granaries (an idea of Văn Phong, turn 888): a share of the spare food set aside, unspoiled, opened in famine
 export const GRANARY = { share: 0.1, isolatedCalm: 0.5 };
+
+// §2.11 Meadow herbs (a nation's idea): healing plants of the grass and the hills, regrowing slowly
+export const MEADOW_HERBS = { terrains: ["grass", "hill"] as string[], min: 10, max: 20, regen: 0.02 };
+// §6.6 Herb gardens (a nation's idea): healing plants grown round the centres, on warm land
+export const HERB_GARDEN = { near: 2, perCentre: 2, zones: ["temp", "trop"] as string[] };

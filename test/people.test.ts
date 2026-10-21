@@ -85,6 +85,7 @@ test("customs: who goes to war, and only they fall", () => {
 test("herbs save infants", () => {
   const run = (herbs: number) => {
     const w = founded("infants");
+    for (const t of w.tiles) delete t.res.herbs; // none to gather this turn (meadows hold them too since v0.37)
     w.nations[0].stock.herbs = herbs;
     turn(w);
     return w.nations[0].demo!;

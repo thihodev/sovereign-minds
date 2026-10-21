@@ -1014,6 +1014,24 @@ Mỗi loại hàng có một **giá thế giới**, tính bằng đơn vị lư�
 - **Tỉnh bị cắt đường:** điểm định cư bị cắt đường về thủ đô mà có kho riêng thì bất mãn tăng chậm một nửa.
 - Kho không giảm hư hỏng (việc của Hố trữ). Lương thực vẫn là kho chung của cả nước.
 
+### 6.6 Thảo dược đồng và Vườn thảo dược (hai sáng kiến của các quốc gia)
+
+**Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt (chậm hơn thảo dược rừng, 8%).
+- Người hái lượm mang về như thảo dược rừng, đầm.
+- Dân thảo nguyên cũng có thuốc mà không cần rừng.
+- Thế giới cũ được thêm thảo dược đồng khi tải.
+
+**Vườn thảo dược** (`herb_garden`):
+- **Xây:** cần Trồng trọt (P14); 5 sợi, 6 công.
+- **Đất:** mỗi vườn một ô đất của mình, vùng ôn đới hoặc nhiệt đới (đồng cỏ, đồi, rừng, rừng rậm, đầm lầy, ven biển), cách thủ đô hay điểm định cư tối đa 2 ô.
+- **Giới hạn:** tối đa 2 vườn mỗi trung tâm, tính theo trung tâm gần nhất.
+- **Sản lượng:** mỗi vườn tự cho 0,5 thảo dược mỗi lượt, không cần người làm.
+
+Thảo dược dùng để:
+- giảm một nửa số người chết vì dịch (1 thảo dược mỗi 10 dân);
+- cứu trẻ sơ sinh;
+- đáp ứng nhu cầu "Thuốc men" của mức sống.
+
 ## 7. Quan hệ quốc gia: ngoại giao, giao thương, chiến tranh
 
 Một quốc gia chỉ có thể nhắn tin, đề nghị trao đổi, ký ước hay tuyên chiến với nước khác sau khi **đã gặp** nước đó, tức là đã thấy ít nhất một ô lãnh thổ của họ (hoặc bắt được người thám hiểm của họ, hoặc bị kéo vào chiến tranh với họ). "Đã gặp" là một chiều: A thấy B chưa chắc B đã thấy A. Mọi cam kết có hiệu lực đều là điều khoản máy đọc được, do Engine thi hành. Lời nói suông không ràng buộc ai.
