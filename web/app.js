@@ -484,6 +484,37 @@
     }
   }
 
+  // §6.1 buildings on their tiles: an icon for what each does; one going up carries scaffolding and a ring of its progress
+  const BTYPE = { tent: "⛺", field: "🌾", pen: "🐐", workshop: "🔨", kiln: "🏺", pit: "🕳", altar: "⛩", palisade: "🪵", well: "🪣", pier: "⚓" };
+  const BKIND = { housing: "🏠", farm: "🌾", craft: "🔨", port: "⚓", water: "🪣", defense: "🛡", sacred: "⛩", store: "🏺", other: "🏛" };
+  const bIcon = b => BTYPE[b.type] || BKIND[b.kind] || "🏛";
+  function drawBuildings(g, vis, s, z, px) {
+    if (s * z < 7) return;
+    const size = clamp(s * .42 * z, 10, 26) * px;
+    for (const n of S.nations) {
+      if (!n.alive) continue;
+      const byTile = new Map();
+      for (const b of n.buildings || []) if (vis(b.tile)) { if (!byTile.has(b.tile)) byTile.set(b.tile, []); byTile.get(b.tile).push(b); }
+      for (const [t, list] of byTile) {
+        const [cx, cy] = center(t), show = list.slice(0, 4);
+        show.forEach((b, k) => {
+          const a = show.length === 1 ? -2.2 : -2.2 + k * (Math.PI * 2 / show.length), r = s * .62;
+          const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * .85;
+          g.beginPath(); g.arc(x, y, size * .62, 0, 7); g.fillStyle = b.done ? "rgba(255,252,240,.88)" : "rgba(255,252,240,.5)"; g.fill();
+          g.lineWidth = 1.4 * px; g.strokeStyle = nationColor(n.id); g.setLineDash(b.done ? [] : [2 * px, 2 * px]); g.stroke(); g.setLineDash([]);
+          g.globalAlpha = b.done && !b.off ? 1 : .55; icon(g, bIcon(b), x, y + size * .03, size * .78); g.globalAlpha = 1;
+          if (!b.done) {
+            const p = b.work ? Math.min(1, b.progress / b.work) : 0;
+            g.beginPath(); g.arc(x, y, size * .78, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p); g.lineWidth = 2.4 * px; g.strokeStyle = "#ffd84a"; g.stroke();
+            icon(g, "🏗", x + size * .55, y - size * .5, size * .5);
+          }
+          if (b.off) { g.lineWidth = 2 * px; g.strokeStyle = "#ff4d3d"; g.beginPath(); g.moveTo(x - size * .4, y - size * .4); g.lineTo(x + size * .4, y + size * .4); g.stroke(); }
+        });
+        if (list.length > show.length) label(g, `+${list.length - show.length}`, cx, cy + s * .55, size * .6, "#fffbe8", 700, px);
+      }
+    }
+  }
+
   // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
   const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
@@ -668,6 +699,7 @@
     }
     const now = performance.now();
     drawAmbient(g, now, s, z, px, vis);
+    drawBuildings(g, vis, s, z, px); // above the people, so the capital's buildings are not lost in the crowd
     drawEvents(g, now, s, z, px);
     if (hoverI >= 0 && hoverI !== pinnedI) { const [x, y] = center(hoverI); hexPath(g, x, y, s * 1.05); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
     if (pinnedI >= 0) {
@@ -1058,7 +1090,7 @@
       ${n.research ? `<div class="bar" role="progressbar" aria-label="Tiến độ nghiên cứu" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}
       ${n.thought ? `<div class="thought"></div>` : ""}
       <h4>${tile === null ? "Công trình" : "Công trình trên ô này"}</h4>
-      <div class="chips">${blds.map(b => `<span>${esc(b.name)}${b.done ? "" : " (đang xây)"}</span>`).join("") || `<span class="none">không có</span>`}</div>
+      <div class="chips">${blds.map(b => `<span>${bIcon(b)} ${esc(b.name)}${b.done ? (b.off ? " (bị phá hoại, tạm ngừng)" : "") : ` (đang xây ${b.progress}/${b.work} công)`}</span>`).join("") || `<span class="none">không có</span>`}</div>
       ${tile === null && (n.settlements || []).length ? `<h4>Điểm định cư</h4><div class="chips">${n.settlements.map(x => `<span>${esc(x.name)}</span>`).join("")}</div>` : ""}
       ${wars.length ? `<h4>Đang chiến tranh</h4><div class="meta">${wars.map(w => esc(w.a === n.id ? w.bName : w.aName)).join(", ")}</div>` : ""}
       ${tile === null && n.alive ? `<h4>Mối đe dọa</h4>${threatList((n.threats || []).filter(t => t.level >= 1).slice(0, 5), "Không có mối đe dọa đáng kể.")}<h4>Tài nguyên trên lãnh thổ</h4>${resChips(n)}` : ""}
@@ -1158,6 +1190,31 @@
   }
   // §2.8 the provinces: one per centre, its land, its people, its way home, its governor and its mood
   const WAY = { capital: "thủ đô", road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" };
+  // §6.1 the nation's buildings: what is going up (in the order the builders take them), what stands, what it can build
+  const at = i => `(${i % geo.N}, ${(i / geo.N) | 0})`;
+  const costText = c => Object.entries(c || {}).map(([k, q]) => `${q} ${RES[k] || k}`).join(" + ") || "không tốn vật liệu";
+  function buildList(n) {
+    const going = (n.buildings || []).filter(b => !b.done), done = (n.buildings || []).filter(b => b.done), rate = n.buildRate || 0;
+    let queue = 0;
+    const goingHtml = going.map(b => {
+      queue += Math.max(0, b.work - b.progress);
+      const eta = rate > 0 ? Math.max(1, Math.ceil(queue / rate)) : null, pct = b.work ? Math.round(b.progress / b.work * 100) : 0;
+      return `<div class="bld"><div class="row"><b>${bIcon(b)} ${esc(b.name)}</b><button class="link" data-tile="${b.tile}">${at(b.tile)} ↗</button><span style="flex:1"></span><span class="meta">${b.progress}/${b.work} công · ${eta ? `xong sau ~${eta} lượt` : "chưa có thợ xây"}</span></div>
+        <div class="bar" role="progressbar" aria-label="Tiến độ ${esc(b.name)}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>${b.desc ? `<div class="meta">${esc(b.desc)}</div>` : ""}</div>`;
+    }).join("");
+    const roads = n.roadWorks || [], roadLeft = roads.reduce((a, r) => a + Math.max(0, r.work - r.progress), 0);
+    const groups = new Map();
+    for (const b of done) { if (!groups.has(b.type)) groups.set(b.type, []); groups.get(b.type).push(b); }
+    const doneHtml = [...groups.values()].map(list => `<div class="bld"><div class="row"><b>${bIcon(list[0])} ${esc(list[0].name)}${list.length > 1 ? ` ×${list.length}` : ""}</b><span style="flex:1"></span>${[...new Set(list.map(b => b.tile))].slice(0, 8).map(t => { const k = list.filter(b => b.tile === t).length; return `<button class="link" data-tile="${t}">${at(t)}${k > 1 ? ` ×${k}` : ""}${list.some(b => b.tile === t && b.off) ? " ✗" : ""}</button>`; }).join(" ")}</div>${list[0].desc ? `<div class="meta">${esc(list[0].desc)}</div>` : ""}</div>`).join("");
+    const cat = n.buildCatalog || [];
+    const rules = d => [d.max ? `tối đa ${d.max}` : "", d.perTile ? "mỗi ô một cái" : "", d.terrains ? `trên ${d.terrains.map(t => TERRAIN[t]?.[0] || t).join("/")}${d.river ? " hoặc ô có sông" : ""}` : d.river ? "cần ô có sông" : "", d.kind === "housing" ? `nhà ở: tối đa ${n.housingSlots} cho mọi trung tâm` : ""].filter(Boolean).join(" · ");
+    const catHtml = cat.length ? `<table class="law-table bcat"><thead><tr><th scope="col">Công trình</th><th scope="col">Vật liệu</th><th scope="col">Công</th><th scope="col">Tác dụng</th></tr></thead><tbody>${cat.map(d => `<tr><td>${bIcon(d)} <b>${esc(d.name)}</b>${d.custom ? " ★" : ""}${d.have ? ` <span class="muted">(có ${d.have})</span>` : ""}${rules(d) ? `<div class="muted">${esc(rules(d))}</div>` : ""}</td><td>${esc(costText(d.cost))}</td><td>${d.work}</td><td>${esc(d.desc || "")}</td></tr>`).join("")}</tbody></table>` : `<p class="note">Chưa phát minh ra công trình nào.</p>`;
+    return `<p class="note">Cách xây: AI ra lệnh <b>build</b> (1 AP) chọn công trình và ô; vật liệu trừ ngay, rồi <b>thợ xây</b> (${n.labor?.build ?? 0} người, khoảng ${rate} công mỗi lượt) làm dần theo thứ tự khởi công. Công thừa sau các công trình dành cho đường đang làm.</p>
+      <h3>Đang xây (${going.length})</h3>${goingHtml || `<p class="note">Không có công trình nào đang xây.</p>`}
+      ${roads.length ? `<h3>Đường đang làm</h3><p class="note">🛤 ${roads.length} ô, còn ${Math.round(roadLeft)} công${rate > 0 ? `, xong sau ~${Math.max(1, Math.ceil((queue + roadLeft) / rate))} lượt` : ""}.</p>` : ""}
+      <h3>Đã xong (${done.length})</h3>${doneHtml || `<p class="note">Chưa có công trình nào.</p>`}
+      <h3>Có thể xây</h3>${catHtml}`;
+  }
   function provinceList(n) {
     return `<p class="muted">Mỗi trung tâm là một tỉnh: đất là các ô gần nó nhất, dân chia theo chỗ ở. Tỉnh bị cô lập, xa thủ đô mà không có bá tước, hay chật chỗ ở thì bất ổn dần; tới 50 nó làm cả nước bất mãn thêm, và khi cả nước bất mãn tới 100 thì tỉnh bất ổn nhất có thể đòi tách ra cùng đất đai.</p>` + n.provinces.map(p => `<div class="card2 province">
       <div class="row"><b>${p.capital ? "★ " : ""}${esc(p.name)}</b><button class="link" data-tile="${p.centre}" aria-label="Xem trên bản đồ">↗</button><span style="flex:1"></span><span class="meta">${p.people} dân · chỗ ở ${p.housing} · ${p.tiles} ô</span></div>
@@ -1177,7 +1234,7 @@
     $("#nation-detail").innerHTML = `
       <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${healthPills(n)}${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       <div class="subtabs" data-key="nation">
-        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button>${(n.provinces || []).length > 1 ? `<button data-sub="provinces">Tỉnh <span class="cnt${n.provinces.some(p => p.mood >= 50) ? " hot" : ""}">${n.provinces.length}</span></button>` : ""}<button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
+        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button>${(n.provinces || []).length > 1 ? `<button data-sub="provinces">Tỉnh <span class="cnt${n.provinces.some(p => p.mood >= 50) ? " hot" : ""}">${n.provinces.length}</span></button>` : ""}<button data-sub="build">Công trình <span class="cnt${(n.buildings || []).some(b => !b.done) ? " warmcnt" : ""}">${(n.buildings || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
         <section data-sub="overview">
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
@@ -1198,11 +1255,11 @@
         </section>
         <section data-sub="court"><p class="muted">${(n.officials || []).length}/${n.courtSlots ?? 0} chỗ quan chức.</p>${courtList(n)}</section>
         ${(n.provinces || []).length > 1 ? `<section data-sub="provinces">${provinceList(n)}</section>` : ""}
+        <section data-sub="build">${buildList(n)}</section>
         <section data-sub="economy">
           <h3>Lao động</h3>${chipsOf(labor)}
           <h3>Kho</h3>${chipsOf(stock)}
           <h3>Tài nguyên</h3>${resTable(n)}
-          <h3>Công trình</h3>${chipsOf(n.buildings.map(b => `${b.name}${b.done ? "" : " (đang xây)"}`))}
           <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => { const l = n.links?.[x.tile]; return `${x.name} ${({ road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" })[l] ?? "✗ cô lập"}`; }))}
           ${n.roadNet ? `<h3>Đường sá & lãnh hải</h3><p class="note">${n.roadNet.tiles} ô đường nối các trung tâm (+${Math.min(10, Math.floor(n.roadNet.tiles / 4))} giới hạn ô) · ${n.roadNet.linked.length}/${(n.settlements || []).length} điểm định cư đã nối thủ đô (🛤) · cấp tối đa: ${esc(S.roadLevels[n.roadNet.level - 1].name)} / ${esc(S.roadLevels[n.roadNet.level - 1].lane)}${n.roadNet.works ? ` · ${n.roadNet.works} ô đang làm` : ""}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}</p>` : ""}
           <h3>Phát minh (${n.inventions.length})</h3>${chipsOf(n.inventions.map(v => v.name))}
@@ -1220,7 +1277,7 @@
         </section>
       </div>`;
     initSubtabs($("#nation-detail"));
-    for (const b of $("#nation-detail").querySelectorAll(".province [data-tile]")) b.onclick = () => { d.close(); centerOn(Number(b.dataset.tile)); };
+    for (const b of $("#nation-detail").querySelectorAll(".province [data-tile], .bld [data-tile]")) b.onclick = () => { d.close(); centerOn(Number(b.dataset.tile)); };
     $("#nation-detail .flagbig").replaceWith(flagCanvas(n.flag, 72, 48));
     $("#dlg-close").onclick = () => d.close();
     if ($("#dlg-model")) {

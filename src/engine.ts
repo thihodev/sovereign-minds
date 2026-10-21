@@ -1429,6 +1429,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       for (const [k, q] of Object.entries(def.cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)}`;
       for (const [k, q] of Object.entries(def.cost)) L.stock(n, k, -q, "build");
       n.buildings.push({ id: world.nextBuildingId++, type: def.type, tile, progress: 0, done: false, hp: 100 });
+      n.lastEvents.push(`Khởi công ${def.name} ở (${col(tile)}, ${row(tile)}): cần ${def.work} công xây${def.desc ? ` (${def.desc})` : ""}.`);
       return null;
     }
     case "claim_tile": {

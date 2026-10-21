@@ -8,6 +8,10 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Căng thẳng từ 70 trở lên liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ. Liên minh và chư hầu vẫn giữ.
   - Có chính nghĩa (tranh chấp, sự cố biên giới, bắt được gián điệp) thì xé hiệp ước không mất uy tín.
   - Cố vấn nói rõ hiệp ước nào đang chặn chiến tranh và còn bao lâu nữa thì tan vỡ.
+- **Công trình hiện rõ hơn (§6.1):**
+  - **Bản đồ:** mỗi công trình có biểu tượng trên ô của nó (⛺ lều, 🌾 ruộng, 🔨 bãi chế tác, ⚓ bến thuyền, …). Công trình đang xây có giàn giáo 🏗 và vòng tiến độ vàng; công trình bị phá hoại có dấu gạch đỏ.
+  - **Hồ sơ quốc gia có tab Công trình:** cách xây; danh sách đang xây (thanh tiến độ, số công còn lại, ước tính số lượt nữa xong theo số thợ xây); đường đang làm; công trình đã xong gộp theo loại, có nút ↗ tới ô; danh mục "Có thể xây" kèm vật liệu, số công, tác dụng và giới hạn.
+  - Thẻ ô hiện tiến độ của công trình trên ô. Nhật ký quốc gia ghi "Khởi công X ở (cột, hàng): cần N công xây".
 
 ## v0.10
 

@@ -6,10 +6,10 @@ import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
 import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
-import { allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
+import { allBuildings, allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
-import { governed, housing, housingParts, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
+import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
 import { DEMO, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
@@ -58,6 +58,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       setupPending: runner.store.getMeta("setup_pending") === "1", claudeWait: runner.claudeWait.until > Date.now() ? runner.claudeWait : null };
   }
 
+  /** A building's purpose, for its map icon (§6.1). */
+  function buildingKind(e: Record<string, unknown>): string {
+    return e.housing ? "housing" : e.farmSlots ? "farm" : e.craftSlots ? "craft" : e.port ? "port" : e.water ? "water" : e.defense ? "defense" : e.stability ? "sacred" : e.spoilage ? "store" : "other";
+  }
+
   function statePayload() {
     const w = runner.world;
     applyLaws(w); // the numbers below follow the laws in force
@@ -86,7 +91,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         labor: n.labor, crafts: n.crafts,
         inventions: n.inventions.map(id => ({ id, name: invName(w, id), custom: !!inv(w, id)?.custom })),
         research: n.research ? { id: n.research.id, name: invName(w, n.research.id), progress: Math.round(n.research.progress * 10) / 10, cost: inventionCost(w, n, n.research.id) } : null,
-        buildings: n.buildings.map(b => ({ type: b.type, name: buildingOf(w, b.type)?.name ?? b.type, tile: b.tile, done: b.done })),
+        buildings: n.buildings.map(b => { const d = buildingOf(w, b.type); return { id: b.id, type: b.type, name: d?.name ?? b.type, tile: b.tile, done: b.done, progress: Math.round(b.progress * 10) / 10, work: d?.work ?? 0, desc: d?.desc ?? "", kind: buildingKind(d?.effect ?? {}), off: !!(b.disabledUntil && b.disabledUntil > w.tick) }; }),
+        roadWorks: (n.roadWorks ?? []).map(r => ({ tile: r.tile, level: r.level, progress: Math.round(r.progress * 10) / 10, work: ROADS.levels[r.level - 1]?.work ?? 0 })),
+        // §6.1 what this nation can build now, and how fast its builders work
+        buildCatalog: n.alive && n.founded ? (() => { const m = mods(w, n); return allBuildings(w).filter(d => n.inventions.includes(d.needs) || m.unlocked.has(d.type)).map(d => ({ type: d.type, name: d.name, cost: d.cost, work: d.work, desc: d.desc, kind: buildingKind(d.effect), max: d.max ?? null, perTile: !!d.perTile, terrains: d.terrains ?? null, river: !!d.river, have: n.buildings.filter(b => b.type === d.type).length, custom: !!w.custom.buildings[d.type] })); })() : [],
+        buildRate: Math.round(n.labor.build * (1 + (mods(w, n).role.build || 0)) * 10) / 10, housingSlots: n.alive ? housingSlots(n, w) : 0,
         settlements: n.settlements, trades: n.trades, inbox: n.inbox.map(m => ({ ...m, fromName: w.nations[m.from]?.name })),
         relations: Object.fromEntries(w.nations.filter(o => o.id !== n.id).map(o => [o.id, relation(w, n.id, o.id)])),
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,

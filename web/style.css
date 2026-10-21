@@ -464,3 +464,9 @@ ul.advice li.lv1 { border-color: var(--accent); }
 .rel-legend summary { cursor: pointer; font-weight: 600; color: var(--ink); }
 .legend-list { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 2px; }
 .legend-list .rel { display: inline-block; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); }
+
+/* §6.1 buildings in the nation profile */
+.bld { display: grid; gap: 4px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.bld .row { gap: 8px; align-items: center; flex-wrap: wrap; }
+.bcat td { font-size: 12.5px; }
+.seg .cnt.warmcnt { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
