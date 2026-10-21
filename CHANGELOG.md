@@ -2,7 +2,16 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.25 (đang làm)
+## v0.26 (đang làm)
+
+- **Tổng kết chiến tranh đúng hơn:**
+  - mỗi nước khi chết được ghi số phận (bị nước nào chiếm, nhập lại nước gốc, hay tự sụp đổ vì đói và dân bỏ đi);
+  - bảng tổng kết không còn gán "diệt vong" cho một cuộc chiến mà nước đó không thua; nó ghi "bị X tiêu diệt", "bị Y tiêu diệt (ngoài cuộc chiến này)" hay "tự sụp đổ (…)";
+  - có dòng người chết vì xô xát trước chiến tranh.
+- **Máu đòi máu:** bên mạnh hơn mới tuyên chiến. Nước nhỏ không còn bị ép đánh láng giềng mạnh hơn; nó giữ chính nghĩa.
+- **Bấm một nước** (bảng quốc gia, danh sách, hồ sơ) thì bản đồ tối đi trừ lãnh thổ nước đó, và viền nước đó sáng lên.
+
+## v0.25
 
 - **Sông là sự sống và đáng để giành (§2.1):**
   - ô ven sông có thêm cá, lúa hoang, sậy;

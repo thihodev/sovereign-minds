@@ -983,7 +983,7 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
 
   Bên bị săn trộm hoặc bị xô xát có **chính nghĩa** (tuyên chiến không mất uy tín) trong 6 lượt.
 - **Máu đòi máu:** 3 vụ xô xát chết người trong 10 lượt thì biên giới thành chiến tranh.
-  - Bên chôn nhiều người hơn tự tuyên chiến, với chính nghĩa và không mất uy tín. Hòa thì bên ổn định thấp hơn tuyên chiến.
+  - Bên **mạnh hơn** (chiến binh cộng dân quân) tuyên chiến, có chính nghĩa và không mất uy tín. Bên yếu hơn cũng có chính nghĩa nhưng không bị ép vào chiến tranh. Số người chết vì xô xát của mỗi bên được ghi vào cuộc chiến.
   - Hiệp ước bất tương xâm và đi lại giữa hai bên tan vỡ.
   - Hiệp ước hòa bình, liên minh hoặc chư hầu ngăn được điều này.
   - Lời cố vấn báo khẩn khi đã có 2 vụ.

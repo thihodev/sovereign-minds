@@ -576,7 +576,7 @@ function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say,
         for (const t of world.tiles) if (t.owner === D.id) { t.owner = A.id; moveBuildings(D, A, t.i); }
         addPeople(A, takePeople(D, D.population, "migrate"));
         for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "reunite"); L.stock(A, g, q, "reunite"); }
-        D.alive = false; D.status = "dead"; D.population = 0;
+        D.alive = false; D.status = "dead"; D.population = 0; D.fate = { tick: world.tick, cause: "reunited", by: A.id };
         say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} trở về với ${A.name}: đất, dân và kho nhập lại như xưa.`);
       } else {
         fallen = fallTo(world, A, D, L, say);
@@ -640,7 +640,7 @@ export function fallTo(world: World, A: Nation, D: Nation, L: Ledger, say: Say):
   for (const t of world.tiles) if (t.owner === D.id) { t.owner = A.id; moveBuildings(D, A, t.i); land++; }
   const got: Record<string, number> = {};
   for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "loot"); L.stock(A, g, q, "loot"); got[g] = q; }
-  D.alive = false; D.status = "dead"; D.population = 0;
+  D.alive = false; D.status = "dead"; D.population = 0; D.fate = { tick: world.tick, cause: "conquest", by: A.id };
   A.stability = Math.max(0, A.stability - WAR.fallStability);
   A.lastEvents.push(`${D.name} sụp đổ: ${stay} người của họ trở thành dân ta, ${land} ô đất và kho của họ về tay ta. Dân mới chưa phục (−${WAR.fallStability} ổn định).`);
   say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} diệt vong dưới tay ${A.name}: ${stay} người sống dưới quyền ${A.name}${fled ? `, ${fled} người chạy sang ${refuge!.name}` : ""}.`);

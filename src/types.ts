@@ -111,6 +111,8 @@ export interface Nation {
   eraTick: number | null;
   /** Tick of the last rename_nation (null = never): one rename per era change. */
   renameTick: number | null;
+  /** How the nation ended, when it has: taken by another, returned to the nation it split from, or perished on its own. */
+  fate?: { tick: number; cause: "conquest" | "reunited" | "perished"; by?: number; why?: string };
   /** §2.3 the turn the capital last moved (it may move again CAPITAL_MOVE.every turns later) */
   capitalMoved?: number;
   /** Names the nation used before rename_nation, oldest first (§2.2). */
@@ -323,7 +325,9 @@ export interface Caravan {
   porters?: number;
   boats?: number;
 }
-export interface War { id: number; a: number; b: number; declared: number; start: number; end: number | null; reason: string }
+export interface War { id: number; a: number; b: number; declared: number; start: number; end: number | null; reason: string;
+  /** §7.9 the dead of the border brawls that led to it, by nation id */
+  brawlDead?: Record<string, number> }
 export interface Battle { tick: number; attacker: number; defender: number; tile: number; kind: "attack" | "raid"; a: number; d: number; won: boolean; lossA: number; lossD: number; note: string }
 
 export interface Intel {

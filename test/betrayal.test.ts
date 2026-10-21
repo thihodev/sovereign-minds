@@ -82,6 +82,7 @@ test("a nation that falls: its people live on under the victor, a fifth flee, it
   fallTo(w, a, d, L, () => { });
   assert.deepEqual(L.audit(w), [], "nothing lost unrecorded");
   assert.equal(d.alive, false);
+  assert.deepEqual(d.fate && { cause: d.fate.cause, by: d.fate.by }, { cause: "conquest", by: a.id }, "its fate is recorded");
   assert.equal(c.population - popC, Math.floor(50 * WAR.fallFlee), "a fifth fled to the calmest nation they knew");
   assert.equal(a.population - popA, 50 - Math.floor(50 * WAR.fallFlee), "the rest live on under the victor");
   assert.equal(w.tiles.filter(t => t.owner === a.id).length >= tilesD, true, "the land passed to the victor");

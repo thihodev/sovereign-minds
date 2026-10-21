@@ -601,6 +601,27 @@
   // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
   const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
+  // the nation picked on the board or in the inspector: the rest of the map dims, its border glows
+  function drawSelectedNation(g, s, z, px, byNation, edges) {
+    if (inspect?.kind !== "nation") return;
+    const id = inspect.id, tiles = byNation.get(id) || [], all = [];
+    S.owners.forEach((o, i) => { if (o === id) all.push(i); });
+    if (!all.length) return;
+    // dim everything but its land
+    g.save(); g.beginPath(); g.rect(-geo.w, -geo.h, geo.w * 3, geo.h * 3);
+    for (const i of all) { const [x, y] = center(i); hexPath2(g, x, y, s * 1.02); }
+    g.fillStyle = "rgba(4,10,16,.45)"; g.fill("evenodd"); g.restore();
+    // a glowing, breathing border in its colour
+    const pulse = .5 + .5 * Math.sin(performance.now() / 380), c = nationColor(id);
+    g.save(); g.beginPath(); for (const i of all) edges(i, id); g.lineCap = "round"; g.lineJoin = "round";
+    g.lineWidth = Math.max(5 * px, s * .55) * (1 + .25 * pulse); g.strokeStyle = `rgba(255,255,255,${.35 + .25 * pulse})`; g.stroke();
+    g.lineWidth = Math.max(2.5 * px, s * .25); g.strokeStyle = c; g.stroke();
+    g.restore();
+    if (ANIM.on) ensureAnim(); // the border breathes while the map is animated
+  }
+  /** A hexagon added to the current path (no beginPath), for clip and even-odd fills. */
+  function hexPath2(g, x, y, s) { for (let k = 0; k < 6; k++) { const a = Math.PI / 180 * (60 * k - 30); k ? g.lineTo(x + s * Math.cos(a), y + s * Math.sin(a)) : g.moveTo(x + s * Math.cos(a), y + s * Math.sin(a)); } g.closePath(); }
+
   // §7.4 war fronts: the borders between nations at war, in red, with crossed swords at the heart of each front
   let frontMemo = null;
   function warFronts() {
@@ -802,6 +823,7 @@
     }
     drawRoads(g, vis, s, z, px);
     drawFronts(g, s, z, px);
+    drawSelectedNation(g, s, z, px, byNation, edges);
     // the capitals' names come first: every other label steps around them
     placed = [];
     const small = clamp(s * .95 * z, 9, 13) * px, fs = clamp(s * 1.1 * z, 11, 16) * px;
@@ -2114,10 +2136,11 @@
     $("#war-history").innerHTML = (S.warHistory || []).map(h => {
       const row = (label, k, bad) => `<tr><td>${label}</td><td class="${bad && h.a[k] > h.b[k] ? "bad" : ""}">${h.a[k]}</td><td class="${bad && h.b[k] > h.a[k] ? "bad" : ""}">${h.b[k]}</td></tr>`;
       const lostA = h.b.tiles, lostB = h.a.tiles;
-      return `<div class="card2 war-tally${h.end === null ? " live" : ""}"><div class="row"><b>${esc(h.a.name)} ⚔ ${esc(h.b.name)}</b><span style="flex:1"></span><span class="pill ${h.end === null ? "bad" : ""}">${esc(h.outcome)}</span></div>
+      return `<div class="card2 war-tally${h.end === null ? " live" : ""}"><div class="row"><b>${esc(h.a.name)} ⚔ ${esc(h.b.name)}</b><span style="flex:1"></span><span class="pill ${h.end === null ? "bad" : ""}" title="${esc(h.outcome)}">${esc(h.outcome.length > 40 ? h.outcome.slice(0, 38) + "…" : h.outcome)}</span></div>
+        ${h.outcome.length > 40 ? `<div class="meta">${esc(h.outcome)}</div>` : ""}
         <div class="meta">lượt ${h.start}${h.end !== null ? `–${h.end}` : " tới nay"} · ${h.battles} trận${h.reason ? ` · ${esc(h.reason)}` : ""}</div>
         <table class="res tally"><thead><tr><th></th><th>${esc(h.a.name)}</th><th>${esc(h.b.name)}</th></tr></thead><tbody>
-          ${row("Trận thắng", "won")}${row("Người chết", "dead", true)}${row("Ô chiếm được", "tiles")}${row("Trung tâm chiếm được", "centres")}${row("Đột kích thành công", "raids")}
+          ${row("Trận thắng", "won")}${row("Người chết trong trận", "dead", true)}${h.brawl ? `<tr><td>Chết vì xô xát trước chiến tranh</td><td class="${h.brawl.a > h.brawl.b ? "bad" : ""}">${h.brawl.a}</td><td class="${h.brawl.b > h.brawl.a ? "bad" : ""}">${h.brawl.b}</td></tr>` : ""}${row("Ô chiếm được", "tiles")}${row("Trung tâm chiếm được", "centres")}${row("Đột kích thành công", "raids")}
           <tr><td>Ô bị mất</td><td class="${lostA > lostB ? "bad" : ""}">${lostA}</td><td class="${lostB > lostA ? "bad" : ""}">${lostB}</td></tr>
         </tbody></table>
         ${h.lastTile !== null ? `<button type="button" class="link" data-tally-tile="${h.lastTile}">📍 Tới nơi giao tranh gần nhất</button>` : ""}</div>`;

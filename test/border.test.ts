@@ -92,18 +92,21 @@ test("a long dispute tears up a non-aggression pact; a just cause breaks a treat
   assert.equal(a.reputation, rep, "a just war");
 });
 
-test("blood for blood: brawl after brawl and the border goes to war, declared by the side that lost more", () => {
+test("blood for blood: brawl after brawl and the border goes to war, taken up by the stronger side", () => {
   const w = touching("brawls");
   const [a, b] = w.nations;
   const st = borderOf(w, a.id, b.id);
   st.brawls = [{ tick: w.tick - 2, dead: { [a.id]: 2, [b.id]: 1 } }, { tick: w.tick - 1, dead: { [a.id]: 1, [b.id]: 0 } }];
   assert.ok(advice(w, b).some(x => /thêm một vụ nữa là chiến tranh/.test(x.text)));
   st.brawls.push({ tick: w.tick, dead: { [a.id]: 1, [b.id]: 1 } });
+  b.labor.warrior = 20; a.labor.warrior = 2; // b is the stronger, though a buried more
   const max = BORDER.incidentMax;
   BORDER.incidentMax = 0;
   try { turn(w); } finally { BORDER.incidentMax = max; }
   const war = w.wars.find(x => (x.a === a.id && x.b === b.id) || (x.a === b.id && x.b === a.id));
   assert.ok(war, "a war broke out");
-  assert.equal(war!.a, a.id, "the side that buried more declares it");
+  assert.equal(war!.a, b.id, "the stronger side takes up the quarrel");
   assert.match(war!.reason ?? "", /xô xát/);
+  assert.deepEqual(war!.brawlDead, { [a.id]: 4, [b.id]: 2 }, "the brawl dead are kept with the war");
+  assert.ok((a.casusBelli[String(b.id)] ?? -1) >= w.tick - 1, "the weaker keeps its just cause");
 });

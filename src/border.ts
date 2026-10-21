@@ -7,11 +7,11 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GOOD_VALUE, KIN, ROADS } from "./rules.ts";
+import { BORDER, GOOD_VALUE, KIN, ROADS, WAR } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
-import { mods, type Ledger } from "./engine.ts";
+import { mods, workers, type Ledger } from "./engine.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
@@ -125,11 +125,15 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     const recent = (st.brawls ?? []).filter(x => tick - x.tick < BORDER.brawlWindow);
     if (recent.length >= BORDER.brawlsToWar && !pendingOrActiveWar(world, a.id, b.id) && !treatiesBetween(world, a.id, b.id, ["peace", "alliance", "vassal"]).length) {
       const lost = (x: Nation) => recent.reduce((s, y) => s + (y.dead[String(x.id)] ?? 0), 0);
-      const [avenger, foe] = lost(a) > lost(b) || (lost(a) === lost(b) && a.stability <= b.stability) ? [a, b] : [b, a];
+      // the stronger side takes up the quarrel (the weaker keeps its just cause, and is not driven to war it cannot win)
+      const might = (x: Nation) => x.labor.warrior + workers(x) * WAR.militiaShare * WAR.militiaStrength;
+      const [avenger, foe] = might(a) > might(b) || (might(a) === might(b) && lost(a) >= lost(b)) ? [a, b] : [b, a];
+      foe.casusBelli[String(avenger.id)] = Math.max(foe.casusBelli[String(avenger.id)] ?? -1, tick + BORDER.causeTicks);
       for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "passage"])) { tr.active = false; tr.end = tick; }
       avenger.casusBelli[String(foe.id)] = Math.max(avenger.casusBelli[String(foe.id)] ?? -1, tick + BORDER.causeTicks);
-      startWar(world, avenger, foe, tick, `${recent.length} vụ xô xát biên giới trong ${BORDER.brawlWindow} lượt, ${lost(avenger)} người ${avenger.name} đã chết`, say);
-      avenger.lastEvents.push(`Máu đổ ở biên giới quá nhiều lần (${recent.length} vụ xô xát, ${lost(avenger)} người ta chết): dân đòi báo thù, ${avenger.name} tuyên chiến với ${foe.name} (có chính nghĩa). Muốn dừng: ký hòa bình (treaty peace).`);
+      startWar(world, avenger, foe, tick, `${recent.length} vụ xô xát biên giới trong ${BORDER.brawlWindow} lượt (${lost(a)} người ${a.name}, ${lost(b)} người ${b.name} đã chết)`, say);
+      const war = world.wars.at(-1)!; war.brawlDead = { [a.id]: lost(a), [b.id]: lost(b) };
+      avenger.lastEvents.push(`Máu đổ ở biên giới quá nhiều lần (${recent.length} vụ xô xát, ${lost(avenger)} người ta chết): ta mạnh hơn, dân đòi ra tay, ${avenger.name} tuyên chiến với ${foe.name} (có chính nghĩa). Muốn dừng: ký hòa bình (treaty peace).`);
       st.brawls = [];
     }
     // A dispute: both sides may fight with a just cause, and both peoples are uneasy

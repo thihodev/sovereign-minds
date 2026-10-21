@@ -788,9 +788,12 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   for (const n of alive) {
     if (!n.alive) continue;
     if (n.population <= 0) {
-      n.population = 0; n.alive = false; n.status = "dead";
+      // why: the last turn's deaths and departures, the largest first
+      const book = n.demo ?? ({} as { died?: Record<string, number>; left?: number });
+      const why = Object.entries({ ...(book.died ?? {}), ...(book.left ? { migrate: book.left } : {}) }).filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([c, k]) => `${k} ${CAUSE_WORD[c] ?? c}`).join(", ");
+      n.population = 0; n.alive = false; n.status = "dead"; n.fate = { tick: world.tick, cause: "perished", why };
       for (const t of world.tiles) if (t.owner === n.id) t.owner = -1;
-      say(n.id, "fall", `${n.name} diệt vong.`);
+      say(n.id, "fall", `${n.name} diệt vong${why ? ` (lượt cuối: ${why})` : ""}.`);
       continue;
     }
     const caps = mods(world, n).caps;
@@ -1505,6 +1508,7 @@ const ENGINE_ACTIONS = new Set([
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
+const CAUSE_WORD: Record<string, string> = { famine: "chết đói", winter: "chết rét", plague: "chết dịch", disaster: "chết vì thiên tai", beasts: "bị thú dữ giết", raid: "bị man di giết", war: "tử trận", brawl: "chết vì xô xát", migrate: "bỏ đi", any: "qua đời" };
 /** §2.3 Land beyond the limit: the poorest, farthest empty tiles go wild, a few a turn. */
 function releaseOver(world: World, n: Nation, over: number): void {
   const centres = [n.capital, ...n.settlements.map(s => s.tile)];

@@ -180,10 +180,19 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           };
         };
         const A = side(x.a), B = side(x.b);
+        // how it ended: a fall to the enemy, a fall elsewhere, a people that perished on its own, or a peace
+        const fell = (loser: typeof A, foe: typeof A) => {
+          const f = w.nations[loser.id]?.fate;
+          if (!f) return `${loser.name} diệt vong`;
+          if (f.by === foe.id) return f.cause === "reunited" ? `${loser.name} nhập lại vào ${foe.name}` : `${loser.name} bị ${foe.name} tiêu diệt`;
+          if (f.by !== undefined) return `${loser.name} bị ${w.nations[f.by]?.name ?? "nước khác"} tiêu diệt (ngoài cuộc chiến này)`;
+          return `${loser.name} tự sụp đổ${f.why ? ` (${f.why})` : ""}, không phải do giao tranh`;
+        };
         const outcome = x.end === null ? "đang diễn ra"
-          : !A.alive && B.alive ? `${A.name} diệt vong` : !B.alive && A.alive ? `${B.name} diệt vong`
+          : !A.alive && B.alive ? fell(A, B) : !B.alive && A.alive ? fell(B, A)
           : w.treaties.some(t => t.type === "peace" && ((t.a === x.a && t.b === x.b) || (t.a === x.b && t.b === x.a)) && Math.abs(t.start - x.end!) <= 1) ? "kết thúc bằng hòa ước" : "đã dừng";
-        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: bs.length, a: A, b: B, lastTile: bs.at(-1)?.tile ?? null };
+        const brawl = x.brawlDead ? { a: x.brawlDead[String(x.a)] ?? 0, b: x.brawlDead[String(x.b)] ?? 0 } : null;
+        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: bs.length, a: A, b: B, brawl, lastTile: bs.at(-1)?.tile ?? null };
       }),
       caravans: w.caravans,
       borders: w.borders ?? {},
