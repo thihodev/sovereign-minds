@@ -558,6 +558,7 @@ export function resolveBattles(ctx: DiploCtx): void {
 
 /** Take a tile. A capital or settlement falls only when the attacker holds WAR.centreFallsAt of its land neighbours. */
 function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say, L: Ledger): string {
+  let fallen: Record<string, number> | null = null; // §7.4 the whole of a fallen nation's stores
   const centres = [D.capital, ...D.settlements.map(s => s.tile)];
   loseLand(world, A, D, tile);
   if (centres.includes(tile)) {
@@ -578,14 +579,14 @@ function captureTile(world: World, A: Nation, D: Nation, tile: number, say: Say,
         D.alive = false; D.status = "dead"; D.population = 0;
         say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} trở về với ${A.name}: đất, dân và kho nhập lại như xưa.`);
       } else {
-        fallTo(world, A, D, L, say);
+        fallen = fallTo(world, A, D, L, say);
       }
     } else {
       D.settlements = D.settlements.filter(s => s.tile !== tile);
       say(D.id, "fall", `${A.name} chiếm điểm định cư của ${D.name}.`);
     }
     moveBuildings(D, A, tile);
-    return "chiếm được trung tâm";
+    return fallen && Object.keys(fallen).length ? `chiếm được trung tâm, thu ${fmtGoods(world, fallen)}` : "chiếm được trung tâm";
   }
   world.tiles[tile].owner = A.id;
   moveBuildings(D, A, tile);
@@ -628,7 +629,7 @@ export function betrayalPhase(world: World, say: Say): void {
 }
 
 /** §7.4 A nation falls to another: its people live on (a fifth flee), its land, buildings and stores pass to the victor. */
-export function fallTo(world: World, A: Nation, D: Nation, L: Ledger, say: Say): void {
+export function fallTo(world: World, A: Nation, D: Nation, L: Ledger, say: Say): Record<string, number> {
   const flee = Math.floor(D.population * WAR.fallFlee);
   const refuge = D.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded && o.id !== A.id && o.id !== D.id).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
   let fled = 0;
@@ -637,11 +638,13 @@ export function fallTo(world: World, A: Nation, D: Nation, L: Ledger, say: Say):
   if (stay > 0) addPeople(A, takePeople(D, stay, "migrate"));
   let land = 0;
   for (const t of world.tiles) if (t.owner === D.id) { t.owner = A.id; moveBuildings(D, A, t.i); land++; }
-  for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "loot"); L.stock(A, g, q, "loot"); }
+  const got: Record<string, number> = {};
+  for (const [g, q] of Object.entries(D.stock)) if (q > 0) { L.stock(D, g, -q, "loot"); L.stock(A, g, q, "loot"); got[g] = q; }
   D.alive = false; D.status = "dead"; D.population = 0;
   A.stability = Math.max(0, A.stability - WAR.fallStability);
   A.lastEvents.push(`${D.name} sụp đổ: ${stay} người của họ trở thành dân ta, ${land} ô đất và kho của họ về tay ta. Dân mới chưa phục (−${WAR.fallStability} ổn định).`);
   say(D.id, "fall", `Thủ đô ${D.capitalName} thất thủ. ${D.name} diệt vong dưới tay ${A.name}: ${stay} người sống dưới quyền ${A.name}${fled ? `, ${fled} người chạy sang ${refuge!.name}` : ""}.`);
+  return got;
 }
 function moveBuildings(from: Nation, to: Nation, tile: number): void {
   const taken = from.buildings.filter(b => b.tile === tile);

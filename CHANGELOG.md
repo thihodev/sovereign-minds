@@ -9,6 +9,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - giờ 1/5 chạy nạn sang nước yên ổn nhất mà họ quen, số còn lại thành dân của nước thắng;
   - đất, công trình và kho còn lại về tay nước thắng; nước thắng −3 ổn định;
   - AI của nước sụp đổ không còn được gọi.
+  - **0.22.1:** ghi chú trận đánh báo đúng phần kho thu được khi một nước sụp đổ (bản 0.22.0 lỡ push kèm một test hỏng vì chỗ này).
 
 ## v0.21
 
