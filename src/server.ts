@@ -123,6 +123,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       ministerRequests: (w.ministerRequests ?? []).map(x => ({ ...x, nationName: w.nations[x.nation]?.name, title: MINISTER_DOMAINS[x.domain]?.title ?? x.domain, desc: MINISTER_DOMAINS[x.domain]?.desc ?? "", populationNow: w.nations[x.nation]?.population ?? 0, seats: ministerSeats(w.nations[x.nation]?.population ?? 0), waitLeft: x.status === "pending" ? Math.max(0, MINISTERS.waitTicks - (w.tick - x.tick)) : 0 })),
       claudeModels: CLAUDE_MODELS, claudeEfforts: CLAUDE_EFFORTS,
       decrees: w.decrees,
+      renameDecree: w.renameDecree ? { code: w.renameDecree.code, from: w.renameDecree.from, until: w.renameDecree.until, done: !!w.renameDecree.done } : null,
       laws: lawTable(w),
       registry: w.registry,
       proposals: w.proposals.slice(-60).map(p => ({ ...p, inventionName: p.inventionId ? invName(w, p.inventionId) : undefined })),
@@ -264,7 +265,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       }
       if (path === "/api/decrees" && method === "POST") {
         const b = await readBody(req);
-        const err = runner.addDecree(String(b.kind ?? "luật"), String(b.text ?? ""), b.fromPetition ? Number(b.fromPetition) : null);
+        // §10.6 a decree that orders new names is a renaming decree whatever kind the Watcher picked; "trong N lượt" sets its length
+        const text = String(b.text ?? ""), within = /trong\s+(\d+)\s+lượt/i.exec(text);
+        const err = String(b.kind) === "đổi tên" || /đổi\s+tên|rename/i.test(text)
+          ? runner.addRenameDecree(text, Number(b.turns) || (within ? Number(within[1]) : NaN), b.fromPetition ? Number(b.fromPetition) : null)
+          : runner.addDecree(String(b.kind ?? "luật"), String(b.text ?? ""), b.fromPetition ? Number(b.fromPetition) : null);
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
 

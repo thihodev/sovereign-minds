@@ -21,7 +21,7 @@ import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -218,6 +218,9 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const turns = Math.min(2, Math.max(0, ...sick.map(x => x.until - tick + 1)));
     if (turns >= 1 && spend("quarantine", { turns })) shut = true;
   }
+
+  // 0c. §10.6 a renaming decree of the gods: obey it with a new name for the capital
+  if (n.founded && renameDecreed(world) && !unrenamed(world, n).changed) spend("rename", { what: "capital", name: `Tân ${n.capitalName}`.slice(0, 30) });
 
   // 1. Research
   if (n.founded && !n.research) {

@@ -1612,7 +1612,7 @@
     }
   }
   function renderDecrees() {
-    $("#decrees").innerHTML = S.decrees.slice().reverse().map(d => `<li><b>${esc(d.code)}</b> · lượt ${d.tick}${d.effectiveTick > S.tick ? ` · hiệu lực từ lượt ${d.effectiveTick}` : ""} · ${d.law ? "<b>luật</b>" : esc(d.kind)}<br>${esc(d.text)}</li>`).join("") || `<li class="note">Chưa có Sắc lệnh.</li>`;
+    $("#decrees").innerHTML = S.decrees.slice().reverse().map(d => `<li><b>${esc(d.code)}</b> · lượt ${d.tick}${d.effectiveTick > S.tick ? ` · hiệu lực từ lượt ${d.effectiveTick}` : ""} · ${d.law ? "<b>luật</b>" : esc(d.kind)}${S.renameDecree?.code === d.code ? ` · ${S.renameDecree.done ? "đã hết hạn" : `đổi tên đến hết lượt ${S.renameDecree.until}`}` : ""}<br>${esc(d.text)}</li>`).join("") || `<li class="note">Chưa có Sắc lệnh.</li>`;
     setCount("decrees", "issued", S.decrees.length);
     renderLaws();
   }
@@ -1644,9 +1644,10 @@
     catch (err) { $("#law-msg").textContent = err.message; }
   };
   function alertMsg(m) { $("#decree-msg").textContent = m; }
+  $("#decree-kind").onchange = () => { $("#decree-turns-row").hidden = $("#decree-kind").value !== "đổi tên"; };
   $("#decree-form").onsubmit = async e => {
     e.preventDefault();
-    try { await api("/api/decrees", { method: "POST", body: { kind: $("#decree-kind").value, text: $("#decree-text").value, fromPetition: $("#decree-from").value || null } }); $("#decree-text").value = ""; $("#decree-from").value = ""; alertMsg("Đã ban Sắc lệnh."); refresh(); }
+    try { await api("/api/decrees", { method: "POST", body: { kind: $("#decree-kind").value, text: $("#decree-text").value, turns: $("#decree-kind").value === "đổi tên" ? Number($("#decree-turns").value) : null, fromPetition: $("#decree-from").value || null } }); $("#decree-text").value = ""; $("#decree-from").value = ""; alertMsg("Đã ban Sắc lệnh."); refresh(); }
     catch (err) { alertMsg(err.message); }
   };
 

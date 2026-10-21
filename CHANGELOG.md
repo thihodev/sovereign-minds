@@ -2,7 +2,16 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.15 (đang làm)
+## v0.16 (đang làm)
+
+- **Sắc lệnh đổi tên có hiệu lực (§10.6).** Trước đây sắc lệnh văn bản như "đổi mọi tên sang tiếng Việt" chỉ được báo cho AI, rồi bị quên.
+  - Loại sắc lệnh mới **Đổi tên**, có thời hạn (mặc định 10 lượt). Sắc lệnh văn bản có chữ "đổi tên" cũng tự thành loại này, và "trong N lượt" đặt thời hạn.
+  - Trong thời hạn, `rename_nation` miễn phí cho mọi nước, đổi được cả dân tộc và thủ đô. Lệnh mới `rename` đổi tên thủ đô, điểm định cư hay quan chức.
+  - Mỗi lượt, AI thấy `gods_rename_order` với danh sách tên chưa đổi, và lời cố vấn nhắc khẩn.
+  - Hết hạn mà chưa đổi tên nào: −10 uy tín, −5 ổn định. Bot tuân lệnh bằng cách đổi tên thủ đô.
+  - Mọi sắc lệnh văn bản được nhắc lại trong lời cố vấn 10 lượt sau khi có hiệu lực.
+
+## v0.15
 
 - **Bộ trưởng AI cho nước lớn (§4.9):** một quốc gia được thêm một "trí tuệ" (một model AI) quản một lĩnh vực:
   - **Mốc:** 1 bộ trưởng ở 500 dân, 2 ở 1.000, 3 ở 2.000, 4 ở 4.000. Dân tụt dưới 90% mốc thì bộ trưởng mới nhất rời ghế.

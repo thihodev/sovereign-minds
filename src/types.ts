@@ -406,6 +406,9 @@ export interface World {
   nextId: number;
   /** Ticks each owned tile has been cut off from every centre (§2.3). */
   cutoff: Record<string, number>;
+  /** §10.6 a renaming decree in force: until when, what the gods asked, and every name as it was when it was given */
+  renameDecree?: { code: string; from: number; until: number; text: string; done?: boolean;
+    names: Record<string, { nation: string; capital: string; people: string; places: Record<string, string>; officials: Record<string, string> }> };
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
   borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it

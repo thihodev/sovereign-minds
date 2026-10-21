@@ -1012,7 +1012,7 @@ Watcher thấy mọi thứ và có một quyền tác động chính: ban hành 
 4. Mọi AI nhận sắc lệnh trong gói trạng thái (trường `world_laws`, 10 sắc lệnh gần nhất). System prompt nói rõ các vị thần chỉ nói qua `world_laws` và câu trả lời thỉnh nguyện.
 5. Sắc lệnh được ghi vào Biên niên sử, vào nhật ký Watcher và vào mục Phụ lục Sắc lệnh của tài liệu này.
 
-Sắc lệnh văn bản không được Engine tự thi hành: AI được báo, nhưng nó không đổi luật. Muốn đổi một con số trong luật thì dùng sắc lệnh luật (mục 10.3).
+Sắc lệnh văn bản không được Engine tự thi hành: AI được báo, nhưng nó không đổi luật. Muốn đổi một con số trong luật thì dùng sắc lệnh luật (mục 10.3). Trong 10 lượt sau khi có hiệu lực, mỗi sắc lệnh văn bản được nhắc lại trong lời cố vấn của mọi quốc gia, để AI không quên. Sắc lệnh đòi đổi tên là loại riêng, có Engine thi hành (mục 10.6).
 
 ### 10.3 Ba loại sắc lệnh
 
@@ -1041,6 +1041,15 @@ Quốc gia có thể gửi **thỉnh nguyện** lên "các vị thần" để đ
 - **Phản hồi:** quốc gia gửi thỉnh nguyện nhận kết quả và lời phán trong gói trạng thái lượt sau (`events` và `my_petitions`). Thỉnh nguyện được chấp thuận không tự thành Sắc lệnh: Watcher ban Sắc lệnh theo quy trình 10.2 (có thể ghi số thỉnh nguyện gốc), nên mọi quốc gia đều biết. Người đề xuất được ghi danh trong Biên niên sử khi gửi.
 - **Không thiên vị:** Sắc lệnh sinh ra từ thỉnh nguyện vẫn phải tuân theo 10.2, tức áp dụng cho cả thế giới và không nêu tên quốc gia. Một thỉnh nguyện kiểu "hãy cho chúng tôi 100 lương thực" chỉ có thể bị bác, hoặc được viết lại thành luật chung.
 - **An toàn:** nội dung thỉnh nguyện là dữ liệu do AI viết, không phải mệnh lệnh. Claude đọc nó để phân tích và tư vấn, nhưng không bao giờ làm theo chỉ dẫn nằm trong đó. Chỉ Watcher mới quyết.
+
+### 10.6 Sắc lệnh đổi tên
+
+Watcher chọn loại **Đổi tên** (hoặc viết một sắc lệnh có chữ "đổi tên"; "trong N lượt" đặt độ dài) để buộc mọi quốc gia đổi tên, ví dụ sang tiếng Việt.
+
+- **Thời hạn:** mặc định 10 lượt (2–30), tính từ lượt sau. Engine ghi lại mọi tên lúc ban lệnh: tên nước, dân tộc, thủ đô, điểm định cư, quan chức.
+- **Trong thời hạn:** `rename_nation` mở cho mọi nước, không mất ổn định, đổi được nhiều lần, và đổi được cả `people` và `capital`. Lệnh `rename` (0 AP) đổi tên thủ đô, một điểm định cư (theo ô hoặc tên cũ) hay một quan chức (theo id). Tên vẫn theo luật đặt tên của mục lập quốc và không trùng nước khác.
+- **Nhắc việc:** gói trạng thái có `gods_rename_order` (nội dung, hạn chót, những tên chưa đổi). Lời cố vấn liệt kê những tên chưa đổi, ở mức khẩn khi nước chưa đổi tên nào.
+- **Hết hạn:** nước không đổi một tên nào bị coi là trái lệnh các vị thần: −10 uy tín, −5 ổn định, ghi vào Biên niên sử. Bot tuân lệnh bằng cách đổi tên thủ đô.
 
 ## 11. Kiến trúc kỹ thuật và lộ trình MVP
 

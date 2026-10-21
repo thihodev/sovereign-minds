@@ -15,7 +15,7 @@ import { JUDGE_SYSTEM, JUDGE_SYSTEM_BATCH, judgeBatchPrompt, judgeUserPrompt, pa
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
-import { DEMO, SCHISM, TRAITS, TRAIT_BY_ID } from "./rules.ts";
+import { DEMO, RENAME_DECREE, SCHISM, TRAITS, TRAIT_BY_ID } from "./rules.ts";
 import { historianFromEnv, type Historian, type HistoryChapter } from "./historian.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus, killAllClaude } from "./claude.ts";
 import type { Store } from "./db.ts";
@@ -583,6 +583,17 @@ export class Runner {
     this.store.logWatcher(this.world.tick, "law", d);
     this.store.saveState(this.world);
     this.emit({ type: "status" });
+    return null;
+  }
+
+  /** §10.6 A renaming decree: every nation may rename itself and its places for free for `turns` turns. */
+  addRenameDecree(text: string, turns: number, fromPetition: number | null): string | null {
+    const err = this.addDecree("đổi tên", text, fromPetition); if (err) return err;
+    const w = this.world, d = w.decrees.at(-1)!, t = Math.max(2, Math.min(30, Math.floor(turns) || RENAME_DECREE.turns));
+    w.renameDecree = { code: d.code, from: d.effectiveTick, until: d.effectiveTick + t - 1, text: d.text, names: Object.fromEntries(w.nations.filter(n => n.alive && n.founded).map(n => [String(n.id), {
+      nation: n.name, capital: n.capitalName, people: n.people,
+      places: Object.fromEntries(n.settlements.map(s => [String(s.tile), s.name])), officials: Object.fromEntries((n.officials ?? []).map(o => [String(o.id), o.name])) }])) };
+    this.store.saveState(w);
     return null;
   }
 

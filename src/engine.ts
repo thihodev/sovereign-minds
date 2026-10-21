@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -434,7 +434,10 @@ function validateFlag(world: World, n: Nation, raw: unknown): string | null {
 }
 
 /** §2.2: a nation may rename once within RENAME.windowTicks ticks after it entered a new era. */
+/** §10.6 A renaming decree of the gods is in force. */
+export function renameDecreed(world: World): boolean { const d = world.renameDecree; return !!d && !d.done && world.tick >= d.from && world.tick <= d.until; }
 export function renameOpen(world: World, n: Nation): boolean {
+  if (renameDecreed(world)) return true;
   if (n.eraTick === null || world.tick - n.eraTick > RENAME.windowTicks) return false;
   return n.renameTick === null || n.renameTick <= n.eraTick;
 }
@@ -502,6 +505,20 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
     n.lastRejected.push({ action: "labor", reason: `Chỉ có ${pool} người có thể ra trận (${DEMO.fighters[n.family?.fighters ?? "all"]}); ${n.labor.warrior - pool} chiến binh về hái lượm` });
     n.labor.gather += n.labor.warrior - pool; n.labor.warrior = pool;
   }
+}
+
+/** §10.6 Which of a nation's names are still as they were when the renaming decree was given. */
+export function unrenamed(world: World, n: Nation): { changed: boolean; left: string[] } {
+  const was = world.renameDecree?.names[String(n.id)];
+  if (!was) return { changed: true, left: [] };
+  const left: string[] = [];
+  if (n.name === was.nation) left.push(`tên nước ${n.name}`);
+  if (n.people === was.people) left.push(`dân tộc ${n.people}`);
+  if (n.capitalName === was.capital) left.push(`thủ đô ${n.capitalName}`);
+  for (const st of n.settlements) if (was.places[String(st.tile)] === st.name) left.push(`điểm định cư ${st.name}`);
+  for (const o of n.officials ?? []) if (was.officials[String(o.id)] === o.name) left.push(`quan ${o.name}`);
+  const total = 3 + n.settlements.length + (n.officials ?? []).length;
+  return { changed: left.length < total, left };
 }
 
 /** An order in a few words, for the nation's record of its own turns (§8.2). */
@@ -761,6 +778,19 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
 
+  // §10.6 a renaming decree ends: those that changed none of their names defied the gods
+  const rd = world.renameDecree;
+  if (rd && !rd.done && tick >= rd.until) {
+    rd.done = true;
+    for (const n of world.nations) {
+      if (!n.alive || !n.founded) continue;
+      const left = unrenamed(world, n);
+      if (left.changed) continue;
+      n.reputation = Math.max(0, n.reputation - RENAME_DECREE.reputation); n.stability = Math.max(0, n.stability - RENAME_DECREE.stability);
+      n.lastEvents.push(`Không đổi tên nào theo sắc lệnh ${rd.code} của các vị thần: −${RENAME_DECREE.reputation} uy tín, −${RENAME_DECREE.stability} ổn định.`);
+      say(n.id, "decree", `${n.name} trái lệnh ${rd.code} của các vị thần.`);
+    }
+  }
   writeAnnals(world, chronicle); // §8.2 each nation's story, chapter by chapter
   world.tick++;
   return { chronicle, audit: L.audit(world), fx: fxEnd() };
@@ -1398,7 +1428,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1784,19 +1814,44 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         return n.eraTick !== null && world.tick - n.eraTick <= RENAME.windowTicks ? "Đã đổi tên hay đổi cờ một lần từ khi vào kỷ nguyên này"
           : `Chỉ được đổi tên hay đổi cờ trong ${RENAME.windowTicks} lượt sau khi bước vào kỷ nguyên mới`;
       }
-      const name = a.name == null ? null : String(a.name).trim(), flag = a.flag ?? null;
-      if (name === null && flag === null) return "Cần name hoặc flag mới";
-      if (name !== null) {
+      const name = a.name == null ? null : String(a.name).trim(), flag = a.flag ?? null, decreed = renameDecreed(world);
+      const capital = decreed && a.capital != null ? String(a.capital).trim() : null, people = decreed && a.people != null ? String(a.people).trim() : null;
+      if (name === null && flag === null && capital === null && people === null) return "Cần name, flag (hoặc capital, people khi có sắc lệnh đổi tên)";
+      for (const [label, v] of [["Tên thủ đô", capital], ["Tên dân tộc", people]] as const) if (v !== null) { const err = validateName(label, v); if (err) return err; }
+      for (const o of world.nations) if (o.id !== n.id && o.founded && ((capital !== null && normName(o.capitalName) === normName(capital)) || (people !== null && normName(o.people) === normName(people)))) return "Tên thủ đô hoặc dân tộc này đã có nước khác dùng";
+      if (name !== null && !(decreed && normName(name) === normName(n.name))) {
         const err = validateName("Tên quốc gia", name) ?? nameTaken(world, n, name); if (err) return err;
         if (normName(name) === normName(n.name)) return "Tên mới trùng tên hiện tại";
       }
       if (flag !== null) { const err = validateFlag(world, n, flag); if (err) return err; }
       const old = n.name;
-      n.stability = Math.max(0, n.stability - RENAME.stability);
-      n.renameTick = world.tick;
-      if (name !== null) { n.formerNames.push(old); n.name = name; }
+      if (!decreed) { n.stability = Math.max(0, n.stability - RENAME.stability); n.renameTick = world.tick; } // §10.6 free under the gods' decree
+      if (name !== null && normName(name) !== normName(n.name)) { n.formerNames.push(old); n.name = name; }
       if (flag !== null) n.flag = toFlag(flag);
-      say(n.id, "rename", name !== null ? `${old} đổi tên thành ${n.name}${flag !== null ? " và đổi cờ" : ""}.` : `${n.name} đổi cờ mới.`);
+      if (capital !== null) n.capitalName = capital;
+      if (people !== null) n.people = people;
+      const also = [capital !== null ? `thủ đô ${capital}` : "", people !== null ? `dân tộc ${people}` : "", flag !== null ? "cờ mới" : ""].filter(Boolean).join(", ");
+      say(n.id, "rename", n.name !== old ? `${old} đổi tên thành ${n.name}${also ? ` (${also})` : ""}.` : `${n.name} đổi ${also}.`);
+      return null;
+    }
+    case "rename": {
+      // §10.6 rename a place or an official: the capital, a settlement, an official
+      const name = String(a.name ?? "").trim(), what = String(a.what ?? "");
+      const err = validateName("Tên mới", name); if (err) return err;
+      if (what === "capital") {
+        if (world.nations.some(o => o.id !== n.id && o.founded && normName(o.capitalName) === normName(name))) return `Tên thủ đô "${name}" đã bị dùng`;
+        n.capitalName = name;
+      }
+      else if (what === "settlement") {
+        const tile = parseTile(a.tile), st = n.settlements.find(x => x.tile === tile || x.name === String(a.old ?? ""));
+        if (!st) return "Không có điểm định cư này (tile [cột, hàng] hoặc old: tên cũ)";
+        st.name = name;
+      } else if (what === "official") {
+        const o = (n.officials ?? []).find(x => x.id === Math.floor(num(a.official)));
+        if (!o) return "Không có quan chức này (official: id)";
+        o.name = name;
+      } else return `what phải là capital, settlement hoặc official (đổi tên nước, dân tộc dùng rename_nation${renameDecreed(world) ? ", miễn phí khi có sắc lệnh đổi tên" : ""})`;
+      n.lastEvents.push(`Đổi tên ${what === "capital" ? "thủ đô" : what === "settlement" ? "điểm định cư" : "quan chức"} thành ${name}.`);
       return null;
     }
     case "petition": {

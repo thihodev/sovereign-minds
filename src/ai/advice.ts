@@ -3,10 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
+import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, neighbours } from "../border.ts";
@@ -27,6 +27,15 @@ export function advice(world: World, n: Nation): Advice[] {
   const out: Advice[] = [], m = mods(world, n), owned = ownedTiles(world, n.id);
   const need = mouths(n) * m.foodPerPerson, food = n.stock.food || 0, roof = housing(world, n), hp = housingParts(world, n);
   const say = (level: number, text: string) => out.push({ level, text });
+
+  // §10.6 the gods' decrees: a renaming decree in force, and what the gods said lately
+  const rd = world.renameDecree;
+  if (rd && !rd.done && world.tick >= rd.from && world.tick <= rd.until) {
+    const { changed, left } = unrenamed(world, n);
+    const how = `rename_nation (name, people, capital, flag) và rename (what: capital|settlement|official), đều miễn phí, không mất ổn định`;
+    say(changed ? 2 : 3, `Sắc lệnh ${rd.code} của các vị thần: "${rd.text}". Còn ${rd.until - world.tick + 1} lượt (hết lượt ${rd.until}).${left.length ? ` Chưa đổi: ${left.slice(0, 8).join(", ")}${left.length > 8 ? ` và ${left.length - 8} tên nữa` : ""}.` : " Đã đổi hết."} Dùng ${how}.${changed ? "" : ` Không đổi tên nào: −${RENAME_DECREE.reputation} uy tín, −${RENAME_DECREE.stability} ổn định.`}`);
+  }
+  for (const d of world.decrees) if (d.code !== rd?.code && d.effectiveTick <= world.tick && world.tick - d.effectiveTick < 10) say(2, `Sắc lệnh ${d.code} của các vị thần (lượt ${d.effectiveTick}): "${d.text}". Hãy làm theo bằng các lệnh của bạn.`);
 
   // §4.8 people who left: the ruler's first duty
   const ex = exodusOf(n, world.tick);

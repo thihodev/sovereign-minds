@@ -234,7 +234,10 @@
             <option value="luật">Luật mới</option>
             <option value="thế giới">Thay đổi thế giới</option>
             <option value="lời phán">Lời phán</option>
+            <option value="đổi tên">Đổi tên (bắt buộc, có hạn)</option>
           </select>
+          <div id="decree-turns-row" hidden><label for="decree-turns">Số lượt để đổi tên</label>
+            <input id="decree-turns" type="number" min="2" max="30" value="10"></div>
           <label for="decree-text">Nội dung (áp dụng cho cả thế giới, không nêu tên quốc gia)</label>
           <textarea id="decree-text" rows="4" maxlength="1000" placeholder="Ví dụ: Các vị thần không hạ ngưỡng 50 dân; hãy mở rộng đất để có chỗ ở."></textarea>
           <input type="hidden" id="decree-from">
