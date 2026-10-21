@@ -14,6 +14,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - luật nói rõ phần thưởng trí tuệ;
   - lời cố vấn nhắc ở mức quan trọng, cứ 5 lượt một lần, với nước 30 lượt chưa đề xuất.
 - Tab Triều đình đánh dấu trí tuệ thưởng sáng kiến và lượt nó rời đi.
+- **0.35.1:** duyệt sáng kiến ngay trong **Sổ sáng kiến**: nút Chấp thuận / Một phần / Bác bỏ và ô lời phán, kèm lĩnh vực trí tuệ nước đó xin. Lời giải thích phần thưởng ở Hộp thư nhắc tới trí tuệ AI.
 
 ## v0.34
 

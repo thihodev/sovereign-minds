@@ -1997,10 +1997,17 @@
       <div class="row"><b>${esc(p.title)}</b><span class="pill">${esc(p.kind || "khác")}</span><span style="flex:1"></span><span class="pill ${cls}">${esc(st)}</span></div>
       <div class="meta">#${p.id} · ${esc(S.nations[p.nation]?.name ?? "?")} · lượt ${p.tick}${p.implemented ? ` · đưa vào game lượt ${p.implemented}${p.implementedNote ? `: ${esc(p.implementedNote)}` : ""}` : ""}</div>
       <div class="body">${esc(p.text)}</div><div class="meta">Lý do: ${esc(p.reason || "—")}${p.verdict ? ` · Lời phán: ${esc(p.verdict)}` : ""}</div>
+      ${p.status === "pending" ? `<textarea rows="2" placeholder="Lời phán của các vị thần (gửi lại cho quốc gia này)" data-verdict="${p.id}"></textarea>
+      <p class="note">Chấp thuận: nước gửi được một trí tuệ AI (bộ trưởng) trong 10 lượt, +10 uy tín, +5 ổn định, nghiên cứu +25%. Một phần: trí tuệ 5 lượt, +5, +2, +10%. Thưởng một lần.${p.mind ? ` Trí tuệ họ xin: ${esc(p.mind)}.` : ""}</p>
+      <div class="row"><button type="button" class="primary" data-decide="${p.id}" data-s="accepted">Chấp thuận</button><button type="button" data-decide="${p.id}" data-s="partial">Một phần</button><button type="button" data-decide="${p.id}" data-s="rejected">Bác bỏ</button></div>` : ""}
       ${(p.status === "accepted" || p.status === "partial") && !p.implemented ? `<div class="row"><input type="text" placeholder="Ghi chú (ví dụ: bản 0.30)" data-note="${p.id}"><button type="button" class="primary" data-built="${p.id}">✅ Đã đưa vào game</button></div>` : ""}
       ${p.implemented && !p.honoured ? `<div class="row"><button type="button" data-unbuilt="${p.id}">Hoàn tác</button><span class="meta">nước gửi sẽ được vinh danh ở lượt sau</span></div>` : ""}
-    </article>`; }).join("") : `<p class="note">Chưa có sáng kiến nào. Các AI được nhắc gửi sáng kiến (thỉnh nguyện loại "sáng kiến") và được thưởng khi bạn chấp thuận.</p>`;
+    </article>`; }).join("") : `<p class="note">Chưa có sáng kiến nào. Các AI được nhắc gửi sáng kiến (thỉnh nguyện loại "sáng kiến", miễn phí) và được thưởng một trí tuệ AI khi bạn chấp thuận.</p>`;
     for (const b of document.querySelectorAll("#ideas [data-built]")) b.onclick = async () => { const note = document.querySelector(`#ideas [data-note="${b.dataset.built}"]`)?.value || ""; await api(`/api/petitions/${b.dataset.built}/implemented`, { method: "POST", body: { done: true, note } }).catch(e => alertMsg(e.message)); refresh(); };
+    for (const b of document.querySelectorAll("#ideas [data-decide]")) b.onclick = async () => {
+      const verdict = document.querySelector(`#ideas [data-verdict="${b.dataset.decide}"]`)?.value || "";
+      await api(`/api/petitions/${b.dataset.decide}`, { method: "POST", body: { status: b.dataset.s, verdict } }).catch(e => alertMsg(e.message)); refresh();
+    };
     for (const b of document.querySelectorAll("#ideas [data-unbuilt]")) b.onclick = async () => { await api(`/api/petitions/${b.dataset.unbuilt}/implemented`, { method: "POST", body: { done: false } }).catch(e => alertMsg(e.message)); refresh(); };
   }
   $("#ideas-export").onclick = () => {
@@ -2024,7 +2031,7 @@
         <div class="meta">#${p.id} · ${esc(n?.name)} · lượt ${p.tick} · loại ${esc(p.category)} · lúc gửi: ${p.context.population} dân, ${p.context.food} lương thực, ổn định ${p.context.stability}, ${p.context.tiles} ô</div>
         <div class="body"></div><div class="meta reason"></div>
         ${p.status === "pending" ? `<textarea rows="2" placeholder="Lời phán của các vị thần (gửi lại cho quốc gia này)"></textarea>
-        <p class="note">Chấp thuận: nước gửi được +10 uy tín, +5 ổn định, nghiên cứu đang làm +25%. Một phần: +5, +2, +10%. Thưởng một lần.</p>
+        <p class="note">${p.category === "sáng kiến" ? "Chấp thuận: nước gửi được một trí tuệ AI (bộ trưởng) trong 10 lượt, +10 uy tín, +5 ổn định, nghiên cứu +25%. Một phần: trí tuệ 5 lượt, +5, +2, +10%. Thưởng một lần." : "Chấp thuận: nước gửi được +10 uy tín, +5 ổn định, nghiên cứu đang làm +25%. Một phần: +5, +2, +10%. Thưởng một lần."}</p>
         <div class="row"><button data-s="accepted" class="primary">Chấp thuận</button><button data-s="partial">Một phần</button><button data-s="rejected">Bác bỏ</button><button data-act="decree">Soạn Sắc lệnh</button><button data-act="ask">Hỏi Claude</button></div>`
         : `<div class="meta">Lời phán: ${esc(p.verdict || "—")}</div>`}`;
       el.querySelector("h3").textContent = p.title;
