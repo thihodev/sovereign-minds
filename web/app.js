@@ -606,7 +606,7 @@
   function roadTree(hubs) {
     const key = S.tick + ":" + S.roads.length + ":" + hubs.size;
     if (treeMemo?.key === key) return treeMemo;
-    const parent = new Map(), links = [], road = i => i >= 0 && (S.roads[i] || 0) > 0;
+    const parent = new Map(), links = [], loose = new Set(), road = i => i >= 0 && (S.roads[i] || 0) > 0;
     S.roads.forEach((lv, start) => {
       if (!lv || parent.has(start)) return;
       // the cluster, one kind of tile
@@ -620,8 +620,9 @@
       const queue = [root];
       for (let q = 0; q < queue.length; q++) for (const j of NB(queue[q])) if (seen.has(j) && !parent.has(j)) { parent.set(j, queue[q]); queue.push(j); }
       for (const [h, i] of touching) links.push([i, h]);
+      if (!touching.size) for (const i of cluster) loose.add(i); // a road no centre uses any more
     });
-    treeMemo = { key, parent, links };
+    treeMemo = { key, parent, links, loose };
     return treeMemo;
   }
   function drawRoads(g, vis, s, z, px) {
@@ -629,8 +630,8 @@
     const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
     // a road network drawn as branches from the centres, not as a mesh of every touching pair
     // roads on land no one holds any more (abandoned, gone wild) are drawn faint
-    const segs = { land: [[], [], [], []], wild: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links } = roadTree(hubs);
-    const kind = (i, j) => isWater(i) ? "sea" : S.owners[i] < 0 && S.owners[j] < 0 ? "wild" : "land";
+    const segs = { land: [[], [], [], []], wild: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links, loose } = roadTree(hubs);
+    const kind = (i, j) => isWater(i) ? "sea" : loose.has(i) && S.owners[i] < 0 && S.owners[j] < 0 ? "wild" : "land";
     S.roads.forEach((lv, i) => {
       if (!lv || !vis(i)) return;
       const water = isWater(i), j = parent.get(i);
@@ -2257,7 +2258,7 @@
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
       `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>` +
       `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>` +
-      `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (trên đất vô chủ)</span>`;
+      `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (đất vô chủ, không nối trung tâm nào; xuống cấp dần)</span>`;
   }
   for (const b of document.querySelectorAll("#chron-filter button")) b.onclick = () => {
     for (const x of document.querySelectorAll("#chron-filter button")) x.classList.toggle("on", x === b);

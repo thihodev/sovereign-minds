@@ -65,7 +65,14 @@ export function advice(world: World, n: Nation): Advice[] {
   }
 
   // Food
-  if (food < need) say(3, `Lương thực ${Math.round(food)} không đủ một lượt ăn (${Math.round(need)}): thiếu thì người chết đói và không trẻ nào ra đời. Dồn người vào hái lượm, săn, đánh cá ngay.`);
+  if (food < need) {
+    // §4.4 a famine first: it costs 5 stability and 10 discontent a turn, and every other remedy fails while it lasts
+    const ways = ["dồn người vào hái lượm, săn, đánh cá ngay (labor)"];
+    if (m.caps.has("trồng-trọt")) ways.push("xây Ruộng trên đồng cỏ hoặc ô có sông");
+    if (n.inventions.includes("P9") && owned.some(t => t.terrain === "coast" || t.river)) ways.push("dựng Bến cá (+25% cá)");
+    ways.push("bớt chiến binh, thợ chế tác, thợ xây, người nghiên cứu cho tới khi đủ ăn", "mua lương thực của nước dư (trade_offer)", "KHÔNG mở lễ hội (tốn 0,5 lương thực mỗi người)");
+    say(3, `Lương thực ${Math.round(food)} không đủ một lượt ăn (${Math.round(need)}): người chết đói, không trẻ nào ra đời, mỗi lượt −5 ổn định và +10 bất mãn, dân bỏ đi. Việc đầu tiên: ${ways.join("; ")}.`);
+  }
   else if (food < need * 1.5) say(2, `Lương thực chỉ đủ ${(food / need).toFixed(1)} lượt (cần ${Math.round(need)} mỗi lượt, hư ${Math.round(m.spoilage * 100)}% mỗi lượt). Dân chỉ tăng khi còn dư ≥ 20% sau bữa.`);
 
   // Housing: the three ways to more room
@@ -115,6 +122,14 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Discontent
   if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, có chỗ ở, có nghi lễ/công trình ổn định) để nó nguội đi.`);
+
+  // §2.5 transport is the lifeblood: land with no road beside it sends home less
+  {
+    const land = owned.filter(t => t.land), served = (t: { i: number; road?: number }) => (t.road || 0) > 0 || NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id && world.tiles[j].land && (world.tiles[j].road || 0) > 0);
+    const off = land.filter(t => !served(t));
+    if (land.length >= 10 && off.length / land.length > 0.5 && (n.stock.wood || 0) >= 6)
+      say(1, `${off.length}/${land.length} ô đất chưa có đường ở trên hay bên cạnh. Mỗi ô có đường của bạn ở trên hoặc kề bên nộp về kho thêm ${ROADS.yield.slice(1).map(x => x * 100 + "%").join("/")} (đường cấp 1/2/3); ô có đường nối về thủ đô được thủ thêm ${ROADS.reinforce * 100}%. Làm đường (build_road) xuyên qua vùng đất giàu nhất (roads.land_without_road).`);
+  }
 
   // A connected realm (§2.7): settlements with no way home
   for (const c of isolated(world, n)) {

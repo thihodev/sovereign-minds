@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.20";
+export const RULES_VERSION = "0.21";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -189,7 +189,10 @@ export const KIN = { noTreaty: ["alliance", "passage", "non_aggression"], fricti
 /** §4.8 People who leave: counted for `keep` turns. When more than `alarm` of the people left in the last
  *  `window` turns, the rulers lose `stability` a turn and `reputation` every `repEvery` turns; the ranking
  *  takes `rankPerPerson` points for each one who left in the window. */
-export const EXODUS = { keep: 30, window: 10, alarm: 0.03, stability: 1, reputation: 1, repEvery: 3, rankPerPerson: 0.5 };
+export const EXODUS = { keep: 30, window: 10, alarm: 0.03, stability: 1, reputation: 1, repEvery: 3, stabEvery: 3, rankPerPerson: 0.5 };
+/** §4.4 A people at stability below `below` leaves: `share` of it a turn (at least 1); a mission at home holds `missionHold`
+ *  of those who would go (they still trust the court). */
+export const UNREST = { below: 10, share: 0.03, missionHold: 0.5 };
 /** §3.2 Every turn a ruler gives at least one order: from the `after`-th idle turn in a row, stability −`stability` a turn. */
 export const IDLE = { after: 2, stability: 2 };
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses
@@ -320,6 +323,11 @@ export const ROADS = {
   tilesPerLimit: 4, maxLimit: 10,
   /** A flood takes one level off at most `floodTiles` roads on the wet tiles; an earthquake off every road within its radius. */
   floodTiles: 3,
+  /** §2.5 Transport is the lifeblood. Land with one of the nation's roads on it or beside it sends home +`yield`[level]
+   *  of what it gives (fresher, faster); a tile of its own on a road joined to its capital is held `reinforce` harder
+   *  (help arrives in time); a border market with a road at the border trades `market` more; a road on land no one holds
+   *  joined to no living nation's centre loses a level every `decayTicks` turns, until it is gone. */
+  yield: [0, 0.03, 0.06, 0.1], reinforce: 0.15, market: 0.5, decayTicks: 20,
 };
 
 // §2.6 Territorial waters: shallow and deep sea are held like land.
@@ -589,11 +597,12 @@ export const RENAME = { windowTicks: 5, stability: 10 };
  *  `reach` tiles): each turn a `convert` chance that 1–`converts` people follow the faith home with the priests; the
  *  hosts lose `foreignStability` a turn; a hostile host (§4.5) kills the priests with chance `danger` a turn. One
  *  mission at home and `abroad` abroad at a time; a host's quarantine or a war ends a mission there. */
-export const MISSION = { cap: "tín-ngưỡng", turns: 5, priests: [2, 6], food: 10, calm: 2, stability: 1, unrest: 3, births: 1.15,
+export const MISSION = { cap: "tín-ngưỡng", turns: 5, priests: [2, 6], food: 10, calm: 2, stability: 2, unrest: 3, births: 1.15,
   convert: 0.3, converts: 3, foreignStability: 1, reach: 15, danger: 0.15, abroad: 2 };
 /** §4.10 A festival: food of `food` × the people (and, if given, a luxury of `luxury` × the people for +`luxuryStability`
- *  more): +`stability`, −`calm` discontent, births ×`births` for `turns` turns; once every `every` turns. */
-export const FESTIVAL = { food: 0.5, luxury: 0.02, stability: 5, luxuryStability: 3, calm: 5, births: 1.3, turns: 3, every: 10 };
+ *  more): +`stability`, −`calm` discontent, births ×`births` for `turns` turns; once every `every` turns, and never with
+ *  less than `minFoodTurns` turns of eating in store (a feast in a famine starves the people). */
+export const FESTIVAL = { food: 0.5, luxury: 0.02, stability: 10, minFoodTurns: 1.5, luxuryStability: 3, calm: 5, births: 1.3, turns: 3, every: 10 };
 /** §10.6 A renaming decree: every nation may rename itself, its people, its places and its officials for free until it
  *  ends; a nation that changed none of its names by then defied the gods: −`reputation`, −`stability`. */
 export const RENAME_DECREE = { turns: 10, reputation: 10, stability: 5 };

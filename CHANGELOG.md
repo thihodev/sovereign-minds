@@ -2,7 +2,22 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.20 (đang làm)
+## v0.21 (đang làm)
+
+- **Dân số và ổn định:**
+  - không mở được lễ hội khi kho dưới 1,5 lượt ăn;
+  - lễ hội +10 ổn định (trước là +5); truyền giáo trong nước +2 ổn định mỗi lượt và giữ lại một nửa số người định bỏ đi vì bất ổn;
+  - dân chỉ bỏ đi vì bất ổn khi ổn định dưới 10, mỗi lượt 3% (trước là dưới 15, 5%);
+  - phạt "mất lòng tin" chỉ tính mỗi 3 lượt một lần;
+  - lời cố vấn về nạn đói nêu cách cụ thể và dặn không mở lễ hội lúc đói.
+- **Giao thông là mạch máu (§2.5b):**
+  - ô có đường cạnh hoặc trên nó cho sản lượng về kho thêm 3/6/10%;
+  - ô nối đường về thủ đô được thủ thêm 15%;
+  - chợ biên giới có đường chạm tới giao thương nhiều hơn 50%;
+  - đường bỏ hoang (không còn nối trung tâm nào) xuống cấp dần mỗi 20 lượt;
+  - AI thấy đất nào thiếu đường, lời cố vấn gợi ý làm đường.
+
+## v0.20
 
 - **0.20.2:** đường trên đất vô chủ (đất đã mất hoặc thành hoang, đường vẫn ở lại) vẽ mờ, mảnh và đứt nét như đường bỏ hoang. Chú giải bản đồ có thêm mục đường.
 - **Sửa (0.20.1):** đường sá không còn bị đứt khúc. Mỗi cụm ô đường liền nhau được vẽ thành một cây liền mạch, kể cả đường không chạm trung tâm hay làm dở, và mọi trung tâm chạm cụm đều được nối vào.

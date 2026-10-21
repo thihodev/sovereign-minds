@@ -6,7 +6,7 @@ import { col, row } from "./hex.ts";
 import { FESTIVAL, LUXURY, MISSION, PROVINCE } from "./rules.ts";
 import { activeWar, hostile, landGap } from "./diplomacy.ts";
 import { mods, workers, type Ledger } from "./engine.ts";
-import { add as addPeople, take as takePeople } from "./people.ts";
+import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { provinces } from "./provinces.ts";
@@ -59,6 +59,8 @@ export function startMission(world: World, n: Nation, a: Record<string, unknown>
 /** The order "festival": a season of feasts and weddings. */
 export function holdFestival(world: World, n: Nation, a: Record<string, unknown>, L: Ledger): string | null {
   if (n.festival && world.tick - n.festival.tick < FESTIVAL.every) return `Mỗi ${FESTIVAL.every} lượt chỉ một lễ hội (lần trước: lượt ${n.festival.tick})`;
+  const eat = mouths(n) * mods(world, n).foodPerPerson;
+  if ((n.stock.food || 0) < eat * FESTIVAL.minFoodTurns) return `Kho chỉ đủ ${((n.stock.food || 0) / Math.max(1, eat)).toFixed(1)} lượt ăn: mở lễ hội lúc thiếu ăn là bỏ đói dân (cần ít nhất ${FESTIVAL.minFoodTurns} lượt). Lo lương thực trước`;
   const food = Math.ceil(n.population * FESTIVAL.food);
   if ((n.stock.food || 0) < food) return `Lễ hội cần ${food} lương thực`;
   const lux = a.luxury === undefined ? null : String(a.luxury), luxQ = Math.ceil(n.population * FESTIVAL.luxury);

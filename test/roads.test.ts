@@ -172,5 +172,30 @@ test("a connected realm: a settlement with no way home yields less; a road joins
   assert.equal(yieldShares(w, n)(site.i), CONNECT.isolatedYield);
   for (const i of roadPlan(w, n, site.i)) w.tiles[i].road = 1;
   assert.equal(links(w, n).get(site.i), "road");
-  assert.equal(yieldShares(w, n)(site.i), 1);
+  const { ROADS } = await import("../src/rules.ts");
+  assert.equal(yieldShares(w, n)(site.i), 1 + ROADS.yield[1], "joined, and a road beside it carries the harvest home");
+});
+
+test("transport is the lifeblood: roads raise yields, bring help, widen markets; abandoned roads fall apart", async () => {
+  const { yieldShares } = await import("../src/connect.ts");
+  const { roadAtBorder } = await import("../src/border.ts");
+  const { ROADS } = await import("../src/rules.ts");
+  const { roadToCapital } = await import("../src/engine.ts");
+  const w = founded(1, "lifeblood");
+  const n = w.nations[0];
+  const t = w.tiles.find(x => x.owner === n.id && x.land && x.i !== n.capital)!;
+  const before = yieldShares(w, n)(t.i);
+  t.road = 3;
+  assert.ok(Math.abs(yieldShares(w, n)(t.i) - before * (1 + ROADS.yield[3])) < 1e-9, "a paved road: +10%");
+  assert.ok(roadToCapital(w, n).has(t.i), "joined to the capital: help comes by road");
+  assert.equal(roadAtBorder(w, n.id, 99), false);
+  // a road left on land no one holds and joined to no centre falls apart; one that joins a centre is kept up
+  const far = w.tiles.find(x => x.land && x.owner === -1 && x.terrain !== "icewall" && x.terrain !== "mountain" && dist(x.i, n.capital) > 8 && NEIGHBORS[x.i].every(j => w.tiles[j].owner === -1))!;
+  far.road = 3;
+  // a road through the wilds that still joins the capital: one step out of its land
+  const kept = w.tiles.find(x => x.land && x.owner === -1 && x.terrain !== "icewall" && x.terrain !== "mountain" && NEIGHBORS[x.i].some(j => w.tiles[j].owner === n.id && (w.tiles[j].road || 0) > 0))!;
+  kept.road = 2;
+  for (let k = 0; k < ROADS.decayTicks; k++) step(w, { 0: { kind: "ok", response: { actions: [{ type: "research", invention: "P2" }] } } });
+  assert.equal(far.road, 2, "a level lost after untended turns");
+  if (kept.owner === -1) assert.equal(kept.road, 2, "a road that joins the capital is kept up");
 });

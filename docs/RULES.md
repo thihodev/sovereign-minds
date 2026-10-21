@@ -123,6 +123,15 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
 - **Hư hại:** lũ lụt làm tối đa 3 ô đường trên đất ngập mất một cấp. Động đất làm mọi đường trong bán kính tâm chấn mất một cấp.
 - **Quan sát:** gói trạng thái có trường `roads`, gồm số ô đường, các điểm định cư đã nối hay chưa nối, và một đường gợi ý tới điểm định cư gần nhất chưa nối. Các ô lãnh thổ có trường `road`.
 
+### 2.5b Giao thông là mạch máu
+
+- **Đường nuôi đất:** ô có đường của nước mình ở trên hoặc kề bên nộp về kho thêm 3% / 6% / 10% (đường cấp 1 / 2 / 3), vì hàng về nhanh và tươi hơn.
+- **Quân tiếp viện:** ô của mình có đường nối về thủ đô được thủ thêm 15%, vì quân kịp tới.
+- **Chợ đường cái:** chợ biên giới mà có đường của một trong hai nước chạm biên giới thì giao thương nhiều hơn 50%.
+- **Đường bỏ hoang:** đường trên đất vô chủ mà không còn nối thủ đô hay điểm định cư của nước nào thì cứ 20 lượt giảm một cấp, tới khi mất hẳn. Đường xuyên vùng hoang mà vẫn nối các trung tâm thì được giữ.
+- **AI thấy:** `roads.land_without_road` cho biết số ô đất chưa có đường và năm ô giàu nhất trong đó. Lời cố vấn gợi ý làm đường khi hơn nửa đất chưa có đường.
+- **Bản đồ:** đường bỏ hoang vẽ mờ và đứt nét.
+
 ### 2.6 Lãnh hải
 
 - **Biển được giữ như đất:** `claim_tile` cho ô biển nông (cần `đi-nước`) và biển sâu (cần `move ocean`).
@@ -417,7 +426,8 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - **Giảm:** đói (−5), thua trận (bên công −2, bên thủ −3), im lặng từ lượt thứ 3 (−5), chiến tranh kéo dài (−1 mỗi lượt từ lượt thứ 5 tính từ khi giao tranh bắt đầu), tù binh (−1 mỗi 5 tù binh), lập điểm định cư (−5 một lần, vì dời dân), **mỗi điểm định cư vượt quá 3: −1 mỗi lượt** (một bộ máy bộ lạc khó cai quản quá nhiều trung tâm; Bàn thờ, Suối Nước Nóng và hiệu ứng ổn định của phát minh mở bù lại được).
 - Ổn định được làm tròn và giữ trong 0–100 cuối mỗi lượt.
 - **Dưới 30:** mọi năng suất −25%.
-- **Dưới 15:** mỗi lượt 5% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang.
+- **Dưới 10:** mỗi lượt 3% dân (tối thiểu 1 người) bỏ đi, sang quốc gia đã gặp có ổn định cao nhất. Chưa gặp ai thì họ biến mất vào vùng hoang. Đang có đoàn truyền giáo trong nước thì một nửa số đó ở lại (mục 4.10).
+- **Mất lòng tin:** dân bỏ đi quá 3% trong 10 lượt thì cứ 3 lượt −1 ổn định, không phải mỗi lượt, để không thành vòng xoáy.
 - **Bằng 0:** nội loạn. AI mất quyền ra lệnh ở lượt kế tiếp (giữ phân công cũ), ổn định đặt lại 20.
 
 ### 4.5 Bất mãn và ly khai

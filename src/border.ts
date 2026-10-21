@@ -7,7 +7,7 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GOOD_VALUE, KIN } from "./rules.ts";
+import { BORDER, GOOD_VALUE, KIN, ROADS } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
@@ -60,6 +60,15 @@ function spare(world: World, n: Nation): Array<[string, number]> {
   return out.sort((a, b) => b[1] * price(world, b[0]) - a[1] * price(world, a[0]) || a[0].localeCompare(b[0]));
 }
 const lacks = (n: Nation, g: string) => (n.stock[g] || 0) < BORDER.marketLack;
+/** §2.5 Does a road of either side reach the border between them? */
+export function roadAtBorder(world: World, a: number, b: number): boolean {
+  for (const t of world.tiles) {
+    if ((t.road || 0) <= 0 || !t.land || (t.owner !== a && t.owner !== b)) continue;
+    const other = t.owner === a ? b : a;
+    if (NEIGHBORS[t.i].some(j => world.tiles[j].owner === other)) return true;
+  }
+  return false;
+}
 
 /** One turn of every border (§7.9). `traded` holds the pairs that completed a trade this turn. */
 export function borderPhase(world: World, L: Ledger, say: (nation: number | null, kind: string, text: string) => void, traded: Set<string>): void {
@@ -85,7 +94,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       if (sa && sb) {
         // §6.3 at world prices
         const pa = price(world, sa[0]), pb = price(world, sb[0]);
-        const value = Math.min(BORDER.marketValue, sa[1] * pa, sb[1] * pb);
+        const value = Math.min(BORDER.marketValue * (roadAtBorder(world, a.id, b.id) ? 1 + ROADS.market : 1), sa[1] * pa, sb[1] * pb); // §2.5 a market on the highway
         const qa = Math.floor(value / pa), qb = Math.floor(value / pb);
         if (qa >= 1 && qb >= 1) {
           L.stock(a, sa[0], -qa, "market"); L.stock(b, sa[0], qa, "market");

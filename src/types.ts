@@ -421,6 +421,8 @@ export interface World {
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
   borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it
+  /** §2.5 turns each road on land no one holds has gone untended (it loses a level every ROADS.decayTicks) */
+  wildRoads?: Record<string, number>;
   /** §2.11 the riches of land and sea were seeded (worlds before v0.18 get them when loaded) */
   riches?: number;
   /** §6.3 world prices in food units, and last turn's for the trend (worlds before v0.17 have none) */

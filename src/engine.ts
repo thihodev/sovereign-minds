@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -298,6 +298,13 @@ function roadWalk(world: World, n: Nation, starts: number[]): Set<number> {
     }
   }
   return seen;
+}
+/** §2.5 The tiles joined to the capital by road this turn (memo per nation and turn: battles ask it often). */
+const capRoadMemo = new WeakMap<Nation, { tick: number; set: Set<number> }>();
+export function roadToCapital(world: World, n: Nation): Set<number> {
+  const hit = capRoadMemo.get(n); if (hit && hit.tick === world.tick) return hit.set;
+  const set = roadWalk(world, n, [n.capital]); capRoadMemo.set(n, { tick: world.tick, set });
+  return set;
 }
 /** §2.5 The road network: the nation's road tiles joined to one of its centres, and the settlements joined to the capital. */
 export function roadNet(world: World, n: Nation): { tiles: number; linked: number[] } {
@@ -753,6 +760,18 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
 
+  // 8b. §2.5 roads on land no one holds and joined to no one's centre go untended and fall apart, a level every
+  // ROADS.decayTicks turns (a road through the wilds that still joins a nation's centres is kept up)
+  const wr = (world.wildRoads ??= {}), used = new Set<number>();
+  for (const o of world.nations) if (o.alive && o.founded) for (const i of roadWalk(world, o, centres(o))) used.add(i);
+  for (const t of world.tiles) {
+    if (!(t.road || 0)) continue;
+    const key = String(t.i);
+    if (t.owner >= 0 || !t.land || used.has(t.i)) { delete wr[key]; continue; }
+    wr[key] = (wr[key] || 0) + 1;
+    if (wr[key] >= ROADS.decayTicks) { t.road = t.road! - 1; if (!t.road) delete t.road; wr[key] = 0; }
+  }
+
   // 9. Regrowth of renewable reserves
   for (const t of world.tiles) {
     for (const k in t.cap) { // only the reserves this tile has
@@ -1111,14 +1130,16 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (sprawl > 0) n.stability -= sprawl * SETTLEMENT.sprawlStability;
   // §4.8 a people that keeps losing its own blames its rulers
   const ex = exodusOf(n, tick);
-  if (ex.share > EXODUS.alarm) {
+  if (ex.share > EXODUS.alarm && tick % EXODUS.stabEvery === n.id % EXODUS.stabEvery) { // not every turn: no death spiral
     n.stability -= EXODUS.stability;
     if (tick % EXODUS.repEvery === 0) n.reputation = Math.max(0, n.reputation - EXODUS.reputation);
-    n.lastEvents.push(`${ex.recent} người đã bỏ xứ ra đi trong ${EXODUS.window} lượt qua (${Math.round(ex.share * 100)}% dân): dân còn lại mất lòng tin (−${EXODUS.stability} ổn định mỗi lượt, uy tín giảm dần). Giữ dân là trách nhiệm đầu tiên của triều đình.`);
+    n.lastEvents.push(`${ex.recent} người đã bỏ xứ ra đi trong ${EXODUS.window} lượt qua (${Math.round(ex.share * 100)}% dân): dân còn lại mất lòng tin (−${EXODUS.stability} ổn định mỗi ${EXODUS.stabEvery} lượt, uy tín giảm dần). Giữ dân là trách nhiệm đầu tiên của triều đình.`);
   }
   n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
-  if (n.stability < 15 && n.population > 0) {
-    const leave = Math.max(1, Math.floor(n.population * 0.05));
+  if (n.stability < UNREST.below && n.population > 0) {
+    // §4.10 priests among the people: many who would go stay
+    const hold = (n.missions ?? []).some(x => x.where < 0 && x.until >= tick) ? UNREST.missionHold : 0;
+    const leave = Math.max(1, Math.floor(n.population * UNREST.share * (1 - hold)));
     const gone = takePeople(n, leave, "migrate");
     const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
     noteExodus(n, tick, leave, dest?.id ?? null, "unrest");

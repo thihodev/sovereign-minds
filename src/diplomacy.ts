@@ -5,7 +5,7 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
-  GESTURES, HAMLET, INJECTION, KIN, LAND, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
+  GESTURES, HAMLET, INJECTION, KIN, LAND, ROADS, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
@@ -14,7 +14,7 @@ import { add, part, take, add as addPeople, take as takePeople } from "./people.
 import { noteExodus } from "./exodus.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
-import { buildingWorks, mods, ownedTiles, parseTile, workers } from "./engine.ts";
+import { buildingWorks, mods, ownedTiles, parseTile, roadToCapital, workers } from "./engine.ts";
 import type { Battle, Caravan, Nation, Treaty, TreatyType, War, World } from "./types.ts";
 import type { Route } from "./routes.ts";
 
@@ -481,7 +481,8 @@ export function resolveBattles(ctx: DiploCtx): void {
         const t = world.tiles[s.tile];
         const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
         const lived = n.buildings.some(b => b.tile === s.tile) || (HAMLET.people[t.terrain] || 0) >= 2; // §2.9 people guard their homes
-        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river && !crossesWater(world, A, s.tile) ? 0.25 : 0) + (lived ? LAND.homeGuard : 0); // a river guards, unless they come with boats
+        const help = (t.road || 0) > 0 && roadToCapital(world, n).has(s.tile) ? ROADS.reinforce : 0; // §2.5 help comes by road
+        v *= 1 + WAR.home + TERRAIN[t.terrain].defense + wall + (t.river && !crossesWater(world, A, s.tile) ? 0.25 : 0) + (lived ? LAND.homeGuard : 0) + help; // a river guards, unless they come with boats
       }
       return v;
     };

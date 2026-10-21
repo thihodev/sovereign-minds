@@ -4,7 +4,7 @@
 // with no road nearby yields less too. Pure reads of the World.
 
 import { NEIGHBORS, dist } from "./hex.ts";
-import { CONNECT, RIVER } from "./rules.ts";
+import { CONNECT, RIVER, ROADS } from "./rules.ts";
 import { mods, roadNet } from "./engine.ts";
 import { activeWar } from "./diplomacy.ts";
 import { piers } from "./routes.ts";
@@ -86,6 +86,8 @@ export function nearestCentre(cs: number[], i: number): { c: number; d: number }
 /** The share of what a tile yields that reaches the nation's stores (§2.7), more where a loyal governor sits (§2.8). */
 export function yieldShares(world: World, n: Nation): (tile: number) => number {
   const ls = links(world, n), cs = [...ls.keys()], young = new Set(n.settlements.filter(s => world.tick - s.tick < CONNECT.grace).map(s => s.tile));
+  // the best road of the nation's own on the tile or beside it
+  const ownRoad = (i: number) => { let lv = world.tiles[i].owner === n.id ? world.tiles[i].road || 0 : 0; for (const j of NEIGHBORS[i]) { const t = world.tiles[j]; if (t.owner === n.id && t.land && (t.road || 0) > lv) lv = t.road!; } return Math.min(lv, ROADS.yield.length - 1); };
   const roadNear = (i: number) => (world.tiles[i].road || 0) > 0 || NEIGHBORS[i].some(j => (world.tiles[j].road || 0) > 0 && world.tiles[j].land);
   const memo = new Map<number, number>(), gov = governorYield(n);
   return (i: number) => {
@@ -93,6 +95,7 @@ export function yieldShares(world: World, n: Nation): (tile: number) => number {
     const { c: best, d } = nearestCentre(cs, i);
     let share = ls.get(best) || young.has(best) ? 1 : CONNECT.isolatedYield;
     if (d > CONNECT.reach && !roadNear(i)) share *= CONNECT.farYield;
+    share *= 1 + ROADS.yield[ownRoad(i)]; // §2.5 a road carries the harvest home
     share *= gov.get(best) ?? 1;
     memo.set(i, share);
     return share;
