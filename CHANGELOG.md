@@ -2,6 +2,13 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.38
+
+- **Chợ cửa khẩu (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**
+  - Dựng trên ô giáp láng giềng, có đường nối về trung tâm; mỗi láng giềng một chợ; 6 gỗ, 4 đá, 10 công.
+  - Không thu tiền riêng (Chợ đã trả theo bạn hàng). Chợ biên giới với nước đó họp tới căng thẳng 70, đổi nhiều hàng hơn 25%, mỗi phiên làm dịu gấp đôi (gấp ba nếu cả hai bên dựng).
+  - AI thấy chợ cửa khẩu của mỗi bên trong `neighbours`; lời cố vấn gợi ý dựng ở biên giới đang căng. Bản đồ 3D có mô hình cổng chợ.
+
 ## v0.37
 
 - **0.37.1, bản đồ 3D dễ dùng hơn:**

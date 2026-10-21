@@ -316,6 +316,7 @@ export function create(container, hooks) {
           case "kiln": P.add("cone", X, h, Z, 0.26, 0.26, 0.26, 0, "#a5532e"); break;
           case "workshop": P.add("box", X, h, Z, 0.3, 0.14, 0.24, r, "#b39b74"); P.add("roof", X, h + 0.14, Z, 0.32, 0.1, 0.26, r, "#6e5a44"); break;
           case "pit": P.add("cyl", X, h - 0.02, Z, 0.24, 0.04, 0.24, 0, "#5a4a36"); break;
+          case "border_gate": P.add("box", X - 0.18, h, Z, 0.07, 0.34, 0.07, 0, wood); P.add("box", X + 0.18, h, Z, 0.07, 0.34, 0.07, 0, wood); P.add("roof", X, h + 0.34, Z, 0.5, 0.16, 0.22, 0, color); P.add("box", X + 0.3, h, Z + 0.22, 0.2, 0.1, 0.16, r, "#c49a5a"); break;
           default: P.add("box", X, h, Z, 0.24 * scaf, 0.16, 0.24, r, "#bfae8c"); P.add("roof", X, h + 0.16, Z, 0.27, 0.12, 0.27, r, hooks.kindColor?.[b.kind] || "#7b6a55");
         }
       }

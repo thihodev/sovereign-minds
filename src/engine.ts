@@ -311,6 +311,8 @@ function roadWalk(world: World, n: Nation, starts: number[]): Set<number> {
   }
   return seen;
 }
+/** §7.9 Is this tile joined by the nation's own roads to one of its centres? */
+export function roadJoined(world: World, n: Nation, tile: number): boolean { return centres(n).includes(tile) || ((world.tiles[tile].road || 0) > 0 && roadWalk(world, n, centres(n)).has(tile)); }
 /** §2.5 The tiles joined to the capital by road this turn (memo per nation and turn: battles ask it often). */
 const capRoadMemo = new WeakMap<Nation, { tick: number; set: Set<number> }>();
 export function roadToCapital(world: World, n: Nation): Set<number> {
@@ -1640,6 +1642,13 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
+      if (def.effect.gate) { // §7.9 on our land at a neighbour's border, joined by road to a centre; one for each neighbour
+        const touch = new Set(NEIGHBORS[tile].map(j => world.tiles[j]).filter(t2 => t2.land && t2.owner >= 0 && t2.owner !== n.id && world.nations[t2.owner]?.alive).map(t2 => t2.owner));
+        if (!touch.size) return `${def.name} phải đặt trên ô của ta giáp đất một nước láng giềng`;
+        if (!roadJoined(world, n, tile)) return `${def.name} cần đường của ta nối từ một trung tâm tới ô này (build_road)`;
+        const served = new Set(n.buildings.filter(b => buildingOf(world, b.type)?.effect.gate).flatMap(b => NEIGHBORS[b.tile].map(j => world.tiles[j].owner)));
+        if ([...touch].every(o => served.has(o))) return `Đã có ${def.name} với ${[...touch].map(o => world.nations[o].name).join(", ")}`;
+      }
       if (def.type === "herb_garden") { // §6.6 on warm land near a centre, two to each centre
         const cs = [n.capital, ...n.settlements.map(s2 => s2.tile)], home = (i: number) => cs.reduce((b2, c) => dist(c, i) < dist(b2, i) || (dist(c, i) === dist(b2, i) && c < b2) ? c : b2, cs[0]);
         if (!HERB_GARDEN.zones.includes(world.tiles[tile].zone)) return `${def.name} cần đất ấm (ôn đới hay nhiệt đới)`;

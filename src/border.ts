@@ -7,11 +7,11 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GOOD_VALUE, KIN, ROADS, WAR } from "./rules.ts";
+import { BORDER, GATE, GOOD_VALUE, KIN, ROADS, WAR } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
-import { goodName } from "./catalog.ts";
+import { buildingOf, goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
-import { mods, workers, type Ledger } from "./engine.ts";
+import { buildingWorks, mods, workers, type Ledger } from "./engine.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
@@ -72,6 +72,10 @@ export function sharedRivers(world: World, a: number, b: number): number {
   }
   return k;
 }
+/** §7.9 Does nation `n` keep a working border gate market on a tile touching the land of `other`? */
+export function hasGate(world: World, n: Nation, other: number): boolean {
+  return n.buildings.some(b => buildingWorks(world, b) && world.tiles[b.tile].owner === n.id && buildingOf(world, b.type)?.effect.gate && NEIGHBORS[b.tile].some(j => world.tiles[j].owner === other));
+}
 /** §2.5 Does a road of either side reach the border between them? */
 export function roadAtBorder(world: World, a: number, b: number): boolean {
   for (const t of world.tiles) {
@@ -101,19 +105,21 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     if (foes) t = Math.max(t, KIN.tensionFloor);
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;
     const r = rngFor(world.seed, tick, "border", a.id, b.id);
+    // §7.9 a border gate market of either side keeps the market open longer, trading more and calming more
+    const ga = hasGate(world, a, b.id), gb = hasGate(world, b, a.id), gate = ga || gb;
     // A small market at the border, while the peoples are not too wary of each other (and neither is in quarantine, §9.5)
-    if (t < BORDER.marketBelow && !foes && !quarantined(a, tick) && !quarantined(b, tick)) {
+    if (t < BORDER.marketBelow + (gate ? GATE.below : 0) && !foes && !quarantined(a, tick) && !quarantined(b, tick)) {
       const sa = spare(world, a).find(([g]) => lacks(b, g)), sb = spare(world, b).find(([g]) => lacks(a, g));
       if (sa && sb) {
         // §6.3 at world prices
         const pa = price(world, sa[0]), pb = price(world, sb[0]);
-        const value = Math.min(BORDER.marketValue * (roadAtBorder(world, a.id, b.id) ? 1 + ROADS.market : 1) * (hasGreat(a, "merchant", tick) || hasGreat(b, "merchant", tick) ? 1.5 : 1), sa[1] * pa, sb[1] * pb); // §2.5 a market on the highway, §4.12 a merchant at it
+        const value = Math.min(BORDER.marketValue * (roadAtBorder(world, a.id, b.id) ? 1 + ROADS.market : 1) * (hasGreat(a, "merchant", tick) || hasGreat(b, "merchant", tick) ? 1.5 : 1) * (gate ? GATE.value : 1), sa[1] * pa, sb[1] * pb); // §2.5 a market on the highway, §4.12 a merchant at it, §7.9 a gate
         const qa = Math.floor(value / pa), qb = Math.floor(value / pb);
         if (qa >= 1 && qb >= 1) {
           L.stock(a, sa[0], -qa, "market"); L.stock(b, sa[0], qa, "market");
           L.stock(b, sb[0], -qb, "market"); L.stock(a, sb[0], qb, "market");
           a.trades[String(b.id)] = (a.trades[String(b.id)] || 0) + 1; b.trades[String(a.id)] = (b.trades[String(a.id)] || 0) + 1;
-          st.market++; t -= BORDER.marketCalm;
+          st.market++; t -= BORDER.marketCalm + (ga ? GATE.calm : 0) + (gb ? GATE.calm : 0);
           // §4.13 each side's treasury taxes what its merchants sold, and the other side's duty is paid on it
           marketTax(L, a, qa * pa); marketTax(L, b, qb * pb);
           importDuty(world, L, a, b, { [sa[0]]: qa }); importDuty(world, L, b, a, { [sb[0]]: qb });

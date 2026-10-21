@@ -1228,7 +1228,15 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
   - Trên bản đồ, một vụ xô xát hiện là "🤜 xô xát biên giới", không phải trận đánh, và người chết vì xô xát có nguyên nhân riêng.
 - **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt. Tranh chấp liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ (liên minh và chư hầu vẫn giữ). Có chính nghĩa thì tự xé hiệp ước (`break_treaty`) không mất uy tín.
 - **Chợ biên giới:** khi căng thẳng dưới 60 và không bên nào đang cách ly (mục 9.5), mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
-- **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
+- **Chợ cửa khẩu** (`border_gate`, sáng kiến của một quốc gia, chấp thuận một phần):
+  - **Xây:** cần Ký hiệu (P12); 6 gỗ, 4 đá, 10 công.
+  - **Đặt ở đâu:** trên ô của mình giáp đất láng giềng, có đường của mình nối ô đó về một trung tâm. Mỗi láng giềng một chợ.
+  - **Không thu tiền riêng.** Với nước láng giềng đó:
+    - chợ biên giới còn họp tới căng thẳng **70** (thay vì 60);
+    - mỗi phiên đổi nhiều hàng hơn 25%;
+    - mỗi phiên làm dịu căng thẳng thêm 1 cho mỗi bên có chợ cửa khẩu (2 nếu một bên có, 3 nếu cả hai).
+  - Muốn biên giới yên hẳn thì vẫn cần hiệp ước.
+- **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, chợ cửa khẩu của mỗi bên, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
 - **Quà tặng:** `trade_offer` chỉ có "give" và "get" rỗng là một món quà.
 - Watcher chỉnh được độ căng thẳng mỗi ô, ngưỡng tranh chấp và chợ biên giới bằng sắc lệnh luật.
 

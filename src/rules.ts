@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.37";
+export const RULES_VERSION = "0.38";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -533,7 +533,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §6.5 a village granary: food it keeps aside, unspoiled, against famine */
   reserve?: number;
   /** §6.6 herbs a garden grows each turn, with no hands */
-  herbs?: number }
+  herbs?: number;
+  /** §7.9 a border gate market: it keeps the border market of its neighbours open and calming */
+  gate?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -557,6 +559,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
   { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "border_gate", name: "Chợ cửa khẩu", needs: "P12", cost: { wood: 6, stone: 4 }, work: 10, desc: "Trên ô của ta giáp đất láng giềng, có đường nối về một trung tâm; mỗi láng giềng một chợ. Không thu tiền riêng: chợ biên giới với nước ấy còn họp tới căng thẳng 70 (thay vì 60), mỗi phiên làm dịu gấp đôi (gấp ba nếu cả hai bên cùng dựng) và đổi nhiều hàng hơn 25%.", effect: { gate: 1 } },
   { type: "herb_garden", name: "Vườn thảo dược", needs: "P14", cost: { fiber: 5 }, work: 6, perTile: true, terrains: ["grass", "hill", "forest", "jungle", "swamp", "coast"], desc: "Trồng cây thuốc trên đất ấm (ôn đới, nhiệt đới) cách thủ đô hay điểm định cư tối đa 2 ô, tối đa 2 vườn mỗi trung tâm: tự cho 0,5 thảo dược mỗi lượt, không cần người làm.", effect: { herbs: 0.5 } },
   { type: "granary", name: "Kho làng", needs: "stone_tools", cost: { wood: 10, stone: 6 }, work: 5, perCentre: true, desc: "Mỗi trung tâm một kho: mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư; tự mở cứu đói khi cả nước thiếu ăn. Điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa.", effect: { reserve: 100 } },
   { type: "market", name: "Chợ", needs: "P12", cost: { wood: 10, stone: 6 }, work: 6, max: 3, desc: "Công trình công cộng: dân họp chợ, ngân khố thu 2 tiền/lượt, thêm 1 tiền mỗi 50 dân và 1 tiền mỗi bạn hàng.", effect: { income: 2, market: 1 } },
@@ -1036,3 +1039,7 @@ export const GRANARY = { share: 0.1, isolatedCalm: 0.5 };
 export const MEADOW_HERBS = { terrains: ["grass", "hill"] as string[], min: 10, max: 20, regen: 0.02 };
 // §6.6 Herb gardens (a nation's idea): healing plants grown round the centres, on warm land
 export const HERB_GARDEN = { near: 2, perCentre: 2, zones: ["temp", "trop"] as string[] };
+
+// §7.9 Border gate markets (a nation's idea, partly taken up): the border market of the two neighbours stays open
+// up to `below` more tension, trades `value` × as much, and each market calms `calm` more per side with a gate
+export const GATE = { below: 10, value: 1.25, calm: 1 };

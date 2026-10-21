@@ -3,13 +3,13 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
-import { borderOf, neighbours } from "../border.ts";
+import { borderOf, hasGate, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
@@ -182,7 +182,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const cause = (n.casusBelli[String(o.id)] ?? -1) >= world.tick;
     if (activeWar(world, n.id, o.id)) continue;
     if (t >= BORDER.dispute) say(3, `Biên giới với ${o.name} rất căng (${t}/100, ${border} ô giáp nhau, ${st.dispute ?? 0} lượt tranh chấp): mỗi lượt −${BORDER.disputeStability} ổn định và hai bên đều có chính nghĩa để tuyên chiến. ${treaty.length ? `Hiệp ước ${treaty.join(", ")} đang chặn chiến tranh; nó sẽ tan vỡ sau ${BORDER.treatyBreakAfter} lượt tranh chấp liên tục, hoặc bạn xé nó ngay (break_treaty) mà không mất uy tín vì có chính nghĩa. ` : ""}Hoặc hạ nhiệt (trade_offer, quà tặng, dỡ cách ly), hoặc chuẩn bị chiến binh.`);
-    else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}`);
+    else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}${!hasGate(world, n, o.id) && n.inventions.includes("P12") ? ` Dựng Chợ cửa khẩu (build border_gate, tile: ô của ta giáp ${o.name}, có đường nối về trung tâm): chợ biên giới còn họp tới căng thẳng ${BORDER.marketBelow + GATE.below}, mỗi phiên làm dịu gấp đôi.` : ""}`);
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
   }

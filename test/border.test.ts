@@ -110,3 +110,33 @@ test("blood for blood: brawl after brawl and the border goes to war, taken up by
   assert.deepEqual(war!.brawlDead, { [a.id]: 4, [b.id]: 2 }, "the brawl dead are kept with the war");
   assert.ok((a.casusBelli[String(b.id)] ?? -1) >= w.tick - 1, "the weaker keeps its just cause");
 });
+
+test("a border gate market: on our land at the neighbour's edge, joined by road; it keeps the market open longer and calming more", async () => {
+  const { hasGate } = await import("../src/border.ts");
+  const { GATE } = await import("../src/rules.ts");
+  const w = touching("gate"), [a, b] = w.nations;
+  a.inventions.push("P12"); a.stock.wood = 50; a.stock.stone = 50;
+  const xy = (i: number) => [i % 128, Math.floor(i / 128)];
+  // our tile touching B, next to our capital
+  const spot = NEIGHBORS[a.capital].find(j => w.tiles[j].owner === a.id && NEIGHBORS[j].some(k => w.tiles[k].owner === b.id))
+    ?? w.tiles.find(t => t.owner === a.id && NEIGHBORS[t.i].some(k => w.tiles[k].owner === b.id) && NEIGHBORS[t.i].includes(a.capital))?.i;
+  assert.ok(spot !== undefined, "a border tile beside the capital");
+  turn(w, { 0: { actions: [{ type: "build", building: "border_gate", tile: xy(spot!) }] } });
+  assert.ok(a.lastRejected.some(r => /đường/.test(r.reason)), JSON.stringify(a.lastRejected)); // no road yet
+  w.tiles[spot!].road = 1;
+  turn(w, { 0: { actions: [{ type: "build", building: "border_gate", tile: xy(spot!) }] } });
+  assert.deepEqual(a.lastRejected, []);
+  const g = a.buildings.find(x => x.type === "border_gate")!; g.done = true; g.progress = 10;
+  assert.ok(hasGate(w, a, b.id));
+  // a second for the same neighbour is refused
+  turn(w, { 0: { actions: [{ type: "build", building: "border_gate", tile: xy(spot!) }] } });
+  assert.ok(a.lastRejected.some(r => /Đã có Chợ cửa khẩu/.test(r.reason)));
+  // at tension 65 the market still opens, and it calms more
+  const st = borderOf(w, a.id, b.id);
+  a.stock.wood = 200; b.stock.wood = 0; b.stock.hide = 200; a.stock.hide = 0;
+  st.tension = 65;
+  const market = st.market;
+  turn(w);
+  assert.equal(st.market, market + 1, "open beyond the usual 60");
+  assert.ok(GATE.below > 0);
+});

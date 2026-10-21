@@ -18,7 +18,7 @@ import { urbanView } from "../urban.ts";
 import { classView } from "../classes.ts";
 import { greatsView } from "../greats.ts";
 import { livingStandard } from "../living.ts";
-import { CLASSES, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
+import { CLASSES, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
 import { seaView } from "../sea.ts";
 import { landReserves, localPrice, price, shortages, specialtiesOf, surpluses, techEdge, trend, veinsNear, worth } from "../market.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
@@ -26,7 +26,7 @@ import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { annalsLines } from "../annals.ts";
-import { borderOf, neighbours } from "../border.ts";
+import { borderOf, hasGate, neighbours } from "../border.ts";
 import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
 import { sharedRivers } from "../border.ts";
@@ -103,6 +103,8 @@ STANDARD OF LIVING — how a people climbs toward the modern age: each era your 
 GREAT PEOPLE: now and then a great one is born to a nation — ${Object.entries(GREATS.kinds).map(([k, v]) => `${k} (${v.desc})`).join(", ")} — more often where people live well (standard of living) and are many, and of the kind the nation's work calls for (research, war, trade, craft and building, faith, boats). They serve ${GREATS.life[0]}–${GREATS.life[1]} turns, at most ${GREATS.max} at a time. invite_great (${AP_COST.invite_great}): {"type":"invite_great","great":id,"gift":{"good":qty}} lures a great person from a nation you know ("greats.others"): the gift (worth ${GREATS.giftWorth}+ at world prices) goes to that nation whatever the answer; the chance is ${GREATS.inviteBase * 100}% + ${GREATS.inviteLife * 100}% × (your standard of living − theirs)/100 (${GREATS.inviteMin * 100}–${GREATS.inviteMax * 100}%); once every ${GREATS.inviteEvery} turns. Keep your own great people by living well.
 
 HEALING HERBS (two ideas nations proposed and the gods built in): herbs grow wild in forests, jungles and swamps, and now a few (${MEADOW_HERBS.min}–${MEADOW_HERBS.max}) on every grass and hill tile too, regrowing ${MEADOW_HERBS.regen * 100}% a turn there; your gatherers bring them home. With Trồng trọt (P14) you can plant "herb_garden" (${Object.entries(BUILDING_BY_TYPE.herb_garden.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.herb_garden.work} work): on your own warm land (temperate or tropical; grass, hill, forest, jungle, swamp or coast) within ${HERB_GARDEN.near} tiles of a centre, at most ${HERB_GARDEN.perCentre} for each centre; each gives ${BUILDING_BY_TYPE.herb_garden.effect.herbs} herbs a turn with no hands. One herb per ${HERBS.perPeople} people halves the deaths of a plague; herbs save newborns and meet the people's need for medicine.
+
+BORDER GATE MARKETS (an idea a nation proposed, taken up in part): build "border_gate" (${Object.entries(BUILDING_BY_TYPE.border_gate.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.border_gate.work} work; needs Ký hiệu P12) on a tile of yours touching a neighbour's land, joined by your own road to one of your centres (tile = that tile); one for each neighbour. It earns no coin of its own, but the border market with that neighbour stays open up to tension ${BORDER.marketBelow + GATE.below} (not ${BORDER.marketBelow}), trades ${Math.round((GATE.value - 1) * 100)}% more, and each market day calms the border ${GATE.calm} more for each side that has a gate (so ${BORDER.marketCalm + GATE.calm} with one, ${BORDER.marketCalm + 2 * GATE.calm} with both). "neighbours[].border_gate" shows who has one. Trade over a tense border instead of fighting for it; a treaty still calms it most.
 
 VILLAGE GRANARIES (an idea a nation proposed and the gods built in): build "granary" on a centre (tile = your capital or a settlement; one each; ${Object.entries(BUILDING_BY_TYPE.granary.cost).map(([g, q]) => `${q} ${g}`).join(", ")}). Each turn the granaries set aside ${GRANARY.share * 100}% of the food left after eating, up to ${BUILDING_BY_TYPE.granary.effect.reserve} per granary ("food_reserve" in your stock): it never spoils and cannot be traded, and when the food falls short of a meal the granaries open by themselves before anyone starves. A settlement cut off from the capital with a granary of its own grows restless half as fast.
 
@@ -304,6 +306,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
       const ns = neighbours(world, n).map(({ o, border, gap }) => {
         const st = borderOf(world, n.id, o.id), cause = n.casusBelli[String(o.id)] ?? -1;
         return { name: o.name, border_tiles: border || undefined, gap: border ? undefined : gap, relation: relation(world, n.id, o.id), tension: Math.round(st.tension), border_market_trades: st.market || undefined,
+          border_gate: border ? { mine: hasGate(world, n, o.id), theirs: hasGate(world, o, n.id) } : undefined,
           incidents: st.incidents.length ? st.incidents.slice(-3).map(x => `L${x.tick}: ${x.text}`) : undefined, just_cause_until: cause >= world.tick ? cause : undefined };
       });
       return ns.length ? ns : undefined;
