@@ -142,6 +142,9 @@ export interface Nation {
   family?: { births: string; fighters: string };
   /** §4.8 the people who left, by turn: how many, to which nation, why */
   exodus?: Array<{ tick: number; k: number; to: number | null; why: string }>;
+  /** §8.2 the nation's annals since its founding (chapters, oldest first) and the chapter being written */
+  annals?: Array<{ from: number; to: number; pop: [number, number]; food: number; stab: number; land: [number, number]; notes: Array<{ tick: number; p: number; text: string }> }>;
+  annalDraft?: { from: number; to: number; pop: [number, number]; food: number; stab: number; land: [number, number]; notes: Array<{ tick: number; p: number; text: string }>; turns: number };
   /** §8.2 the last turns in brief, for the nation's own observation */
   recent?: Array<{ tick: number; pop: number; food: number; stab: number; orders: string[]; events: string[] }>;
   /** §8.2 what it ordered this turn and what came of it */

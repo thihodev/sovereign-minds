@@ -9,6 +9,7 @@ import { TILE_COUNT } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
 import { buildObservation, systemPrompt } from "./ai/prompt.ts";
 import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
+import { backfillAnnals } from "./annals.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
 import { JUDGE_SYSTEM, JUDGE_SYSTEM_BATCH, judgeBatchPrompt, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { migrate, invName } from "./catalog.ts";
@@ -115,7 +116,11 @@ export class Runner {
       console.log(`[world] Thế giới đã lưu có ${saved.tiles.length} ô, bản đồ bây giờ ${TILE_COUNT} ô: đã sao lưu vào ${store.backupAndReset()}, chờ tạo thế giới mới.`);
       saved = null;
     }
-    if (saved) this.world = migrate(saved);
+    if (saved) {
+      this.world = migrate(saved);
+      // §8.2 a world saved before the annals: rebuild each nation's story from the stored chronicle and population history
+      for (const n of this.world.nations) if (n.founded && !n.annals && this.world.tick > 1) backfillAnnals(this.world, n, this.store.chronicleOf(n.id, n.name.length > 2 ? n.name : ""), this.store.nationStats(n.id, 0, this.world.tick));
+    }
     else {
       const { specs, notes } = nationSpecs(cfg);
       this.world = createWorld(cfg.seed, specs);

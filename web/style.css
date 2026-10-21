@@ -471,3 +471,8 @@ ul.advice li.lv1 { border-color: var(--accent); }
 .bcat td { font-size: 12.5px; }
 .seg .cnt.warmcnt { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 ul.recent li { padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+/* §8.2 a nation's annals */
+ol.annals { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ol.annals > li { border-left: 3px solid var(--line); padding: 4px 8px; }
+ol.annals .row { gap: 8px; flex-wrap: wrap; align-items: baseline; }
+ol.annals ul { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); display: grid; gap: 2px; }

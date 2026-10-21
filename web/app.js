@@ -1273,6 +1273,7 @@
           <h3>Tình báo về nước khác</h3>${intel || `<p class="note">Chưa có tin tình báo.</p>`}
         </section>
         <section data-sub="log">
+          ${(n.annals || []).length ? `<h3>Biên niên quốc gia (AI đọc mỗi lượt)</h3><ol class="annals">${n.annals.slice().reverse().map(c => `<li><div class="row"><b>${esc(c.turns)}</b><span class="meta">dân ${esc(c.people)} · lương thực TB ${c.food_avg} · ổn định TB ${c.stability_avg} · ô ${esc(c.tiles)}</span></div>${c.notable.length ? `<ul class="plain">${c.notable.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>` : ""}
           <p class="mono muted">gọi ${n.stats.calls} · hợp lệ ${n.stats.ok} · hành động sai ${n.stats.invalid} · lượt ngủ ${n.stats.asleepTicks} · lượt im lặng ${n.stats.silentTicks}</p>
           <h3>Bản ghi nhớ (AI tự viết)</h3><pre>${esc(n.memory || "—")}</pre>
           <h3>5 lượt gần nhất</h3>${turns.map(turnCard).join("") || "<p>—</p>"}

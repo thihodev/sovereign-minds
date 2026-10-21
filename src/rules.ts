@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.12";
+export const RULES_VERSION = "0.13";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -158,6 +158,10 @@ export const PROSPERITY = {
    *  `rankWeight` × the average over them (§9.3). */
   sayEvery: 15, history: 10, rankWeight: 0.5,
 };
+/** §8.2 A nation's annals: a chapter every `chapter` turns with its `notes` most notable events (each at most
+ *  `noteLength` characters); past `maxChapters`, the shortest two neighbouring chapters older than the last `keepFine`
+ *  merge, so the further back, the longer the chapters. `recent` turns are also kept in detail. */
+export const ANNALS = { chapter: 10, notes: 5, noteLength: 120, maxChapters: 20, keepFine: 10, recent: 10 };
 /** §4.8 People who leave: counted for `keep` turns. When more than `alarm` of the people left in the last
  *  `window` turns, the rulers lose `stability` a turn and `reputation` every `repEvery` turns; the ranking
  *  takes `rankPerPerson` points for each one who left in the window. */

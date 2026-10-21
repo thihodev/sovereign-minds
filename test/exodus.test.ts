@@ -41,9 +41,9 @@ test("a nation sees its last turns: its orders, what came of them, its people", 
   const a = w.nations[0];
   turn(w, { 0: [{ type: "research", invention: "P2" }, { type: "claim_tile", tile: [0, 0] }] });
   turn(w);
-  const obs = buildObservation(w, a) as { recent_turns: Array<{ orders: string[]; happened: string[] }> };
+  const obs = buildObservation(w, a) as { recent_turns: string[] };
   assert.equal(obs.recent_turns.length, 2);
-  assert.ok(obs.recent_turns[0].orders.some(o => /^research P2 ✓/.test(o)), JSON.stringify(obs.recent_turns[0].orders));
-  assert.ok(obs.recent_turns[0].orders.some(o => /^claim_tile .*✗/.test(o)), "a refused order and why");
-  assert.match(obs.recent_turns[0].happened[0], /Dân số/);
+  assert.match(obs.recent_turns[0], /lệnh: research P2 ✓/);
+  assert.match(obs.recent_turns[0], /claim_tile .*✗/, "a refused order and why");
+  assert.match(obs.recent_turns[0], /Dân số/);
 });

@@ -2,9 +2,9 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, ANNALS, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
-import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
+import { allBuildings, allRecipes, buildingOf, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
 import { tileValue } from "../worldgen.ts";
 import { nationResources, nationThreats } from "../threats.ts";
@@ -15,6 +15,7 @@ import { demo, fighters, households, mouths } from "../people.ts";
 import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
+import { annalsLines } from "../annals.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
@@ -33,7 +34,7 @@ GOAL: there is no single winner. Let your people survive, grow and advance; buil
 
 YOUR FIRST DUTY IS TO KEEP YOUR PEOPLE. Every family that leaves — for a richer neighbour, across the border, with a discontented faction, or away from unrest — is a verdict on your rule. "people_leaving" counts who left, where to and why; when more than ${EXODUS.alarm * 100}% of your people leave within ${EXODUS.window} turns you lose ${EXODUS.stability} stability a turn and reputation, and the world ranking takes ${EXODUS.rankPerPerson} point for each one who left. Watch it every turn and fix its causes (food, room, stability, prosperity against your neighbours, roads to cut-off provinces).
 
-YOUR TURNS ARE ONE STORY. You are called afresh each turn: what you remember is "memory" (your own notes), "your_last_thought", and "recent_turns" — your last turns in brief: the orders you gave (✓ done, ✗ refused and why), what happened, your people, food and stability. Read them before you decide: carry your plans on, do not repeat a refused order without fixing its cause, and notice trends.
+YOUR TURNS ARE ONE STORY. You are called afresh each turn: what you know of your past is "annals" (your nation's whole story since its founding, kept by the engine: a chapter every ${ANNALS.chapter} turns with your people, food, stability, land and the events that mattered most; old chapters are merged and told in brief), "recent_turns" (your last ${ANNALS.recent} turns in detail: the orders you gave, ✓ done or ✗ refused and why, what happened, your people, food and stability), "your_last_thought" and "memory" (your own notes). Read them before you decide: carry your plans on, learn from what failed, do not repeat a refused order without fixing its cause, and notice the long trends of your people.
 
 YOUR PEOPLE'S NATURE: "identity" in the observation is the character your people were born with. It is fixed for the whole game and its strengths and weaknesses are real rules. Let it shape your names, culture, priorities and diplomacy: play to its strengths and guard its weaknesses.
 
@@ -167,7 +168,9 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
   const obs: Record<string, unknown> = {
     tick: world.tick,
     your_last_thought: n.lastThought || undefined,
-    recent_turns: n.recent?.length ? n.recent.slice(-5).map(r => ({ turn: r.tick, people: r.pop, food: r.food, stability: r.stab, orders: r.orders.length ? r.orders : ["(none)"], happened: r.events })) : undefined,
+    // §8.2 the nation's whole story, one line a chapter, and its last turns, one line each (compact: sent every turn)
+    annals: (() => { const a = annalsLines(n); return a.length ? a : undefined; })(),
+    recent_turns: n.recent?.length ? n.recent.map(r => `L${r.tick} | dân ${r.pop}, lương thực ${r.food}, ổn định ${r.stab} | lệnh: ${r.orders.join("; ") || "(không có)"} | ${r.events.join(" ; ")}`) : undefined,
     people_leaving: (() => {
       const ex = exodusOf(n, world.tick);
       return ex.recent ? { last_turn: ex.lastTurn, last_10_turns: ex.recent, share_pct: Math.round(ex.share * 1000) / 10, to: Object.fromEntries(Object.entries(ex.to).map(([id, k]) => [world.nations[Number(id)]?.name ?? "?", k])), why: Object.fromEntries(Object.entries(ex.why).map(([w, k]) => [WHY_VI[w as keyof typeof WHY_VI], k])), alarm: ex.share > EXODUS.alarm || undefined } : undefined;
@@ -199,7 +202,8 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, r1(v)])),
     tile_limit: tileLimit(world, n),
     governed: governed(world, n),
-    territory: owned.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, road: t.road || undefined, res: visibleRes(world, n, t), building: n.buildings.filter(b => b.tile === t.i).map(b => b.done ? b.type : `${b.type}(đang xây)`).join(",") || undefined })),
+    // compact (sent every turn): one line a tile — "[col,row] terrain, river, road N · resources · buildings"
+    territory: owned.map(t => `[${col(t.i)},${row(t.i)}] ${TERRAIN[t.terrain].name}${t.river ? ", sông" : ""}${t.road ? `, đường ${t.road}` : ""}${t.land ? "" : ", lãnh hải"}${(() => { const r = Object.entries(visibleRes(world, n, t)); return r.length ? ` · ${r.map(([k, v]) => `${k} ${v}`).join(", ")}` : ""; })()}${(() => { const b = n.buildings.filter(x => x.tile === t.i); return b.length ? ` · ${b.map(x => x.done ? x.type : `${x.type} (đang xây)`).join(", ")}` : ""; })()}`),
     claimable: (() => {
       // the richest free tiles next to us, and always the first step toward the nearest river
       const top = [...frontier.values()].sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i).slice(0, 8);
@@ -212,13 +216,19 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
       fresh_water_for_capital: !freshWater(world, n) && dist(way.tile, n.capital) <= RIVER.waterReach ? true : undefined,
       rivers_you_hold: way.ownRiver || undefined,
     } : undefined,
-    inventions: n.inventions.map(id => ({ id, name: invName(world, id), depth: depthOf(world, id) })),
+    inventions: n.inventions.map(id => `${id} ${invName(world, id)} (d${depthOf(world, id)})`),
     capabilities: [...m.caps],
     research: n.research ? { project: n.research.id, name: invName(world, n.research.id), progress: r1(n.research.progress), cost: inventionCost(world, n, n.research.id) } : null,
     research_options: researchOptions(world, n).map(id => { const v = inv(world, id)!; return { id, name: v.name, rp: inventionCost(world, n, id), depth: depthOf(world, id), effect: v.desc, invented_by: v.custom ? world.nations[v.custom.by]?.name : undefined }; }),
     invention_budget: "power ≤ 4 + 2 × depth; depth = 1 + deepest prerequisite",
     my_proposals: world.proposals.filter(p => p.nation === n.id).slice(-3).map(p => ({ name: p.name, status: p.status, depth: p.depth, power: p.power, judge_reason: p.ruling?.reason, became: p.inventionId ?? undefined })),
-    buildings: n.buildings.map(b => ({ type: b.type, tile: xy(b.tile), done: b.done, progress: b.done ? undefined : r1(b.progress) })),
+    buildings: (() => {
+      // compact: done ones grouped by type with their tiles, the ones going up with their progress
+      const done = new Map<string, number[]>();
+      for (const b of n.buildings) if (b.done) { if (!done.has(b.type)) done.set(b.type, []); done.get(b.type)!.push(b.tile); }
+      return [...[...done.entries()].map(([t, tiles]) => `${t} ×${tiles.length} @ ${[...new Set(tiles)].map(i => `[${col(i)},${row(i)}]`).join(" ")}`),
+        ...n.buildings.filter(b => !b.done).map(b => `${b.type} [${col(b.tile)},${row(b.tile)}] đang xây ${r1(b.progress)}/${buildingOf(world, b.type)?.work ?? "?"} công`)];
+    })(),
     can_build: allBuildings(world).filter(b => n.inventions.includes(b.needs) || m.unlocked.has(b.type)).map(b => ({ type: b.type, name: b.name, cost: b.cost, work: b.work, note: b.desc })),
     recipes: allRecipes(world).filter(r => n.inventions.includes(r.needs) || m.unlocked.has(r.id)).map(r => ({ id: r.id, name: r.name, in: r.input, out: r.output, work: r.work, at: r.building, tool: r.use })),
     goods_names: Object.fromEntries(Object.keys(n.stock).map(k => [k, goodName(world, k)])),

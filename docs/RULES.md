@@ -766,6 +766,12 @@ Gồm: bản tóm tắt luật này (viết bằng tiếng Anh, `src/ai/prompt.t
 
 Ví dụ rút gọn; danh sách trường đầy đủ nằm trong `buildObservation()`:
 
+**Lịch sử của chính quốc gia:** mỗi lượt AI là một lần gọi mới, không nhớ hội thoại cũ. Vì vậy gói trạng thái mang theo cả câu chuyện của nước đó:
+- `annals`: **biên niên quốc gia** từ ngày lập quốc, do Engine tự ghi (không tốn lượt AI). Cứ 10 lượt là một chương, mỗi chương một dòng: dân đầu → cuối, lương thực và ổn định trung bình, số ô, và 5 sự kiện quan trọng nhất (lập quốc, định cư, chiến tranh, hiệp ước, kỷ nguyên, phát minh đầu tiên trên thế giới, ly khai, đói, dịch…). Quá 20 chương thì hai chương liền nhau ngắn nhất (trừ 10 chương gần nhất) gộp làm một: càng xa càng tóm tắt. Thế giới lưu trước bản này được dựng lại biên niên từ biên niên thế giới và số liệu dân số trong DB.
+- `recent_turns`: 10 lượt gần nhất, mỗi lượt một dòng: dân, lương thực, ổn định, các lệnh đã ra (✓ được làm, ✗ bị từ chối kèm lý do) và chuyện đã xảy ra.
+- `your_last_thought` và `memory` (bản ghi nhớ do AI tự viết).
+- Các phần lớn của gói (lãnh thổ, công trình, phát minh, biên niên) viết gọn mỗi mục một dòng để tiết kiệm.
+
 **Cố vấn (`advice`)** đứng đầu gói trạng thái: tối đa 7 lời khuyên do Engine tính từ chính luật đang chạy, xếp theo mức độ (!!! khẩn, !! quan trọng, ! nên làm). Gồm: lương thực sắp hết; hết chỗ ở và ba cách mở thêm (nhà ở, thôn xóm trên các ô cụ thể, điểm định cư); còn thiếu gì để lập định cư hay sang kỷ nguyên mới; thiếu nước; vượt giới hạn đất; bất mãn; hạn chế sinh khi dân ít; chưa nghiên cứu gì; lao động rảnh. Hồ sơ quốc gia hiện đúng các lời khuyên này cho Watcher.
 
 ```json

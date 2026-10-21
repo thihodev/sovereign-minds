@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, CONNECT, DEMO, EXODUS, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, ANNALS, CONNECT, DEMO, EXODUS, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -16,6 +16,7 @@ import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
+import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
@@ -729,7 +730,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (n.founded && tick > 0) {
       const brief = n.lastEvents.filter(e => !/^Dân số \d/.test(e)).slice(0, 5).map(e => e.length > 150 ? `${e.slice(0, 147)}…` : e);
       (n.recent ??= []).push({ tick, pop: n.population, food: Math.round(n.stock.food || 0), stab: n.stability, orders: n.turnOrders ?? [], events: [bookLine(n), ...brief] });
-      if (n.recent.length > 6) n.recent.shift();
+      if (n.recent.length > ANNALS.recent) n.recent.shift();
       n.turnOrders = [];
     }
     const owned = ownedTiles(world, n.id);
@@ -748,6 +749,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
 
+  writeAnnals(world, chronicle); // §8.2 each nation's story, chapter by chapter
   world.tick++;
   return { chronicle, audit: L.audit(world), fx: fxEnd() };
 }

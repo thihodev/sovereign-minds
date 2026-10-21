@@ -87,6 +87,10 @@ export class Store {
     const ins = this.db.prepare("INSERT INTO chronicle (tick, nation, kind, text) VALUES (?, ?, ?, ?)");
     for (const e of entries) ins.run(e.tick, e.nation, e.kind, e.text);
   }
+  /** Every chronicle line about one nation (its own, or naming it), oldest first. */
+  chronicleOf(nation: number, name: string): Array<{ tick: number; nation: number | null; kind: string; text: string }> {
+    return this.db.prepare("SELECT tick, nation, kind, text FROM chronicle WHERE nation = ? OR (? <> '' AND text LIKE '%' || ? || '%') ORDER BY id").all(nation, name, name) as Array<{ tick: number; nation: number | null; kind: string; text: string }>;
+  }
   chronicle(limit: number, beforeId?: number): unknown[] {
     return beforeId
       ? this.db.prepare("SELECT * FROM chronicle WHERE id < ? ORDER BY id DESC LIMIT ?").all(beforeId, limit)

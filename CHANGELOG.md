@@ -2,7 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.12 (đang làm)
+## v0.13 (đang làm)
+
+- **AI thấy toàn bộ lịch sử nước mình (§8.2):**
+  - **Biên niên quốc gia:** do Engine tự ghi từ ngày lập quốc, không tốn lượt AI. Mỗi 10 lượt là một chương một dòng: dân, lương thực, ổn định, đất, và 5 sự kiện quan trọng nhất. Chương cũ được gộp dần, nên 1.000 lượt vẫn gọn trong khoảng 20 dòng.
+  - Thế giới đang chạy được dựng lại biên niên từ dữ liệu đã lưu khi khởi động.
+  - Lượt gần đây tăng từ 6 lên **10**, mỗi lượt một dòng gồm lệnh ✓/✗ và chuyện đã xảy ra.
+  - Prompt dặn đọc biên niên và các lượt gần đây trước khi ra lệnh.
+- **Gói trạng thái gọn hơn:** lãnh thổ, công trình và phát minh viết mỗi mục một dòng. Ở một ván 600 lượt, gói trạng thái khoảng 29.500 ký tự (trước 33.500) mà vẫn chứa toàn bộ lịch sử.
+- Hồ sơ quốc gia, tab Nhật ký AI, hiện đúng biên niên mà AI đọc.
+
+## v0.12
 
 - **Giữ dân là trách nhiệm đầu tiên (§4.8):**
   - Mọi lần dân bỏ đi đều được ghi lại: bao nhiêu người, sang nước nào, vì sao (bất ổn, ganh tị với nước giàu hơn, vượt biên, phái bất mãn, ly khai).
