@@ -23,6 +23,7 @@ import { annalsLines } from "../annals.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
+import { sharedRivers } from "../border.ts";
 import { provinces } from "../provinces.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity, prosperityRank } from "../prosperity.ts";
@@ -74,7 +75,7 @@ YOUR COURT (officials): appoint people to run a field for you; each works every 
 
 ${ministersRules()}
 
-RIVERS: river tiles hold fish, clay, reeds and floodplain plants, and flint gravel near the hills. Fields on a river give +${RIVER.fieldBonus * 100}%, on a delta +${RIVER.deltaBonus * 100}%. Fish runs bring extra fish to river land (${RIVER.runChance * 100}% a turn). Fresh water ("fresh_water"): a capital with no river, swamp, hot spring or Giếng (well, building "well") within ${RIVER.waterReach} tiles grows ×${RIVER.dryGrowth} as fast and catches plague ×${RIVER.dryPlague}. With boats (capability đi-nước) explorers spend half a step on river tiles. A river tile also houses one more family (hamlets) and, with a pier, is a road for boats. Rivers are worth reaching even a few tiles away: "nearest_river" shows the nearest one you have seen and the free tiles to claim, in order, to get there ("claimable" marks the first one toward_river).
+RIVERS ARE LIFE, and worth fighting for: river tiles hold the most fish, clay, reeds and floodplain plants (wild grain) of any land, and flint gravel near the hills; each houses ${HAMLET.river} more families. Fields on a river give +${RIVER.fieldBonus * 100}%, on a delta +${RIVER.deltaBonus * 100}%. Fish runs bring extra fish to river land (${RIVER.runChance * 100}% a turn). Fresh water ("fresh_water"): a capital with no river, swamp, hot spring or Giếng (well, building "well") within ${RIVER.waterReach} tiles grows ×${RIVER.dryGrowth} as fast and catches plague ×${RIVER.dryPlague}. With boats (capability đi-nước) explorers spend half a step on river tiles. A river tile also houses one more family (hamlets) and, with a pier, is a road for boats. Neighbours that both hold land on one river quarrel over its water (border tension +${BORDER.riverFriction} a turn per river shared): "rivers_contested" lists the river land your neighbours hold near your border. Rivers are worth reaching even a few tiles away, worth settling, worth guarding, and worth a war: "nearest_river" shows the nearest one you have seen and the free tiles to claim, in order, to get there ("claimable" marks the first one toward_river).
 
 TRADE ROADS: a caravan goes overland or by water, whichever arrives first. Overland: road cost per tile = terrain move cost (grass 1, forest 2, jungle 3…), ${TRADE.landSpeed} per turn; it needs porters, 1 per ${TRADE.porterLoad} units, at most ${TRADE.porterShare * 100}% of your workers, and they do not work at home until it arrives; food on it spoils ${TRADE.landSpoil * 100}% a turn. By water: needs a finished Bến thuyền (building "pier", on a river or coast tile, needs Thuyền độc mộc) and boats (good "boat": recipe "boat", 6 wood + 1 rope at a workshop), 1 boat per ${TRADE.boatLoad} units; it sails rivers and shallow sea, ${TRADE.waterSpeed} tiles a turn; food spoils ${TRADE.waterSpoil * 100}%. Roads never enter the land of a nation at war with you; crossing a third nation's land without a passage or alliance treaty costs a toll of ${TRADE.toll * 100}% of every good. On the way: a barbarian camp within ${TRADE.hordeReach} tiles may rob it (${TRADE.hordeLoss * 100}%); storms at sea sink a boat and ${TRADE.stormLoss * 100}% of the goods (${TRADE.stormChance * 100}% a turn); if it is on the land of a nation that goes to war with you, everything is seized. "known_nations[].trade_road" shows how 15 units would go now. With a pier within ${RIVER.pierReach} tiles, your attacks reach 1 tile further to a target on a river or shore, and the defender loses the river's +25%.
 
@@ -232,6 +233,18 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
       const step = way?.path[0];
       if (step !== undefined && !top.some(t => t.i === step)) top.push(world.tiles[step]);
       return top.map(t => ({ tile: xy(t.i), terrain: TERRAIN[t.terrain].name, river: t.river || undefined, toward_river: t.i === step || undefined, res: visibleRes(world, n, t) }));
+    })(),
+    // §2.1 rivers your neighbours hold near your border: the water two peoples want
+    rivers_contested: (() => {
+      const mine = ownedTiles(world, n.id);
+      if (!mine.length) return undefined;
+      const out: Array<{ owner: string; river_tiles_near_my_border: number; nearest: number[]; shared_rivers: number }> = [];
+      for (const o of world.nations) {
+        if (o.id === n.id || !o.alive || !o.founded || !n.met.includes(o.id)) continue;
+        const near = world.tiles.filter(t => t.owner === o.id && t.river && t.land && mine.some(m => dist(m.i, t.i) <= 3));
+        if (near.length) out.push({ owner: o.name, river_tiles_near_my_border: near.length, nearest: xy(near.sort((a, b) => a.i - b.i)[0].i), shared_rivers: sharedRivers(world, n.id, o.id) });
+      }
+      return out.length ? out : undefined;
     })(),
     nearest_river: way ? {
       tile: xy(way.tile), tiles_to_claim: way.path.length, claim_in_order: way.path.slice(0, 6).map(xy),

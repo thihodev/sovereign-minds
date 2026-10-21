@@ -2,7 +2,16 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.24 (đang làm)
+## v0.25 (đang làm)
+
+- **Sông là sự sống và đáng để giành (§2.1):**
+  - ô ven sông có thêm cá, lúa hoang, sậy;
+  - ruộng ven sông +50%, ruộng châu thổ +100%; mỗi ô sông thêm 2 gia đình;
+  - hai nước láng giềng cùng giữ một con sông thì biên giới căng thêm mỗi lượt (tranh chấp nguồn nước);
+  - AI thấy `rivers_contested` và được cố vấn; bot nhắm vào đất ven sông của nước yếu.
+- **Bảng model AI:** trọng tài hiện là **một** dòng, kèm danh sách dự phòng. Trước đây mỗi nhà cung cấp dự phòng bị hiện thành một trọng tài riêng, dù mỗi đơn chỉ có một trọng tài chấm.
+
+## v0.24
 
 - **Tên tiếng Việt (§2.2):**
   - mọi tên người và nơi chốn mới (nước, thủ đô, dân tộc, điểm định cư, quan chức, đổi tên) phải là âm tiết tiếng Việt;

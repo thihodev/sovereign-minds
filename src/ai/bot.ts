@@ -206,7 +206,9 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // §7.10 among the weak, the one sitting on rich veins near our border first
   const weak = canWage ? others.filter(o => weakNeighbour(v, o)) : [];
   const covet = weak.length > 1 ? veinsNear(world, n) : [];
-  const prey = weak.sort((a, b) => covet.filter(x => x.owner === b.id).length - covet.filter(x => x.owner === a.id).length || a.id - b.id)[0];
+  // §2.1 rivers at our border count as much as veins
+  const wet = (o: Nation) => weak.length > 1 ? world.tiles.filter(t => t.owner === o.id && t.river && t.land && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id)).length : 0;
+  const prey = weak.sort((a, b) => (covet.filter(x => x.owner === b.id).length + wet(b)) - (covet.filter(x => x.owner === a.id).length + wet(a)) || a.id - b.id)[0];
 
   // 0. Too much land: give up the poorest, far from any centre — §2.9 an empty one first: giving up a lived-in tile shakes the people
   const extra = Math.ceil(Math.max(v.held - v.limit, settleNow ? v.held + ring - (v.limit + 3) : 0));

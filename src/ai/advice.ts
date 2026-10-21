@@ -2,7 +2,7 @@
 // it now, with the numbers. The rules are long; this tells each nation the few that matter this turn,
 // and it is always right about them because it is computed from the same code that applies them.
 
-import { NEIGHBORS, col, row, within } from "../hex.ts";
+import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
 import { AP_COST, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
@@ -115,6 +115,12 @@ export function advice(world: World, n: Nation): Advice[] {
   if (era && era.missing.length) say(1, `Để sang ${era.era} còn thiếu: ${era.missing.join(", ")}.`);
 
   // Water
+  // §2.1 rivers: the richest land; a neighbour's river land at our border is worth a treaty, a trade, or a war
+  {
+    const ownRiver = owned.filter(t => t.river && t.land).length;
+    const theirs = world.nations.filter(o => o.id !== n.id && o.alive && o.founded && n.met.includes(o.id)).map(o => ({ o, k: world.tiles.filter(t => t.owner === o.id && t.river && t.land && owned.some(m => dist(m.i, t.i) <= 2)).length })).filter(x => x.k > 0).sort((a, b) => b.k - a.k)[0];
+    if (theirs && ownRiver < 3) say(2, `${theirs.o.name} giữ ${theirs.k} ô đất ven sông sát biên giới ta, còn ta chỉ có ${ownRiver}. Đất ven sông giàu nhất: nhiều cá, lúa hoang, đất sét, ruộng +${RIVER.fieldBonus * 100}% (châu thổ +${RIVER.deltaBonus * 100}%), mỗi ô thêm ${HAMLET.river} gia đình. Giành lấy bằng thương lượng (nhượng đất trong hiệp ước), hoặc bằng chiến tranh khi có chính nghĩa và quân mạnh hơn.`);
+  }
   if (!freshWater(world, n)) {
     // §2.3 a settlement on a river could be the better capital
     const wet = n.settlements.find(st => within(st.tile, RIVER.waterReach).some(j => world.tiles[j].river || world.tiles[j].terrain === "swamp"));

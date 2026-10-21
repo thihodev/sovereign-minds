@@ -60,6 +60,16 @@ function spare(world: World, n: Nation): Array<[string, number]> {
   return out.sort((a, b) => b[1] * price(world, b[0]) - a[1] * price(world, a[0]) || a[0].localeCompare(b[0]));
 }
 const lacks = (n: Nation, g: string) => (n.stock[g] || 0) < BORDER.marketLack;
+/** §2.1 How many rivers both nations hold land on. */
+export function sharedRivers(world: World, a: number, b: number): number {
+  let k = 0;
+  for (const r of world.rivers) {
+    let ha = false, hb = false;
+    for (const i of r) { const o = world.tiles[i]?.owner; if (o === a) ha = true; else if (o === b) hb = true; if (ha && hb) break; }
+    if (ha && hb) k++;
+  }
+  return k;
+}
 /** §2.5 Does a road of either side reach the border between them? */
 export function roadAtBorder(world: World, a: number, b: number): boolean {
   for (const t of world.tiles) {
@@ -84,6 +94,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     let t = st.tension + Math.min(BORDER.frictionMax, len * BORDER.friction) * (kin(a, b) ? KIN.friction : 1) - BORDER.fade; // §4.5 old wounds
     for (const tr of treatiesBetween(world, a.id, b.id)) t -= BORDER.treatyCalm[tr.type] ?? 0;
     if (traded.has(pairKey(a.id, b.id))) t -= BORDER.tradeCalm;
+    t += sharedRivers(world, a.id, b.id) * BORDER.riverFriction; // §2.1 one river, two thirsts
     const foes = hostile(world, a, b); // §4.5 the old nation and the traitors
     if (foes) t = Math.max(t, KIN.tensionFloor);
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;

@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.24";
+export const RULES_VERSION = "0.25";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -140,6 +140,8 @@ export const BORDER = {
   /** `brawlsToWar` deadly brawls within `brawlWindow` turns and blood calls for blood: the side that buried more
    *  declares war (a just cause), unless a peace, alliance or vassalage binds the two. */
   brawlsToWar: 3, brawlWindow: 10,
+  /** §2.1 Neighbours that both hold land on one river quarrel over its water: +`riverFriction` tension a turn per river shared. */
+  riverFriction: 1.5,
   rise: { poach: 8, brawl: 15, crossing: 5 } as Record<string, number>,
   /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn; after
    *  `treatyBreakAfter` turns of dispute in a row their non-aggression, peace and passage treaties fall apart. */
@@ -203,7 +205,7 @@ export const IDLE = { after: 2, stability: 2 };
 export const HAMLET = {
   people: { grass: 3, coast: 3, forest: 2, taiga: 2, jungle: 2, hill: 2, swamp: 1, desert: 1, tundra: 1, glacier: 1, mountain: 0, icewall: 0, ocean: 0, shallow: 0 } as Record<string, number>,
   /** A river tile houses this many more. */
-  river: 1,
+  river: 2,
   max: 40, perEra: 20,
 };
 /** §4.2 Buildings that give housing (tents, open-invention housing): at most `perCentre` per centre (capital + each settlement). */
@@ -281,8 +283,10 @@ export const TRADE = {
 export const RIVER = {
   /** Extra reserves on river tiles; flint gravel only within `flintNear` tiles of hills or mountains (the upper course). */
   reeds: 40, plants: 20, flint: 25, flintNear: 3,
-  /** Fields on a river tile give +25%, on a delta +50%. */
-  fieldBonus: 0.25, deltaBonus: 0.5,
+  /** Fields on a river tile give +50%, on a delta +100% (the floods leave silt every year). */
+  fieldBonus: 0.5, deltaBonus: 1,
+  /** §2.1 The river's plenty, laid on every river tile after the spawns: more fish, wild grain on the floodplain, reeds. */
+  plenty: { fish: 60, plants: 40, reeds: 20 } as Record<string, number>,
   /** A capital with no river, swamp, spring or well within `waterReach` tiles grows ×dryGrowth and catches plague ×dryPlague. */
   waterReach: 2, dryGrowth: 0.75, dryPlague: 1.5,
   /** Fish run: chance a turn with river land; up to `runTiles` river tiles get `runFish` fish. */

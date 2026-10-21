@@ -313,8 +313,14 @@ export class Runner {
       for (const m of n.ministers ?? []) if (m.controller !== "bot")
         out.push({ role: "Bộ trưởng", who: `${MINISTER_DOMAINS[m.domain]?.title ?? m.domain} · ${n.name}`, provider: "claude", model: m.model ?? "", effort: m.effort ?? "", status: n.status, perTurn: 1 });
     }
-    for (const p of this.cfg.judgeProviders) if (this.cfg.judgesPerTick > 0)
-      out.push({ role: "Trọng tài", who: "chấm phát minh", provider: p, model: p === "claude" ? process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5" : p, effort: "", status: (this.judgeSleep.get(p) || 0) > Date.now() ? "asleep" : "active", perTurn: this.cfg.judgesPerTick });
+    // one judge rules on each proposal: the first provider that is awake; the rest stand by
+    const judges = this.cfg.judgeProviders.filter(p => p === "claude" || (PROVIDERS[p] && providerKey(PROVIDERS[p])));
+    if (judges.length && this.cfg.judgesPerTick > 0) {
+      const awake = judges.find(p => (this.judgeSleep.get(p) || 0) <= Date.now()) ?? judges[0];
+      const name = (p: string) => p === "claude" ? process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5" : PROVIDERS[p]?.label ?? p;
+      const spare = judges.filter(p => p !== awake);
+      out.push({ role: "Trọng tài", who: `chấm phát minh${spare.length ? ` · dự phòng khi lỗi hay hết hạn mức: ${spare.map(name).join(", ")}` : ""}`, provider: awake, model: name(awake), effort: "", status: (this.judgeSleep.get(awake) || 0) > Date.now() ? "asleep" : "active", perTurn: this.cfg.judgesPerTick });
+    }
     if (this.historian) out.push({ role: "Sử gia", who: "chép sử mỗi vài lượt", provider: "", model: this.historian.author, effort: "", status: "active", perTurn: 0 });
     return out;
   }

@@ -283,6 +283,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
 
   seedRiches(seedStr, tiles); // §2.11 and §2.10 after the spawns: fair starts are weighed without them
   seedAnimals(seedStr, tiles); // §6.4
+  seedRiverPlenty(seedStr, tiles); // §2.1
   seedVeins(seedStr, tiles);
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
@@ -354,6 +355,15 @@ export function seedRiches(seed: string, tiles: Tile[]): void {
     }
     // gold washed down from the hills into the rivers
     if (t.river && t.land && chance(0.06) && near(t, ["hill", "mountain"], 2)) put(t, "gold", jit(20));
+  }
+}
+
+/** §2.1 The river's plenty: more fish, wild grain and reeds on every river tile (after the spawns, so fair starts stay fair). */
+export function seedRiverPlenty(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "river-plenty"), jit = (v: number) => Math.round(v * (0.7 + rand() * 0.6));
+  for (const t of tiles) {
+    if (!t.river || !t.land) continue;
+    for (const [k, v] of Object.entries(RIVER.plenty) as Array<[ResKey, number]>) { const x = jit(v); t.res[k] = (t.res[k] || 0) + x; t.cap[k] = (t.cap[k] || 0) + x; }
   }
 }
 

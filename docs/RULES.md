@@ -53,6 +53,13 @@ Thế giới là lưới ô lục giác 64 × 64. Mỗi quốc gia bắt đầu 
 
 Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây dại 20–80, cá 60 (ô có sông thêm 60), gỗ 150–200, đá 300–500, đá lửa 40, đất sét 150, sậy 60, muối 30, quặng đồng 80, thiếc 60, sắt 100. Tài nguyên tái tạo hồi theo % của trần, nên 7 ô khởi đầu chỉ nuôi bền vững khoảng 40–50 người bằng săn hái. Muốn đông dân hơn thì phải mở rộng lãnh thổ hoặc phát minh trồng trọt.
 
+**Sông là sự sống, và đáng để giành (v0.25):**
+- **Ô ven sông giàu nhất:** ngoài phần có sẵn, mỗi ô ven sông có thêm khoảng 60 cá, 40 cây dại (lúa hoang trên bãi bồi) và 20 sậy. Thế giới cũ được thêm khi nạp lại.
+- **Phù sa:** ruộng trên ô sông +50%, ở châu thổ +100%. Mỗi ô sông có thêm chỗ cho 2 gia đình.
+- **Tranh chấp nguồn nước:** hai nước láng giềng cùng giữ đất trên một con sông thì căng thẳng biên giới tăng thêm 1,5 mỗi lượt cho mỗi con sông chung. Căng thẳng dồn lại thành xô xát, và xô xát lặp lại thành chiến tranh (mục 7.9).
+- **AI thấy** `rivers_contested`: đất ven sông của láng giềng sát biên giới mình, và số sông hai bên cùng giữ. Lời cố vấn nhắc giành sông bằng thương lượng hoặc chiến tranh khi mình có ít đất ven sông.
+- **Bot** ưu tiên đánh nước yếu có đất ven sông sát biên giới.
+
 ### 2.2 Lập quốc: tên, cờ, bản sắc
 
 **Tên tiếng Việt (v0.24):** mọi tên người và nơi chốn đều phải là tên tiếng Việt: tên nước, thủ đô, dân tộc, điểm định cư, quan chức, và khi đổi tên.

@@ -23,7 +23,7 @@ test("wild herds are seeded, and given to worlds from before", () => {
   for (const k of ["wolf", "wild_goat", "aurochs", "boar", "junglefowl"] as ResKey[]) assert.ok(w.tiles.some(t => (t.cap[k] || 0) > 0), k);
   for (const t of w.tiles) for (const k of ["wolf", "wild_goat", "aurochs", "boar", "junglefowl"] as ResKey[]) { delete t.res[k]; delete t.cap[k]; }
   w.riches = 1; migrate(w);
-  assert.equal(w.riches, 2);
+  assert.ok((w.riches ?? 0) >= 2);
   assert.ok(w.tiles.some(t => (t.cap.aurochs || 0) > 0));
 });
 
