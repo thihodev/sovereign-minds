@@ -11,8 +11,8 @@ const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ con
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
 function two(seed: string): World {
   const w = createWorld(seed, bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: flag("#3355ff") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bình", capital: "Do Bình", people: "Dan Bình", flag: flag("#3355ff") }] } } });
   for (const n of w.nations) { n.stock.food = 500; n.population = 80; n.met = w.nations.filter(o => o !== n).map(o => o.id); }
   return w;
 }

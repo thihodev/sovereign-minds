@@ -12,7 +12,7 @@ const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "su
 function founded(nations: number, seed: string): World {
   const w = createWorld(seed, bots(nations));
   const inputs: Record<number, TurnInput> = {};
-  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABC"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(["#c0392b", "#3355ff", "#00e676"][k]) }] } }; });
+  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, flag: flag(["#c0392b", "#3355ff", "#00e676"][k]) }] } }; });
   step(w, inputs);
   for (const n of w.nations) { n.stock.food = 400; n.population = 80; n.stability = 80; n.met = w.nations.filter(o => o !== n).map(o => o.id); }
   return w;
@@ -83,7 +83,7 @@ test("a road to the capital: the settlement is no sprawl, and roads raise the ti
     spots.push(t.i);
   }
   assert.equal(spots.length, SETTLEMENT.freeCentres + 1, "room for the settlements");
-  spots.forEach((tile, k) => { w.tiles[tile].owner = n.id; n.settlements.push({ tile, name: `S${k}`, tick: 0 }); });
+  spots.forEach((tile, k) => { w.tiles[tile].owner = n.id; n.settlements.push({ tile, name: `Sao ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, tick: 0 }); });
   const limit0 = tileLimit(w, n);
   const path = roadPlan(w, n, spots[0]);
   assert.ok(path.length >= 2, "a way through the wilds");

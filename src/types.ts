@@ -111,6 +111,8 @@ export interface Nation {
   eraTick: number | null;
   /** Tick of the last rename_nation (null = never): one rename per era change. */
   renameTick: number | null;
+  /** §2.3 the turn the capital last moved (it may move again CAPITAL_MOVE.every turns later) */
+  capitalMoved?: number;
   /** Names the nation used before rename_nation, oldest first (§2.2). */
   formerNames: string[];
   /** Inventions whose secrets a spy stole: researching them costs 50% less (§7.8). */

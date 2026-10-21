@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.23";
+export const RULES_VERSION = "0.24";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -231,7 +231,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -617,6 +617,10 @@ export const LAND_COLORS: Record<string, string> = {
 export const FLAG_LAND_DELTA_E = 15;
 /** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
 export const RENAME = { windowTicks: 5, stability: 10 };
+/** §2.3 Moving the capital to one of the nation's settlements (to richer land or a better crossroads): `materials` wood
+ *  and/or stone, −`stability` (the court and its people uprooted), once every `every` turns. The old capital becomes a
+ *  settlement. */
+export const CAPITAL_MOVE = { materials: 30, stability: 8, every: 30 };
 /** §4.10 Missions. A people with the capability `cap` sends `priests` (from its gatherers and idle hands, away from work
  *  while it lasts) for `turns` turns, paying `food` food a priest. At home: −`calm` discontent and +`stability` a turn,
  *  −`unrest` in the most restless province, births ×`births`. Abroad (a nation it knows, not at war with it, within

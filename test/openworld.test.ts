@@ -11,7 +11,7 @@ import type { AIResponse, Nation, TurnInput, World } from "../src/types.ts";
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0]; n.stock.food = 500; n.population = 130;
   return w;
 }
@@ -121,7 +121,7 @@ test("the engine catches a duplicate invention by itself and studies the one in 
   // proposed by a nation that does not own it: no judge is asked, and it studies the one in the book
   const other = createWorld("dupes-2", bots(1));
   other.custom = w.custom;
-  step(other, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "sun" } }] } } });
+  step(other, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bình", capital: "Do Bình", people: "Dan Bình", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "sun" } }] } } });
   const b = other.nations[0];
   b.inventions.push("fire"); b.research = null; b.stock.food = 500;
   step(other, { 0: { kind: "ok", response: { actions: [{ type: "propose_invention", name: "Lều da", description: "Dựng lều bằng da thú căng khung", prereqs: ["fire"], effects: [{ kind: "role_bonus", role: "hunt", percent: 10 }] }] } } });

@@ -2,8 +2,8 @@
 // it now, with the numbers. The rules are long; this tells each nation the few that matter this turn,
 // and it is always right about them because it is computed from the same code that applies them.
 
-import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { NEIGHBORS, col, row, within } from "../hex.ts";
+import { AP_COST, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -115,7 +115,11 @@ export function advice(world: World, n: Nation): Advice[] {
   if (era && era.missing.length) say(1, `Để sang ${era.era} còn thiếu: ${era.missing.join(", ")}.`);
 
   // Water
-  if (!freshWater(world, n)) say(1, "Thủ đô không có nước ngọt trong 2 ô: dân tăng chậm hơn và dễ mắc dịch. Đào Giếng (build well) hoặc chiếm đất tới sông (nearest_river).");
+  if (!freshWater(world, n)) {
+    // §2.3 a settlement on a river could be the better capital
+    const wet = n.settlements.find(st => within(st.tile, RIVER.waterReach).some(j => world.tiles[j].river || world.tiles[j].terrain === "swamp"));
+    say(1, `Thủ đô không có nước ngọt trong 2 ô: dân tăng chậm hơn và dễ mắc dịch. Đào Giếng (build well) hoặc chiếm đất tới sông (nearest_river)${wet && (n.capitalMoved === undefined || world.tick - n.capitalMoved >= CAPITAL_MOVE.every) ? `, hoặc dời đô về ${wet.name} bên sông (move_capital, ${CAPITAL_MOVE.materials} gỗ/đá, −${CAPITAL_MOVE.stability} ổn định)` : ""}.`);
+  }
 
   // Land over the limit
   const held = governed(world, n), limit = tileLimit(world, n);

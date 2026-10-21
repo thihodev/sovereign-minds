@@ -55,6 +55,11 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 ### 2.2 Lập quốc: tên, cờ, bản sắc
 
+**Tên tiếng Việt (v0.24):** mọi tên người và nơi chốn đều phải là tên tiếng Việt: tên nước, thủ đô, dân tộc, điểm định cư, quan chức, và khi đổi tên.
+- **Cách kiểm tra:** mỗi chữ phải là một âm tiết tiếng Việt (phụ âm đầu, vần, phụ âm cuối của tiếng Việt; có dấu hay không dấu đều được), không có số và chữ ngoại. Tên sai bị từ chối và AI được báo lý do.
+- **Tên do engine và bot tự sinh** (thủ lĩnh ly khai, quan, bộ trưởng, quốc gia bot) đều là tên Việt, ví dụ "Bình Sơn", "Trần Minh".
+- **Tên có từ trước** luật này vẫn giữ nguyên. Muốn đổi thì Watcher ban sắc lệnh đổi tên (mục 10.6).
+
 Ở lượt 0, trước mọi hành động khác, mỗi AI phải gửi một hành động `found_nation`:
 
 - **Tên quốc gia:** 2–30 ký tự, không trùng (không phân biệt hoa thường, bỏ dấu và ký tự đặc biệt) với quốc gia khác. Không được chứa tên model hay tên nhà cung cấp (Gemini, Llama, GPT…; danh sách cấm nằm trong `FORBIDDEN_NAME_WORDS`). Trùng thì ai gửi trước theo thứ tự seed được giữ, bên kia bị từ chối và phải chọn lại.
@@ -73,6 +78,11 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
 - **Mất ô:** ô bị chiếm trong chiến tranh, nhượng qua hiệp ước, bị bỏ (`abandon_tile`), hoặc bị cắt rời: một ô không liền với thủ đô hay điểm định cư nào trong 5 lượt liên tiếp sẽ thành vô chủ.
+
+**Dời đô (v0.24):** lệnh `move_capital` (3 AP) dời thủ đô về một điểm định cư của mình, tới vùng giàu tài nguyên, bên sông, ven biển hay chỗ thuận đường giao thương.
+- **Cái giá:** 30 gỗ và/hoặc đá, −8 ổn định, và 30 lượt mới dời lại được một lần.
+- **Sau khi dời:** thủ đô cũ thành điểm định cư. Mọi thứ tính từ thủ đô đổi theo: lối về của các điểm định cư (mục 2.7), tỉnh xa (mục 2.8), nước ngọt, chỗ ở khởi điểm.
+- **AI thấy** `capital_move`: thủ đô và từng điểm định cư có sông, ven biển, nước ngọt, đường kề bên, mạch giàu và tài nguyên quanh 2 ô hay không. Lời cố vấn gợi ý dời đô khi thủ đô thiếu nước ngọt mà có điểm định cư bên sông.
 
 ### 2.4 Đặc thù quốc gia
 

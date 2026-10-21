@@ -22,7 +22,7 @@ const bots = (k: number): NationSpec[] => Array.from({ length: k }, () => ({ con
 const FLAGS = [["#c0392b", "sun"], ["#3355ff", "moon"]];
 function founded(seed: string, pop: number): World {
   const w = createWorld(seed, bots(2));
-  step(w, Object.fromEntries(w.nations.map((n, k) => [n.id, { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"AB"[k]}`, capital: `Do${"AB"[k]}`, people: `Dan${"AB"[k]}`, flag: { layout: "h2", colors: [FLAGS[k][0], "#ffffff"], symbol: FLAGS[k][1] } }] } }])));
+  step(w, Object.fromEntries(w.nations.map((n, k) => [n.id, { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, flag: { layout: "h2", colors: [FLAGS[k][0], "#ffffff"], symbol: FLAGS[k][1] } }] } }])));
   for (const n of w.nations) { n.stock.food = 50000; n.stability = 80; }
   w.nations[0].population = pop;
   return w;
@@ -104,7 +104,7 @@ test("a minister acts only in its field, from its own AP, after the ruler; its o
   const ruler = buildObservation(v, n).ministers as { serving: Array<{ last_turn_orders: string[]; last_thought: string }> };
   assert.equal(ruler.serving[0].last_turn_orders.length, 4); assert.equal(ruler.serving[0].last_thought, "Mở đất.");
   // a minister of a nation that answered nothing still acts; one the nation does not have does nothing
-  turn(v, {}, { 0: [{ minister: 999, domain: "war", response: { actions: [{ type: "raid", target: "NuocB", warriors: 1 }] } }] });
+  turn(v, {}, { 0: [{ minister: 999, domain: "war", response: { actions: [{ type: "raid", target: "Nuoc Bình", warriors: 1 }] } }] });
   assert.ok(!orders(n).some(x => x.startsWith("[chiến tranh]")));
 });
 
@@ -119,18 +119,18 @@ test("economy labour applies only when the ruler sends none; the ruler's researc
     0: [
       { minister: eco.id, domain: "economy", response: { labor: { research: 9 } } },
       { minister: learn.id, domain: "learning", response: { actions: [{ type: "research", invention: "P2" }] } },
-      { minister: dip.id, domain: "diplomacy", response: { actions: [{ type: "treaty", to: "NuocB", kind: "peace", duration: 10 }, { type: "declare_war", target: "NuocB" }] } },
-      { minister: war.id, domain: "war", response: { warriors: 20, actions: [{ type: "declare_war", target: "NuocB" }] } },
+      { minister: dip.id, domain: "diplomacy", response: { actions: [{ type: "treaty", to: "Nuoc Bình", kind: "peace", duration: 10 }, { type: "declare_war", target: "Nuoc Bình" }] } },
+      { minister: war.id, domain: "war", response: { warriors: 20, actions: [{ type: "declare_war", target: "Nuoc Bình" }] } },
     ],
   });
   const o = orders(n).join(" | ");
   assert.equal(n.labor.research, 3, "the ruler's labour stands");
   assert.match(o, /\[kinh tế\] labor ✗ người trị vì đã phân công/);
   assert.match(o, /\[học thuật\] research P2 ✗ Người trị vì đã ra lệnh research/);
-  assert.match(o, /\[ngoại giao\] treaty NuocB ✗ Giảng hòa là việc của người trị vì/);
-  assert.match(o, /\[ngoại giao\] declare_war NuocB ✗ Ngoài lĩnh vực/);
+  assert.match(o, /\[ngoại giao\] treaty Nuoc Bình ✗ Giảng hòa là việc của người trị vì/);
+  assert.match(o, /\[ngoại giao\] declare_war Nuoc Bình ✗ Ngoài lĩnh vực/);
   assert.match(o, /\[chiến tranh\] warriors ✗/);
-  assert.match(o, /\[chiến tranh\] declare_war NuocB ✗ Ngoài lĩnh vực/);
+  assert.match(o, /\[chiến tranh\] declare_war Nuoc Bình ✗ Ngoài lĩnh vực/);
   assert.equal(w.wars.length, 0);
   // no labour from the ruler: the war minister sets the warriors
   turn(w, {}, { 0: [{ minister: war.id, domain: "war", response: { warriors: 20 } }] });
@@ -144,7 +144,7 @@ test("a minister's prompt holds only its field's rules; its observation carries 
   const m = seat(w, n, "learning");
   const sys = ministerSystem(w, n, m);
   assert.match(sys, /^You are a MINISTER/);
-  assert.match(sys, /You serve the ruler of NuocA/);
+  assert.match(sys, /You serve the ruler of Nuoc An/);
   assert.match(sys, /- research \(1\)/); assert.match(sys, /- propose_invention \(2\)/);
   assert.doesNotMatch(sys, /- declare_war \(/); assert.doesNotMatch(sys, /- build \(1\)/); assert.doesNotMatch(sys, /found_nation \(0/);
   assert.match(sys, /AN OPEN WORLD/);

@@ -11,6 +11,7 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
+import { vietPlace } from "../names.ts";
 import { localPrice, price, veinsNear } from "../market.ts";
 import { FESTIVAL, MISSION, HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
@@ -29,13 +30,15 @@ import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile,
 
 // ---------------------------------------------------------------- founding
 
-const SYL = ["ar", "ve", "lo", "mi", "ta", "ru", "en", "so", "ka", "di", "on", "ha", "li", "mu", "re", "za"];
+
 /** Primary colours far apart from each other (ΔE ≥ 25), so bots never clash. */
 const PALETTE = ["#c0392b", "#3355ff", "#00e676", "#7d3c98", "#d68910", "#00c2d1", "#f4d03f", "#6e2c00", "#f5a3c7", "#1b2631", "#85c1e9", "#a9dfbf"];
 
 function founding(world: World, n: Nation, rand: Rand): Record<string, unknown> {
-  const word = () => { let s = ""; for (let i = 0; i < 2 + Math.floor(rand() * 2); i++) s += pickOne(SYL, rand); return s[0].toUpperCase() + s.slice(1); };
-  const name = word();
+  // §2.2 Vietnamese names, and another try when one is taken
+  const takenNames = new Set(world.nations.filter(o => o.founded).flatMap(o => [o.name, o.capitalName, o.people].map(x => x.toLowerCase())));
+  let name = vietPlace(rand); for (let k = 0; k < 20 && takenNames.has(name.toLowerCase()); k++) name = vietPlace(rand);
+  let capital = vietPlace(rand); for (let k = 0; k < 20 && (takenNames.has(capital.toLowerCase()) || capital === name); k++) capital = vietPlace(rand);
   const taken = world.nations.filter(o => o.founded && o.id !== n.id).map(o => o.flag.colors[0]);
   let color = PALETTE[n.id % PALETTE.length];
   for (let k = 0; k < PALETTE.length; k++) {
@@ -43,7 +46,7 @@ function founding(world: World, n: Nation, rand: Rand): Record<string, unknown> 
     if (taken.every(t => deltaE(c, t) >= FLAG_MIN_DELTA_E) && Object.values(LAND_COLORS).every(l => deltaE(c, l) >= FLAG_LAND_DELTA_E)) { color = c; break; }
   }
   return {
-    type: "found_nation", name, capital: word(), people: `người ${name}`,
+    type: "found_nation", name, capital, people: `người ${name}`,
     flag: { layout: pickOne(FLAG_LAYOUTS, rand), colors: [color, "#f2efe6"], symbol: pickOne(FLAG_SYMBOLS, rand) },
     manifesto: "Lửa của chúng ta sẽ không bao giờ tắt.",
   };
@@ -281,7 +284,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   let settling = false;
   if (settleNow && sett !== null) {
     const names = ["Bến", "Đồi", "Suối", "Bãi", "Gò", "Làng", "Trại", "Rừng"];
-    settling = spend("found_settlement", { tile: xy(sett), name: `${names[n.settlements.length % names.length]} ${pickOne(SYL, rand).toUpperCase()[0]}${pickOne(SYL, rand)}${n.settlements.length + 1}` });
+    settling = spend("found_settlement", { tile: xy(sett), name: `${names[n.settlements.length % names.length]} ${vietPlace(rand, 1)}` });
   }
 
   let roadWork = 0; // §2.5 work for a road ordered this turn

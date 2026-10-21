@@ -16,7 +16,7 @@ const COLORS = ["#c0392b", "#3355ff", "#00e676", "#7d3c98", "#b7950b"];
 function founded(nations = 2, seed = "sys"): World {
   const w = createWorld(seed, bots(nations));
   const inputs: Record<number, TurnInput> = {};
-  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABCDE"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(COLORS[k]) }] } }; });
+  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, flag: flag(COLORS[k]) }] } }; });
   step(w, inputs);
   for (const n of w.nations) { n.stock.food = 200; n.population = 40; }
   return w;

@@ -9,7 +9,7 @@ import type { AIResponse, TurnInput, World } from "../src/types.ts";
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0]; n.stock.food = 2000; n.population = 20; n.stability = 80; // under the natural housing of 25
   return w;
 }

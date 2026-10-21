@@ -16,8 +16,8 @@ const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ con
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
 function founded(seed: string): World {
   const w = createWorld(seed, bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Aldoria", capital: "Aldor", people: "Aldori", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Bremen", capital: "Brem", people: "Bremi", flag: flag("#3355ff") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Lạc Việt", capital: "Phong Châu", people: "Lạc", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Âu Việt", capital: "Cổ Loa", people: "Âu", flag: flag("#3355ff") }] } } });
   for (const n of w.nations) { n.stock.food = 500; n.stability = 70; }
   return w;
 }
@@ -40,12 +40,12 @@ test("under a renaming decree a nation renames itself, its people and its capita
   decree(w, 5);
   turn(w); // the decree's turn begins
   const stab = a.stability;
-  assert.ok(advice(w, a).some(x => x.level === 3 && /SL-001/.test(x.text) && /thủ đô Aldor/.test(x.text)), "the advice names what is still to change");
+  assert.ok(advice(w, a).some(x => x.level === 3 && /SL-001/.test(x.text) && /thủ đô Phong Châu/.test(x.text)), "the advice names what is still to change");
   assert.equal(buildObservation(w, a).gods_rename_order?.obeyed, false);
   turn(w, { 0: { actions: [{ type: "rename_nation", name: "Đại Việt", people: "Người Việt", capital: "Thăng Long" }] } });
   assert.deepEqual(a.lastRejected, []);
   assert.equal(a.name, "Đại Việt"); assert.equal(a.people, "Người Việt"); assert.equal(a.capitalName, "Thăng Long");
-  assert.ok(a.formerNames.includes("Aldoria"));
+  assert.ok(a.formerNames.includes("Lạc Việt"));
   assert.ok(a.stability >= stab - 2, `no renaming cost (${stab} → ${a.stability})`);
   // a second time is allowed too while the decree lasts
   turn(w, { 0: { actions: [{ type: "rename_nation", flag: flag("#ffcc00") }] } });
@@ -54,11 +54,11 @@ test("under a renaming decree a nation renames itself, its people and its capita
 
 test("the rename order: capital, settlement, official; names others hold are refused", () => {
   const w = founded("rename-order"), [a, b] = w.nations;
-  a.settlements.push({ tile: a.capital + 6, name: "Westhold", tick: 0 });
-  turn(w, { 0: { actions: [{ type: "rename", what: "settlement", old: "Westhold", name: "Bến Tây" }, { type: "rename", what: "capital", name: "Brem" }] } });
+  a.settlements.push({ tile: a.capital + 6, name: "Bến Tây Cũ", tick: 0 });
+  turn(w, { 0: { actions: [{ type: "rename", what: "settlement", old: "Bến Tây Cũ", name: "Bến Tây" }, { type: "rename", what: "capital", name: "Cổ Loa" }] } });
   assert.equal(a.settlements[0].name, "Bến Tây");
   assert.ok(a.lastRejected.some(r => /đã bị dùng/.test(r.reason)), JSON.stringify(a.lastRejected));
-  assert.equal(b.capitalName, "Brem");
+  assert.equal(b.capitalName, "Cổ Loa");
 });
 
 test("at the end of the decree a nation that changed nothing loses reputation and stability", () => {

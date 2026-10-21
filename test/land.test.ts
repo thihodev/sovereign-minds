@@ -10,8 +10,8 @@ const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ con
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
 function two(seed: string): World {
   const w = createWorld(seed, bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: flag("#3355ff") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bình", capital: "Do Bình", people: "Dan Bình", flag: flag("#3355ff") }] } } });
   for (const n of w.nations) { n.stock.food = 500; n.population = 80; n.stability = 80; n.met = w.nations.filter(o => o !== n).map(o => o.id); }
   return w;
 }
@@ -56,7 +56,7 @@ test("a split nation: no pact with its old nation, a just war for the old one, a
 
 test("land beyond the limit goes wild a tile a turn, and no one is unhappy about it", () => {
   const w = createWorld("over-limit", [{ controller: "bot", provider: "bot", model: "bot" }]);
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocRong", capital: "DoRong", people: "DanRong", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Rong", capital: "Do Rong", people: "Dan Rong", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0];
   n.stock.food = 500; n.stability = 60; n.discontent = 0;
   // far more land than the people can hold

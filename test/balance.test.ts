@@ -15,7 +15,7 @@ const xy = (i: number) => [col(i), row(i)];
 function founded(nations = 1, seed = "balance"): World {
   const w = createWorld(seed, bots(nations));
   const inputs: Record<number, TurnInput> = {};
-  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABC"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(COLORS[k]) }] } }; });
+  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, flag: flag(COLORS[k]) }] } }; });
   step(w, inputs);
   for (const n of w.nations) { n.stock.food = 200; n.population = 40; }
   return w;
@@ -95,7 +95,7 @@ test("settlements beyond three wear on stability", () => {
   const w = founded();
   const n = w.nations[0];
   n.stability = 50;
-  freeTiles(w, 5).forEach((tile, k) => n.settlements.push({ tile, name: `S${k}`, tick: 0 }));
+  freeTiles(w, 5).forEach((tile, k) => n.settlements.push({ tile, name: `Sao ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, tick: 0 }));
   turn(w, {});
   assert.equal(n.stability, 50 + 1 - 2, "+1 for food, −1 for each of the two settlements beyond three");
 });

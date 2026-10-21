@@ -15,8 +15,8 @@ const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "su
 /** A and B side by side; B split from A long ago (a world from before the rule). */
 function split(seed: string): World {
   const w = createWorld(seed, bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocGoc", capital: "DoGoc", people: "DanGoc", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocTach", capital: "DoTach", people: "DanTach", flag: flag("#3355ff") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Goc", capital: "Do Goc", people: "Dan Goc", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Tach", capital: "Do Tach", people: "Dan Tach", flag: flag("#3355ff") }] } } });
   const [a, b] = w.nations;
   for (const t of w.tiles) if (t.owner === b.id) t.owner = -1;
   const edge = w.tiles.filter(t => t.owner === -1 && t.land && t.terrain !== "mountain" && NEIGHBORS[t.i].some(j => w.tiles[j].owner === a.id));
@@ -71,9 +71,9 @@ test("a nation that falls: its people live on under the victor, a fifth flee, it
   const { Ledger } = await import("../src/engine.ts");
   const { WAR } = await import("../src/rules.ts");
   const w = createWorld("fall", bots(3));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocThang", capital: "DoThang", people: "DanThang", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocMat", capital: "DoMat", people: "DanMat", flag: flag("#3355ff") }] } },
-    2: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocLanh", capital: "DoLanh", people: "DanLanh", flag: flag("#22aa44") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Thang", capital: "Do Thang", people: "Dan Thang", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Mat", capital: "Do Mat", people: "Dan Mat", flag: flag("#3355ff") }] } },
+    2: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Lanh", capital: "Do Lanh", people: "Dan Lanh", flag: flag("#22aa44") }] } } });
   const [a, d, c] = w.nations;
   d.met.push(a.id, c.id); c.stability = 90; a.stability = 60;
   d.population = 50; d.stock.wood = 40;

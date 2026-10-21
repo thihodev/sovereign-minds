@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -20,6 +20,7 @@ import { noteFlow, updateMarket } from "./market.ts";
 import { discoveryReport } from "./sea.ts";
 import { blessing, holdFestival, missionPhase, priestsAway, startMission } from "./faith.ts";
 import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
+import { vietError, vietPerson, vietPlace } from "./names.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -430,7 +431,7 @@ function validateName(label: string, v: string): string | null {
   if (v.length < 2 || v.length > 30) return `${label} phải dài 2–30 ký tự`;
   const nv = normName(v);
   if (FORBIDDEN_NAME_WORDS.some(w => nv.includes(w))) return `${label} không được dùng tên model hay nhà cung cấp`;
-  return null;
+  return vietError(label, v); // §2.2 names are Vietnamese
 }
 function nameTaken(world: World, n: Nation, name: string): string | null {
   for (const o of world.nations) if (o.id !== n.id && o.founded && normName(o.name) === normName(name)) return `Tên "${name}" đã có quốc gia khác dùng`;
@@ -474,13 +475,11 @@ export function renameOpen(world: World, n: Nation): boolean {
   return n.renameTick === null || n.renameTick <= n.eraTick;
 }
 
-const SYL = ["ka", "ru", "mi", "to", "la", "an", "ve", "so", "ha", "ni", "ra", "el", "ta", "mo", "ku", "shi", "or", "ba", "di", "yu"];
 function autoFound(world: World, n: Nation, rand: Rand): void {
-  const make = () => { const k = 2 + Math.floor(rand() * 2); let s = ""; for (let i = 0; i < k; i++) s += pickOne(SYL, rand); return s[0].toUpperCase() + s.slice(1); };
   for (let attempt = 0; attempt < 200; attempt++) {
-    const base = make();
+    const base = vietPlace(rand);
     const color = "#" + Math.floor(rand() * 0xffffff).toString(16).padStart(6, "0");
-    const a = { name: base, capital: make(), people: `người ${base}`, flag: { layout: pickOne(FLAG_LAYOUTS, rand), colors: [color, "#f4f1e8"], symbol: pickOne(FLAG_SYMBOLS, rand) } };
+    const a = { name: base, capital: vietPlace(rand), people: `người ${base}`, flag: { layout: pickOne(FLAG_LAYOUTS, rand), colors: [color, "#f4f1e8"], symbol: pickOne(FLAG_SYMBOLS, rand) } };
     if (!validateFounding(world, n, a)) { applyFounding(n, a, ""); return; }
   }
 }
@@ -1215,7 +1214,7 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
       const site = prov ? prov.centre : schismSite(world, n);
       if (site < 0) continue;
       const r = rngFor(world.seed, tick, "schism", n.id);
-      const leader = `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
+      const leader = vietPerson(r);
       const share = prov ? prov.people / n.population : SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
       const why = prov ? `tỉnh ${prov.name} ${prov.causes.filter(c => c !== "crowded").map(c => CAUSE_VI[c]).join(" và ")}; ${grievance(world, n)}` : grievance(world, n);
       const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: prov ? prov.people : Math.round(n.population * share), site, leader, grievance: why, status: "pending", ...(prov ? { province: prov.centre, provinceName: prov.name } : {}) };
@@ -1502,7 +1501,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1699,7 +1698,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       let given = String(a.name ?? "").trim().slice(0, 30);
       for (const t of new Set([OFFICIAL_DOMAINS[domain]?.title ?? "", ...Object.values(OFFICIAL_DOMAINS).map(d => d.title), "Thống đốc", "Trấn Bá", "Bá tước"]))
         if (t && given.toLowerCase().startsWith(t.toLowerCase() + " ")) { given = given.slice(t.length).trim(); break; }
-      const name = given.length >= 2 && !validateName("Tên quan", given) ? given : `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
+      const name = given.length >= 2 && !validateName("Tên quan", given) ? given : vietPerson(r); // §2.2 a Vietnamese name when the one given is not
       const o = { id: world.nextId++, name, domain, seat, skill: 1, loyalty: OFFICIALS.start, since: world.tick, lastAct: "vừa nhậm chức" };
       court.push(o);
       n.lastEvents.push(`Bổ nhiệm ${def.title} ${name}${seat !== null ? ` giữ (${col(seat)}, ${row(seat)})` : ""} (#${o.id}).`);
@@ -1767,6 +1766,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (tile < 0) return "Cần tile [cột, hàng]";
       const t = world.tiles[tile], name = String(a.name ?? "").trim().slice(0, 30);
       if (name.length < 2) return "Đặt tên cho điểm định cư (2–30 ký tự)";
+      { const err = vietError("Tên điểm định cư", name); if (err) return err; }
       if (t.owner !== -1 || !t.land || t.terrain === "mountain") return "Phải là ô đất liền vô chủ, không phải núi";
       if (centres(n).some(c => dist(c, tile) < SETTLEMENT.minDist)) return `Phải cách thủ đô và các điểm định cư khác ít nhất ${SETTLEMENT.minDist} ô`;
       if (!ownedTiles(world, n.id).some(o => dist(o.i, tile) <= SETTLEMENT.maxDist)) return `Phải trong vòng ${SETTLEMENT.maxDist} ô từ lãnh thổ`;
@@ -1842,6 +1842,28 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     case "mission": return startMission(world, n, a, L, explorers.get(n.id) || 0, to => findTarget(world, n, to));
     case "festival": return holdFestival(world, n, a, L);
     case "cull": return cull(n, a, L); // §6.4
+    case "move_capital": {
+      // §2.3 the capital moves to one of the nation's settlements; the old capital becomes a settlement
+      if (n.capitalMoved !== undefined && world.tick - n.capitalMoved < CAPITAL_MOVE.every) return `Vừa dời đô ở lượt ${n.capitalMoved}: lần tới từ lượt ${n.capitalMoved + CAPITAL_MOVE.every}`;
+      const tile = a.tile !== undefined ? parseTile(a.tile) : -1;
+      const st = n.settlements.find(x => x.tile === tile || (a.settlement !== undefined && x.name.toLowerCase() === String(a.settlement).trim().toLowerCase()));
+      if (!st) return `Thủ đô chỉ dời về một điểm định cư của bạn (settlement: tên, hoặc tile: [cột, hàng]). Có: ${n.settlements.map(x => x.name).join(", ") || "chưa có điểm định cư nào"}`;
+      if (world.tiles[st.tile].owner !== n.id) return `${st.name} không còn thuộc về bạn`;
+      const name = a.name == null ? st.name : String(a.name).trim();
+      { const err = validateName("Tên thủ đô mới", name); if (err) return err; }
+      const left: Record<string, number> = { wood: n.stock.wood || 0, stone: n.stock.stone || 0 };
+      if (left.wood + left.stone < CAPITAL_MOVE.materials) return `Dời đô cần ${CAPITAL_MOVE.materials} gỗ và/hoặc đá (đang có ${Math.floor(left.wood + left.stone)})`;
+      let need = CAPITAL_MOVE.materials;
+      for (const g of (left.wood >= left.stone ? ["wood", "stone"] : ["stone", "wood"])) { const q = Math.min(need, left[g]); if (q > 0) { L.stock(n, g, -q, "build"); need -= q; } }
+      const oldTile = n.capital, oldName = n.capitalName;
+      n.settlements = n.settlements.filter(x => x !== st);
+      n.settlements.push({ tile: oldTile, name: oldName, tick: world.tick, road: st.road });
+      n.capital = st.tile; n.capitalName = name; n.capitalMoved = world.tick;
+      n.stability = Math.max(0, n.stability - CAPITAL_MOVE.stability);
+      n.lastEvents.push(`Dời đô từ ${oldName} về ${name} (${col(st.tile)}, ${row(st.tile)}): tốn ${CAPITAL_MOVE.materials} gỗ/đá, −${CAPITAL_MOVE.stability} ổn định; ${oldName} thành điểm định cư.`);
+      say(n.id, "capital", `${n.name} dời đô từ ${oldName} về ${name}.`);
+      return null;
+    }
     case "plant_spy": {
       if (!m.caps.has(SPY.needsCap)) return "Cần năng lực tổ-chức (phát minh Hội đồng bộ lạc)";
       const target = findNation(world, a.target);

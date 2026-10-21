@@ -48,8 +48,8 @@ test("founding rules: names, model names, flag colours", () => {
   const w = createWorld("found", bots(2));
   const flag = { layout: "h2", colors: ["#aa2222", "#ffffff"], symbol: "sun" };
   const inputs: Record<number, TurnInput> = {
-    0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Arun", capital: "Lò Đá", people: "người Arun", flag }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "ARÙN", capital: "Suối", people: "người Suối", flag: { ...flag, colors: ["#ab2323", "#000000"] } }] } },
+    0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Văn Lang", capital: "Lò Đá", people: "người Văn Lang", flag }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "VĂN LÀNG", capital: "Suối", people: "người Suối", flag: { ...flag, colors: ["#ab2323", "#000000"] } }] } },
   };
   step(w, inputs);
   const founded = w.nations.filter(n => n.founded);

@@ -14,7 +14,7 @@ const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ con
 const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "sun" });
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocBien", capital: "DoBien", people: "DanBien", flag: flag("#c0392b") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bien", capital: "Do Bien", people: "Dan Bien", flag: flag("#c0392b") }] } } });
   const n = w.nations[0];
   n.stock.food = 500; n.stability = 60; n.population = 60;
   return w;

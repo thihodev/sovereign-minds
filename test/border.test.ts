@@ -13,8 +13,8 @@ const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "su
 /** Two nations; B's land is moved right next to A's. */
 function touching(seed: string): World {
   const w = createWorld(seed, bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: flag("#c0392b") }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: flag("#3355ff") }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: flag("#c0392b") }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bình", capital: "Do Bình", people: "Dan Bình", flag: flag("#3355ff") }] } } });
   const [a, b] = w.nations;
   for (const t of w.tiles) if (t.owner === b.id) t.owner = -1;
   // a strip of B's land along A's edge

@@ -14,7 +14,7 @@ const flag = (c: string) => ({ layout: "h2", colors: [c, "#ffffff"], symbol: "su
 function founded(seed: string, k = 2): World {
   const w = createWorld(seed, bots(k));
   const acts: Record<number, TurnInput> = {};
-  for (const n of w.nations) acts[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Dao${n.id}x`, capital: `Do${n.id}x`, people: `Dan${n.id}x`, flag: flag(["#c0392b", "#3355ff"][n.id]) }] } };
+  for (const n of w.nations) acts[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Dao ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][n.id]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][n.id]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][n.id]}`, flag: flag(["#c0392b", "#3355ff"][n.id]) }] } };
   step(w, acts);
   for (const n of w.nations) { n.stock.food = 600; n.population = 60; n.stability = 50; n.inventions.push("P5"); }
   return w;

@@ -8,7 +8,7 @@ import type { AIResponse, TurnInput, World } from "../src/types.ts";
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0]; n.stock.food = 3000; n.stock.wood = 100; n.population = 100;
   return w;
 }
@@ -50,8 +50,8 @@ test("a faction forms at 100, waits for the Watcher, and gives up if nobody answ
 test("refused: they ask a nation they know to take them in; it accepts, or they go home", t => {
   const margin = PROSPERITY.margin; PROSPERITY.margin = Infinity; t.after(() => { PROSPERITY.margin = margin; }); // §4.7 envy of the rich host aside
   const w = createWorld("refuge", bots(2));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } },
-    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocB", capital: "DoB", people: "DanB", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "moon" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } },
+    1: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Bình", capital: "Do Bình", people: "Dan Bình", flag: { layout: "h2", colors: ["#3355ff", "#ffffff"], symbol: "moon" } }] } } });
   const [a, b] = w.nations;
   a.stock.food = 3000; a.population = 100; b.stock.food = 3000; b.population = 10; b.stability = 80;
   a.met = [b.id]; b.met = [a.id];

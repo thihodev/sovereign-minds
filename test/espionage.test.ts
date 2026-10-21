@@ -15,7 +15,7 @@ const COLORS = ["#c0392b", "#3355ff", "#00e676"];
 function founded(nations = 2, seed = "spy"): World {
   const w = createWorld(seed, bots(nations));
   const inputs: Record<number, TurnInput> = {};
-  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc${"ABC"[k]}`, capital: `Do${k}`, people: `Dan${k}`, flag: flag(COLORS[k]) }] } }; });
+  w.nations.forEach((n, k) => { inputs[n.id] = { kind: "ok", response: { actions: [{ type: "found_nation", name: `Nuoc ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, capital: `Do ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, people: `Dan ${["An", "Bình", "Cao", "Dương", "Em", "Phú", "Gia", "Hà", "Ích", "Kim"][k]}`, flag: flag(COLORS[k]) }] } }; });
   step(w, inputs);
   for (const n of w.nations) { n.stock.food = 400; n.population = 40; }
   for (const a of w.nations) for (const b of w.nations) if (a !== b && !a.met.includes(b.id)) a.met.push(b.id);

@@ -2,7 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.23 (đang làm)
+## v0.24 (đang làm)
+
+- **Tên tiếng Việt (§2.2):**
+  - mọi tên người và nơi chốn mới (nước, thủ đô, dân tộc, điểm định cư, quan chức, đổi tên) phải là âm tiết tiếng Việt;
+  - bot và engine tự sinh tên Việt (Bình Sơn, Trần Minh…);
+  - tên cũ giữ nguyên, đổi bằng sắc lệnh đổi tên.
+- **Dời đô (§2.3):**
+  - `move_capital` dời thủ đô về một điểm định cư (30 gỗ/đá, −8 ổn định, 30 lượt một lần), thủ đô cũ thành điểm định cư;
+  - AI thấy `capital_move` để so các nơi; lời cố vấn gợi ý dời về nơi có sông khi thủ đô thiếu nước ngọt.
+
+## v0.23
 
 - **Thú nuôi và thuần hóa (§6.4):**
   - thú hoang (sói, dê núi, bò rừng, lợn rừng, gà rừng) trên bản đồ; có Thuần dưỡng thì thợ săn bắt sống về nuôi;

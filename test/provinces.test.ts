@@ -14,7 +14,7 @@ import type { AIResponse, Nation, TurnInput, World } from "../src/types.ts";
 const bots = (k: number): NationSpec[] => Array.from({ length: k }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));
-  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "NuocA", capital: "DoA", people: "DanA", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
+  step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc A", capital: "Do A", people: "Dan A", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0]; n.stock.food = 3000; n.stock.wood = 100; n.population = 100;
   return w;
 }
@@ -41,7 +41,7 @@ test("every tile in the province of its nearest centre; the people shared by hou
   n.population = Math.floor(housing(w, n)); // room for everyone: no province is crowded
   const ps = provinces(w, n);
   assert.equal(ps.length, 2);
-  assert.equal(ps[0].capital, true); assert.equal(ps[0].centre, n.capital); assert.equal(ps[0].name, "DoA");
+  assert.equal(ps[0].capital, true); assert.equal(ps[0].centre, n.capital); assert.equal(ps[0].name, "Do A");
   assert.equal(ps[1].centre, st); assert.equal(ps[1].name, "Xa Xôi");
   const all = ps.flatMap(p => p.tiles).sort((a, b) => a - b);
   assert.deepEqual(all, ownedTiles(w, n.id).map(t => t.i), "each tile in exactly one province");

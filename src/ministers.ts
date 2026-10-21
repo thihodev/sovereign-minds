@@ -3,6 +3,7 @@
 // open the seats (MINISTERS.at): growing is how a nation earns more minds. Everything here is deterministic:
 // the Watcher's answer is written into the world, and the engine acts on it at the start of the next step().
 
+import { vietPerson } from "./names.ts";
 import { AP_COST, INJECTION, MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
 import { rngFor, pickOne } from "./rng.ts";
 import { recipeOf } from "./catalog.ts";
@@ -63,7 +64,7 @@ export function requestMinister(world: World, n: Nation, a: Record<string, unkno
 
 // ---------------------------------------------------------------- the Watcher's answers, and seats lost (start of step)
 
-const SYL = ["ka", "ru", "mi", "to", "la", "an", "ve", "so", "ha", "ni", "ra", "el", "ta", "mo", "ku", "shi", "or", "ba", "di", "yu"];
+
 
 export function ministerPhase(world: World, say: Say): void {
   const tick = world.tick;
@@ -74,7 +75,7 @@ export function ministerPhase(world: World, say: Say): void {
       const court = (n.ministers ??= []);
       if (court.some(m => m.domain === x.domain)) { x.status = "refused"; x.verdict = `${x.verdict ? `${x.verdict} ` : ""}(đã có ${def.title})`; x.delivered = false; continue; }
       const r = rngFor(world.seed, tick, "minister", n.id, x.id);
-      const name = `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
+      const name = vietPerson(r); // §2.2
       const m: Minister = { id: world.nextId++, domain: x.domain, name, controller: x.controller ?? "bot", model: x.model ?? "bot", effort: x.effort, since: tick, request: x.id, lastOrders: [] };
       court.push(m);
       x.status = "done"; x.minister = m.id; x.delivered = true;
