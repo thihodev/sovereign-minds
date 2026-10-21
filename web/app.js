@@ -16,7 +16,9 @@
     glacier: ["Băng hà", "#c4d8e2"], icewall: ["Tường Băng", "#eef7fc"],
   };
   const ZONE = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" };
-  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải", coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa hoang", boat: "thuyền" };
+  const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải", coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa hoang", boat: "thuyền",
+    honey: "mật ong", spice: "gia vị", fur: "lông thú", amber: "hổ phách", ochre: "đất son", marble: "cẩm thạch", gold: "vàng", silver: "bạc", gems: "đá quý",
+    shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi" };
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 
   let ST = null, S = null, geo = null, hoverI = -1;
@@ -486,7 +488,7 @@
   }
 
   // §6.1 buildings on their tiles: an icon for what each does; one going up carries scaffolding and a ring of its progress
-  const BTYPE = { tent: "⛺", field: "🌾", pen: "🐐", workshop: "🔨", kiln: "🏺", pit: "🕳", altar: "⛩", palisade: "🪵", well: "🪣", pier: "⚓" };
+  const BTYPE = { tent: "⛺", field: "🌾", pen: "🐐", workshop: "🔨", kiln: "🏺", pit: "🕳", altar: "⛩", palisade: "🪵", well: "🪣", pier: "⚓", fish_dock: "🎣", salt_pan: "🧂", harbor: "🚢", temple: "🏛" };
   const BKIND = { housing: "🏠", farm: "🌾", craft: "🔨", port: "⚓", water: "🪣", defense: "🛡", sacred: "⛩", store: "🏺", other: "🏛" };
   const bIcon = b => BTYPE[b.type] || BKIND[b.kind] || "🏛";
   function drawBuildings(g, vis, s, z, px) {
@@ -1080,14 +1082,33 @@
   // What you clicked: a tile (with its owner) or a nation.
   let inspect = null, inspReq = 0;
   const REGION = { west: "Lục địa Tây", east: "Lục địa Đông", isl: "Quần đảo" };
-  const HIDDEN_RES = new Set(["copper", "tin", "iron"]);
+  const HIDDEN_RES = new Set(["copper", "tin", "iron", "gold", "silver", "gems"]);
   function inspectNation(id) {
     const n = S.nations[id]; if (!n) return;
     pinnedI = -1; inspect = { kind: "nation", id };
     openRight("inspect"); renderInspector();
     if (n.alive) centerOn(n.capital); else scheduleRender();
   }
-  const VEIN_COLOR = { copper: "#d9822b", tin: "#b8c4cc", iron: "#7a4a3a", salt: "#ffffff", flint: "#3d3d4a", clay: "#b5653c", coal: "#222222", sulfur: "#e8d84a", oil: "#111111", horse: "#a0703a" };
+  const VEIN_COLOR = { copper: "#d9822b", tin: "#b8c4cc", iron: "#7a4a3a", salt: "#ffffff", flint: "#3d3d4a", clay: "#b5653c", coal: "#222222", sulfur: "#e8d84a", oil: "#111111", horse: "#a0703a",
+    gold: "#ffd700", silver: "#e6e8ec", gems: "#3fd0c9", marble: "#f4f1ea", amber: "#ffb000", spice: "#c0392b", fur: "#8b5a2b", fish: "#4fc3f7", pearl: "#fdf6e3", whale: "#2c3e70" };
+  // §2.11 the sea around a nation, and the fine things its people enjoy
+  function seaBlock(n) {
+    const v = n.sea, l = n.luxuries, out = [];
+    const xyT = t => `(${t.join(", ")})`;
+    if (l) out.push(`<p class="note">Xa xỉ phẩm đang dùng: ${l.kinds.length ? l.kinds.map(g => esc(RES[g] ?? g)).join(", ") : "không"} (+${l.stability} ổn định/lượt; mỗi loại cần ${l.need} trong kho)</p>`);
+    if (v) {
+      const rows = [];
+      rows.push(`Thuyền: ${v.can.hold_shallow_sea ? "giữ được biển nông" : "chưa (cần Thuyền độc mộc)"}${v.can.hold_deep_sea ? ", vượt biển sâu" : ""} · bến ${v.can.piers}${v.can.harbors ? ` (cảng ${v.can.harbors})` : ""} · bến cá ${v.can.fish_bonus_from_docks}`);
+      if (v.my_waters) rows.push(`Lãnh hải ${v.my_waters.tiles} ô: cá ${v.my_waters.fish} (hồi ${v.my_waters.fish_regrows_per_turn}/lượt)${v.my_waters.pearls ? ` · ngọc trai ${v.my_waters.pearls}` : ""}${v.my_waters.coral ? ` · san hô ${v.my_waters.coral}` : ""}${v.my_waters.whales ? ` · cá voi ${v.my_waters.whales}` : ""}`);
+      if (v.my_shore) rows.push(`Bờ biển ${v.my_shore.tiles} ô: sò ốc ${v.my_shore.shellfish}${v.my_shore.amber ? ` · hổ phách ${v.my_shore.amber}` : ""}`);
+      const f = v.free_waters_near;
+      if (f) rows.push(`Biển vô chủ gần: ${f.tiles} ô (${f.shallow} nông), cá ${f.fish}, hồi ${f.fish_regrows_per_turn}/lượt · chiếm ngay được ${f.claimable_now}${f.fishing_grounds.length ? ` · ngư trường ◆ ${f.fishing_grounds.map(x => xyT(x.tile)).join(" ")}` : ""}${f.pearl_beds.length ? ` · ngọc trai ${f.pearl_beds.map(x => xyT(x.tile)).join(" ")}` : ""}${f.whales.length ? ` · cá voi ${f.whales.map(x => xyT(x.tile)).join(" ")}` : ""}`);
+      if (v.pier_sites) rows.push(`Chỗ dựng bến tốt: ${v.pier_sites.map(p => `${xyT(p.tile)} (${p.fish_within_reach} cá)`).join(", ")}`);
+      for (const a of v.lands_across_the_sea || []) rows.push(`Đất bên kia biển ${xyT(a.nearest)}${a.island ? " (quần đảo)" : ""}: đã thấy ${a.seen_tiles} ô, cách thủ đô ${a.distance}${a.owners ? ` · của ${a.owners.map(esc).join(", ")}` : ""}${a.free_goods ? ` · vô chủ có ${a.free_goods.map(esc).join(", ")}` : ""}`);
+      out.push(`<h3>Biển</h3><ul class="plain">${rows.map(r => `<li>${r}</li>`).join("")}</ul>`);
+    }
+    return out.join("");
+  }
   function nationBlock(n, tile) {
     const el = document.createElement("section"); el.className = "insp-nation";
     const pct = n.research ? Math.min(100, n.research.progress / n.research.cost * 100) : 0;
@@ -1281,6 +1302,7 @@
           <h3>Lao động</h3>${chipsOf(labor)}
           <h3>Kho</h3>${chipsOf(stock)}
           <h3>Tài nguyên</h3>${resTable(n)}
+          ${seaBlock(n)}
           ${n.market ? `<h3>Đặc sản & thị trường</h3><p class="note">Đặc sản: ${n.market.specialties.map(x => `${esc(x.name)}${x.veins ? ` ◆${x.veins} mạch` : ""} (${Math.round(x.share * 100)}% trữ lượng các nước)`).join(", ") || "—"}<br>Thế mạnh: ${[...n.market.edge.inventions, ...n.market.edge.products].map(esc).join(", ") || "—"}<br>Thiếu: ${n.market.shortages.map(x => `${esc(x.name)} (giá ở đây ${x.local}, thế giới ${x.world})`).join(", ") || "—"}<br>Dư: ${n.market.surpluses.map(x => `${esc(x.name)} +${x.spare} (giá ${x.world})`).join(", ") || "—"}</p>` : ""}
           <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => { const l = n.links?.[x.tile]; return `${x.name} ${({ road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" })[l] ?? "✗ cô lập"}`; }))}
           ${n.roadNet ? `<h3>Đường sá & lãnh hải</h3><p class="note">${n.roadNet.tiles} ô đường nối các trung tâm (+${Math.min(10, Math.floor(n.roadNet.tiles / 4))} giới hạn ô) · ${n.roadNet.linked.length}/${(n.settlements || []).length} điểm định cư đã nối thủ đô (🛤) · cấp tối đa: ${esc(S.roadLevels[n.roadNet.level - 1].name)} / ${esc(S.roadLevels[n.roadNet.level - 1].lane)}${n.roadNet.works ? ` · ${n.roadNet.works} ô đang làm` : ""}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}</p>` : ""}
@@ -1393,17 +1415,33 @@
     incite: "Kích động", message: "Gửi tin", trade_offer: "Đề nghị trao đổi", accept_trade: "Nhận trao đổi", treaty: "Đề nghị hiệp ước", accept_treaty: "Nhận hiệp ước",
     break_treaty: "Phá ước", declare_war: "Tuyên chiến", declare_independence: "Tuyên bố độc lập", attack: "Tấn công", raid: "Đột kích", clear_wild: "Đánh man di",
     quarantine: "Cách ly", request_minister: "Xin bộ trưởng AI",
+    appoint_official: "Bổ nhiệm quan", dismiss_official: "Bãi nhiệm quan", reward_official: "Ban thưởng quan", build_road: "Làm đường",
+    family_policy: "Phong tục gia đình", accept_migrants: "Nhận dân di cư", rename: "Đổi tên địa danh", gift: "Tặng quà",
   };
-  const KEY = { tile: "ô", target: "nhắm", to: "gửi", warriors: "chiến binh", people: "người", direction: "hướng", from: "từ", invention: "phát minh", type_: "loại", building: "công trình", name: "tên", text: "nội dung", kind: "loại", duration: "thời hạn", offer: "đề nghị", give: "đưa", get: "nhận", horde: "bộ lạc", title: "tiêu đề", reason: "lý do", category: "loại", capital: "thủ đô", people_: "dân tộc", tribute: "cống phẩm", payer: "bên nộp" };
-  function val(v) {
-    if (Array.isArray(v) && v.length === 2 && v.every(x => typeof x === "number")) return `(${v[0]}, ${v[1]})`;
-    if (v && typeof v === "object") return Object.entries(v).map(([k, q]) => typeof q === "number" ? `${q} ${RES[k] ?? k}` : `${k}: ${val(q)}`).join(", ");
-    return String(v);
+  // the values the AIs write in English, said in Vietnamese
+  const WORD = {
+    governor: "bá tước", general: "đại tướng", agriculture: "thượng thư nông", scholar: "đại học sĩ", merchant: "tổng quản thương", builder: "tổng công trình", explorer: "trưởng đoàn thám hiểm",
+    economy: "kinh tế", war: "quân sự", diplomacy: "ngoại giao", learning: "học thuật", interior: "nội vụ",
+    encourage: "khuyến khích sinh", neutral: "tự nhiên", limit: "hạn chế sinh", men: "chỉ đàn ông", all: "mọi người",
+    non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu",
+    me: "mình", them: "bên kia", on: "bật", off: "tắt", capital: "thủ đô", settlement: "điểm định cư", official: "quan chức",
+    E: "Đông", W: "Tây", NE: "Đông Bắc", NW: "Tây Bắc", SE: "Đông Nam", SW: "Tây Nam",
+  };
+  const KEY = { tile: "ô", target: "nhắm", to: "gửi", warriors: "chiến binh", people: "người", direction: "hướng", from: "từ", invention: "phát minh", type_: "loại", building: "công trình", name: "tên", text: "nội dung", kind: "loại", duration: "thời hạn", offer: "đề nghị", give: "đưa", get: "nhận", horde: "bộ lạc", title: "tiêu đề", reason: "lý do", category: "loại", capital: "thủ đô", people_: "dân tộc", tribute: "cống phẩm", payer: "bên nộp",
+    domain: "chức", seat: "trấn giữ", official: "quan", path: "đường", level: "cấp", births: "sinh đẻ", fighters: "ra trận", what: "đổi", old: "tên cũ", treaty: "hiệp ước", accept: "nhận", faction: "phe", on: "bật", cede: "nhượng ô", gesture: "cử chỉ", good: "hàng", amount: "số lượng", qty: "số lượng", answer: "trả lời" };
+  const isXY = v => Array.isArray(v) && v.length === 2 && v.every(x => typeof x === "number");
+  function val(v, k) {
+    if (isXY(v)) return `(${v[0]}, ${v[1]})`;
+    if (Array.isArray(v)) return v.every(isXY) ? v.map(x => val(x)).join(" → ") : v.map(x => val(x)).join(", "); // a road: its tiles in order
+    if (v && typeof v === "object") return Object.entries(v).map(([g, q]) => typeof q === "number" ? `${q} ${RES[g] ?? g}` : `${KEY[g] ?? g}: ${val(q)}`).join(", ");
+    if (typeof v === "boolean") return v ? "có" : "không";
+    if (k === "people" && typeof v === "string") return v; // a people's name
+    return WORD[v] ?? RES[v] ?? String(v);
   }
   function actionLine(a) {
     if (!a || typeof a !== "object") return esc(String(a));
     if (a.type === "propose_invention") return `<b>${ACTION[a.type]}</b> “${esc(a.name)}”: ${esc(a.description || "")}${effectList(Array.isArray(a.effects) ? a.effects : [])}`;
-    const rest = Object.entries(a).filter(([k]) => k !== "type" && k !== "flag" && k !== "manifesto").map(([k, v]) => `${KEY[k] ?? k} ${esc(val(v))}`).join(" · ");
+    const rest = Object.entries(a).filter(([k]) => k !== "type" && k !== "flag" && k !== "manifesto").map(([k, v]) => `${KEY[k] ?? k} ${esc(val(v, k))}`).join(" · ");
     return `<b>${esc(ACTION[a.type] ?? a.type)}</b>${rest ? ` — ${rest}` : ""}`;
   }
   function parseReply(raw) {

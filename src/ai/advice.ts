@@ -3,10 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, LUXURY, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers } from "../engine.ts";
+import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, neighbours } from "../border.ts";
@@ -16,7 +16,8 @@ import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
-import { goodVi, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
+import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
+import { seaAdvice } from "../sea.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -207,6 +208,16 @@ export function advice(world: World, n: Nation): Advice[] {
   const mine = specialtiesOf(world, n).filter(x => x.veins.length);
   const exposed = mine.flatMap(x => x.veins.map(i => ({ good: x.good, i }))).find(v => world.nations.some(o => o.alive && o.founded && o.id !== n.id && activeWar(world, n.id, o.id) && world.tiles.some(t => t.owner === o.id && Math.abs(col(t.i) - col(v.i)) + Math.abs(row(t.i) - row(v.i)) <= 3)));
   if (exposed) say(3, `Mạch ${goodVi(world, exposed.good)} của bạn ở ${xy(exposed.i)} nằm sát quân thù: đặt chiến binh, dựng hàng rào, đừng để mất nó.`);
+
+  // §2.11 the sea, and the fine things that calm a people
+  for (const a of seaAdvice(world, n)) say(a.level, a.text);
+  const lux = luxuries(world, n);
+  if (lux.kinds.length < 2 && n.population >= 20) {
+    const res = landReserves(world).get(n.id) ?? {};
+    const onLand = LUXURY.goods.filter(g => !lux.kinds.includes(g) && (res[g]?.amount ?? 0) > 0 && canSeeRes(world, n, g)).map(g => goodVi(world, g));
+    const sellers = known.filter(o => LUXURY.goods.some(g => surpluses(world, o).some(x => x.good === g))).map(o => o.name);
+    say(1, `Xa xỉ phẩm: dân đang dùng ${lux.kinds.length ? lux.kinds.map(g => goodVi(world, g)).join(", ") : "không thứ nào"} (+${lux.stability} ổn định/lượt). Mỗi loại có đủ ${lux.need} trong kho cho thêm +${LUXURY.stability}/lượt (tối đa +${LUXURY.max}).${onLand.length ? ` Trên đất bạn có: ${onLand.join(", ")} (hái lượm, săn, đánh cá hay đào mỏ để lấy).` : ""}${sellers.length ? ` Mua của ${sellers.slice(0, 3).join(", ")}.` : ""}`);
+  }
 
   for (const a of ministerAdvice(world, n)) say(a.level, a.text);
 

@@ -15,7 +15,9 @@ export type Region = "west" | "east" | "isl" | null;
 export type ResKey =
   | "game" | "plants" | "fish" | "wood" | "stone" | "flint" | "clay"
   | "salt" | "reeds" | "copper" | "tin" | "iron" | "herbs"
-  | "coal" | "oil" | "sulfur" | "horse";
+  | "coal" | "oil" | "sulfur" | "horse"
+  | "honey" | "spice" | "fur" | "amber" | "ochre" | "marble" | "gold" | "silver" | "gems"
+  | "shellfish" | "pearl" | "coral" | "whale";
 
 export type Role =
   | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay" | "mine"
@@ -416,6 +418,8 @@ export interface World {
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
   borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it
+  /** §2.11 the riches of land and sea were seeded (worlds before v0.18 get them when loaded) */
+  riches?: number;
   /** §6.3 world prices in food units, and last turn's for the trend (worlds before v0.17 have none) */
   market?: { prices: Record<string, number>; prev: Record<string, number> };
 }

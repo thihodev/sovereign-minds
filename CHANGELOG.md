@@ -2,7 +2,30 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.17 (đang làm)
+## v0.18 (đang làm)
+
+- **Sản vật của đất và biển (§2.11).**
+  - Tài nguyên mới trên đất: mật ong, gia vị, lông thú, hổ phách, đất son, cẩm thạch, vàng, bạc, đá quý (ba thứ cuối ẩn như quặng).
+  - Tài nguyên mới dưới biển: sò ốc, ngọc trai, san hô, cá voi (cho dầu cá voi).
+  - Hái lượm mang về mật ong, gia vị, hổ phách; săn mang về lông thú; ngư dân mò ngọc trai và san hô, nhặt sò ốc khi hết cá, và săn cá voi khi có tàu viễn dương. Thợ mỏ đào vàng, bạc, đá quý, cẩm thạch, đất son.
+  - Mạch giàu mới, kể cả trên biển: ngư trường, bãi ngọc trai, đường cá voi.
+- **Công dụng:**
+  - xa xỉ phẩm có trong kho được dùng hết dần, mỗi loại +0,3 ổn định mỗi lượt (tối đa +1,5), và được giá cao trên thị trường;
+  - muối và gia vị giữ lương thực lâu hơn; lông thú giữ ấm như áo da.
+- **Công trình mới:** Bến cá, Ruộng muối, Cảng (chiếm lãnh hải xa hơn), Đền cẩm thạch.
+- **AI hiểu biển:**
+  - khối `sea` trong gói quan sát: lãnh hải, bờ biển, biển vô chủ gần, ngư trường, chỗ dựng bến, đất bên kia biển;
+  - `luxuries`: xa xỉ phẩm đang dùng;
+  - lời cố vấn về biển và xa xỉ phẩm;
+  - mỗi đoàn thám hiểm về báo lại những gì đã thấy.
+- **Watcher:**
+  - mục Biển và xa xỉ phẩm trong tab Kinh tế;
+  - lớp bản đồ cho mọi sản vật;
+  - dấu ◆ cho các mạch mới;
+  - nhật ký AI dịch mọi lệnh và giá trị sang tiếng Việt (bổ nhiệm quan, làm đường, phong tục…), và đường đi hiện là chuỗi ô.
+- **Hiệu năng:** vòng hồi tài nguyên chỉ duyệt những tài nguyên ô đó có. Mỗi lượt nhanh hơn khoảng 30%.
+
+## v0.17
 
 - **Mạch giàu (§2.10).** Mỗi loại hàng (đồng, thiếc, sắt, muối, đá lửa, đất sét, than, lưu huỳnh, dầu, ngựa) có 6–12 mạch rải khắp bản đồ, cách nhau ≥ 12 ô. Mỗi mạch có trữ lượng gấp 4 và cho +50% khi khai thác. Chiếm ô là chiếm mạch. Bản đồ đánh dấu ◆. Thế giới cũ được thêm mạch khi nạp lại.
 - **Giá cả (§6.3).** Giá thế giới (tính bằng lương thực) = giá chuẩn × √(cầu ÷ cung), từ ×0,25 tới ×4. Cầu là thứ đã dùng hoặc cần cho công thức; cung là thứ làm ra cộng kho. Mỗi nước còn có giá riêng, cho biết nó thiếu hay dư gì. Chợ biên giới và bot đổi hàng theo giá này. Đề nghị trao đổi kèm `worth`.

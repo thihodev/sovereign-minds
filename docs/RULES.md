@@ -207,6 +207,66 @@ Không vùng đất nào có đủ mọi thứ. Lúc tạo thế giới, sau khi
 - Thế giới tạo trước v0.17 được thêm mạch giàu khi nạp lại.
 - Trên bản đồ, mạch giàu là dấu ◆ màu theo loại hàng.
 
+### 2.11 Sản vật của đất và biển
+
+Ngoài những thứ cơ bản (thú săn, cây dại, cá, gỗ, đá, đá lửa, đất sét, muối, sậy, thảo dược, ngựa, quặng), thế giới còn có:
+
+| Sản vật | Ở đâu | Ai mang về | Hồi lại |
+| --- | --- | --- | --- |
+| Mật ong | rừng (25%), rừng rậm (30%), đồng cỏ không lạnh (10%) | hái lượm 0,05/người | 10%/lượt |
+| Gia vị | rừng rậm (50%), rừng và đồng cỏ nhiệt đới (12%) | hái lượm 0,04/người | 8% |
+| Hổ phách | bờ biển ôn đới và hàn đới (10%) | hái lượm 0,02/người | không |
+| Lông thú | rừng taiga (50%), lãnh nguyên (40%), sông băng (30%), rừng hàn đới (30%) | săn 0,08/người | 8% |
+| Đất son | đồi (15%), sa mạc (12%) | khai mỏ | không |
+| Cẩm thạch | núi (8%), đồi (5%) | khai mỏ | không |
+| Vàng (ẩn) | núi (4%), đồi (3%), sông gần đồi núi (6%, vàng sa khoáng) | khai mỏ | không |
+| Bạc (ẩn) | núi (5%), đồi (2%) | khai mỏ | không |
+| Đá quý (ẩn) | núi (3%) | khai mỏ | không |
+| Sò ốc | bờ biển (60%), biển nông (20%) | ngư dân, khi cá đã hết: 1 lương thực mỗi đơn vị | 12% |
+| Ngọc trai | biển nông nhiệt đới (8%), ôn đới (3%) | ngư dân 0,03/người | 3% |
+| San hô | biển nông nhiệt đới (6%) | ngư dân 0,02/người | 2% |
+| Cá voi | biển sâu (2–4%) | ngư dân có tàu viễn dương 0,05/người, trên biển sâu mình giữ; mỗi con: 6 lương thực, 2 xương, 1 dầu cá voi | 4% |
+
+- **Quặng ẩn:** vàng, bạc, đá quý ẩn như đồng, thiếc, sắt cho tới khi có năng lực nhận-biết-khoáng.
+- **Thứ tự khai mỏ:** thợ mỏ đào `mine_target` trước, rồi các quặng nhìn thấy được, rồi muối, sậy, cẩm thạch, đất son.
+- **Mạch giàu (mục 2.10)** có thêm: vàng 6, bạc 6, đá quý 4, cẩm thạch 6, hổ phách 4, gia vị 6, lông thú 6. Trên biển có **ngư trường** (cá, 10 mạch), **bãi ngọc trai** (6) và **đường cá voi** (4).
+- **Thế giới cũ:** thế giới tạo trước v0.18 được thêm sản vật và mạch mới khi nạp lại.
+
+**Công dụng:**
+- **Xa xỉ phẩm** (mật ong, gia vị, lông thú, hổ phách, đất son, vàng, bạc, đá quý, ngọc trai, san hô, dầu cá voi):
+  - mỗi loại nước có trong kho từ 0,5% số dân trở lên (ít nhất 1) thì mỗi lượt dùng hết phần đó và được +0,3 ổn định;
+  - tối đa +1,5 ổn định mỗi lượt;
+  - mọi dân tộc đều muốn có (cầu 1% số dân mỗi lượt cho mỗi loại, mục 6.3), nên xa xỉ phẩm bán được giá cao.
+- **Muối và gia vị** giữ lương thực: mỗi đơn vị trong kho giảm hư hỏng 0,2 điểm %, tối đa 4 điểm.
+- **Lông thú** giữ ấm: mỗi tấm tính như 2 áo da khi xét mùa đông.
+- **Cẩm thạch** dùng xây Đền cẩm thạch.
+
+**Công trình mới:**
+
+| Công trình | Cần | Vật liệu | Công | Tác dụng |
+| --- | --- | --- | --- | --- |
+| Bến cá | Lưới và bẫy (P9), ô bờ biển hoặc có sông, tối đa 2 | 10 gỗ, 3 dây | 5 | đánh cá +25% (mọi bến cộng lại tối đa +50%) |
+| Ruộng muối | Gốm (P13), ô bờ biển, tối đa 3 | 6 đất sét, 4 đá | 6 | +3 muối mỗi lượt từ nước biển |
+| Cảng | Đếm (P18), ô bờ biển, tối đa 2 | 30 gỗ, 20 đá, 6 dây | 14 | như Bến thuyền; chiếm lãnh hải xa thêm 3 ô; đánh cá +10% |
+| Đền cẩm thạch | Nghi lễ (P5), tối đa 1 | 20 cẩm thạch, 10 đá | 10 | +2 ổn định mỗi lượt |
+
+**AI biết gì về biển** (`sea` trong gói quan sát):
+- thuyền giữ được biển nông hay biển sâu, số bến và cảng;
+- lãnh hải và bờ biển của mình: cá, lượng cá hồi mỗi lượt, ngọc trai, san hô, cá voi, sò ốc, hổ phách;
+- vùng biển vô chủ gần mình (trong 6 ô): số ô, cá, lượng cá hồi mỗi lượt, số ô chiếm được ngay, ngư trường, bãi ngọc, cá voi;
+- chỗ tốt nhất để dựng bến;
+- đất đã thấy bên kia biển: ô gần nhất, khoảng cách, có phải quần đảo không, của nước nào, đất vô chủ có gì.
+
+Lời cố vấn nhắc về biển giàu cá chưa khai thác, ngư trường vô chủ, bãi ngọc trai, việc thiếu bến thuyền và đất bên kia biển. Nó cũng nhắc xa xỉ phẩm khi dân dùng chưa tới 2 loại.
+
+**Báo cáo thám hiểm:** mỗi đoàn thám hiểm về báo lại những gì vừa thấy lần đầu:
+- số ô mới (đất và nước), sông;
+- mạch giàu (của ai hay vô chủ), kỳ quan;
+- hai ô đất vô chủ tốt nhất;
+- tài nguyên trên đất và nước vô chủ, kèm tổng lượng và chỗ gần nhất;
+- biển nông (lượng cá, lượng cá hồi), biển sâu (có cá voi không);
+- đất bên kia biển, đất của các nước khác, trại man di.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.

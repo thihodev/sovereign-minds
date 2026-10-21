@@ -1,6 +1,7 @@
 // Watcher HTTP server: the web UI, a JSON API, a live event stream (SSE),
 // Claude login and the Claude chat. Meant for a local machine.
 
+import { seaView } from "./sea.ts";
 import { shortages, specialtiesOf, surpluses, techEdge } from "./market.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -10,7 +11,7 @@ import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allBuildings, allInventions, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
-import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
+import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
 import { ministerAp, ministerSeats, nextMilestone } from "./ministers.ts";
@@ -65,7 +66,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
 
   /** A building's purpose, for its map icon (§6.1). */
   function buildingKind(e: Record<string, unknown>): string {
-    return e.housing ? "housing" : e.farmSlots ? "farm" : e.craftSlots ? "craft" : e.port ? "port" : e.water ? "water" : e.defense ? "defense" : e.stability ? "sacred" : e.spoilage ? "store" : "other";
+    return e.housing ? "housing" : e.farmSlots || e.seaSalt ? "farm" : e.craftSlots ? "craft" : e.port || e.fish ? "port" : e.water ? "water" : e.defense ? "defense" : e.stability ? "sacred" : e.spoilage ? "store" : "other";
   }
 
   function statePayload() {
@@ -115,6 +116,9 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         // §4.9 AI ministers: seats, the next milestone, each minister's own AP
         ministers: (n.ministers ?? []).map(m => ({ ...m, title: MINISTER_DOMAINS[m.domain]?.title ?? m.domain })),
         ministerSeats: ministerSeats(n.population), ministerNext: nextMilestone(n.population), ministerAp: ministerAp(n),
+        // §2.11 the sea around it, and the luxuries its people enjoy
+        sea: n.alive && n.founded ? seaView(w, n) : null,
+        luxuries: n.alive && n.founded ? luxuries(w, n) : null,
         // §6.3 + §7.10 riches, edge, lacks (the Watcher sees every ore)
         market: n.alive && n.founded ? (() => { const e = techEdge(w, n); return {
           specialties: specialtiesOf(w, n, null).map(x => ({ good: x.good, name: goodName(w, x.good), share: x.share, veins: x.veins.length })),

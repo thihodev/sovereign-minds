@@ -281,20 +281,23 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     if (d >= 12 * SCALE * 0.75 && d <= 20 * SCALE * 0.8 && tiles[p].region === tiles[q].region) { herd = [p, q]; break; }
   }
 
-  seedVeins(seedStr, tiles); // §2.10 after the spawns: fair starts are weighed without them
+  seedRiches(seedStr, tiles); // §2.11 and §2.10 after the spawns: fair starts are weighed without them
+  seedVeins(seedStr, tiles);
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
 
-export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "horse", "copper", "tin", "iron", "coal", "sulfur", "oil"];
+export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "horse", "copper", "tin", "iron", "coal", "sulfur", "oil",
+  "honey", "spice", "fur", "amber", "ochre", "marble", "gold", "silver", "gems", "shellfish", "pearl", "coral", "whale"];
 
 /** §2.1 Coal, oil, sulfur (hidden) and wild horses, laid with their own random stream so the rest of the
  *  map is unchanged; also run once on worlds made before they existed. Sets reserves and caps. */
 /** §2.10 Rich veins: a few of each good's deposits, spread over the map, hold far more and yield more. */
-export function seedVeins(seed: string, tiles: Tile[]): void {
-  const rand = rngFor(seed, "veins");
-  for (const [k, count] of Object.entries(VEIN.count) as Array<[ResKey, number]>) {
-    const picked: number[] = [];
-    for (const t of shuffle(tiles.filter(t => t.land && !t.vein && (t.cap[k] || 0) > 0).map(t => t.i), rand)) {
+export function seedVeins(seed: string, tiles: Tile[], goods: string[] = Object.keys(VEIN.count)): void {
+  const rand = rngFor(seed, "veins", goods.join(","));
+  for (const k of goods as ResKey[]) {
+    const count = VEIN.count[k] ?? 0, picked: number[] = [];
+    const sea = (VEIN.water as string[]).includes(k); // fishing grounds, pearl beds and whale roads lie at sea; the rest on land
+    for (const t of shuffle(tiles.filter(t => !t.vein && t.land !== sea && (t.cap[k] || 0) > 0).map(t => t.i), rand)) {
       if (picked.length >= count) break;
       if (picked.some(j => dist(j, t) < VEIN.apart)) continue;
       const x = tiles[t]; picked.push(t);
@@ -302,6 +305,53 @@ export function seedVeins(seed: string, tiles: Tile[]): void {
       const more = Math.round((x.cap[k] || 0) * (VEIN.mult - 1));
       x.res[k] = (x.res[k] || 0) + more; x.cap[k] = (x.cap[k] || 0) + more;
     }
+  }
+}
+
+/** §2.11 The riches of land and sea beyond the basics: luxuries, precious ores, marble, and the sea's own goods. */
+export function seedRiches(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "riches"), jit = (v: number) => Math.round(v * (0.7 + rand() * 0.6));
+  const put = (t: Tile, k: ResKey, v: number) => { t.res[k] = (t.res[k] || 0) + v; t.cap[k] = (t.cap[k] || 0) + v; };
+  const near = (t: Tile, terr: string[], r: number) => within(t.i, r).some(j => terr.includes(tiles[j].terrain));
+  for (const t of tiles) {
+    const z = t.zone, chance = (p: number) => rand() < p;
+    switch (t.terrain) {
+      case "forest":
+        if (chance(0.25)) put(t, "honey", jit(15));
+        if (z === "trop" && chance(0.12)) put(t, "spice", jit(20));
+        if (z === "cold" && chance(0.3)) put(t, "fur", jit(25));
+        break;
+      case "jungle": if (chance(0.3)) put(t, "honey", jit(15)); if (chance(0.5)) put(t, "spice", jit(20)); break;
+      case "grass": if (z !== "cold" && chance(0.1)) put(t, "honey", jit(15)); if (z === "trop" && chance(0.12)) put(t, "spice", jit(20)); break;
+      case "taiga": if (chance(0.5)) put(t, "fur", jit(25)); break;
+      case "tundra": if (chance(0.4)) put(t, "fur", jit(25)); break;
+      case "glacier": if (chance(0.3)) put(t, "fur", jit(25)); break;
+      case "hill":
+        if (chance(0.15)) put(t, "ochre", jit(60));
+        if (chance(0.05)) put(t, "marble", jit(300));
+        if (chance(0.03)) put(t, "gold", jit(30));
+        if (chance(0.02)) put(t, "silver", jit(40));
+        break;
+      case "mountain":
+        if (chance(0.08)) put(t, "marble", jit(300));
+        if (chance(0.04)) put(t, "gold", jit(30));
+        if (chance(0.05)) put(t, "silver", jit(40));
+        if (chance(0.03)) put(t, "gems", jit(15));
+        break;
+      case "desert": if (chance(0.12)) put(t, "ochre", jit(60)); break;
+      case "coast":
+        if (chance(0.6)) put(t, "shellfish", jit(30));
+        if (z !== "trop" && chance(0.1)) put(t, "amber", jit(20));
+        break;
+      case "shallow":
+        if (chance(0.2)) put(t, "shellfish", jit(25));
+        if (chance(z === "trop" ? 0.08 : z === "temp" ? 0.03 : 0)) put(t, "pearl", jit(12));
+        if (z === "trop" && chance(0.06)) put(t, "coral", jit(10));
+        break;
+      case "ocean": if (chance(z === "trop" ? 0.02 : 0.04)) put(t, "whale", jit(20)); break;
+    }
+    // gold washed down from the hills into the rivers
+    if (t.river && t.land && chance(0.06) && near(t, ["hill", "mountain"], 2)) put(t, "gold", jit(20));
   }
 }
 

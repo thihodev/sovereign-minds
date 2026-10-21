@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -17,6 +17,7 @@ import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
 import { noteFlow, updateMarket } from "./market.ts";
+import { discoveryReport } from "./sea.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -75,10 +76,28 @@ export class Ledger {
 export function totals(world: World): Record<string, number> {
   const out: Record<string, number> = {};
   const add = (k: string, v: number) => { out[k] = (out[k] || 0) + (v || 0); };
-  for (const t of world.tiles) for (const [k, v] of Object.entries(t.res)) add(k, v || 0);
-  for (const n of world.nations) for (const [k, v] of Object.entries(n.stock)) add(k, v);
+  for (const t of world.tiles) for (const k in t.res) add(k, t.res[k as ResKey] || 0);
+  for (const n of world.nations) for (const k in n.stock) add(k, n.stock[k]);
   for (const c of world.caravans || []) for (const [k, v] of Object.entries(c.goods)) add(k, v);
   return out;
+}
+
+/** §2.6 + §2.11 Is this water within reach of one of the nation's piers (further from a harbour)? */
+export function seaReach(world: World, n: Nation, tile: number): boolean {
+  return n.buildings.some(b => {
+    const e = buildingOf(world, b.type)?.effect;
+    return !!e?.port && buildingWorks(world, b) && world.tiles[b.tile].owner === n.id && dist(b.tile, tile) <= SEA.pierReach + (e.harbor || 0);
+  });
+}
+
+/** §2.11 Ores dug with no special knowledge, after the hidden ones the nation can see. */
+export const OPEN_MINE: ResKey[] = ["salt", "reeds", "marble", "ochre"];
+
+/** §2.11 Luxuries in store: each kind the people can enjoy this turn is used up and calms them. */
+export function luxuries(world: World, n: Nation): { kinds: string[]; stability: number; need: number } {
+  const need = Math.max(1, n.population * LUXURY.use);
+  const kinds = LUXURY.goods.filter(g => (n.stock[g] || 0) >= need);
+  return { kinds, stability: Math.min(LUXURY.max, kinds.length * LUXURY.stability), need: Math.round(need * 10) / 10 };
 }
 
 // ---------------------------------------------------------------- creation
@@ -92,7 +111,7 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
     version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, hordes: newHordes(seed, gen.wild), registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
-    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {},
+    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 1,
   };
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
@@ -733,9 +752,10 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
 
   // 9. Regrowth of renewable reserves
   for (const t of world.tiles) {
-    for (const [k, share] of Object.entries(REGEN) as Array<[ResKey, number]>) {
-      const cap = t.cap[k] || 0, cur = t.res[k] || 0;
-      if (cap > 0 && cur < cap) L.tile(t, k, Math.min(cap - cur, cap * share), "regen");
+    for (const k in t.cap) { // only the reserves this tile has
+      const share = REGEN[k as ResKey]; if (!share) continue;
+      const cap = t.cap[k as ResKey] || 0, cur = t.res[k as ResKey] || 0;
+      if (cap > 0 && cur < cap) L.tile(t, k as ResKey, Math.min(cap - cur, cap * share), "regen");
     }
   }
 
@@ -856,8 +876,24 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const k = HUNT_TOOLS.slice().reverse().find(t => (n.stock[t] || 0) >= 1);
     if (k) L.stock(n, k, -1, "wear");
   }
-  const f = take("fish", labor.fish * YIELD.fish * mult("fish"), "fish");
+  // §2.11 docks and harbours help the fishers; when the fish run short they gather shellfish on the shore
+  const fishWant = labor.fish * YIELD.fish * mult("fish") * (1 + Math.min(0.5, doneEffect(world, n, "fish")));
+  const f = take("fish", fishWant, "fish");
   L.stock(n, "food", f, "fish"); foodMade += f;
+  if (taken < fishWant) { const sh = take("shellfish", fishWant - taken, "fish") * SEA_HARVEST.shellfish; L.stock(n, "food", sh, "fish"); foodMade += sh; }
+  // §2.11 with ocean ships, whales on the deep water the nation holds
+  if (labor.fish && m.move.has("ocean")) {
+    const wh = take("whale", labor.fish * SEA_HARVEST.whaleRate * mult("fish"), "fish");
+    for (const [g, q] of Object.entries(SEA_HARVEST.whale)) L.stock(n, g, wh * q, "fish");
+    foodMade += wh * (SEA_HARVEST.whale.food || 0);
+  }
+  // §2.11 what the workers bring home besides: honey, spices, amber, furs, pearls, coral
+  for (const [role, goods] of Object.entries(HARVEST)) {
+    if (!labor[role as Role]) continue;
+    for (const [g, rate] of Object.entries(goods) as Array<[ResKey, number]>) L.stock(n, g, take(g, labor[role as Role] * rate * mult(role as Role), role), role);
+  }
+  // §2.11 salt pans on the shore
+  const pans = doneEffect(world, n, "seaSalt"); if (pans) L.stock(n, "salt", pans, "extract");
   for (const r of ["wood", "stone", "flint", "clay"] as Role[]) {
     if (!labor[r]) continue;
     let effort = labor[r];
@@ -871,8 +907,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   // Mining: visible ores first (the nation's choice), then salt and reeds
   if (labor.mine) {
-    const visible = ["copper", "tin", "iron", ...DEEP_RES].filter(k => m.reveal.has(k));
-    const order = [n.mineTarget, ...visible, "salt", "reeds"].filter((k, i, a) => k && a.indexOf(k) === i && (["salt", "reeds"].includes(k) || m.reveal.has(k))) as ResKey[];
+    const visible = [...HIDDEN_ORES, ...DEEP_RES].filter(k => m.reveal.has(k));
+    const order = [n.mineTarget, ...visible, ...OPEN_MINE].filter((k, i, a) => k && a.indexOf(k) === i && ((OPEN_MINE as string[]).includes(k) || m.reveal.has(k))) as ResKey[];
     let want = labor.mine * YIELD.extract * mult("mine");
     for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= taken; }
   }
@@ -922,7 +958,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const capZone = world.tiles[n.capital].zone;
   if (erand() < winterChance(world, n)) {
     const lost = Math.min(n.stock.food || 0, foodMade * EVENTS.winter.foodLoss); L.stock(n, "food", -lost, "winter");
-    const dead = Math.floor(n.population * winterDeathShare(world, n, m.winter, doneEffect(world, n, "housing") > 0, (n.stock.hide_coat || 0) >= n.population / 2));
+    const dead = Math.floor(n.population * winterDeathShare(world, n, m.winter, doneEffect(world, n, "housing") > 0, (n.stock.hide_coat || 0) + (n.stock.fur || 0) * KEEP.furCoats >= n.population / 2)); // §2.11 furs keep warm too
     takePeople(n, dead, "winter");
     fx({ kind: "winter", tile: n.capital, nation: n.id }); fxDeath(n.capital, n.id, dead, "winter");
     n.lastEvents.push(`Mùa đông khắc nghiệt: mất ${fmt(lost)} lương thực, ${dead} người chết rét.`);
@@ -1028,8 +1064,11 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
   }
   if (m.caps.has(DEMO.marriageCap)) n.stability += DEMO.marriageStability;
+  const lux = luxuries(world, n); // §2.11
+  if (lux.kinds.length) { for (const g of lux.kinds) L.stock(n, g, -lux.need, "luxury"); n.stability += lux.stability; }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
   spoil -= Math.min(SPOILAGE.potteryMax, Math.floor(n.stock.pottery || 0) * SPOILAGE.potteryEach); // sealed pots keep food
+  spoil -= Math.min(KEEP.max, Math.floor((n.stock.salt || 0) + (n.stock.spice || 0)) * KEEP.each); // §2.11 salted, spiced
   if (ownsWonder(world, n, "salt")) spoil *= 0.5;
   spoil = Math.max(SPOILAGE.min, spoil);
   L.stock(n, "food", -(n.stock.food || 0) * spoil, "spoil");
@@ -1520,8 +1559,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!t.land && !m.move.has("shallow")) return "Cần năng lực đi-nước (thuyền) để giữ ô biển nông";
       if (!NEIGHBORS[tile].some(j => world.tiles[j].owner === n.id)) return "Ô phải kề lãnh thổ";
       // §2.6 waters off your own shore are yours to hold; further out, only within reach of your piers
-      if (!t.land && !NEIGHBORS[tile].some(j => world.tiles[j].owner === n.id && world.tiles[j].land) && !piers(world, n).some(p => dist(p, tile) <= SEA.pierReach))
-        return `Vùng biển không giáp bờ của bạn phải nằm trong ${SEA.pierReach} ô quanh một Bến thuyền của bạn`;
+      if (!t.land && !NEIGHBORS[tile].some(j => world.tiles[j].owner === n.id && world.tiles[j].land) && !seaReach(world, n, tile))
+        return `Vùng biển không giáp bờ của bạn phải nằm trong ${SEA.pierReach} ô quanh một Bến thuyền của bạn (Cảng: thêm 3 ô)`;
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
       claims.push({ n, tile });
@@ -1719,7 +1758,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if ((explorers.get(n.id) || 0) + people > spare) return "Người thám hiểm được lấy từ nhóm hái lượm và người rảnh, nhưng không đủ người";
       explorers.set(n.id, (explorers.get(n.id) || 0) + people);
       const rand = rngFor(world.seed, world.tick, "explore", n.id, dir);
-      const seen = new Set(n.seen), canSail = m.move.has("shallow");
+      const seen = new Set(n.seen), canSail = m.move.has("shallow"), fresh: number[] = [];
       let cur = parseTile(a.from) >= 0 && world.tiles[parseTile(a.from)].owner === n.id ? parseTile(a.from) : n.capital, danger = 0;
       const walked = [cur];
       const passable = (i: number) => {
@@ -1739,7 +1778,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         cur = nx; walked.push(nx);
         budget -= canSail && t.river ? RIVER.exploreStep : 1;
         danger = Math.max(danger, tileDanger(world, t));
-        for (const j of within(cur, canSail ? 3 : 2)) seen.add(j);
+        for (const j of within(cur, canSail ? 3 : 2)) if (!seen.has(j)) { seen.add(j); fresh.push(j); }
         if (t.owner !== -1 && t.owner !== n.id) {
           const o = world.nations[t.owner];
           const passage = treatiesBetween(world, n.id, o.id, ["passage", "alliance"]).length > 0;
@@ -1750,7 +1789,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       let dead = 0; for (let k = 0; k < people; k++) if (rand() < BEASTS.explorerBase + BEASTS.explorerPerDanger * danger) dead++;
       if (dead) { takePeople(n, dead, "explore"); n.lastEvents.push(`${dead} người thám hiểm không trở về.`); }
       fx({ kind: "explore", tile: walked[0], nation: n.id, path: walked, n: people }); fxDeath(cur, n.id, dead, "explore");
-      n.lastEvents.push(`Đoàn thám hiểm đi hướng ${dir} và trở về.`);
+      n.lastEvents.push(discoveryReport(world, n, dir, fresh)); // §7.6 what they saw
       return null;
     }
     case "plant_spy": {

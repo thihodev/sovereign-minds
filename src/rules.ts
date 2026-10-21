@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.17";
+export const RULES_VERSION = "0.18";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -27,15 +27,18 @@ export const ZONE_NAME = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhi�
 export const REGION_NAME = { west: "Lục địa Tây", east: "Lục địa Đông", isl: "Quần đảo Đá Lửa" } as const;
 
 /** Renewable reserves regrow by this share of their cap each tick (§2.1). */
-export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08, horse: 0.06 };
+export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08, horse: 0.06,
+  honey: 0.10, spice: 0.08, fur: 0.08, shellfish: 0.12, pearl: 0.03, coral: 0.02, whale: 0.04 };
 /** Ores are invisible to AIs until they own the capability below (§2.1). */
-export const HIDDEN_ORES: ResKey[] = ["copper", "tin", "iron"];
+export const HIDDEN_ORES: ResKey[] = ["copper", "tin", "iron", "gold", "silver", "gems"];
 export const ORE_SENSE_CAP = "nhận-biết-khoáng";
 
 export const RES_NAME: Record<string, string> = {
   game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét",
   salt: "muối", reeds: "sậy", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", herbs: "thảo dược", boat: "thuyền",
   coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa",
+  honey: "mật ong", spice: "gia vị", fur: "lông thú", amber: "hổ phách", ochre: "đất son", marble: "cẩm thạch", gold: "vàng", silver: "bạc", gems: "đá quý",
+  shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
   bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
@@ -463,7 +466,9 @@ export const INVENTIONS: Invention[] = [
 export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INVENTIONS.map(v => [v.id, v]));
 
 // §6.1 Buildings
-export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number; water?: number; port?: number }
+export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number; water?: number; port?: number;
+  /** §2.11 fishing +share; salt from the sea a turn; a harbour reaches further over the water */
+  fish?: number; seaSalt?: number; harbor?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -480,6 +485,12 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "well", name: "Giếng", needs: "stone_tools", cost: { stone: 10, wood: 4 }, work: 5, desc: "Nước ngọt cho thủ đô xa sông (trong vòng 2 ô).", effect: { water: 1 } },
   { type: "pier", name: "Bến thuyền", needs: "P16", cost: { wood: 12, rope: 2 }, work: 5, perTile: true, terrains: ["coast"], river: true, desc: "Thuyền ra vào: buôn bằng đường thủy; quân có thuyền vượt sông.", effect: { port: 1 } },
   { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác.", effect: { craftSlots: 4 } },
+  // §2.11 the sea
+  { type: "fish_dock", name: "Bến cá", needs: "P9", cost: { wood: 10, rope: 3 }, work: 5, perTile: true, max: 2, terrains: ["coast"], river: true, desc: "Phơi lưới, kéo thuyền: đánh cá +25% (tối đa 2 bến).", effect: { fish: 0.25 } },
+  { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
+  { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%.", effect: { port: 1, harbor: 3, fish: 0.1 } },
+  // §2.11 marble
+  { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
 
@@ -505,14 +516,34 @@ export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
 /** Standard value of each good (§6.2): an open recipe's output is worth what went in plus labour. */
 export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
-  copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
+  copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6,
+  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
+/** §2.11 What the workers bring home besides their main yield, per worker a turn, from the land and water they hold
+ *  (gatherers: herbs §9.4, honey, spices, amber on the beach; hunters: furs; fishers: pearls, coral). */
+export const HARVEST: Record<string, Partial<Record<ResKey, number>>> = {
+  gather: { honey: 0.05, spice: 0.04, amber: 0.02 },
+  hunt: { fur: 0.08 },
+  fish: { pearl: 0.03, coral: 0.02 },
+};
+/** §2.11 The sea: fishers gather shellfish on the shore (`shellfish` food each, after the fish), and with ocean ships
+ *  hunt whales on deep water they hold (`whaleRate` a fisher; each whale gives `whale` goods). */
+export const SEA_HARVEST = { shellfish: 1, whaleRate: 0.05, whale: { food: 6, bone: 2, whale_oil: 1 } as Record<string, number> };
+/** §2.11 Luxuries: a people with `use` × its people of a luxury in store each turn uses it up and gains `stability`
+ *  (at most `max` from all of them); the market wants `want` × people of each a turn (§6.3). */
+export const LUXURY = { goods: ["honey", "spice", "fur", "amber", "ochre", "gold", "silver", "gems", "pearl", "coral", "whale_oil"], use: 0.005, stability: 0.3, max: 1.5, want: 0.01 };
+/** §2.11 Salt and spices keep food: each unit in store cuts spoilage by `each` points, at most `max`.
+ *  Furs keep people warm: `furCoats` coats' worth each (a people with coats for half of it loses half as many to the cold). */
+export const KEEP = { each: 0.002, max: 0.04, furCoats: 2 };
 /** §2.10 Rich veins: a few deposits of each good hold `mult` times the reserves and yield +`yield` to whoever works them.
  *  `count` per good on the whole map, at least `apart` tiles from another vein of the same good. */
 export const VEIN = {
-  count: { copper: 12, tin: 8, iron: 8, salt: 8, flint: 10, clay: 6, coal: 8, sulfur: 6, oil: 6, horse: 8 } as Record<string, number>,
+  count: { copper: 12, tin: 8, iron: 8, salt: 8, flint: 10, clay: 6, coal: 8, sulfur: 6, oil: 6, horse: 8,
+    gold: 6, silver: 6, gems: 4, marble: 6, amber: 4, spice: 6, fur: 6, fish: 10, pearl: 6, whale: 4 } as Record<string, number>,
   mult: 4, yield: 0.5, apart: 12,
+  /** veins of these lie at sea */
+  water: ["fish", "pearl", "whale"],
 };
 /** §6.3 Prices, in units of food. A good's world price is its standard value × √(demand / supply), within
  *  [`min`, `max`] × the standard value, moving `pace` of the way each turn. Demand is what the nations used

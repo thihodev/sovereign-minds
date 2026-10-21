@@ -4,16 +4,16 @@
 // Prices are computed at the end of each turn from what the nations made, used and hold; the rest are pure reads.
 
 import { dist } from "./hex.ts";
-import { GOOD_VALUE, MARKET, RES_NAME } from "./rules.ts";
+import { GOOD_VALUE, LUXURY, MARKET, RES_NAME } from "./rules.ts";
 import { allRecipes, depthOf, goodValue, invName } from "./catalog.ts";
 import { canSeeRes, mods, type Ledger } from "./engine.ts";
 import type { Nation, ResKey, World } from "./types.ts";
 
 /** Goods of the land a nation can be rich in (§7.10). */
-export const LAND_GOODS: ResKey[] = ["copper", "tin", "iron", "salt", "flint", "clay", "stone", "wood", "reeds", "herbs", "horse", "coal", "oil", "sulfur", "fish", "game"];
+export const LAND_GOODS: ResKey[] = ["copper", "tin", "iron", "gold", "silver", "gems", "marble", "salt", "flint", "clay", "ochre", "stone", "wood", "reeds", "herbs", "honey", "spice", "fur", "amber", "horse", "coal", "oil", "sulfur", "fish", "pearl", "coral", "whale", "game"];
 /** Ledger reasons that are making or using a good, not moving it between nations or losing it. */
 const MADE = new Set(["gather", "hunt", "fish", "extract", "mine", "craft", "growth", "bounty"]);
-const USED = new Set(["eat", "craft", "wear", "build", "road", "settle", "claim", "officials", "reward", "births"]);
+const USED = new Set(["eat", "craft", "wear", "build", "road", "settle", "claim", "officials", "reward", "births", "luxury"]);
 
 /** The Ledger's note of a stock change, by nation: what was made and what was used this turn. */
 export function noteFlow(flows: Map<number, Record<string, [number, number]>>, n: Nation, key: string, delta: number, reason: string): void {
@@ -34,6 +34,7 @@ export function wants(world: World, n: Nation): Record<string, number> {
     if (!n.inventions.includes(rec.needs) && !m.unlocked.has(rec.id)) continue;
     for (const [g, q] of Object.entries(rec.input)) out[g] = (out[g] || 0) + q * MARKET.recipeWant;
   }
+  for (const g of LUXURY.goods) out[g] = (out[g] || 0) + n.population * LUXURY.want; // §2.11 every people likes fine things
   return out;
 }
 /** A nation's need for a good per turn: what it used, or what its recipes want if more. */
@@ -135,6 +136,7 @@ export interface Shortage { good: string; local: number; world: number; need: nu
 export function shortages(world: World, n: Nation): Shortage[] {
   const w = wants(world, n), out: Shortage[] = [];
   for (const g of goods(world)) {
+    if ((LUXURY.goods as string[]).includes(g)) continue; // fine things are wanted, not needed (§2.11)
     const need = needOf(world, n, g, w); if (need < 0.3 || !canSeeRes(world, n, g)) continue;
     const local = localPrice(world, n, g, w);
     if (local >= goodValue(world, g) * MARKET.dear) out.push({ good: g, local, world: price(world, g), need: Math.round(need * 10) / 10, have: Math.round(haveOf(n, g) * 10) / 10 });
