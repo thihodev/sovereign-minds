@@ -11,6 +11,8 @@ import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
+import { MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
+import { ministerAp, ministerSeats, nextMilestone } from "./ministers.ts";
 import { WHY_VI, exodusOf } from "./exodus.ts";
 import { annalsFor } from "./annals.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
@@ -109,12 +111,16 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null,
         nextEra: n.alive ? nextEraNeeds(w, n) : null, courtSlots: n.alive ? maxOfficials(w, n) : 0,
         officials: (n.officials ?? []).map(o => ({ ...o, title: OFFICIAL_DOMAINS[o.domain]?.title ?? o.domain })), work: n.alive && n.founded ? workSites(w, n) : [],
+        // §4.9 AI ministers: seats, the next milestone, each minister's own AP
+        ministers: (n.ministers ?? []).map(m => ({ ...m, title: MINISTER_DOMAINS[m.domain]?.title ?? m.domain })),
+        ministerSeats: ministerSeats(n.population), ministerNext: nextMilestone(n.population), ministerAp: ministerAp(n),
       })),
       hordes: (w.hordes ?? []).map(h => ({ ...h, strength: Math.round(h.strength) })),
       lastFx: runner.lastFx,
       spies: w.spies,
       petitions: w.petitions,
       schisms: (w.schisms ?? []).map(x => ({ ...x, fromName: w.nations[x.from]?.name, nationName: x.nation !== undefined ? w.nations[x.nation]?.name : undefined, toName: x.to !== undefined ? w.nations[x.to]?.name : undefined, waitLeft: x.status === "pending" ? Math.max(0, SCHISM.waitTicks - (w.tick - x.tick)) : 0 })),
+      ministerRequests: (w.ministerRequests ?? []).map(x => ({ ...x, nationName: w.nations[x.nation]?.name, title: MINISTER_DOMAINS[x.domain]?.title ?? x.domain, desc: MINISTER_DOMAINS[x.domain]?.desc ?? "", populationNow: w.nations[x.nation]?.population ?? 0, seats: ministerSeats(w.nations[x.nation]?.population ?? 0), waitLeft: x.status === "pending" ? Math.max(0, MINISTERS.waitTicks - (w.tick - x.tick)) : 0 })),
       claudeModels: CLAUDE_MODELS, claudeEfforts: CLAUDE_EFFORTS,
       decrees: w.decrees,
       laws: lawTable(w),
@@ -230,6 +236,19 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (schM && method === "POST") {
         const b = await readBody(req);
         const err = runner.decideSchism(Number(schM[1]), String(b.status), String(b.model ?? ""), String(b.effort ?? ""), String(b.verdict ?? ""));
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      // §4.9 the Watcher grants (with a mind) or refuses a minister, or dismisses one
+      const minM = path.match(/^\/api\/ministers\/requests\/(\d+)$/);
+      if (minM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.decideMinister(Number(minM[1]), String(b.status), String(b.model ?? ""), String(b.effort ?? ""), String(b.verdict ?? ""));
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      const disM = path.match(/^\/api\/nation\/(\d+)\/ministers\/(\d+)\/dismiss$/);
+      if (disM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.dismissMinister(Number(disM[1]), Number(disM[2]), String(b.verdict ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
       const propM = path.match(/^\/api\/proposals\/(\d+)$/);

@@ -164,6 +164,49 @@ export interface Nation {
   provinceUnrest?: Record<string, number>;
   /** §4.7 how well the people lives, and how it feels about it against the nations it knows */
   prosperity?: Prosperity;
+  /** §4.9 the AI ministers the gods granted it, each running one field (worlds before v0.14 have none) */
+  ministers?: Minister[];
+}
+
+/** §4.9 An AI minister: one more mind that runs one field of its nation every turn, from its own AP. */
+export interface Minister {
+  id: number;
+  domain: string;
+  name: string;
+  /** Its mind: a Claude model and effort, or the bot's logic for its field. */
+  controller: "ai" | "bot";
+  model: string;
+  effort?: string;
+  since: number;
+  /** The request it was granted by. */
+  request: number;
+  /** Last turn: what it thought and what it ordered (✓/✗), and the tick. */
+  lastThought?: string;
+  lastOrders?: string[];
+  lastTick?: number;
+}
+
+/** §4.9 A nation's request to the gods for a minister, waiting for the Watcher. */
+export interface MinisterRequest {
+  id: number;
+  nation: number;
+  domain: string;
+  tick: number;
+  /** The people when it asked. */
+  population: number;
+  reason: string;
+  /** pending → approved (by the Watcher) → done (the minister took office next turn) → ended (dismissed or stepped down);
+   *  or refused / expired. */
+  status: "pending" | "approved" | "refused" | "expired" | "done" | "ended";
+  controller?: "ai" | "bot";
+  model?: string;
+  effort?: string;
+  verdict?: string;
+  decidedTick?: number;
+  /** The minister it became. */
+  minister?: number;
+  /** The nation has been told of the Watcher's last word (refusal, dismissal). */
+  delivered?: boolean;
 }
 
 /** §4.7 Prosperity 0–100 (four parts of 25) and national pride. */
@@ -334,6 +377,8 @@ export interface World {
   nations: Nation[];
   /** §4.5 factions that want to leave, and those that did (worlds before v0.6 have none) */
   schisms?: Schism[];
+  /** §4.9 nations' requests for AI ministers (worlds before v0.14 have none) */
+  ministerRequests?: MinisterRequest[];
   wonders: Wonder[];
   rivers: number[][];
   herd: [number, number] | null;
@@ -403,10 +448,15 @@ export interface Ruling {
 }
 
 /** What one nation submitted for a tick. Logged verbatim, so replay is exact. */
-export type TurnInput =
+export type TurnInput = (
   | { kind: "ok"; response: AIResponse }
   | { kind: "asleep" }
-  | { kind: "silent"; reason: string };
+  | { kind: "silent"; reason: string }
+) & {
+  /** §4.9 what the nation's ministers answered this turn (absent: none); they act after the ruler, whatever the ruler's kind. */
+  ministers?: MinisterInput[];
+};
+export interface MinisterInput { minister: number; domain: string; response: AIResponse }
 
 export interface AIResponse {
   thought?: string;

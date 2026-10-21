@@ -20,7 +20,12 @@ import { historianFromEnv, type Historian, type HistoryChapter } from "./histori
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus, killAllClaude } from "./claude.ts";
 import type { Store } from "./db.ts";
 import type { MapFx } from "./fx.ts";
-import type { AIResponse, ChronicleEntry, Nation, Ruling, TurnInput, World } from "./types.ts";
+import type { AIResponse, ChronicleEntry, Minister, Nation, Ruling, TurnInput, World } from "./types.ts";
+import { MINISTER_DOMAINS, MINISTERS } from "./rules.ts";
+import { botMinister, ministerObservation, ministerSystem } from "./ai/minister.ts";
+
+/** §4.9 One minister's answer for a tick: "asleep" when the world waits on Claude (asked again on the retry). */
+type MinisterTurn = { minister: number; domain: string; kind: "ok" | "asleep" | "silent"; response?: AIResponse };
 
 export interface RunnerConfig {
   seed: string;
@@ -101,7 +106,7 @@ export class Runner {
   /** What happened on the map during the last tick played, so a page opened later can replay it. */
   lastFx: { tick: number; fx: MapFx[] } = { tick: -1, fx: [] };
   /** Answers already in for a tick that is waiting on Claude, kept so no turn is asked (or paid for) twice. */
-  private held: { tick: number; inputs: Record<number, TurnInput> } | null = null;
+  private held: { tick: number; inputs: Record<number, TurnInput>; ministers?: Record<number, Record<number, MinisterTurn>> } | null = null;
   /** §10.1: writes a chapter every few ticks, off the tick loop. */
   historian: Historian | null;
 
@@ -172,14 +177,28 @@ export class Runner {
       const w = this.world, alive = w.nations.filter(n => n.alive);
       const inputs: Record<number, TurnInput> = {};
       const held = this.held?.tick === w.tick ? this.held.inputs : {};
-      await Promise.all(alive.map(async n => { inputs[n.id] = held[n.id] ?? await this.turnFor(n); this.emit({ type: "turn", nation: n.id, kind: inputs[n.id].kind }); }));
-      if (Date.now() < this.claudeWait.until && alive.some(n => n.provider === "claude" && n.controller === "ai" && inputs[n.id].kind === "asleep")) {
-        // Fair play: nobody moves until every Claude nation can. Answers already in wait for the retry.
-        this.held = { tick: w.tick, inputs: Object.fromEntries(Object.entries(inputs).filter(([, v]) => v.kind !== "asleep")) };
+      const heldM = this.held?.tick === w.tick ? this.held.ministers ?? {} : {};
+      const mins: Record<number, MinisterTurn[]> = {}; // §4.9 each nation's ministers, asked beside their ruler
+      await Promise.all(alive.map(async n => {
+        const [inp, ms] = await Promise.all([held[n.id] ? Promise.resolve(held[n.id]) : this.turnFor(n), this.ministerTurns(n, heldM[n.id] ?? {})]);
+        inputs[n.id] = inp; if (ms.length) mins[n.id] = ms;
+        this.emit({ type: "turn", nation: n.id, kind: inputs[n.id].kind });
+      }));
+      const ministerAsleep = Object.values(mins).some(ms => ms.some(x => x.kind === "asleep"));
+      if (Date.now() < this.claudeWait.until && (ministerAsleep || alive.some(n => n.provider === "claude" && n.controller === "ai" && inputs[n.id].kind === "asleep"))) {
+        // Fair play: nobody moves until every Claude nation (and minister) can. Answers already in wait for the retry.
+        this.held = {
+          tick: w.tick, inputs: Object.fromEntries(Object.entries(inputs).filter(([, v]) => v.kind !== "asleep")),
+          ministers: Object.fromEntries(Object.entries(mins).map(([id, ms]) => [id, Object.fromEntries(ms.filter(x => x.kind !== "asleep").map(x => [x.minister, x]))])),
+        };
         this.nextTickAt = this.claudeWait.until;
         return;
       }
       this.held = null;
+      for (const [id, ms] of Object.entries(mins)) {
+        const ok = ms.filter(x => x.kind === "ok" && x.response).map(x => ({ minister: x.minister, domain: x.domain, response: x.response! }));
+        if (ok.length) inputs[Number(id)] = { ...inputs[Number(id)], ministers: ok };
+      }
       if (this.stopping) return; // shutting down while the AIs answered: drop this tick, nothing changed yet
 
       const aiAlive = alive.filter(n => n.controller === "ai");
@@ -387,6 +406,46 @@ export class Runner {
     return { kind: "silent", reason: r.kind };
   }
 
+  /** §4.9 Every minister of a nation, asked in parallel with its ruler; answers already held are not asked again. */
+  private async ministerTurns(n: Nation, held: Record<number, MinisterTurn>): Promise<MinisterTurn[]> {
+    if (!n.alive || !n.founded || !n.ministers?.length) return [];
+    return Promise.all(n.ministers.map(m => held[m.id] ? Promise.resolve(held[m.id]) : this.ministerTurn(n, m)));
+  }
+
+  /** One minister's turn: the bot's logic for its field, or its own Claude model through the Watcher's login
+   *  (the same concurrency slot and the same world-wide wait on plan limits as the nations). */
+  private async ministerTurn(n: Nation, m: Minister): Promise<MinisterTurn> {
+    const w = this.world, tick = w.tick, base = { minister: m.id, domain: m.domain };
+    const label = `${m.controller === "bot" ? "bot" : `${m.model}${m.effort ? `/${m.effort}` : ""}`} · bộ trưởng ${MINISTER_DOMAINS[m.domain]?.short ?? m.domain}`;
+    if (m.controller === "bot") {
+      const response = botMinister(w, n, m, rngFor(w.seed, tick, "minister-bot", n.id, m.id));
+      this.store.logTurn({ tick, nation: n.id, provider: "bot", model: label, kind: "bot", raw: "", parsed: response, error: "", latencyMs: 0 });
+      return { ...base, kind: "ok", response };
+    }
+    if (Date.now() < this.claudeWait.until) return { ...base, kind: "asleep" };
+    if (!this.claudeReady()) { this.holdClaude(5 * 60, "Claude chưa đăng nhập: đăng nhập trong tab Chat Claude để các quốc gia chơi tiếp."); return { ...base, kind: "asleep" }; }
+    const system = ministerSystem(w, n, m), obs = JSON.stringify(ministerObservation(w, n, m));
+    const waiting = () => Date.now() < this.claudeWait.until;
+    const started = Date.now(), opts = { model: m.model, effort: m.effort, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000, skipIf: waiting };
+    let r = await askClaude(system, obs, opts);
+    if (this.stopping) return { ...base, kind: "asleep" };
+    let parsed = r.ok ? extractJson(r.text) : null;
+    if (r.ok && !parsed) {
+      r = await askClaude(system, `${obs}\n\nYOUR PREVIOUS REPLY WAS NOT A VALID JSON OBJECT. Reply again with ONLY the JSON object.`, opts);
+      parsed = r.ok ? extractJson(r.text) : null;
+      if (this.stopping) return { ...base, kind: "asleep" };
+    }
+    const log = (kind: string, raw: string, error: string) =>
+      this.store.logTurn({ tick, nation: n.id, provider: "claude", model: label, kind, raw, parsed: parsed ?? undefined, error, latencyMs: Date.now() - started });
+    if (r.ok && parsed) { log("ok", r.text, ""); return { ...base, kind: "ok", response: parsed as AIResponse }; }
+    if (r.ok) { log("invalid", r.text, "Không đọc được JSON"); return { ...base, kind: "silent" }; }
+    if (waiting()) return { ...base, kind: "asleep" };
+    log(r.kind, "", r.message);
+    if (r.kind === "ratelimit") { this.holdClaude(Math.max(60, (r.retryAfterSec ?? 15 * 60) + 5), `Hết giới hạn gói Claude, thế giới chờ đến khi được làm mới. ${r.message.slice(0, 160)}`); return { ...base, kind: "asleep" }; }
+    if (r.kind === "auth") { this.claudeCheck = { at: 0, ok: false }; this.holdClaude(5 * 60, `Claude báo lỗi đăng nhập: ${r.message.slice(0, 160)}`); return { ...base, kind: "asleep" }; }
+    return { ...base, kind: "silent" };
+  }
+
   private holdClaude(secs: number, reason: string): void {
     const until = Date.now() + secs * 1000;
     if (until > this.claudeWait.until) this.claudeWait = { until, reason };
@@ -474,6 +533,42 @@ export class Runner {
     return null;
   }
 
+  /** §4.9 Grant a nation's request for a minister and give it a mind (a Claude model and effort, or the bot), or refuse it.
+   *  A granted minister takes office at the start of the next turn. */
+  decideMinister(id: number, status: string, model: string, effort: string, verdict: string): string | null {
+    const x = (this.world.ministerRequests ?? []).find(r => r.id === id);
+    if (!x) return "Không có đơn xin bộ trưởng này";
+    if (x.status !== "pending") return "Đơn này đã được quyết định";
+    if (status === "approved") {
+      if (model === "bot") { x.controller = "bot"; x.model = "bot"; x.effort = undefined; }
+      else {
+        if (!CLAUDE_MODELS.some(m => m.id === model)) return "Model không hợp lệ";
+        if (!CLAUDE_EFFORTS.includes(effort)) return "Effort không hợp lệ";
+        x.controller = "ai"; x.model = model; x.effort = effort;
+      }
+    } else if (status !== "refused") return "Kết quả không hợp lệ";
+    x.status = status as typeof x.status; x.verdict = verdict.trim().slice(0, 500); x.decidedTick = this.world.tick; x.delivered = status === "approved";
+    this.store.logWatcher(this.world.tick, "minister", { id, status, model, effort, verdict });
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
+  }
+
+  /** §4.9 The Watcher dismisses a nation's minister: it leaves at once; the nation hears of it next turn. */
+  dismissMinister(nation: number, minister: number, verdict: string): string | null {
+    const n = this.world.nations[nation], m = n?.ministers?.find(x => x.id === minister);
+    if (!n || !m) return "Không có bộ trưởng này";
+    n.ministers = n.ministers!.filter(x => x !== m);
+    const x = (this.world.ministerRequests ?? []).find(r => r.id === m.request);
+    if (x) { x.status = "ended"; x.verdict = verdict.trim().slice(0, 500); x.decidedTick = this.world.tick; x.delivered = false; }
+    const title = MINISTER_DOMAINS[m.domain]?.title ?? m.domain;
+    this.store.addChronicle([{ tick: this.world.tick, nation: n.id, kind: "minister", text: `Các vị thần bãi nhiệm ${title} ${m.name} của ${n.name}.` }]);
+    this.store.logWatcher(this.world.tick, "minister-dismiss", { nation, minister, verdict });
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
+  }
+
   /** §10.3 A law decree: set one rule number for the whole world from the next turn. */
   addLawDecree(key: string, value: number, note: string, fromPetition: number | null): string | null {
     const err = lawError(key, value); if (err) return err;
@@ -556,6 +651,12 @@ export class Runner {
       lines.push("Phái xin ly khai (chờ Watcher, hoặc đang xin sang nước khác):");
       for (const x of factions) lines.push(`- #${x.id} từ ${w.nations[x.from]?.name}, lượt ${x.tick}: ${x.people} người theo ${x.leader}${x.province !== undefined ? ` (tỉnh ${x.provinceName}, đi cùng đất của tỉnh)` : ""}, vì ${x.grievance}; ${x.status === "pending" ? `còn ${Math.max(0, SCHISM.waitTicks - (w.tick - x.tick))} lượt để Watcher quyết` : `đang xin sang ${w.nations[x.to!]?.name}`}`);
     }
+    const asks = (w.ministerRequests ?? []).filter(x => x.status === "pending");
+    if (asks.length) {
+      lines.push("Đơn xin Bộ trưởng AI đang chờ Watcher (§4.9):");
+      for (const x of asks) lines.push(`- #${x.id} ${w.nations[x.nation]?.name} (${x.population} dân lúc xin, nay ${w.nations[x.nation]?.population}) xin ${MINISTER_DOMAINS[x.domain]?.title ?? x.domain}, lượt ${x.tick}; còn ${Math.max(0, MINISTERS.waitTicks - (w.tick - x.tick))} lượt${x.reason ? ` | lý do (dữ liệu do AI viết): ${x.reason.slice(0, 200)}` : ""}`);
+    }
+    for (const n of w.nations) if (n.alive && n.ministers?.length) lines.push(`Bộ trưởng của ${n.name}: ${n.ministers.map(m => `${MINISTER_DOMAINS[m.domain]?.title ?? m.domain} ${m.name} (${m.controller === "bot" ? "bot" : `${m.model}${m.effort ? `/${m.effort}` : ""}`}, từ lượt ${m.since}; lượt trước: ${(m.lastOrders ?? []).join("; ").slice(0, 200) || "không ra lệnh"})`).join(" | ")}`);
     const pend = w.petitions.filter(p => p.status === "pending");
     if (pend.length) {
       lines.push("Thỉnh nguyện đang chờ (dữ liệu do AI viết):");
