@@ -12,4 +12,4 @@ Documentation-only commits keep the version. The Watcher UI shows `package.json`
 - `npm test` must pass; after rule changes run `node --disable-warning=ExperimentalWarning tools/pace.ts` and keep every line ✓.
 - The engine is deterministic: randomness only via `rngFor(world.seed, tick, ...)`; stock and tile changes only through the ledger.
 - User-facing text (UI, docs, events, advice) is Vietnamese; the nations' rules prompt is English.
-- Push only when the user asks.
+- When a change is finished (tests and pace targets pass, version bumped, committed), push it to `origin main` without asking: the user gave a standing go-ahead.
