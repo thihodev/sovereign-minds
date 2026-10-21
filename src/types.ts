@@ -128,6 +128,9 @@ export interface Nation {
   /** Tick until which declaring war on a nation costs no reputation (caught spy). */
   casusBelli: Record<string, number>;
   /** Extra centres founded with found_settlement (§2.3). */
+  /** §4.10 missions out (where: −1 at home, else the host nation's id), and the last festival */
+  missions?: Array<{ where: number; priests: number; tick: number; until: number; converts: number }>;
+  festival?: { tick: number; until: number };
   /** §6.3 what the nation made and used of each good, remembered over a few turns: [made, used] per turn */
   flow?: Record<string, [number, number]>;
   settlements: Array<{ tile: number; name: string; tick: number; /** §2.5 joined to the capital by road */ road?: boolean }>;

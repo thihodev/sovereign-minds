@@ -7,17 +7,18 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
-import { activeWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
+import { activeWar, betrayalPhase, findTarget, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
 import { noteFlow, updateMarket } from "./market.ts";
 import { discoveryReport } from "./sea.ts";
+import { blessing, holdFestival, missionPhase, priestsAway, startMission } from "./faith.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -706,6 +707,8 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   // 5a. Living borders: tension, incidents and the border market (§7.9)
   const traded = new Set<string>();
   for (const n of world.nations) for (const [o, k] of Object.entries(n.trades)) if (k > (tradesBefore.get(n.id)?.[o] ?? 0)) traded.add(pairKey(n.id, Number(o)));
+  betrayalPhase(world, say); // §4.5 the old nation and the traitors
+  missionPhase(world, say); // §4.10 priests at work
   borderPhase(world, L, say, traded);
 
   // 5b. The wild: hordes grow, raid and come back (§9.4)
@@ -714,7 +717,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   // 6. Economy
   for (const n of alive) {
     if (!n.alive) continue;
-    economy(world, n, L, say, (explorers.get(n.id) || 0) + busy(world, n).porters); // §7.3 porters on the road do not work at home
+    economy(world, n, L, say, (explorers.get(n.id) || 0) + busy(world, n).porters + priestsAway(n, world.tick)); // §7.3 porters on the road, §4.10 priests away do not work at home
   }
   // 6b. Plague spreads between peoples; quarantines take their toll (§9.5)
   contagionPhase(world, L, say, linksBefore);
@@ -1049,7 +1052,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // logistic growth — all as fertile as the people now is
   const before = n.population;
   d.aged = grow(n, prand);
-  const fert = fertility(n, m.caps.has(DEMO.marriageCap)), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1) * (shortage > 1e-9 ? fed * fed : 1);
+  const bless = blessing(n, world.tick); // §4.10 a mission at home, a festival
+  const fert = fertility(n, m.caps.has(DEMO.marriageCap), bless), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1) * (shortage > 1e-9 ? fed * fed : 1) * bless;
   const replace = n.population >= roof ? 0 : d.aged * keep, grow2 = n.population >= roof || surplus < GROWTH.surplus ? 0 : growthFor(before, roof) * (1 + m.growth) * fert;
   const want = replace + grow2;
   if (want > 0) {
@@ -1271,6 +1275,8 @@ function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): v
     fx({ kind: "settle", tile: x.site, nation: child.id, text: `phái ${x.leader}` });
     say(parent.id, "schism", `${k} người của ${parent.name} theo ${x.leader} ra đi, lập một quốc gia mới ở (${col(x.site)}, ${row(x.site)}).`);
   }
+  // §4.5 a betrayal: the two are hostile until a peace or vassalage is signed
+  parent.lastEvents.push(`Những kẻ theo ${x.leader} đã phản bội ${parent.name}. Từ nay hai bên thù địch: không buôn bán, không hiệp ước bằng hữu cho tới khi ký hòa bình hoặc họ quy phục làm chư hầu; ta luôn có chính nghĩa đánh họ và đánh họ mạnh hơn ${KIN.vengeance * 100}%.`);
 }
 
 // ---------------------------------------------------------------- roads and sea lanes (§2.5)
@@ -1473,7 +1479,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1792,6 +1798,9 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       n.lastEvents.push(discoveryReport(world, n, dir, fresh)); // §7.6 what they saw
       return null;
     }
+    // §4.10 faith
+    case "mission": return startMission(world, n, a, L, explorers.get(n.id) || 0, to => findTarget(world, n, to));
+    case "festival": return holdFestival(world, n, a, L);
     case "plant_spy": {
       if (!m.caps.has(SPY.needsCap)) return "Cần năng lực tổ-chức (phát minh Hội đồng bộ lạc)";
       const target = findNation(world, a.target);

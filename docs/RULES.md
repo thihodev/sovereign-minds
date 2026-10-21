@@ -452,6 +452,16 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - Căng thẳng biên giới giữa hai nước tăng nhanh gấp 1,5 lần.
 - Nếu thủ đô của nước tách ra rơi vào tay nước gốc, cả nước nhập trở lại: đất, công trình, dân và kho.
 
+**Phản bội và thù địch (v0.19):** tách ra là phản bội. Cho tới khi hai bên ký **hòa bình** hoặc nước tách ra làm **chư hầu**, hai nước **thù địch** (quan hệ "thù địch"):
+- **Không buôn bán:** không gửi, không nhận đề nghị trao đổi (đề nghị đang mở bị hủy), không có chợ biên giới.
+- **Không làm bạn:** mọi hiệp ước bất tương xâm, đi lại hay liên minh giữa hai nước bị hủy ngay, kể cả hiệp ước ký trước khi có luật này.
+- **Biên giới:** căng thẳng không bao giờ dưới 40, và vẫn tăng nhanh gấp 1,5 lần.
+- **Chiến tranh:** nước gốc đánh kẻ phản bội mạnh hơn 10%, và luôn có chính nghĩa.
+- **Đất:** mỗi ô nước gốc lấy lại cho dân nó +1 ổn định; mỗi ô kẻ phản bội chiếm của nước gốc làm nước gốc mất thêm 1 ổn định.
+- **Một dân tộc:** hai nước luôn biết nhau và có chung ngôn ngữ.
+- **Áp dụng cho mọi cặp nước gốc và nước tách ra,** kể cả những nước đã tách trước v0.19. Mỗi lượt Engine giữ đúng luật này: cho hai nước biết nhau, hủy hiệp ước bằng hữu, hủy đề nghị trao đổi.
+- **AI được báo:** `known_nations[].split` ghi TRAITORS hay traitors, và lời cố vấn nhắc cả hai bên.
+
 ### 4.6 Triều đình: phân quyền cho quan chức
 
 Một quốc gia giao một lĩnh vực cho một người. Người đó **tự làm việc mỗi lượt, không tốn AP của nhà vua**:
@@ -475,6 +485,26 @@ Một quốc gia giao một lĩnh vực cho một người. Người đó **tự
   - `appoint_official` (1 AP): `{"domain","name","seat"}`
   - `dismiss_official` (0 AP): ổn định −2, các quan khác −5 trung thành
   - `reward_official` (0 AP): `{"official","goods"}`, mỗi 2 giá trị hàng tặng = +1 trung thành; hàng tặng bị tiêu đi
+
+### 4.10 Tín ngưỡng: truyền giáo và lễ hội
+
+Dân bỏ đi vì bất ổn, ganh tị hay đất rộng quản không xuể thì triều đình có cách lấy lại lòng dân. Cần năng lực **tín-ngưỡng** (từ Nghi lễ, P5).
+
+- **Truyền giáo trong nước** (`mission`, 2 AP, `"where":"home"`, 2–6 nhà truyền giáo, 10 lương thực mỗi người):
+  - trong 5 lượt, mỗi lượt bất mãn −2, ổn định +1, tỉnh bất ổn nhất −3 bất ổn, sinh nở ×1,15;
+  - nhà truyền giáo lấy từ nhóm hái lượm và người rảnh, và không làm việc ở nhà trong thời gian đó;
+  - mỗi lúc chỉ một đoàn trong nước.
+- **Truyền giáo ra nước ngoài** (`"where":"tên nước"`):
+  - chỉ tới nước đã gặp, trong vòng 15 ô, không đang chiến tranh với mình; tối đa 2 đoàn một lúc;
+  - mỗi lượt có 30% khả năng 1–3 người nước đó theo đạo về nước mình (×1,5 nếu ổn định nước đó dưới 50);
+  - nước chủ nhà −1 ổn định mỗi lượt và được báo tin. Người bỏ đi theo đạo tính vào số dân bỏ đi của nước chủ nhà;
+  - nước chủ nhà đuổi đoàn truyền giáo bằng cách ly; chiến tranh cũng chấm dứt đoàn truyền giáo;
+  - nước thù địch (mục 4.5) có thể giết nhà truyền giáo (15% mỗi lượt), và nước gửi đi có chính nghĩa để báo thù.
+- **Lễ hội** (`festival`, 1 AP, mỗi 10 lượt một lần): tốn 0,5 lương thực mỗi người dân (thêm 0,02 mỗi người của một xa xỉ phẩm để được +3 ổn định nữa):
+  - +5 ổn định, −5 bất mãn;
+  - mùa cưới: sinh nở ×1,3 trong 3 lượt.
+- **AI thấy** `faith` trong gói quan sát: có truyền giáo được không, các đoàn đang đi, lễ hội đã sẵn sàng chưa, sinh nở đang được nhân bao nhiêu, và nước nào đang truyền giáo trên đất mình.
+- **Lời cố vấn** gợi ý truyền giáo và lễ hội khi dân bỏ đi hoặc bất mãn từ 60 trở lên. Bot truyền giáo trong nước khi bất mãn từ 40, và mở lễ hội khi ổn định dưới 35 mà kho đầy.
 
 ### 4.7 Thịnh vượng và tự tôn
 

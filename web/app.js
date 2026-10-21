@@ -180,7 +180,7 @@
   // centre and the tiles where their trade works (S.nations[].work). Events: the last tick's map
   // effects (fx from the engine) play one after another: deaths, births, buildings, raids, floods…
   const ROLE_ICON = { gather: "🌿", hunt: "🏹", fish: "🐟", wood: "🪓", stone: "⛏", flint: "⛏", clay: "🏺", mine: "⛏", farm: "🌾", craft: "🔨", build: "🧱", research: "📜", warrior: "🛡" };
-  const CAUSE_ICON = { famine: "🍂", winter: "❄", plague: "🦠", beasts: "🐺", quake: "💥", raid: "🔥", battle: "⚔", explore: "🧭", horde: "⚔" };
+  const CAUSE_ICON = { famine: "🍂", winter: "❄", plague: "🦠", beasts: "🐺", quake: "💥", raid: "🔥", battle: "⚔", brawl: "🤜", explore: "🧭", horde: "⚔" };
   // Long enough to follow by eye; the strip above the map can replay any of them
   const FX_DUR = { contagion: 5500, death: 4800, birth: 3600, explore: 6500, caravan: 6500, robbed: 6500, raid: 6500, repelled: 6500, clear: 6500, battle: 5500, migrate: 6000, settle: 5500, era: 6000, invention: 4800, winter: 5500, meteor: 3600 };
   const FX_DEFAULT = 4200;
@@ -203,10 +203,11 @@
   }
   // The map is wide: a strip of what is playing, each one a button that flies there
   const FX_WORD = {
-    death: f => `${CAUSE_ICON[f.cause] || "☠"} ${f.n} người chết${{ famine: " đói", winter: " rét", plague: " vì dịch", beasts: " vì thú dữ", quake: " vì động đất", raid: " vì man di", battle: " trận mạc", explore: " khi thám hiểm", horde: " đánh man di" }[f.cause] || ""}`,
+    death: f => `${CAUSE_ICON[f.cause] || "☠"} ${f.n} người chết${{ famine: " đói", winter: " rét", plague: " vì dịch", beasts: " vì thú dữ", quake: " vì động đất", raid: " vì man di", battle: " trận mạc", brawl: " vì xô xát biên giới", explore: " khi thám hiểm", horde: " đánh man di" }[f.cause] || ""}`,
     birth: f => `👶 +${f.n} dân`, build: f => `🔨 xây xong ${f.text || ""}`, invention: f => `💡 ${f.text || "phát minh"}`, claim: () => "🚩 khai hoang", lost_tile: () => "🏚 bỏ hoang một ô",
     explore: () => "🧭 thám hiểm", settle: f => `🏕 lập ${f.text || "điểm định cư"}`, era: f => `🌟 bước vào ${f.text}`, migrate: f => `🚶 ${f.n} người bỏ đi`,
-    raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔ đánh man di thất bại", battle: f => String(f.text).startsWith("won") ? "⚔ thắng trận" : "⚔ thua trận",
+    raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔ đánh man di thất bại", battle: f => { const [res, kind, foe] = String(f.text).split(":"); return `⚔ ${res === "won" ? "thắng" : "thua"} ${kind === "raid" ? "trận đột kích" : "trận"}${foe ? ` khi đánh ${foe}` : ""}`; },
+    brawl: f => `🤜 xô xát biên giới với ${f.text} (${f.n} người chết, không phải chiến tranh)`,
     beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
     fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
     schism: f => `✊ ${f.n} người theo ${f.text} xin ly khai, chờ bạn duyệt`, road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
@@ -425,7 +426,7 @@
           icon(g, f.kind === "caravan" ? (f.text === "water" ? "⛵" : "🐂") : "🧭", ex, ey - unit * 1.3, big * .9);
           break;
         }
-        case "raid": case "repelled": case "clear": case "battle": case "migrate": case "robbed": {
+        case "raid": case "repelled": case "clear": case "battle": case "brawl": case "migrate": case "robbed": {
           const from = f.kind === "migrate" ? f.tile : f.from, to = f.kind === "migrate" ? f.to : f.tile;
           if (from === undefined || to === undefined) break;
           const a = center(from), b = center(to), walk = Math.min(1, t / .55);
@@ -439,7 +440,7 @@
             const k2 = (t - .55) / .45, [bx, by] = b;
             g.beginPath(); g.arc(bx, by, unit * (0.8 + k2 * 2), 0, 7); g.lineWidth = 3 * px; g.strokeStyle = "#ff4d3d"; g.stroke();
             const won = String(f.text || "").startsWith("won") || f.kind === "raid";
-            const sym = f.kind === "repelled" ? "🛡" : f.kind === "raid" || f.kind === "robbed" ? "🔥" : f.kind === "clear" ? (f.text === "won" ? "🏳" : "⚔") : won ? "⚔" : "🛡";
+            const sym = f.kind === "brawl" ? "🤜" : f.kind === "repelled" ? "🛡" : f.kind === "raid" || f.kind === "robbed" ? "🔥" : f.kind === "clear" ? (f.text === "won" ? "🏳" : "⚔") : won ? "⚔" : "🛡";
             icon(g, sym, bx, by - unit * 1.4, big * 1.3);
           }
           if (f.kind === "migrate" && f.n) floatText(g, `${f.n} người bỏ đi`, a[0], a[1] - unit * 1.4, big * .8, "#ffd0a0", px);
@@ -1095,6 +1096,7 @@
   function seaBlock(n) {
     const v = n.sea, l = n.luxuries, out = [];
     const xyT = t => `(${t.join(", ")})`;
+    if (n.missions?.length || n.festival) out.push(`<p class="note">Tín ngưỡng: ${(n.missions || []).map(m => `${m.priests} nhà truyền giáo ${m.where < 0 ? "trong nước" : `ở ${esc(m.place)}`} tới lượt ${m.until}${m.converts ? ` (${m.converts} người theo đạo)` : ""}`).join("; ") || "không có đoàn truyền giáo"}${n.festival ? ` · lễ hội gần nhất lượt ${n.festival.tick}` : ""}</p>`);
     if (l) out.push(`<p class="note">Xa xỉ phẩm đang dùng: ${l.kinds.length ? l.kinds.map(g => esc(RES[g] ?? g)).join(", ") : "không"} (+${l.stability} ổn định/lượt; mỗi loại cần ${l.need} trong kho)</p>`);
     if (v) {
       const rows = [];
@@ -1417,6 +1419,7 @@
     quarantine: "Cách ly", request_minister: "Xin bộ trưởng AI",
     appoint_official: "Bổ nhiệm quan", dismiss_official: "Bãi nhiệm quan", reward_official: "Ban thưởng quan", build_road: "Làm đường",
     family_policy: "Phong tục gia đình", accept_migrants: "Nhận dân di cư", rename: "Đổi tên địa danh", gift: "Tặng quà",
+    mission: "Truyền giáo", festival: "Mở lễ hội",
   };
   // the values the AIs write in English, said in Vietnamese
   const WORD = {
@@ -1424,11 +1427,11 @@
     economy: "kinh tế", war: "quân sự", diplomacy: "ngoại giao", learning: "học thuật", interior: "nội vụ",
     encourage: "khuyến khích sinh", neutral: "tự nhiên", limit: "hạn chế sinh", men: "chỉ đàn ông", all: "mọi người",
     non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu",
-    me: "mình", them: "bên kia", on: "bật", off: "tắt", capital: "thủ đô", settlement: "điểm định cư", official: "quan chức",
+    me: "mình", them: "bên kia", home: "trong nước", on: "bật", off: "tắt", capital: "thủ đô", settlement: "điểm định cư", official: "quan chức",
     E: "Đông", W: "Tây", NE: "Đông Bắc", NW: "Tây Bắc", SE: "Đông Nam", SW: "Tây Nam",
   };
   const KEY = { tile: "ô", target: "nhắm", to: "gửi", warriors: "chiến binh", people: "người", direction: "hướng", from: "từ", invention: "phát minh", type_: "loại", building: "công trình", name: "tên", text: "nội dung", kind: "loại", duration: "thời hạn", offer: "đề nghị", give: "đưa", get: "nhận", horde: "bộ lạc", title: "tiêu đề", reason: "lý do", category: "loại", capital: "thủ đô", people_: "dân tộc", tribute: "cống phẩm", payer: "bên nộp",
-    domain: "chức", seat: "trấn giữ", official: "quan", path: "đường", level: "cấp", births: "sinh đẻ", fighters: "ra trận", what: "đổi", old: "tên cũ", treaty: "hiệp ước", accept: "nhận", faction: "phe", on: "bật", cede: "nhượng ô", gesture: "cử chỉ", good: "hàng", amount: "số lượng", qty: "số lượng", answer: "trả lời" };
+    domain: "chức", seat: "trấn giữ", where: "nơi", priests: "nhà truyền giáo", luxury: "xa xỉ phẩm", official: "quan", path: "đường", level: "cấp", births: "sinh đẻ", fighters: "ra trận", what: "đổi", old: "tên cũ", treaty: "hiệp ước", accept: "nhận", faction: "phe", on: "bật", cede: "nhượng ô", gesture: "cử chỉ", good: "hàng", amount: "số lượng", qty: "số lượng", answer: "trả lời" };
   const isXY = v => Array.isArray(v) && v.length === 2 && v.every(x => typeof x === "number");
   function val(v, k) {
     if (isXY(v)) return `(${v[0]}, ${v[1]})`;
@@ -1863,7 +1866,7 @@
   }
 
   // ---------------------------------------------------------------- diplomacy
-  function relClass(r) { return /chiến/.test(r) ? "war" : /liên minh|tông chủ|chư hầu/.test(r) ? "ally" : /hòa bình|bất tương/.test(r) ? "peace" : ""; }
+  function relClass(r) { return /chiến/.test(r) ? "war" : /thù địch/.test(r) ? "hostile" : /liên minh|tông chủ|chư hầu/.test(r) ? "ally" : /hòa bình|bất tương/.test(r) ? "peace" : ""; }
   function renderDiplomacy() {
     const alive = S.nations.filter(n => n.founded && n.alive);
     // one card per nation: who it knows and how (strangers are only counted)

@@ -12,7 +12,7 @@
 // take tribute or make peace.
 
 import { localPrice, price, veinsNear } from "../market.ts";
-import { HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { FESTIVAL, MISSION, HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
@@ -23,7 +23,7 @@ import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
-import { centreFallNeed, frontCap, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
+import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
 
@@ -378,7 +378,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 9. Reach out: non-aggression with neighbours, trade surplus for shortages, a greeting
   if (n.founded && others.length) {
     const near = others.filter(o => !pendingOrActiveWar(world, n.id, o.id) && v.gap(o.id) <= 8);
-    const unsigned = near.filter(o => !treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace"]).length
+    const unsigned = near.filter(o => !kin(n, o) && !treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace"]).length
       && !world.treatyOffers.some(x => (x.from === n.id && x.to === o.id) || (x.from === o.id && x.to === n.id)) && !weakNeighbour(v, o));
     // §7.9 a tense border first: a treaty calms it every turn
     const tense = unsigned.filter(o => borderOf(world, n.id, o.id).tension >= 40).sort((a, b) => borderOf(world, n.id, b.id).tension - borderOf(world, n.id, a.id).tension)[0];
@@ -391,7 +391,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const rich = new Set<number>();
     if (source !== undefined && tick % 3 === n.id % 3) for (const i of n.seen) { const t = world.tiles[i]; if (t.owner >= 0 && (t.res[source] || 0) > 30) rich.add(t.owner); }
     const holds = (o: Nation) => rich.has(o.id) ? 0 : 1;
-    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id) && !quarantined(o, tick)).sort((a, b) => holds(a) - holds(b) || v.gap(a.id) - v.gap(b.id) || a.id - b.id);
+    const partners = others.filter(o => !pendingOrActiveWar(world, n.id, o.id) && !quarantined(o, tick) && !hostile(world, n, o)).sort((a, b) => holds(a) - holds(b) || v.gap(a.id) - v.gap(b.id) || a.id - b.id);
     if (deal && partners.length && !shut && tick % 3 === n.id % 3) spend("trade_offer", { to: partners[Math.floor(rand() * Math.min(3, partners.length))].name, give: deal.give, get: deal.get });
     if (tick % 10 === n.id % 10 && ap >= 1) {
       const o = pickOne(others, rand);
@@ -416,6 +416,13 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const menOnly = { ...n, family: { ...fam, fighters: "men" } } as Nation;
     const fight = atWar && fighters(menOnly) < Math.max(n.labor.warrior, 10) ? "all" : "men";
     if (births !== fam.births || fight !== fam.fighters) spend("family_policy", { births, fighters: fight });
+  }
+
+  // 5b. §4.10 a restless people: priests at home, a feast when the mood is low and the stores are full
+  if (n.founded && v.m.caps.has(MISSION.cap)) {
+    const homeMission = (n.missions ?? []).some(x => x.where < 0 && x.until >= tick);
+    if (!homeMission && (n.discontent ?? 0) >= 40 && v.food >= v.need + 2 * MISSION.food + 10) spend("mission", { where: "home", priests: 2 });
+    if (n.stability < 35 && (!n.festival || tick - n.festival.tick >= FESTIVAL.every) && v.food >= v.need * 2 + v.pop * FESTIVAL.food) spend("festival", {});
   }
 
   // 5a'. Take in a faction that asks, while there is room and food for them (§4.5)

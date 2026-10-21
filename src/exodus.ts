@@ -5,8 +5,8 @@
 import { EXODUS } from "./rules.ts";
 import type { Nation } from "./types.ts";
 
-export type Why = "unrest" | "envy" | "border" | "faction" | "schism" | "conquest";
-export const WHY_VI: Record<Why, string> = { unrest: "bất ổn", envy: "ganh tị với nước giàu hơn", border: "vượt biên sang nơi yên ổn hơn", faction: "phái bất mãn xin sang nước khác", schism: "ly khai lập quốc riêng", conquest: "đất bị chiếm, dân ở lại dưới quyền kẻ chiếm" };
+export type Why = "unrest" | "envy" | "border" | "faction" | "schism" | "conquest" | "faith";
+export const WHY_VI: Record<Why, string> = { unrest: "bất ổn", envy: "ganh tị với nước giàu hơn", border: "vượt biên sang nơi yên ổn hơn", faction: "phái bất mãn xin sang nước khác", schism: "ly khai lập quốc riêng", conquest: "đất bị chiếm, dân ở lại dưới quyền kẻ chiếm", faith: "theo đạo của nhà truyền giáo nước khác" };
 
 /** Write down who left this turn. */
 export function noteExodus(n: Nation, tick: number, k: number, to: number | null, why: Why): void {
@@ -17,7 +17,7 @@ export function noteExodus(n: Nation, tick: number, k: number, to: number | null
 }
 
 /** Departures the rulers answer for with the alarm (§4.8): a schism and a conquest have their own price already. */
-const BLAMED = new Set<string>(["unrest", "envy", "border", "faction"]);
+const BLAMED = new Set<string>(["unrest", "envy", "border", "faction", "faith"]);
 
 /** The people who left in the last `turns` turns: how many, what share (of those the rulers answer for), where to, why. */
 export function exodusOf(n: Nation, tick: number, turns = EXODUS.window): { lastTurn: number; recent: number; share: number; to: Record<string, number>; why: Partial<Record<Why, number>> } {

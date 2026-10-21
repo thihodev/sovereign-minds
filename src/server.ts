@@ -118,6 +118,9 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         ministerSeats: ministerSeats(n.population), ministerNext: nextMilestone(n.population), ministerAp: ministerAp(n),
         // §2.11 the sea around it, and the luxuries its people enjoy
         sea: n.alive && n.founded ? seaView(w, n) : null,
+        // §4.10 missions out and the last festival
+        missions: (n.missions ?? []).filter(x => x.until >= w.tick).map(x => ({ ...x, place: x.where < 0 ? "trong nước" : w.nations[x.where]?.name })),
+        festival: n.festival ?? null,
         luxuries: n.alive && n.founded ? luxuries(w, n) : null,
         // §6.3 + §7.10 riches, edge, lacks (the Watcher sees every ore)
         market: n.alive && n.founded ? (() => { const e = techEdge(w, n); return {

@@ -5,12 +5,12 @@
 import { DEMO } from "./rules.ts";
 import type { Demography, Nation } from "./types.ts";
 
-export type Cause = "famine" | "winter" | "plague" | "disaster" | "beasts" | "raid" | "war" | "explore" | "porter" | "migrate" | "any";
+export type Cause = "famine" | "winter" | "plague" | "disaster" | "beasts" | "raid" | "war" | "brawl" | "explore" | "porter" | "migrate" | "any";
 
 /** Who a cause strikes first, by age group (children, youths, adults, elders). */
 const AGE_WEIGHT: Record<Cause, number[]> = {
   famine: [3, 1, 0.7, 3], winter: [2, 0.7, 0.5, 3], plague: [1.5, 0.6, 0.6, 3], disaster: [1, 1, 1, 1],
-  beasts: [0.1, 0.8, 1, 0.3], raid: [1, 1, 1, 1], war: [0, 0.6, 1, 0], explore: [0, 0.5, 1, 0], porter: [0, 0.5, 1, 0],
+  beasts: [0.1, 0.8, 1, 0.3], raid: [1, 1, 1, 1], war: [0, 0.6, 1, 0], brawl: [0, 0.8, 1, 0.2], explore: [0, 0.5, 1, 0], porter: [0, 0.5, 1, 0],
   migrate: [0.6, 1, 1, 0.3], any: [1, 1, 1, 1],
 };
 
@@ -78,7 +78,7 @@ export function bookLine(n: Nation): string {
   if (d.born) parts.push(`+${d.born} trẻ ra đời`);
   if (d.arrived) parts.push(`+${d.arrived} người tới`);
   if (d.aged) parts.push(`−${d.aged} qua đời vì tuổi già hay lao lực`);
-  const NAME: Record<string, string> = { famine: "đói", winter: "rét", plague: "dịch", disaster: "thiên tai", beasts: "thú dữ", raid: "man di", war: "trận mạc", explore: "thám hiểm", porter: "khuân vác", any: "khác" };
+  const NAME: Record<string, string> = { famine: "đói", winter: "rét", plague: "dịch", disaster: "thiên tai", beasts: "thú dữ", raid: "man di", war: "trận mạc", brawl: "xô xát biên giới", explore: "thám hiểm", porter: "khuân vác", any: "khác" };
   for (const [k, v] of Object.entries(d.died ?? {})) if (v) parts.push(`−${v} chết vì ${NAME[k] ?? k}`);
   if (d.left) parts.push(`−${d.left} bỏ đi`);
   if (d.infants) parts.push(`(${d.infants} trẻ sơ sinh không qua khỏi)`);
@@ -145,8 +145,8 @@ export function breeding(n: Nation): number {
   return Math.min(1, women * pair);
 }
 /** How fertile the people is now for growth: breeding × the birth custom × marriage. */
-export function fertility(n: Nation, marriage: boolean): number {
-  return breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.fert ?? 1) * (marriage ? DEMO.marriage : 1);
+export function fertility(n: Nation, marriage: boolean, blessing = 1): number {
+  return breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.fert ?? 1) * (marriage ? DEMO.marriage : 1) * blessing;
 }
 /** Newborns: half boys, half girls; the odd one by the seed. */
 export function babies(n: Nation, k: number, rand: () => number): void {

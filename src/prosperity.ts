@@ -21,7 +21,7 @@ export type Parts = Prosperity["parts"];
 const r1 = (x: number) => Math.round(x * 10) / 10;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** Deaths that scar a people (not old age, not the explorers and porters lost on the road). */
-const HARM = ["famine", "winter", "plague", "disaster", "beasts", "raid", "war"];
+const HARM = ["famine", "winter", "plague", "disaster", "beasts", "raid", "war", "brawl"];
 
 /** The four parts (0–25 each) of how well a people lives now, with the woe it carries (§4.7). */
 export function measure(world: World, n: Nation, woe = n.prosperity?.woe ?? 0): Parts {

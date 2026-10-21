@@ -45,10 +45,12 @@ export function relation(world: World, a: number, b: number): string {
   if (t.some(x => x.type === "vassal")) return overlordOf(world, a) === b ? "chư hầu của họ" : "tông chủ của họ";
   if (t.some(x => x.type === "alliance")) return "liên minh";
   if (t.some(x => x.type === "peace")) return "hòa bình";
+  if (kin(world.nations[a], world.nations[b])) return "thù địch"; // §4.5 one betrayed the other
   if (t.some(x => x.type === "non_aggression")) return "bất tương xâm";
   return world.nations[a].met.includes(b) ? "đã gặp" : "chưa biết";
 }
 export function sharedLanguage(world: World, a: Nation, b: Nation): boolean {
+  if (kin(a, b)) return true; // §4.5 they were one people: they speak one tongue
   return (mods(world, a).caps.has("ghi-chép") && mods(world, b).caps.has("ghi-chép")) || (a.trades[String(b.id)] || 0) >= SHARED_LANGUAGE_TRADES;
 }
 /** Shortest distance between two nations' lands. */
@@ -80,7 +82,7 @@ function goods(world: World, raw: unknown, max: number): Record<string, number> 
   return Object.keys(out).length ? out : "Danh sách hàng trống";
 }
 const has = (n: Nation, g: Record<string, number>) => Object.entries(g).every(([k, q]) => (n.stock[k] || 0) >= q - 1e-9);
-function findTarget(world: World, n: Nation, v: unknown): Nation | string {
+export function findTarget(world: World, n: Nation, v: unknown): Nation | string {
   const o = typeof v === "number" ? world.nations[v] : world.nations.find(x => x.founded && x.name.toLowerCase() === String(v ?? "").trim().toLowerCase());
   if (!o || o.id === n.id) return "Không tìm thấy quốc gia đó";
   if (!o.alive) return `${o.name} đã diệt vong`;
@@ -90,6 +92,7 @@ function findTarget(world: World, n: Nation, v: unknown): Nation | string {
 
 /** §9.5 Why no goods may pass between two peoples while one of them is in quarantine, or null. */
 function closedFor(world: World, n: Nation, o: Nation): string | null {
+  if (hostile(world, n, o)) return `${o.name} ${o.origin?.from === n.id ? "là kẻ phản bội đã tách khỏi nước bạn" : "coi nước bạn là kẻ phản bội"}: hai nước thù địch, không buôn bán cho tới khi ký hòa bình (peace) hoặc một bên làm chư hầu`;
   if (quarantined(n, world.tick)) return "Đang cách ly: không buôn bán với nước ngoài (quarantine turns 0 để dỡ)";
   if (quarantined(o, world.tick)) return `${o.name} đang cách ly: không nhận buôn bán`;
   return null;
@@ -487,7 +490,8 @@ export function resolveBattles(ctx: DiploCtx): void {
     const fronts = frontOf(D);
     const dMen = Math.floor(D.labor.warrior / fronts);
     const militia = Math.max(1, Math.floor(workers(D) * WAR.militiaShare / fronts));
-    const aStr = strength(A, s.warriors, 0, false), dStr = strength(D, dMen, militia, true);
+    // §4.5 the old nation fights the traitors harder
+    const aStr = strength(A, s.warriors, 0, false) * (D.origin?.from === A.id ? 1 + KIN.vengeance : 1), dStr = strength(D, dMen, militia, true) * (A.origin?.from === D.id ? 1 + KIN.vengeance : 1);
     const won = aStr > dStr;
     const lossRate = (win: boolean) => { const [lo, hi] = win ? WAR.winLoss : WAR.loseLoss; return lo + r() * (hi - lo); };
     const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won)));
@@ -505,7 +509,7 @@ export function resolveBattles(ctx: DiploCtx): void {
     if (taken && prisoners) { add(A, taken); A.stability -= Math.floor(prisoners / 5); }
     // The attackers march from their nearest land to the tile; the dead fall there
     const home = ownedTiles(world, A.id).reduce((b, t) => dist(t.i, s.tile) < dist(b, s.tile) ? t.i : b, A.capital);
-    fx({ kind: "battle", tile: s.tile, nation: A.id, from: home, n: s.warriors, text: `${won ? "won" : "lost"}:${s.kind}` });
+    fx({ kind: "battle", tile: s.tile, nation: A.id, from: home, n: s.warriors, text: `${won ? "won" : "lost"}:${s.kind}:${D.name}` });
     fxDeath(s.tile, A.id, lossA, "battle"); fxDeath(s.tile, D.id, lossD, "battle");
     let note = "";
     if (won && s.kind === "raid") {
@@ -597,9 +601,32 @@ function loseLand(world: World, A: Nation, D: Nation, tile: number): void {
   D.discontent = Math.min(100, (D.discontent ?? 0) + LAND.lostDiscontent);
   D.casusBelli[String(A.id)] = Math.max(D.casusBelli[String(A.id)] ?? -1, world.tick + LAND.reclaimTicks);
   D.lastEvents.push(`Mất ô (${col(tile)}, ${row(tile)}) vào tay ${A.name}${k ? `, cùng ${k} người sống ở đó` : ""}: −${LAND.lostStability} ổn định. Có chính nghĩa đòi lại đất tới lượt ${world.tick + LAND.reclaimTicks}.`);
+  // §4.5 land between the old nation and the traitors stirs both peoples
+  if (D.origin?.from === A.id) { A.stability = Math.min(100, A.stability + KIN.retake); A.lastEvents.push(`Lấy lại ô (${col(tile)}, ${row(tile)}) từ kẻ phản bội ${D.name}: dân hả hê (+${KIN.retake} ổn định).`); }
+  if (A.origin?.from === D.id) { D.stability = Math.max(0, D.stability - KIN.retake); D.lastEvents.push(`Kẻ phản bội ${A.name} chiếm đất của ta: nỗi nhục (−${KIN.retake} ổn định nữa).`); }
 }
 /** §4.5 Two nations, one of which split from the other. */
 export function kin(a: Nation, b: Nation): boolean { return a.origin?.from === b.id || b.origin?.from === a.id; }
+/** §4.5 A nation and the faction that betrayed it are hostile until a peace or vassalage is signed. */
+export function hostile(world: World, a: Nation, b: Nation): boolean {
+  return kin(a, b) && !treatiesBetween(world, a.id, b.id, KIN.makePeace as never).length;
+}
+/** §4.5 Each turn: the old nation and the traitors always know each other, every treaty of friendship between them
+ *  falls, and no trade offer stands between them while they are hostile. Worlds from before keep this too. */
+export function betrayalPhase(world: World, say: Say): void {
+  for (const c of world.nations) {
+    const p = c.origin ? world.nations[c.origin.from] : undefined;
+    if (!p || !c.alive || !p.alive || !c.founded || !p.founded) continue;
+    if (!c.met.includes(p.id)) c.met.push(p.id);
+    if (!p.met.includes(c.id)) p.met.push(c.id);
+    for (const tr of treatiesBetween(world, p.id, c.id, KIN.noTreaty as never)) {
+      tr.active = false; tr.end = world.tick;
+      for (const x of [p, c]) x.lastEvents.push(`Hiệp ước ${TREATY_NAME[tr.type]} #${tr.id} với ${(x === p ? c : p).name} bị hủy: ${x === p ? "kẻ phản bội" : "nước cũ coi bạn là kẻ phản bội"} không thể là bạn.`);
+      say(p.id, "treaty", `${p.name} và ${c.name} — nước gốc và kẻ ly khai — không thể là bạn: hiệp ước ${TREATY_NAME[tr.type]} bị hủy.`);
+    }
+    if (hostile(world, p, c)) for (const o of world.tradeOffers) if (o.status === "open" && ((o.from === p.id && o.to === c.id) || (o.from === c.id && o.to === p.id))) o.status = "expired";
+  }
+}
 
 function moveBuildings(from: Nation, to: Nation, tile: number): void {
   const taken = from.buildings.filter(b => b.tile === tile);

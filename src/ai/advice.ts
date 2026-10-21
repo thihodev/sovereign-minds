@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, LUXURY, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -14,7 +14,7 @@ import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
-import { activeWar, treatiesBetween } from "../diplomacy.ts";
+import { activeWar, hostile, treatiesBetween } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
 import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
 import { seaAdvice } from "../sea.ts";
@@ -49,7 +49,19 @@ export function advice(world: World, n: Nation): Advice[] {
     if (ex.why.envy) fix.push("nâng thịnh vượng (lương thực dự trữ, hàng hóa, chỗ ở)");
     if (ex.why.unrest || ex.why.border) fix.push("nâng ổn định (đủ ăn, không vượt giới hạn đất, bàn thờ, hạ căng thẳng biên giới)");
     if (ex.why.faction || ex.why.schism) fix.push("hạ bất mãn (đường tới tỉnh cô lập, bá tước, ổn định ≥ 60)");
+    // §4.10 the ruler's own way to win hearts back
+    const faithful = m.caps.has(MISSION.cap), homeMission = (n.missions ?? []).some(x => x.where < 0 && x.until >= world.tick);
+    if (ex.why.unrest || ex.why.faction || ex.why.envy || ex.why.border) fix.push(faithful
+      ? `${homeMission ? "" : "truyền giáo trong nước (mission home: −bất mãn, +ổn định, sinh nở ×" + MISSION.births + "); "}${!n.festival || world.tick - n.festival.tick >= FESTIVAL.every ? `mở lễ hội (festival: +${FESTIVAL.stability} ổn định, mùa cưới sinh ×${FESTIVAL.births})` : "lễ hội lần tới sau lượt " + (n.festival.tick + FESTIVAL.every)}`
+      : "nghiên cứu Nghi lễ (P5) để truyền giáo và an lòng dân");
+    if (ex.why.faith) fix.push("nhà truyền giáo nước khác đang kéo dân đi: cách ly (quarantine) để đuổi họ, hoặc làm dân hài lòng hơn");
     say(ex.share > EXODUS.alarm ? 3 : ex.lastTurn ? 2 : 1, `${ex.recent} người đã bỏ đi trong ${EXODUS.window} lượt qua (${Math.round(ex.share * 100)}% dân${ex.lastTurn ? `, ${ex.lastTurn} người lượt vừa rồi` : ""}): ${why}${where ? `; ${where}` : ""}.${ex.share > EXODUS.alarm ? ` Đã quá ${EXODUS.alarm * 100}%: mỗi lượt −${EXODUS.stability} ổn định, uy tín và hạng giảm.` : ""} Giữ dân: ${fix.join("; ") || "giữ cho dân đủ ăn, có chỗ ở và yên ổn"}.`);
+  }
+
+  // §4.10 discontent climbing: faith and feasts calm a people before it splits
+  if ((n.discontent ?? 0) >= 60 && !ex.recent) {
+    const faithful = m.caps.has(MISSION.cap);
+    say((n.discontent ?? 0) >= 85 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 thì một phái đòi ly khai. ${faithful ? `Truyền giáo trong nước (mission home, −${MISSION.calm}/lượt trong ${MISSION.turns} lượt) và lễ hội (festival, −${FESTIVAL.calm}, +${FESTIVAL.stability} ổn định)` : "Nghiên cứu Nghi lễ (P5) để truyền giáo"}; bỏ bớt ô vượt giới hạn; bổ nhiệm bá tước và làm đường cho tỉnh xa.`);
   }
 
   // Food
@@ -208,6 +220,13 @@ export function advice(world: World, n: Nation): Advice[] {
   const mine = specialtiesOf(world, n).filter(x => x.veins.length);
   const exposed = mine.flatMap(x => x.veins.map(i => ({ good: x.good, i }))).find(v => world.nations.some(o => o.alive && o.founded && o.id !== n.id && activeWar(world, n.id, o.id) && world.tiles.some(t => t.owner === o.id && Math.abs(col(t.i) - col(v.i)) + Math.abs(row(t.i) - row(v.i)) <= 3)));
   if (exposed) say(3, `Mạch ${goodVi(world, exposed.good)} của bạn ở ${xy(exposed.i)} nằm sát quân thù: đặt chiến binh, dựng hàng rào, đừng để mất nó.`);
+
+  // §4.5 betrayal: the old nation and the traitors
+  for (const o of world.nations) {
+    if (!o.alive || !o.founded || !hostile(world, n, o)) continue;
+    if (o.origin?.from === n.id) say(1, `${o.name} là kẻ phản bội đã tách khỏi ta (lượt ${o.origin.tick}): hai nước thù địch, không buôn bán. Ta luôn có chính nghĩa đánh họ và đánh mạnh hơn ${KIN.vengeance * 100}%; mỗi ô lấy lại +${KIN.retake} ổn định; chiếm được thủ đô của họ thì cả nước họ trở về. Muốn buôn bán lại: ký hòa bình (peace) hoặc buộc họ làm chư hầu.`);
+    else say(2, `${o.name} coi ta là kẻ phản bội: hai nước thù địch, không buôn bán, họ có thể tấn công bất cứ lượt nào mà không mất uy tín (và đánh mạnh hơn ${KIN.vengeance * 100}%). Giữ chiến binh và hàng rào ở biên giới với họ, tìm đồng minh nơi khác, hoặc cầu hòa (treaty peace) để yên ổn.`);
+  }
 
   // §2.11 the sea, and the fine things that calm a people
   for (const a of seaAdvice(world, n)) say(a.level, a.text);

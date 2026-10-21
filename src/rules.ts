@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.18";
+export const RULES_VERSION = "0.19";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -175,7 +175,11 @@ export const LAND = { abandonStability: 3, abandonDiscontent: 2, abandonEmpty: 0
 /** §4.5 A nation that split from another cannot make common cause with it: the old nation wants it back. Treaties of
  *  these kinds are refused between them; the old nation always has a just cause against the new; their border is
  *  `friction` times as tense; a new nation whose capital falls to its old nation returns to it, land, people and stores. */
-export const KIN = { noTreaty: ["alliance", "passage", "non_aggression"], friction: 1.5 };
+export const KIN = { noTreaty: ["alliance", "passage", "non_aggression"], friction: 1.5,
+  /** §4.5 betrayal: until a peace or vassalage is signed the two are hostile — no trade, no border market, tension
+   *  never below `tensionFloor`; the old nation fights the traitors `vengeance` harder; a tile taken back cheers its
+   *  people (+`retake` stability), a tile lost to the traitors shames them (−`retake` more). */
+  tensionFloor: 40, vengeance: 0.1, retake: 1, makePeace: ["peace", "vassal"] };
 /** §4.8 People who leave: counted for `keep` turns. When more than `alarm` of the people left in the last
  *  `window` turns, the rulers lose `stability` a turn and `reputation` every `repEvery` turns; the ranking
  *  takes `rankPerPerson` points for each one who left in the window. */
@@ -215,7 +219,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -573,6 +577,17 @@ export const LAND_COLORS: Record<string, string> = {
 export const FLAG_LAND_DELTA_E = 15;
 /** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
 export const RENAME = { windowTicks: 5, stability: 10 };
+/** §4.10 Missions. A people with the capability `cap` sends `priests` (from its gatherers and idle hands, away from work
+ *  while it lasts) for `turns` turns, paying `food` food a priest. At home: −`calm` discontent and +`stability` a turn,
+ *  −`unrest` in the most restless province, births ×`births`. Abroad (a nation it knows, not at war with it, within
+ *  `reach` tiles): each turn a `convert` chance that 1–`converts` people follow the faith home with the priests; the
+ *  hosts lose `foreignStability` a turn; a hostile host (§4.5) kills the priests with chance `danger` a turn. One
+ *  mission at home and `abroad` abroad at a time; a host's quarantine or a war ends a mission there. */
+export const MISSION = { cap: "tín-ngưỡng", turns: 5, priests: [2, 6], food: 10, calm: 2, stability: 1, unrest: 3, births: 1.15,
+  convert: 0.3, converts: 3, foreignStability: 1, reach: 15, danger: 0.15, abroad: 2 };
+/** §4.10 A festival: food of `food` × the people (and, if given, a luxury of `luxury` × the people for +`luxuryStability`
+ *  more): +`stability`, −`calm` discontent, births ×`births` for `turns` turns; once every `every` turns. */
+export const FESTIVAL = { food: 0.5, luxury: 0.02, stability: 5, luxuryStability: 3, calm: 5, births: 1.3, turns: 3, every: 10 };
 /** §10.6 A renaming decree: every nation may rename itself, its people, its places and its officials for free until it
  *  ends; a nation that changed none of its names by then defied the gods: −`reputation`, −`stability`. */
 export const RENAME_DECREE = { turns: 10, reputation: 10, stability: 5 };

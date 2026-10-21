@@ -2,7 +2,24 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.18 (đang làm)
+## v0.19 (đang làm)
+
+- **Phản bội và thù địch (§4.5).** Nước tách ra là kẻ phản bội.
+  - Cho tới khi ký hòa bình hoặc làm chư hầu, hai nước **thù địch**: không buôn bán, không chợ biên giới, căng thẳng biên giới không dưới 40.
+  - Mọi hiệp ước bằng hữu cũ bị hủy, kể cả với những nước đã tách ra từ trước.
+  - Nước gốc đánh kẻ phản bội mạnh hơn 10%. Lấy lại đất thì dân hả hê; mất đất vào tay kẻ phản bội thì thêm nhục.
+  - Hai nước luôn biết nhau và chung ngôn ngữ.
+  - AI, lời cố vấn và UI (quan hệ "thù địch" màu cam) đều nắm rõ.
+- **Tín ngưỡng (§4.10):**
+  - `mission` truyền giáo trong nước: giảm bất mãn và bất ổn tỉnh, tăng sinh nở;
+  - `mission` truyền giáo ra nước ngoài: kéo người theo đạo về nước mình;
+  - `festival` lễ hội: tăng ổn định, mùa cưới tăng sinh nở;
+  - lời cố vấn gợi ý khi dân bỏ đi hay bất mãn cao; bot cũng dùng.
+- **Sửa thông báo sai:** xô xát ở biên giới không còn hiện "⚔ thua trận".
+  - UI ghi "🤜 xô xát biên giới với X (không phải chiến tranh)", và người chết vì xô xát có nguyên nhân riêng thay vì bị tính là "man di".
+  - Trận đánh thật ghi rõ thắng hay thua khi đánh nước nào.
+
+## v0.18
 
 - **Sản vật của đất và biển (§2.11).**
   - Tài nguyên mới trên đất: mật ong, gia vị, lông thú, hổ phách, đất son, cẩm thạch, vàng, bạc, đá quý (ba thứ cuối ẩn như quặng).

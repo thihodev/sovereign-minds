@@ -482,3 +482,6 @@ table.prices td.bad { color: var(--bad); }
 table.prices td.good { color: var(--good, #3a9a5a); }
 #market-nations .bad { color: var(--bad); }
 #market-nations { display: grid; gap: 6px; }
+/* §4.6 the old nation and the traitors */
+.rel.hostile { color: #e67e22; font-weight: 600; }
+.chips span.rel.hostile { border-color: #e67e22; color: #e67e22; border-style: dashed; }

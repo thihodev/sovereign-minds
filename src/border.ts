@@ -8,7 +8,7 @@ import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
 import { BORDER, GOOD_VALUE, KIN } from "./rules.ts";
-import { activeWar, kin, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
+import { activeWar, hostile, kin, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
@@ -73,10 +73,12 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     let t = st.tension + Math.min(BORDER.frictionMax, len * BORDER.friction) * (kin(a, b) ? KIN.friction : 1) - BORDER.fade; // §4.5 old wounds
     for (const tr of treatiesBetween(world, a.id, b.id)) t -= BORDER.treatyCalm[tr.type] ?? 0;
     if (traded.has(pairKey(a.id, b.id))) t -= BORDER.tradeCalm;
+    const foes = hostile(world, a, b); // §4.5 the old nation and the traitors
+    if (foes) t = Math.max(t, KIN.tensionFloor);
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;
     const r = rngFor(world.seed, tick, "border", a.id, b.id);
     // A small market at the border, while the peoples are not too wary of each other (and neither is in quarantine, §9.5)
-    if (t < BORDER.marketBelow && !quarantined(a, tick) && !quarantined(b, tick)) {
+    if (t < BORDER.marketBelow && !foes && !quarantined(a, tick) && !quarantined(b, tick)) {
       const sa = spare(world, a).find(([g]) => lacks(b, g)), sb = spare(world, b).find(([g]) => lacks(a, g));
       if (sa && sb) {
         // §6.3 at world prices
@@ -135,12 +137,13 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
   } else if (roll < 0.7) {
     // A brawl between herders: a few dead on each side
     const da = Math.min(2, Math.max(1, Math.floor(r() * 3))), db = Math.min(2, Math.max(0, Math.floor(r() * 3)));
-    takePeople(victim, Math.min(da, Math.max(0, victim.population - 5)), "raid");
-    takePeople(culprit, Math.min(db, Math.max(0, culprit.population - 5)), "raid");
+    takePeople(victim, Math.min(da, Math.max(0, victim.population - 5)), "brawl");
+    takePeople(culprit, Math.min(db, Math.max(0, culprit.population - 5)), "brawl");
     text = `Xô xát ở biên giới giữa người ${culprit.name} và ${victim.name}: ${da} người ${victim.name} và ${db} người ${culprit.name} chết`;
     rise = BORDER.rise.brawl;
     victim.casusBelli[String(culprit.id)] = Math.max(victim.casusBelli[String(culprit.id)] ?? -1, tick + BORDER.causeTicks);
-    fx({ kind: "battle", tile: at.i, nation: culprit.id, n: da + db, text: "lost:border" });
+    // a brawl, not a battle: no war, no winner (the Watcher's strip says so)
+    fx({ kind: "brawl", tile: at.i, nation: culprit.id, n: da + db, text: victim.name });
   } else {
     // Families cross from the restless side to the calmer one
     const [from, to] = a.stability < b.stability ? [a, b] : [b, a];
