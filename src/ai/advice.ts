@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, BUILDING_BY_TYPE, TREASURY, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, BUILDING_BY_TYPE, ROYALS, TREASURY, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -21,6 +21,7 @@ import { seaAdvice } from "../sea.ts";
 import { herdView } from "../herds.ts";
 import { livingStandard } from "../living.ts";
 import { greatsView } from "../greats.ts";
+import { inLaws, royalsView } from "../royals.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -291,6 +292,14 @@ export function advice(world: World, n: Nation): Advice[] {
     if (purse > TREASURY.safe) say(1, `Ngân khố ${Math.round(purse)} tiền: quá ${TREASURY.safe} thì mỗi lượt thất thoát ${TREASURY.leak * 100}% phần dư. Hãy chi: thuê thợ cho công trình đang xây (invest building, ${TREASURY.coinPerWork} tiền/công), nuôi học giả (invest research, ${TREASURY.coinPerRP} tiền/RP), xây chợ, làm đường (ngân khố tự mua gỗ, đá còn thiếu), hoặc mua hàng của nước khác bằng tiền (trade_offer give coin).`);
     else if (purse < 10 && net < 0) say(2, `Ngân khố cạn (${Math.round(purse)} tiền, lượt trước hụt ${Math.round(-net)}): lương quan lại sẽ phải trả bằng lương thực. Xây công trình sinh lợi (chợ, bến thuyền, cảng), làm đường, hoặc tăng thuế một chút.`);
     if (canMarket) say(1, `Xây Chợ (build market): công trình công cộng thu ${BUILDING_BY_TYPE.market?.effect.income ?? 2} tiền/lượt, thêm 1 tiền mỗi 50 dân và mỗi bạn hàng.`);
+  }
+
+  // §4.14 royal marriages: an offer waiting, or a tense neighbour to bind
+  {
+    const rv = royalsView(world, n);
+    for (const o of rv.marriage_offers_to_you ?? []) say(2, `${o.from} cầu hôn: gả ${o.royal} sang triều ta${Object.keys(o.dowry).length ? ` với hồi môn ${Object.entries(o.dowry).map(([k, q]) => `${q} ${goodVi(world, k)}`).join(", ")}` : ""}. Nhận lời (accept_marriage, offer ${o.offer}) để thành thông gia ${ROYALS.bond} lượt: biên giới dịu đi, không thuế quan, +${ROYALS.reputation} uy tín.`);
+    const tense = known.filter(o => !inLaws(world, n.id, o.id) && borderOf(world, n.id, o.id).tension >= 40 && !activeWar(world, n.id, o.id)).sort((x, y) => borderOf(world, n.id, y.id).tension - borderOf(world, n.id, x.id).tension)[0];
+    if (tense && rv.unwed.length) say(1, `Biên giới với ${tense.name} đang căng (${Math.round(borderOf(world, n.id, tense.id).tension)}/100): gả ${rv.unwed[0].name} sang đó (royal_marriage) để thành thông gia, mỗi lượt căng thẳng −${ROYALS.calm}.`);
   }
 
   // §4.12 great people: a richer life draws the great ones of a poorer neighbour

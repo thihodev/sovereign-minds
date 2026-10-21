@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.30";
+export const RULES_VERSION = "0.31";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -233,7 +233,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -359,7 +359,8 @@ export const SEA = {
 export const WAR = {
   reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.5,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
-  weapon: { horse: 0.8, bow: 0.6, spear: 0.5 } as Record<string, number>, // §6.4 a rider counts almost double independenceAfter: 10, unprovokedPenalty: 5,
+  weapon: { horse: 0.8, bow: 0.6, spear: 0.5 } as Record<string, number>, // §6.4 a rider counts almost double
+  independenceAfter: 10, unprovokedPenalty: 5,
   /** §7.4 a nation that falls: `fallFlee` of its survivors flee to the calmest nation they know, the rest live on under
    *  the victor with its land, buildings and stores; the victor's stability −`fallStability` (a people not yet won over). */
   fallFlee: 0.2, fallStability: 3,
@@ -824,7 +825,7 @@ export interface MinisterDomain {
 export const MINISTER_DOMAINS: Record<string, MinisterDomain> = {
   economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang, thuế và đầu tư từ ngân khố", en: "labor, crafts, mine_target, build, build_road, claim_tile, tax, invest", actions: ["build", "build_road", "claim_tile", "tax", "invest"] },
   war: { title: "Bộ trưởng Chiến tranh", short: "chiến tranh", desc: "số chiến binh, tấn công, đột kích, đánh man di (tuyên chiến và giảng hòa vẫn là việc của người trị vì)", en: "the number of warriors (\"warriors\"), attack, raid, clear_wild (never declare_war or peace)", actions: ["attack", "raid", "clear_wild"] },
-  diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine"] },
+  diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly, hôn nhân hoàng tộc", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine, royal_marriage, accept_marriage", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine", "royal_marriage", "accept_marriage"] },
   learning: { title: "Bộ trưởng Học thuật", short: "học thuật", desc: "chọn nghiên cứu, đề xuất phát minh", en: "research, propose_invention", actions: ["research", "propose_invention"] },
   interior: { title: "Bộ trưởng Nội vụ", short: "nội vụ", desc: "bổ nhiệm, cách chức, ban thưởng quan chức; phong tục gia đình", en: "appoint_official, dismiss_official, reward_official, family_policy", actions: ["appoint_official", "dismiss_official", "reward_official", "family_policy"] },
 };
@@ -950,4 +951,23 @@ export const TREASURY = {
   safe: 150, leak: 0.03,
   /** border market: the tax each side's treasury takes on the value its merchants sold */
   marketTax: 0.1,
+};
+
+// §4.14 The royal house (the court's kin; the ruler is the AI itself) and marriages between courts
+export const ROYALS = {
+  /** chance a turn of a new prince or princess while fewer than `maxUnwed` wait unwed (halved below 40 stability) */
+  birth: 0.05, maxUnwed: 3,
+  /** turns a royal lives on */
+  life: [40, 80] as [number, number],
+  /** a marriage binds the two nations this many turns: border tension −calm a turn, no duties between them */
+  bond: 40, calm: 2,
+  /** both courts gain at the wedding */
+  reputation: 3, stability: 3,
+  /** the side that declares war on its in-laws */
+  breach: { reputation: 15, stability: 10 },
+  /** turns the other court has to answer */
+  offerTicks: 3,
+  houses: ["Lạc", "Hùng", "Âu", "Thục", "Triệu", "Khúc", "Ngô", "Đinh", "Lý", "Trần", "Lê", "Mạc", "Hồ", "Nguyễn", "Trịnh", "Tây Sơn"],
+  sons: ["Lang", "Tuấn", "Khải", "Quang", "Thành", "Đức", "Nhân", "Tông", "Hoảng", "Kiên", "Vũ", "Phong"],
+  daughters: ["Ngọc Hân", "Huyền Trân", "Mỵ Châu", "Thiều Hoa", "Lan Anh", "Thục Nương", "An Tư", "Ngọc Hoa", "Diệu Linh", "Thanh Thảo", "Bích Châu", "Mỵ Nương"],
 };

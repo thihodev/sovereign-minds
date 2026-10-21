@@ -7,6 +7,7 @@ import { TRADE, TREASURY } from "./rules.ts";
 import { buildingOf } from "./catalog.ts";
 import { buildingWorks, researchPoints, roadNet, type Ledger } from "./engine.ts";
 import { price } from "./market.ts";
+import { inLaws } from "./royals.ts";
 import type { Nation, World } from "./types.ts";
 
 type Say = (nation: number | null, kind: string, text: string) => void;
@@ -55,7 +56,7 @@ const earn = (L: Ledger, n: Nation, amount: number, line: string) => {
 export function marketTax(L: Ledger, n: Nation, sold: number): void { earn(L, n, sold * TREASURY.marketTax, "market"); }
 /** No duties between allies, nor between an overlord and its vassal. */
 function freeTrade(world: World, a: number, b: number): boolean {
-  return world.treaties.some(t => t.active && TREASURY.freeTrade.includes(t.type) && ((t.a === a && t.b === b) || (t.a === b && t.b === a)));
+  return inLaws(world, a, b) || world.treaties.some(t => t.active && TREASURY.freeTrade.includes(t.type) && ((t.a === a && t.b === b) || (t.a === b && t.b === a))); // §4.14 in-laws too
 }
 const value = (world: World, g: Record<string, number>) => Object.entries(g).reduce((s, [k, q]) => s + (k === "coin" ? 0 : q * price(world, k)), 0);
 

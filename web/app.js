@@ -1558,6 +1558,7 @@
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
           ${treasuryBlock(n)}
           ${greatsBlock(n)}
+          ${royalsBlock(n)}
           ${livingBlock(n)}
           ${prosperityBlock(n)}
           ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
@@ -1645,6 +1646,13 @@
     return `<h3>Ngân khố: ${f(t.coin)} tiền${t.last ? ` <span class="muted">(lượt trước ${Math.abs(net) < 0.05 ? "±0" : `${net > 0 ? "+" : "−"}${f(Math.abs(net))}`})</span>` : ""}</h3>
       <p class="note">Thuế sản xuất <b>${pct(t.tax)}</b>${t.tax > t.fair ? ` <span class="pill bad">nặng</span>` : ""} · thuế quan và phí qua đất <b>${pct(t.tariff)}</b>${t.coin > t.safe ? ` · <span class="pill bad">kho đầy, đang thất thoát</span>` : ""}</p>
       ${t.last ? `<div class="books"><div><h4>Thu</h4><ul>${book(t.last.in, 1) || `<li class="muted">—</li>`}</ul></div><div><h4>Chi</h4><ul>${book(t.last.out, -1) || `<li class="muted">—</li>`}</ul></div></div>` : ""}`;
+  }
+  function royalsBlock(n) {
+    const r = n.royals; if (!r || !r.house) return "";
+    const people = [...(r.unwed || []).map(x => `<li><span class="i">👑</span><div><b>${esc(x.name)}</b><div class="meta">chưa thành hôn · sinh lượt ${x.born}</div></div></li>`),
+      ...(r.married_in || []).map(x => `<li><span class="i">💍</span><div><b>${esc(x.name)}</b><div class="meta">từ ${esc(x.from || "?")} về</div></div></li>`)].join("");
+    const laws = (r.in_laws || []).map(x => `<li><span class="i">🤝</span><div><b>Thông gia với ${esc(x.nation)}</b><div class="meta">${esc(x.bride)} · tới lượt ${x.until} · biên giới dịu đi, không thuế quan</div></div></li>`).join("");
+    return `<h3>Hoàng tộc ${esc(r.house)}</h3><p class="note">Người trị vì là chính AI; hoàng tộc là họ hàng của triều đình, gả cưới để kết thông gia với nước khác.</p><ul class="court">${laws}${people || `<li class="muted">Chưa có ai.</li>`}</ul>`;
   }
   function greatsBlock(n) {
     const g = n.greats || []; if (!g.length) return "";

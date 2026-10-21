@@ -2,6 +2,18 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.31
+
+- **Hoàng tộc và hôn nhân (§4.14):** người trị vì vẫn là chính AI. Mỗi nước có một hoàng tộc với hoàng tử, công chúa.
+  - Gả sang triều nước khác kèm hồi môn (`royal_marriage`, `accept_marriage`).
+  - Hai nước thành thông gia trong 40 lượt: biên giới dịu đi, không thuế quan.
+  - Tuyên chiến với thông gia: mất uy tín và ổn định.
+  - Hồ sơ quốc gia có mục Hoàng tộc; lời cố vấn gợi ý kết thông gia với láng giềng đang căng.
+- **Sửa lỗi:** hai hằng số chiến tranh (`independenceAfter`, `unprovokedPenalty`) bị nằm trong một dòng chú thích.
+  - Tuyên chiến không chính nghĩa làm uy tín thành NaN (lưu thành `null`).
+  - Chư hầu tuyên bố độc lập được ngay.
+  - Uy tín hỏng trong save cũ được đặt lại 30 khi tải.
+
 ## v0.30
 
 - **Ngân khố, thuế và công trình công cộng (§4.13):** mỗi nước có ngân khố bằng tiền (`coin`), và mọi hoạt động kinh tế đi qua đó.

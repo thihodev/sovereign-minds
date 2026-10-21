@@ -46,6 +46,7 @@ export function migrate(world: World): World {
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];
     n.labor.mine ??= 0;
     n.eraTick ??= null; n.renameTick ??= null; n.formerNames ??= []; n.stolenTech ??= [];
+    if (typeof n.reputation !== "number" || !Number.isFinite(n.reputation)) n.reputation = 30; // v0.31 a lost war constant left NaN (saved as null) after unprovoked wars
   }
   for (const s of world.spies) s.acted ??= "";
   return world;

@@ -117,6 +117,8 @@ export interface Nation {
   greats?: Great[]; invited?: number;
   /** §4.13 tax rates and this turn's and last turn's books (the coin itself is stock.coin) */
   treasury?: import("./treasury.ts").Treasury;
+  /** §4.14 the royal house: its name and its princes and princesses (those married in carry `from`) */
+  house?: string; royals?: import("./royals.ts").Royal[];
   /** §10.5 petitions the gods took up: the nation's honoured ideas */
   initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */
@@ -441,6 +443,8 @@ export interface World {
   renameDecree?: { code: string; from: number; until: number; text: string; done?: boolean;
     names: Record<string, { nation: string; capital: string; people: string; places: Record<string, string>; officials: Record<string, string> }> };
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
+  /** §4.14 royal marriages between the courts, and the offers still open */
+  marriages?: import("./royals.ts").Marriage[]; marriageOffers?: import("./royals.ts").MarriageOffer[];
   borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it
   /** §2.5 turns each road on land no one holds has gone untended (it loses a level every ROADS.decayTicks) */

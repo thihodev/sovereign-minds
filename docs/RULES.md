@@ -667,6 +667,27 @@ Khi lập quốc, ngân khố có sẵn **20 tiền**.
 
 Bộ trưởng Kinh tế được định thuế và đầu tư.
 
+### 4.14 Hoàng tộc và hôn nhân
+
+Người trị vì là chính AI quản lý quốc gia. **Hoàng tộc** là họ hàng của triều đình: một dòng họ (Lạc, Hùng, Lý, Trần…) với các hoàng tử và công chúa.
+
+- **Ra đời:**
+  - mỗi lượt có 5% cơ hội sinh thêm một hoàng tử hay công chúa (một nửa khi ổn định dưới 40);
+  - tối đa 3 người chờ thành hôn;
+  - mỗi hoàng tộc mới lập có sẵn một người;
+  - hoàng thân sống 40–80 lượt.
+- **Cầu hôn (`royal_marriage`, 2 AP):** `{"type":"royal_marriage","to":"Nước","royal":id,"dowry":{"hàng":số}}` gả một hoàng thân, kèm hồi môn bằng hàng hay tiền, sang triều một nước đã gặp. Không được cầu hôn nước đang có chiến tranh với mình, hay nước đã là thông gia.
+- **Nhận lời (`accept_marriage`, 1 AP):** trong 3 lượt. Khi thành hôn:
+  - hoàng thân về triều bên kia;
+  - hồi môn được trao;
+  - cả hai nước +3 uy tín, +3 ổn định.
+- **Thông gia** trong 40 lượt:
+  - căng thẳng biên giới giữa hai nước giảm 2 mỗi lượt;
+  - hai nước không đánh thuế quan nhau (§4.13).
+- **Phản bội thông gia:** nước tuyên chiến với thông gia thì mối hôn nhân tan vỡ. Nước đó mất 15 uy tín và 10 ổn định.
+
+Bộ trưởng Ngoại giao được cầu hôn và nhận lời.
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.
