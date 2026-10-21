@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.22";
+export const RULES_VERSION = "0.23";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -28,7 +28,8 @@ export const REGION_NAME = { west: "Lục địa Tây", east: "Lục địa Đô
 
 /** Renewable reserves regrow by this share of their cap each tick (§2.1). */
 export const REGEN: Partial<Record<ResKey, number>> = { game: 0.10, fish: 0.08, wood: 0.05, plants: 0.15, reeds: 0.10, herbs: 0.08, horse: 0.06,
-  honey: 0.10, spice: 0.08, fur: 0.08, shellfish: 0.12, pearl: 0.03, coral: 0.02, whale: 0.04 };
+  honey: 0.10, spice: 0.08, fur: 0.08, shellfish: 0.12, pearl: 0.03, coral: 0.02, whale: 0.04,
+  wolf: 0.05, wild_goat: 0.08, aurochs: 0.06, boar: 0.08, junglefowl: 0.12 };
 /** Ores are invisible to AIs until they own the capability below (§2.1). */
 export const HIDDEN_ORES: ResKey[] = ["copper", "tin", "iron", "gold", "silver", "gems"];
 export const ORE_SENSE_CAP = "nhận-biết-khoáng";
@@ -39,6 +40,8 @@ export const RES_NAME: Record<string, string> = {
   coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa",
   honey: "mật ong", spice: "gia vị", fur: "lông thú", amber: "hổ phách", ochre: "đất son", marble: "cẩm thạch", gold: "vàng", silver: "bạc", gems: "đá quý",
   shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi",
+  wolf: "sói hoang", wild_goat: "dê núi hoang", aurochs: "bò rừng", boar: "lợn rừng", junglefowl: "gà rừng",
+  dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
   bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
@@ -228,7 +231,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -345,7 +348,7 @@ export const SEA = {
 export const WAR = {
   reach: 2, reachSail: 3, weariAfter: 5, winLoss: [0.05, 0.15], loseLoss: [0.2, 0.4], prisoners: 0.5,
   raidShare: 0.3, carryPerWarrior: 5, militiaShare: 0.1, militiaStrength: 0.5, luck: [0.8, 1.2],
-  weapon: { bow: 0.6, spear: 0.5 } as Record<string, number>, independenceAfter: 10, unprovokedPenalty: 5,
+  weapon: { horse: 0.8, bow: 0.6, spear: 0.5 } as Record<string, number>, // §6.4 a rider counts almost double independenceAfter: 10, unprovokedPenalty: 5,
   /** §7.4 a nation that falls: `fallFlee` of its survivors flee to the calmest nation they know, the rest live on under
    *  the victor with its land, buildings and stores; the victor's stability −`fallStability` (a people not yet won over). */
   fallFlee: 0.2, fallStability: 3,
@@ -489,7 +492,9 @@ export const INVENTION_BY_ID: Record<string, Invention> = Object.fromEntries(INV
 // §6.1 Buildings
 export interface BuildingEffect { housing?: number; stability?: number; spoilage?: number; craftSlots?: number; defense?: number; farmSlots?: number; farmFood?: number; water?: number; port?: number;
   /** §2.11 fishing +share; salt from the sea a turn; a harbour reaches further over the water */
-  fish?: number; seaSalt?: number; harbor?: number }
+  fish?: number; seaSalt?: number; harbor?: number;
+  /** §6.4 animals a pen holds */
+  herd?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -502,7 +507,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "altar", name: "Bàn thờ", needs: "P5", cost: { stone: 10 }, work: 6, max: 1, desc: "+1 ổn định mỗi lượt.", effect: { stability: 1 } },
   { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%.", effect: { defense: 0.4 } },
   { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
-  { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực.", effect: { farmSlots: 2, farmFood: 2 } },
+  { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực; nhốt được 10 con gia súc.", effect: { farmSlots: 2, farmFood: 2, herd: 10 } },
   { type: "well", name: "Giếng", needs: "stone_tools", cost: { stone: 10, wood: 4 }, work: 5, desc: "Nước ngọt cho thủ đô xa sông (trong vòng 2 ô).", effect: { water: 1 } },
   { type: "pier", name: "Bến thuyền", needs: "P16", cost: { wood: 12, rope: 2 }, work: 5, perTile: true, terrains: ["coast"], river: true, desc: "Thuyền ra vào: buôn bằng đường thủy; quân có thuyền vượt sông.", effect: { port: 1 } },
   { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác.", effect: { craftSlots: 4 } },
@@ -538,9 +543,27 @@ export const HUNT_TOOLS = ["bow", "spear", "blade", "stone_tool"];
 export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
   copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6,
+  dog: 4, goat: 4, cattle: 8, pig: 4, fowl: 1,
   honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
+/** §6.4 Animals. `wild`: the wild kind on the map that hunters bring home alive (with the capability `cap`); `breed`: growth
+ *  a turn while there is room; `graze`: needs pasture; per head a turn, tended: `food`, `fiber` (wool), `hide`; `meat`: food
+ *  when slaughtered. */
+export const ANIMALS: Record<string, { name: string; wild: ResKey; cap: string; breed: number; graze: boolean; food: number; fiber: number; hide: number; meat: number }> = {
+  dog: { name: "chó", wild: "wolf", cap: "thuần-dưỡng", breed: 0.08, graze: false, food: 0, fiber: 0, hide: 0, meat: 2 },
+  goat: { name: "dê cừu", wild: "wild_goat", cap: "thuần-dưỡng", breed: 0.12, graze: true, food: 0.2, fiber: 0.15, hide: 0.02, meat: 3 },
+  cattle: { name: "bò", wild: "aurochs", cap: "thuần-dưỡng", breed: 0.06, graze: true, food: 0.3, fiber: 0, hide: 0.04, meat: 6 },
+  pig: { name: "lợn", wild: "boar", cap: "thuần-dưỡng", breed: 0.14, graze: false, food: 0.15, fiber: 0, hide: 0.02, meat: 4 },
+  fowl: { name: "gà", wild: "junglefowl", cap: "thuần-dưỡng", breed: 0.25, graze: false, food: 0.1, fiber: 0, hide: 0, meat: 1 },
+  horse: { name: "ngựa", wild: "horse", cap: "thuần-ngựa", breed: 0.06, graze: true, food: 0, fiber: 0, hide: 0, meat: 5 },
+};
+/** §6.4 Herds: hunters catch `tame` animals a hunter a turn from the wild herds on the nation's land; room: `pen` per pen,
+ *  `pasture` grazers per grass, hill or tundra tile held, `yard` others per centre; beyond it `cull` of the excess is
+ *  slaughtered each turn (meat to the stores). A herder (a farmer with no field) tends `herder` animals; untended ones give
+ *  `untended` of their goods. Dogs: hunting up to +`dogHunt` (a dog for two hunters); oxen: fields up to +`plough` (an ox for
+ *  three farmers). */
+export const HERDS = { tame: 0.04, pen: 10, pasture: 2, yard: 5, cull: 0.3, herder: 8, untended: 0.3, dogHunt: 0.15, plough: 0.2 };
 /** §2.11 What the workers bring home besides their main yield, per worker a turn, from the land and water they hold
  *  (gatherers: herbs §9.4, honey, spices, amber on the beach; hunters: furs; fishers: pearls, coral). */
 export const HARVEST: Record<string, Partial<Record<ResKey, number>>> = {

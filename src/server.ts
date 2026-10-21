@@ -2,19 +2,20 @@
 // Claude login and the Claude chat. Meant for a local machine.
 
 import { seaView } from "./sea.ts";
+import { herdView } from "./herds.ts";
 import { shortages, specialtiesOf, surpluses, techEdge } from "./market.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
 import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
-import { allBuildings, allInventions, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
+import { allBuildings, allInventions, allRecipes, buildingEffectText, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
-import { ministerAp, ministerSeats, nextMilestone } from "./ministers.ts";
+import { freeDomains, freeSeats, ministerAp, ministerSeats, nextMilestone } from "./ministers.ts";
 import { WHY_VI, exodusOf } from "./exodus.ts";
 import { annalsFor } from "./annals.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
@@ -116,8 +117,10 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         // §4.9 AI ministers: seats, the next milestone, each minister's own AP
         ministers: (n.ministers ?? []).map(m => ({ ...m, title: MINISTER_DOMAINS[m.domain]?.title ?? m.domain })),
         ministerSeats: ministerSeats(n.population), ministerNext: nextMilestone(n.population), ministerAp: ministerAp(n),
+        ministerFree: n.alive && n.founded ? { seats: freeSeats(w, n), domains: freeDomains(w, n).map(d => ({ id: d, title: MINISTER_DOMAINS[d].title, desc: MINISTER_DOMAINS[d].desc })) } : null,
         // §2.11 the sea around it, and the luxuries its people enjoy
         sea: n.alive && n.founded ? seaView(w, n) : null,
+        herds: n.alive && n.founded ? herdView(w, n) ?? null : null, // §6.4
         // §4.10 missions out and the last festival
         missions: (n.missions ?? []).filter(x => x.until >= w.tick).map(x => ({ ...x, place: x.where < 0 ? "trong nước" : w.nations[x.where]?.name })),
         festival: n.festival ?? null,
@@ -144,6 +147,18 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       registry: w.registry,
       proposals: w.proposals.slice(-60).map(p => ({ ...p, inventionName: p.inventionId ? invName(w, p.inventionId) : undefined })),
       judge: runner.judgeInfo(),
+      // §6.2 everything the world can make: recipes and buildings, the invention each needs, and who can make it now
+      products: (() => {
+        const live = w.nations.filter(n => n.alive && n.founded), g = (x: Record<string, number>) => Object.entries(x).map(([k, q]) => `${q} ${goodName(w, k)}`).join(" + ");
+        const knows = (n: typeof live[number], needs: string, id: string) => n.inventions.includes(needs) || mods(w, n).unlocked.has(id);
+        return {
+          recipes: allRecipes(w).map(r => ({ id: r.id, name: r.name, input: g(r.input), output: g(r.output), work: r.work, at: buildingOf(w, r.building)?.name ?? r.building, needs: invName(w, r.needs), custom: !!w.custom.recipes[r.id],
+            makers: live.filter(n => knows(n, r.needs, r.id) && n.buildings.some(b => b.type === r.building && b.done)).map(n => n.name),
+            know: live.filter(n => knows(n, r.needs, r.id)).map(n => n.name), tool: r.use ? `${r.use.role} +${Math.round(r.use.bonus * 100)}%, mỗi món cho ${r.use.per} người` : undefined })),
+          buildings: allBuildings(w).map(b => ({ type: b.type, name: b.name, cost: g(b.cost), work: b.work, effect: buildingEffectText(b.effect), desc: b.desc, needs: invName(w, b.needs), custom: !!w.custom.buildings[b.type],
+            built: live.map(n => [n.name, n.buildings.filter(x => x.type === b.type && x.done).length] as const).filter(([, k]) => k > 0).map(([nm, k]) => `${nm} ×${k}`) })),
+        };
+      })(),
       customInventions: Object.values(w.custom.inventions).map(v => ({ id: v.id, name: v.name, prereqs: v.prereqs.map(p => ({ id: p, name: invName(w, p) })), rp: v.rp, caps: v.caps, desc: v.desc, by: v.custom?.by, tick: v.custom?.tick, depth: v.custom?.depth, description: v.custom?.description, effects: describeEffects(w, v.effects) })),
       treaties: w.treaties.filter(t => t.active).map(t => ({ ...t, aName: w.nations[t.a]?.name, bName: w.nations[t.b]?.name })),
       wars: w.wars.filter(x => x.end === null).map(x => ({ ...x, aName: w.nations[x.a]?.name, bName: w.nations[x.b]?.name })),
@@ -261,6 +276,13 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (minM && method === "POST") {
         const b = await readBody(req);
         const err = runner.decideMinister(Number(minM[1]), String(b.status), String(b.model ?? ""), String(b.effort ?? ""), String(b.verdict ?? ""));
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      // §4.9 the Watcher grants a minister unasked
+      const grM = path.match(/^\/api\/nation\/(\d+)\/ministers\/grant$/);
+      if (grM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.grantMinister(Number(grM[1]), String(b.domain ?? ""), String(b.model ?? ""), String(b.effort ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
       const disM = path.match(/^\/api\/nation\/(\d+)\/ministers\/(\d+)\/dismiss$/);

@@ -17,7 +17,8 @@ export type ResKey =
   | "salt" | "reeds" | "copper" | "tin" | "iron" | "herbs"
   | "coal" | "oil" | "sulfur" | "horse"
   | "honey" | "spice" | "fur" | "amber" | "ochre" | "marble" | "gold" | "silver" | "gems"
-  | "shellfish" | "pearl" | "coral" | "whale";
+  | "shellfish" | "pearl" | "coral" | "whale"
+  | "wolf" | "wild_goat" | "aurochs" | "boar" | "junglefowl";
 
 export type Role =
   | "gather" | "hunt" | "fish" | "farm" | "wood" | "stone" | "flint" | "clay" | "mine"

@@ -19,6 +19,7 @@ import { applyLaws } from "./laws.ts";
 import { noteFlow, updateMarket } from "./market.ts";
 import { discoveryReport } from "./sea.ts";
 import { blessing, holdFestival, missionPhase, priestsAway, startMission } from "./faith.ts";
+import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -112,7 +113,7 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
     version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, hordes: newHordes(seed, gen.wild), registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
-    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 1,
+    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 2,
   };
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
@@ -888,7 +889,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Hunting: one tool serves four hunters; hunters without tools work at half strength
   const tools = HUNT_TOOLS.reduce((s, k) => s + (n.stock[k] || 0), 0);
   const equipped = Math.min(labor.hunt, Math.floor(tools) * 4);
-  const h = take("game", (equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt"), "hunt");
+  const h = take("game", ((equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt")) * (1 + dogBonus(n, labor.hunt)), "hunt"); // §6.4 dogs on the trail
   L.stock(n, "food", h, "hunt"); L.stock(n, "hide", h * YIELD.huntHide, "hunt"); L.stock(n, "bone", h * YIELD.huntBone, "hunt"); foodMade += h;
   // §2.1 a people that can tame horses brings some back alive
   if (m.caps.has(HORSES.cap) && labor.hunt) L.stock(n, "horse", take("horse", labor.hunt * HORSES.huntShare * mult("hunt"), "hunt"), "hunt");
@@ -934,8 +935,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     let want = labor.mine * YIELD.extract * mult("mine");
     for (const k of order) { if (want <= 0) break; const got = take(k, want, "mine"); L.stock(n, k, got, "mine"); want -= taken; }
   }
-  // Farming buildings grow food from soil and labour
+  // Farming buildings grow food from soil and labour; oxen pull the ploughs (§6.4)
   let farmers = labor.farm;
+  const plough = ploughBonus(n, labor.farm);
   const volcano = world.wonders.find(w => w.key === "volcano");
   for (const b of n.buildings) {
     const e = buildingOf(world, b.type)?.effect; if (!buildingWorks(world, b) || !e?.farmSlots || farmers <= 0) continue;
@@ -943,9 +945,11 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
     const silt = (n.eventTimers.fertile || 0) > 0 ? 1 + FLOOD.fertile : 1; // §9.4 a flood leaves rich mud
     const bed = world.tiles[b.tile], alluvium = bed.delta ? 1 + RIVER.deltaBonus : bed.river ? 1 + RIVER.fieldBonus : 1; // §2.1
-    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? alluvium * drought : 1) * mult("farm") * share(b.tile);
+    const x = k * (e.farmFood || 0) * fertile * silt * (b.type === "field" ? alluvium * drought * (1 + plough) : 1) * mult("farm") * share(b.tile);
     L.stock(n, "food", x, "growth"); foodMade += x;
   }
+  // §6.4 the farmers with no field tend the herds
+  foodMade += herdTurn(world, n, L, labor.hunt, farmers, take, mult("hunt"));
 
   // Crafting: workshop-like buildings give slots; a recipe needs its building
   let craftWork = Math.min(labor.craft, doneEffect(world, n, "craftSlots")) * mult("craft");
@@ -1498,7 +1502,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1691,7 +1695,10 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (court.some(o => o.seat === seat)) return "Trung tâm này đã có bá tước";
       }
       const r = rngFor(world.seed, world.tick, "official", n.id, court.length);
-      const given = String(a.name ?? "").trim().slice(0, 30);
+      // the title is the court's to give, not part of the name ("Bá tước Đá Phong" → "Đá Phong")
+      let given = String(a.name ?? "").trim().slice(0, 30);
+      for (const t of new Set([OFFICIAL_DOMAINS[domain]?.title ?? "", ...Object.values(OFFICIAL_DOMAINS).map(d => d.title), "Thống đốc", "Trấn Bá", "Bá tước"]))
+        if (t && given.toLowerCase().startsWith(t.toLowerCase() + " ")) { given = given.slice(t.length).trim(); break; }
       const name = given.length >= 2 && !validateName("Tên quan", given) ? given : `${pickOne(SYL, r).toUpperCase()[0]}${pickOne(SYL, r)}${pickOne(SYL, r)}`;
       const o = { id: world.nextId++, name, domain, seat, skill: 1, loyalty: OFFICIALS.start, since: world.tick, lastAct: "vừa nhậm chức" };
       court.push(o);
@@ -1834,6 +1841,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     // §4.10 faith
     case "mission": return startMission(world, n, a, L, explorers.get(n.id) || 0, to => findTarget(world, n, to));
     case "festival": return holdFestival(world, n, a, L);
+    case "cull": return cull(n, a, L); // §6.4
     case "plant_spy": {
       if (!m.caps.has(SPY.needsCap)) return "Cần năng lực tổ-chức (phát minh Hội đồng bộ lạc)";
       const target = findNation(world, a.target);

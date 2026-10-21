@@ -20,8 +20,9 @@ import { historianFromEnv, type Historian, type HistoryChapter } from "./histori
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, askClaude, claudeStatus, killAllClaude } from "./claude.ts";
 import type { Store } from "./db.ts";
 import type { MapFx } from "./fx.ts";
-import type { AIResponse, ChronicleEntry, Minister, Nation, Ruling, TurnInput, World } from "./types.ts";
+import type { AIResponse, ChronicleEntry, Minister, Nation, Ruling, TurnInput, World, MinisterRequest } from "./types.ts";
 import { MINISTER_DOMAINS, MINISTERS } from "./rules.ts";
+import { freeDomains, freeSeats, ministerSeats } from "./ministers.ts";
 import { botMinister, ministerObservation, ministerSystem } from "./ai/minister.ts";
 
 /** §4.9 One minister's answer for a tick: "asleep" when the world waits on Claude (asked again on the retry). */
@@ -551,6 +552,21 @@ export class Runner {
     this.store.logWatcher(this.world.tick, "minister", { id, status, model, effort, verdict });
     this.store.saveState(this.world);
     this.emit({ type: "status" });
+    return null;
+  }
+
+  /** §4.9 The Watcher grants a nation a minister unasked (a free seat and field): it takes office next turn. */
+  grantMinister(nation: number, domain: string, model: string, effort: string): string | null {
+    const w = this.world, n = w.nations[nation];
+    if (!n?.alive || !n.founded) return "Không có quốc gia này";
+    if (!MINISTER_DOMAINS[domain]) return "Lĩnh vực không hợp lệ";
+    if (!freeDomains(w, n).includes(domain)) return `Đã có hoặc đang chờ ${MINISTER_DOMAINS[domain].title}`;
+    if (freeSeats(w, n) < 1) return `Không còn ghế trống (${ministerSeats(n.population)} ghế ở ${n.population} dân)`;
+    const list = (w.ministerRequests ??= []);
+    const x: MinisterRequest = { id: (list.at(-1)?.id ?? 0) + 1, nation: n.id, domain, tick: w.tick, population: n.population, reason: "Các vị thần tự ban", status: "pending" };
+    list.push(x);
+    const err = this.decideMinister(x.id, "approved", model, effort, "Các vị thần ban cho một trí tuệ mới.");
+    if (err) { list.pop(); return err; }
     return null;
   }
 

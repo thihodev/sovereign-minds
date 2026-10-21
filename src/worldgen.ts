@@ -282,12 +282,14 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   }
 
   seedRiches(seedStr, tiles); // §2.11 and §2.10 after the spawns: fair starts are weighed without them
+  seedAnimals(seedStr, tiles); // §6.4
   seedVeins(seedStr, tiles);
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
 
 export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "horse", "copper", "tin", "iron", "coal", "sulfur", "oil",
-  "honey", "spice", "fur", "amber", "ochre", "marble", "gold", "silver", "gems", "shellfish", "pearl", "coral", "whale"];
+  "honey", "spice", "fur", "amber", "ochre", "marble", "gold", "silver", "gems", "shellfish", "pearl", "coral", "whale",
+  "wolf", "wild_goat", "aurochs", "boar", "junglefowl"];
 
 /** §2.1 Coal, oil, sulfur (hidden) and wild horses, laid with their own random stream so the rest of the
  *  map is unchanged; also run once on worlds made before they existed. Sets reserves and caps. */
@@ -352,6 +354,24 @@ export function seedRiches(seed: string, tiles: Tile[]): void {
     }
     // gold washed down from the hills into the rivers
     if (t.river && t.land && chance(0.06) && near(t, ["hill", "mountain"], 2)) put(t, "gold", jit(20));
+  }
+}
+
+/** §6.4 Wild herds that hunters can bring home alive: wolves, wild goats, aurochs, boars, junglefowl. */
+export function seedAnimals(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "animals"), jit = (v: number) => Math.round(v * (0.7 + rand() * 0.6));
+  const put = (t: Tile, k: ResKey, v: number) => { t.res[k] = (t.res[k] || 0) + v; t.cap[k] = (t.cap[k] || 0) + v; };
+  for (const t of tiles) {
+    const r = () => rand();
+    switch (t.terrain) {
+      case "forest": if (r() < 0.08) put(t, "wolf", jit(10)); if (r() < 0.08) put(t, "boar", jit(15)); break;
+      case "taiga": if (r() < 0.1) put(t, "wolf", jit(10)); break;
+      case "hill": if (r() < 0.15) put(t, "wild_goat", jit(20)); break;
+      case "mountain": if (r() < 0.1) put(t, "wild_goat", jit(20)); break;
+      case "grass": if (r() < 0.08) put(t, "aurochs", jit(15)); if (t.zone === "trop" && r() < 0.06) put(t, "junglefowl", jit(20)); break;
+      case "jungle": if (r() < 0.1) put(t, "boar", jit(15)); if (r() < 0.12) put(t, "junglefowl", jit(20)); break;
+      case "tundra": if (r() < 0.05) put(t, "wolf", jit(10)); break;
+    }
   }
 }
 

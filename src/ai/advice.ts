@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -18,6 +18,7 @@ import { activeWar, hostile, treatiesBetween } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
 import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
 import { seaAdvice } from "../sea.ts";
+import { herdView } from "../herds.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -250,6 +251,17 @@ export function advice(world: World, n: Nation): Advice[] {
     if (!o.alive || !o.founded || !hostile(world, n, o)) continue;
     if (o.origin?.from === n.id) say(1, `${o.name} là kẻ phản bội đã tách khỏi ta (lượt ${o.origin.tick}): hai nước thù địch, không buôn bán. Ta luôn có chính nghĩa đánh họ và đánh mạnh hơn ${KIN.vengeance * 100}%; mỗi ô lấy lại +${KIN.retake} ổn định; chiếm được thủ đô của họ thì cả nước họ trở về. Muốn buôn bán lại: ký hòa bình (peace) hoặc buộc họ làm chư hầu.`);
     else say(2, `${o.name} coi ta là kẻ phản bội: hai nước thù địch, không buôn bán, họ có thể tấn công bất cứ lượt nào mà không mất uy tín (và đánh mạnh hơn ${KIN.vengeance * 100}%). Giữ chiến binh và hàng rào ở biên giới với họ, tìm đồng minh nơi khác, hoặc cầu hòa (treaty peace) để yên ổn.`);
+  }
+
+  // §6.4 herds: wild ones on the land to tame, a herd outgrowing its room, meat in a famine
+  const hv = herdView(world, n);
+  if (hv) {
+    const tameable = hv.wild_on_my_land.filter(x => x.can_tame), locked = hv.wild_on_my_land.filter(x => !x.can_tame && x.animal !== "horse");
+    if (!Object.keys(hv.animals).length && tameable.length && n.labor.hunt > 0) say(1, `Trên đất bạn có thú hoang thuần hóa được (${tameable.map(x => `${goodVi(world, x.wild)} → ${goodVi(world, x.animal)}`).join(", ")}): thợ săn sẽ bắt sống về nuôi. Chúng sinh sôi, cho thịt, sữa, lông, da; chó giúp săn, bò kéo cày, ngựa ra trận.`);
+    else if (!tameable.length && locked.length && !m.caps.has(ANIMALS.goat.cap)) say(1, `Đất bạn có ${locked.map(x => goodVi(world, x.wild)).join(", ")}: nghiên cứu Thuần dưỡng (P15) để bắt về nuôi thành đàn gia súc.`);
+    const grazers = ["goat", "cattle", "horse"].reduce((s2, k) => s2 + (hv.animals[k] || 0), 0);
+    if (grazers > hv.room_grazers) say(1, `Đàn ăn cỏ (${grazers}) vượt sức chứa ${hv.room_grazers}: mỗi lượt một phần bị giết thịt. Dựng Chuồng (+${HERDS.pen}) hoặc giữ thêm đồng cỏ.`);
+    if (food < need && Object.keys(hv.animals).length) say(3, `Đang thiếu ăn: có thể giết thịt gia súc ngay (cull), ví dụ ${Object.entries(hv.animals).slice(0, 2).map(([k, c]) => `${c} ${goodVi(world, k)} = ${c * ANIMALS[k].meat} lương thực`).join(", ")}.`);
   }
 
   // §2.11 the sea, and the fine things that calm a people

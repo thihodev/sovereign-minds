@@ -106,6 +106,9 @@
     <optgroup label="Biển (trữ lượng hiện tại)">
       <option value="shellfish">Sò ốc</option><option value="pearl">Ngọc trai</option><option value="coral">San hô</option><option value="whale">Cá voi</option>
     </optgroup>
+    <optgroup label="Thú hoang (thuần hóa được)">
+      <option value="wolf">Sói hoang</option><option value="wild_goat">Dê núi hoang</option><option value="aurochs">Bò rừng</option><option value="boar">Lợn rừng</option><option value="junglefowl">Gà rừng</option>
+    </optgroup>
   </select>
   <span class="layer-scale" id="layer-scale" hidden><i></i><span id="layer-scale-text"></span></span>
   <label class="anim-toggle" title="Người tí hon đi làm việc trên bản đồ (tắt nếu máy chậm)"><input type="checkbox" id="anim-on"> Hoạt ảnh</label>
@@ -163,13 +166,18 @@
     </div>
 
     <div class="panel subtabs" id="tab-inventions" data-key="inventions" hidden>
-      <nav class="seg" role="tablist" aria-label="Phát minh"><button data-sub="pending">Chờ duyệt <span class="cnt" data-count="pending"></span></button><button data-sub="decided">Đã quyết <span class="cnt" data-count="decided"></span></button><button data-sub="book">Sổ phát minh <span class="cnt" data-count="book"></span></button></nav>
+      <nav class="seg" role="tablist" aria-label="Phát minh"><button data-sub="pending">Chờ duyệt <span class="cnt" data-count="pending"></span></button><button data-sub="decided">Đã quyết <span class="cnt" data-count="decided"></span></button><button data-sub="book">Sổ phát minh <span class="cnt" data-count="book"></span></button><button data-sub="products">Sản phẩm</button></nav>
       <section data-sub="pending">
         <p class="note">Đơn qua kiểm tra cứng của Engine rồi tới Trọng tài Claude. Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
         <div id="proposals-pending"></div>
       </section>
       <section data-sub="decided"><div id="proposals"></div></section>
       <section data-sub="book"><div id="custom-inventions"></div></section>
+      <section data-sub="products">
+        <p class="note">Mọi thứ thế giới làm ra được: công thức (nguyên liệu → sản phẩm) và công trình, phát minh cần có, và những nước đang làm được. ★ là do các nước tự phát minh.</p>
+        <h3 class="sub">Công thức</h3><div id="products-recipes"></div>
+        <h3 class="sub">Công trình</h3><div id="products-buildings"></div>
+      </section>
     </div>
 
     <div class="panel" id="tab-tree" hidden>

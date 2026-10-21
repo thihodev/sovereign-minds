@@ -779,6 +779,39 @@ Mỗi loại hàng có một **giá thế giới**, tính bằng đơn vị lư�
   - mỗi đề nghị trao đổi gửi tới một nước kèm `worth`, tức giá trị hai bên theo giá thế giới;
   - AI thấy giá trong `market.prices`, gồm giá, giá chuẩn và xu hướng.
 
+### 6.4 Thú nuôi và thuần hóa
+
+- **Thú hoang** sống trên bản đồ:
+  - sói: rừng 8%, taiga 10%, lãnh nguyên 5%;
+  - dê núi: đồi 15%, núi 10%;
+  - bò rừng: đồng cỏ 8%;
+  - lợn rừng: rừng 8%, rừng rậm 10%;
+  - gà rừng: rừng rậm 12%, đồng cỏ nhiệt đới 6%;
+  - ngựa hoang: có từ trước (mục 2.1).
+
+  Thú hoang hồi lại 5–12% mỗi lượt. Thế giới cũ được thêm thú hoang khi nạp lại.
+- **Thuần hóa:** khi có năng lực thuần-dưỡng (phát minh Thuần dưỡng, P15), mỗi thợ săn mỗi lượt bắt sống 0,04 con từ thú hoang trên đất của mình. Sói thành chó, dê núi thành dê cừu, bò rừng thành bò, lợn rừng thành lợn, gà rừng thành gà. Ngựa vẫn bắt như cũ, cần năng lực thuần-ngựa.
+- **Đàn là hàng trong kho:** bị cướp, bị thu khi thua trận, và đem trao đổi được.
+- **Sinh sôi** khi còn chỗ: chó 8%, dê cừu 12%, bò 6%, lợn 14%, gà 25%, ngựa 6% mỗi lượt.
+- **Sức chứa:**
+  - thú ăn cỏ (dê cừu, bò, ngựa): 2 con mỗi ô đồng cỏ, đồi, lãnh nguyên hay bờ biển mình giữ;
+  - thú khác: 5 con mỗi trung tâm;
+  - mỗi Chuồng thêm 10 con.
+
+  Vượt sức chứa thì mỗi lượt 30% phần thừa bị giết thịt thành lương thực.
+- **Chăn đàn:** nông dân không có ruộng để làm thì chăn đàn, mỗi người lo 8 con. Đàn không người chăn chỉ cho 30% sản phẩm.
+- **Sản phẩm mỗi con mỗi lượt:**
+  - dê cừu: 0,2 lương thực, 0,15 sợi (lông), 0,02 da;
+  - bò: 0,3 lương thực, 0,04 da;
+  - lợn: 0,15 lương thực, 0,02 da;
+  - gà: 0,1 lương thực.
+- **Công dụng:**
+  - **chó** giúp săn: tối đa +15%, cứ 2 thợ săn cần 1 chó;
+  - **bò** kéo cày: ruộng tối đa +20%, cứ 3 nông dân cần 1 bò;
+  - **ngựa** chở người ra trận: mỗi con tính như vũ khí (+0,8 chiến binh), chết theo người cưỡi.
+- **Giết thịt** (`cull`, 0 AP): đổi thú lấy lương thực ngay. Chó 2, dê cừu 3, bò 6, lợn 4, gà 1, ngựa 5 lương thực mỗi con.
+- **AI thấy** `herds`: đàn của mình, sức chứa, và thú hoang trên đất mình (bắt được hay chưa). Lời cố vấn nhắc khi có thú để thuần hóa, khi đàn vượt sức chứa, và khi đói thì có thể giết thịt.
+
 ## 7. Quan hệ quốc gia: ngoại giao, giao thương, chiến tranh
 
 Một quốc gia chỉ có thể nhắn tin, đề nghị trao đổi, ký ước hay tuyên chiến với nước khác sau khi **đã gặp** nước đó, tức là đã thấy ít nhất một ô lãnh thổ của họ (hoặc bắt được người thám hiểm của họ, hoặc bị kéo vào chiến tranh với họ). "Đã gặp" là một chiều: A thấy B chưa chắc B đã thấy A. Mọi cam kết có hiệu lực đều là điều khoản máy đọc được, do Engine thi hành. Lời nói suông không ràng buộc ai.

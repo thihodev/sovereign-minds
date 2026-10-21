@@ -2,7 +2,22 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.22 (đang làm)
+## v0.23 (đang làm)
+
+- **Thú nuôi và thuần hóa (§6.4):**
+  - thú hoang (sói, dê núi, bò rừng, lợn rừng, gà rừng) trên bản đồ; có Thuần dưỡng thì thợ săn bắt sống về nuôi;
+  - đàn sinh sôi trong sức chứa (đồng cỏ, trung tâm, chuồng), nông dân rảnh chăn đàn, đàn cho thịt, sữa, lông, da;
+  - chó giúp săn, bò kéo cày, ngựa ra trận như vũ khí;
+  - lệnh `cull` giết thịt lấy lương thực;
+  - AI thấy `herds` và có lời cố vấn; Watcher có mục Đàn gia súc và lớp bản đồ thú hoang.
+- **Phát minh làm ra được gì:**
+  - tab con **Sản phẩm** trong Phát minh: mọi công thức và công trình, phát minh cần có, nước nào đang làm được hay đã xây;
+  - Sổ phát minh mô tả đủ công thức (nguyên liệu → sản phẩm) và công trình (vật liệu, tác dụng);
+  - AI thấy `invention_hints` (hàng mình có mà chưa công thức nào dùng) và được nhắc nên phát minh ra sản phẩm thật, không chỉ "+10% một nghề".
+- **Bộ trưởng AI:** Watcher **ban thẳng** bộ trưởng trong tab Triều đình của một nước còn ghế trống, không cần chờ nước đó xin.
+- **Sửa:** tên quan không còn lặp chức ("Bá tước Bá tước Đá Phong").
+
+## v0.22
 
 - **Một nước sụp đổ (§7.4):**
   - trước đây dân còn sống biến mất và đất thành đất hoang;

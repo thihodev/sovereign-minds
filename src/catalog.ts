@@ -7,7 +7,7 @@ import {
   type BuildingDef, type Invention, type Recipe,
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
-import { seedDeepResources, seedRiches, seedVeins } from "./worldgen.ts";
+import { seedAnimals, seedDeepResources, seedRiches, seedVeins } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
 
@@ -39,6 +39,7 @@ export function migrate(world: World): World {
     seedVeins(world.seed, world.tiles, ["gold", "silver", "gems", "marble", "amber", "spice", "fur", "fish", "pearl", "whale"]);
     world.riches = 1;
   }
+  if ((world.riches ?? 0) < 2) { seedAnimals(world.seed, world.tiles); world.riches = 2; } // v0.23 wild herds
   for (const n of world.nations) {
     n.officials ??= [];
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];
@@ -217,6 +218,22 @@ export function describeBuilding(e: BuildingDef["effect"]): string {
 /** A nation's era as an index into ERA_TABLE (0 for unknown names). */
 export function eraIndex(n: Nation | undefined): number { return n ? ERA_INDEX[n.era] ?? 0 : 0; }
 
+/** What a building does, in a few Vietnamese words. */
+export function buildingEffectText(e: BuildingDef["effect"]): string {
+  const p: string[] = [];
+  if (e.housing) p.push(`+${e.housing} chỗ ở`);
+  if (e.farmSlots) p.push(`${e.farmSlots} chỗ nông dân × ${e.farmFood ?? 0} lương thực`);
+  if (e.craftSlots) p.push(`${e.craftSlots} chỗ chế tác`);
+  if (e.defense) p.push(`phòng thủ +${Math.round(e.defense * 100)}%`);
+  if (e.stability) p.push(`+${e.stability} ổn định/lượt`);
+  if (e.spoilage) p.push(`hư lương thực −${Math.round(e.spoilage * 100)}%`);
+  if (e.water) p.push("nước ngọt");
+  if (e.port) p.push("bến thuyền");
+  if (e.fish) p.push(`đánh cá +${Math.round(e.fish * 100)}%`);
+  if (e.seaSalt) p.push(`+${e.seaSalt} muối/lượt`);
+  if (e.harbor) p.push(`lãnh hải xa thêm ${e.harbor} ô`);
+  return p.join(", ");
+}
 export function describeEffects(world: World, e: Invention["effects"]): string {
   const p: string[] = [];
   for (const [r, v] of Object.entries(e.role || {})) p.push(`${r} +${Math.round((v || 0) * 100)}%`);
@@ -235,7 +252,12 @@ export function describeEffects(world: World, e: Invention["effects"]): string {
   if (e.medicine) p.push(`dịch bệnh −${Math.round(e.medicine * 100)}%`);
   if (e.officials) p.push(`+${e.officials} quan chức`);
   if (e.housingSlots) p.push(`+${e.housingSlots} công trình nhà ở mỗi trung tâm`);
-  for (const u of e.unlocks || []) { const r = recipeOf(world, u), b = buildingOf(world, u); if (r) p.push(`công thức ${r.name}`); if (b) p.push(`công trình ${b.name}`); }
+  const g = (x: Record<string, number>) => Object.entries(x).map(([k, q]) => `${q} ${goodName(world, k)}`).join(" + ") || "không gì";
+  for (const u of e.unlocks || []) {
+    const r = recipeOf(world, u), b = buildingOf(world, u);
+    if (r) p.push(`công thức ${r.name}: ${g(r.input)} → ${g(r.output)} (${r.work} công, tại ${buildingOf(world, r.building)?.name ?? r.building})`);
+    if (b) p.push(`công trình ${b.name} (tốn ${g(b.cost)}, ${b.work} công${buildingEffectText(b.effect) ? `; ${buildingEffectText(b.effect)}` : ""})`);
+  }
   return p.join("; ");
 }
 

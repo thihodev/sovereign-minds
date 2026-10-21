@@ -18,7 +18,8 @@
   const ZONE = { cold: "Hàn đới", temp: "Ôn đới", trop: "Nhiệt đới" };
   const RES = { game: "thú săn", plants: "cây dại", fish: "cá", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", salt: "muối", reeds: "sậy", herbs: "thảo dược", copper: "quặng đồng", tin: "quặng thiếc", iron: "sắt", food: "lương thực", fiber: "sợi", hide: "da", bone: "xương", stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo", bow: "cung tên", axe: "rìu", pottery: "gốm", cloth: "vải", coal: "than đá", oil: "dầu mỏ", sulfur: "lưu huỳnh", horse: "ngựa hoang", boat: "thuyền",
     honey: "mật ong", spice: "gia vị", fur: "lông thú", amber: "hổ phách", ochre: "đất son", marble: "cẩm thạch", gold: "vàng", silver: "bạc", gems: "đá quý",
-    shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi" };
+    shellfish: "sò ốc", pearl: "ngọc trai", coral: "san hô", whale: "cá voi", whale_oil: "dầu cá voi",
+    wolf: "sói hoang", wild_goat: "dê núi hoang", aurochs: "bò rừng", boar: "lợn rừng", junglefowl: "gà rừng", dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà" };
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 
   let ST = null, S = null, geo = null, hoverI = -1;
@@ -1204,6 +1205,13 @@
   function seaBlock(n) {
     const v = n.sea, l = n.luxuries, out = [];
     const xyT = t => `(${t.join(", ")})`;
+    // §6.4 herds
+    const h = n.herds;
+    if (h) {
+      const ICON = { dog: "🐕", goat: "🐐", cattle: "🐂", pig: "🐖", fowl: "🐓", horse: "🐎" };
+      const herd = Object.entries(h.animals || {}).map(([k, c]) => `${ICON[k] || ""} ${esc(RES[k] ?? k)} ${c}`).join(" · ");
+      out.push(`<h3>Đàn gia súc</h3><p class="note">${herd || "Chưa nuôi con nào."}<br>Sức chứa: thú ăn cỏ ${h.room_grazers} · thú khác ${h.room_others} (chuồng ${h.pens})${(h.wild_on_my_land || []).length ? `<br>Thú hoang trên đất: ${h.wild_on_my_land.map(x => `${esc(RES[x.wild] ?? x.wild)} ${x.on_my_land}${x.can_tame ? " (đang bắt về nuôi)" : " (cần Thuần dưỡng)"}`).join(", ")}` : ""}</p>`);
+    }
     if (n.missions?.length || n.festival) out.push(`<p class="note">Tín ngưỡng: ${(n.missions || []).map(m => `${m.priests} nhà truyền giáo ${m.where < 0 ? "trong nước" : `ở ${esc(m.place)}`} tới lượt ${m.until}${m.converts ? ` (${m.converts} người theo đạo)` : ""}`).join("; ") || "không có đoàn truyền giáo"}${n.festival ? ` · lễ hội gần nhất lượt ${n.festival.tick}` : ""}</p>`);
     if (l) out.push(`<p class="note">Xa xỉ phẩm đang dùng: ${l.kinds.length ? l.kinds.map(g => esc(RES[g] ?? g)).join(", ") : "không"} (+${l.stability} ổn định/lượt; mỗi loại cần ${l.need} trong kho)</p>`);
     if (v) {
@@ -1434,6 +1442,12 @@
     initSubtabs($("#nation-detail"));
     for (const b of $("#nation-detail").querySelectorAll(".province [data-tile], .bld [data-tile]")) b.onclick = () => { d.close(); centerOn(Number(b.dataset.tile)); };
     // §4.9 the Watcher dismisses a minister
+    const go = $("#nation-detail").querySelector("[data-grant-go]");
+    if (go) go.onclick = async () => {
+      const box = go.closest(".grant"), val = k => box.querySelector(`[data-grant=${k}]`).value;
+      try { await api(`/api/nation/${id}/ministers/grant`, { method: "POST", body: { domain: val("domain"), model: val("model"), effort: val("effort") } }); box.querySelector("[data-grant-msg]").textContent = "Đã ban: nhậm chức từ lượt sau."; refresh(); }
+      catch (e) { box.querySelector("[data-grant-msg]").textContent = e.message; }
+    };
     for (const b of $("#nation-detail").querySelectorAll("button[data-dismiss-minister]")) b.onclick = async () => {
       if (!confirm("Bãi nhiệm bộ trưởng này? Quốc gia sẽ được báo ở lượt sau và có thể xin lại.")) return;
       try { await api(`/api/nation/${id}/ministers/${b.dataset.dismissMinister}/dismiss`, { method: "POST", body: { verdict: "" } }); d.close(); refresh(); }
@@ -1473,10 +1487,12 @@
     return `<h3>Thịnh vượng: ${p.score}/100 ${mood}</h3>${bar}${legend}<p class="note">Dân so cuộc sống của mình với các nước quen biết: hơn trung bình thì tung hô triều đình, kém thì ganh tị và có nhà bỏ sang nước giàu hơn.${trend}</p>${cmp}`;
   }
 
+  // a name that already carries its title is not given it twice
+  const titled = (title, name) => { const t = String(title || ""), v = String(name || ""); return t && v.toLowerCase().startsWith(t.toLowerCase() + " ") ? v : `${t} ${v}`.trim(); };
   function courtList(n) {
     const c = n.officials || [];
     if (!c.length) return `<p class="note">Chưa bổ nhiệm ai.</p>`;
-    return `<ul class="court">${c.map(o => `<li><span class="i">${DOMAIN_ICON[o.domain] || "👤"}</span><div><b>${esc(o.title)} ${esc(o.name)}</b>${o.seat !== null && o.seat !== undefined ? ` <span class="muted">giữ (${o.seat % ST.n}, ${(o.seat / ST.n) | 0})</span>` : ""}
+    return `<ul class="court">${c.map(o => `<li><span class="i">${DOMAIN_ICON[o.domain] || "👤"}</span><div><b>${esc(titled(o.title, o.name))}</b>${o.seat !== null && o.seat !== undefined ? ` <span class="muted">giữ (${o.seat % ST.n}, ${(o.seat / ST.n) | 0})</span>` : ""}
       <div class="meta">tay nghề ${"★".repeat(o.skill)}${"☆".repeat(5 - o.skill)} · trung thành <span class="${o.loyalty < 30 ? "bad" : o.loyalty < 50 ? "warn" : ""}">${o.loyalty}</span> · từ lượt ${o.since}</div>
       <div class="meta">Lượt trước: ${esc(o.lastAct)}</div></div></li>`).join("")}</ul>`;
   }
@@ -1486,8 +1502,11 @@
   function ministerList(n) {
     const c = n.ministers || [];
     const head = `<h3>Bộ trưởng AI</h3><p class="muted">${c.length}/${n.ministerSeats ?? 0} ghế · mỗi bộ trưởng ${n.ministerAp ?? 0} AP riêng mỗi lượt${n.ministerNext ? ` · ghế tiếp theo từ ${n.ministerNext} dân (đang có ${n.population})` : ""}.</p>`;
-    if (!c.length) return `${head}<p class="note">Chưa có bộ trưởng nào. Quốc gia từ 500 dân được xin các vị thần một bộ trưởng (thêm ghế ở 1000, 2000, 4000 dân).</p>`;
-    return `${head}<ul class="court">${c.map(m => `<li><span class="i">${MINISTER_ICON[m.domain] || "👤"}</span><div style="flex:1"><b>${esc(m.title)} ${esc(m.name)}</b> <span class="muted">${esc(m.controller === "bot" ? "bot" : `Claude ${m.model}${m.effort ? ` · ${m.effort}` : ""}`)}</span>
+    // the Watcher may grant one unasked while a seat is free
+    const f = n.ministerFree, models = [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot</option>`].join("");
+    const grant = f?.seats > 0 && f.domains.length ? `<div class="grant row"><b>Ban bộ trưởng (${f.seats} ghế trống):</b><select data-grant="domain">${f.domains.map(d => `<option value="${esc(d.id)}" title="${esc(d.desc)}">${esc(d.title)}</option>`).join("")}</select><select data-grant="model">${models}</select><select data-grant="effort">${(S.claudeEfforts || []).map(e => `<option${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("")}</select><button type="button" class="primary" data-grant-go>Ban</button><span class="meta" data-grant-msg></span></div>` : "";
+    if (!c.length) return `${head}${grant}<p class="note">Chưa có bộ trưởng nào. Quốc gia từ 500 dân tự xin các vị thần (request_minister, hiện trong Thỉnh nguyện), hoặc bạn ban thẳng ở đây (thêm ghế ở 1000, 2000, 4000 dân).</p>`;
+    return `${head}${grant}<ul class="court">${c.map(m => `<li><span class="i">${MINISTER_ICON[m.domain] || "👤"}</span><div style="flex:1"><b>${esc(titled(m.title, m.name))}</b> <span class="muted">${esc(m.controller === "bot" ? "bot" : `Claude ${m.model}${m.effort ? ` · ${m.effort}` : ""}`)}</span>
       <div class="meta">từ lượt ${m.since}${m.lastTick !== undefined ? ` · lần cuối ra lệnh lượt ${m.lastTick}` : ""}</div>
       ${m.lastThought ? `<div class="meta">Suy nghĩ: “${esc(m.lastThought)}”</div>` : ""}
       <div class="meta">Lượt trước: ${esc((m.lastOrders || []).join(" · ") || "chưa ra lệnh")}</div></div>
@@ -1905,6 +1924,13 @@
   }
   const effectList = effects => effects?.length ? `<ul class="effects">${effects.map(e => { const [i, t] = effectText(e); return `<li><span class="i">${i}</span><span>${t}</span></li>`; }).join("")}</ul>` : "";
 
+  // §6.2 what the world can make, and who makes it
+  function renderProducts() {
+    const P = S.products; if (!P) return;
+    const who = (list, empty) => list.length ? list.map(esc).join(", ") : `<span class="muted">${empty}</span>`;
+    $("#products-recipes").innerHTML = `<table class="res prod"><thead><tr><th>Công thức</th><th>Nguyên liệu → sản phẩm</th><th>Làm được</th></tr></thead><tbody>${P.recipes.map(r => `<tr><td><b>${esc(r.name)}</b>${r.custom ? " ★" : ""}<div class="meta">cần ${esc(r.needs)} · ${r.work} công · tại ${esc(r.at)}</div></td><td>${esc(r.input)} → <b>${esc(r.output)}</b>${r.tool ? `<div class="meta">công cụ: ${esc(r.tool)}</div>` : ""}</td><td>${who(r.makers, r.know.length ? `biết: ${r.know.map(esc).join(", ")} (chưa có xưởng)` : "chưa nước nào")}</td></tr>`).join("")}</tbody></table>`;
+    $("#products-buildings").innerHTML = `<table class="res prod"><thead><tr><th>Công trình</th><th>Tác dụng</th><th>Đã xây</th></tr></thead><tbody>${P.buildings.map(b => `<tr><td><b>${esc(b.name)}</b>${b.custom ? " ★" : ""}<div class="meta">cần ${esc(b.needs)} · tốn ${esc(b.cost || "không gì")} · ${b.work} công</div></td><td>${esc(b.effect || b.desc || "—")}</td><td>${who(b.built, "chưa ai xây")}</td></tr>`).join("")}</tbody></table>`;
+  }
   function renderInventions() {
     const props = (S.proposals || []).slice().reverse();
     const pending = props.filter(p => p.status === "pending").length, badge = $("#prop-count");
@@ -2249,7 +2275,7 @@
   // ---------------------------------------------------------------- data flow
   async function refresh() {
     S = await api("/api/state");
-    applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
+    applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderProducts(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
     if (DOCKS.right.open && curTab === "stats") renderStats();
     renderTrees();
     if (DOCKS.right.open && curTab === "inspect") renderInspector();

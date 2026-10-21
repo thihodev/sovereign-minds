@@ -582,3 +582,7 @@ body.right-open .news:not(.pinned) > header { border-bottom: 0; }
 body.left-open .board:not(.pinned) > ol { display: none; }
 body.left-open .board:not(.pinned) > header { border-bottom: 0; }
 body.right-open .news:not(.pinned):not(.min) [data-act=min], body.left-open .board:not(.pinned):not(.min) [data-act=min] { transform: rotate(180deg); }
+table.prod th { text-align: left !important; }
+table.prod td { font-size: 12.5px; }
+.grant { gap: 6px; padding: 6px 0 10px; }
+.grant select { padding: 3px 6px; font-size: 12px; }
