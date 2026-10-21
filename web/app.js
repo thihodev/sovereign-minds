@@ -209,6 +209,7 @@
     fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
     schism: f => `✊ ${f.n} người theo ${f.text} xin ly khai, chờ bạn duyệt`, road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
     contagion: f => `🦠 dịch lan từ ${f.text} sang ${S.nations[f.nation] ? nationName(S.nations[f.nation]) : "?"}${{ border: " qua biên giới", caravan: " theo đoàn buôn", market: " qua chợ biên giới" }[f.cause] || ""}`,
+    minister: f => `🏛 có ${String(f.text || "bộ trưởng").toLowerCase()} mới`,
     drought: () => "☀ hạn hán", bounty: () => "🌾 bội thu", herd: () => "🐂 đàn bò rừng", fire: () => "🔥 cháy rừng", meteor: () => "☄ thiên thạch", eruption: () => "🌋 núi lửa phun", riot: () => "✊ nội loạn", horde_back: () => "☠ man di trở lại",
   };
   const QUIET_FX = new Set(["birth", "claim", "herd", "bounty", "fishrun", "road"]);
@@ -402,11 +403,11 @@
           break;
         }
         case "birth": floatText(g, `+${f.n} 👶`, x, y - unit - t * unit * 2, big, "#7ee08a", px); break;
-        case "build": case "settle": case "invention": case "era": {
+        case "build": case "settle": case "invention": case "era": case "minister": {
           const rr = unit * (0.6 + t * (f.kind === "era" ? 3.2 : 1.8));
           g.beginPath(); g.arc(x, y, rr, 0, 7); g.lineWidth = 3 * px; g.strokeStyle = f.kind === "invention" || f.kind === "era" ? "#ffd84a" : nc; g.stroke();
           if (f.kind === "settle" && f.from !== undefined) route(g, [center(f.from), [x, y]], px);
-          icon(g, { build: "🔨", settle: "🏕", invention: "💡", era: "🌟" }[f.kind], x, y - unit * 1.2 - t * unit, big * 1.2);
+          icon(g, { build: "🔨", settle: "🏕", invention: "💡", era: "🌟", minister: "🏛" }[f.kind], x, y - unit * 1.2 - t * unit, big * 1.2);
           if (f.text && s * z >= 3) floatText(g, f.text, x, y + unit * 1.3, big * .8, f.kind === "build" || f.kind === "settle" ? "#ffffff" : "#ffe9a0", px);
           break;
         }
@@ -1243,7 +1244,7 @@
     $("#nation-detail").innerHTML = `
       <div class="row dlg-top"><span class="flagbig"></span><div><h2>${esc(n.name)}</h2><div class="muted">${esc(n.people)} · thủ đô ${esc(n.capitalName)} · ${esc(modelLabel(n))}</div></div><span style="flex:1"></span>${healthPills(n)}${statusPill(n)}<button id="dlg-close">Đóng</button></div>
       <div class="subtabs" data-key="nation">
-        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length || ""}</span></button>${(n.provinces || []).length > 1 ? `<button data-sub="provinces">Tỉnh <span class="cnt${n.provinces.some(p => p.mood >= 50) ? " hot" : ""}">${n.provinces.length}</span></button>` : ""}<button data-sub="build">Công trình <span class="cnt${(n.buildings || []).some(b => !b.done) ? " warmcnt" : ""}">${(n.buildings || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
+        <nav class="seg"><button data-sub="overview">Tổng quan</button><button data-sub="court">Triều đình <span class="cnt">${(n.officials || []).length + (n.ministers || []).length || ""}</span></button>${(n.provinces || []).length > 1 ? `<button data-sub="provinces">Tỉnh <span class="cnt${n.provinces.some(p => p.mood >= 50) ? " hot" : ""}">${n.provinces.length}</span></button>` : ""}<button data-sub="build">Công trình <span class="cnt${(n.buildings || []).some(b => !b.done) ? " warmcnt" : ""}">${(n.buildings || []).length || ""}</span></button><button data-sub="economy">Kinh tế</button><button data-sub="threats">Đe dọa ${threatsN ? `<span class="cnt hot">${threatsN}</span>` : ""}</button><button data-sub="foreign">Đối ngoại <span class="cnt">${relations.length || ""}</span></button><button data-sub="log">Nhật ký AI</button></nav>
         <section data-sub="overview">
           ${n.manifesto ? `<p class="manifesto">“${esc(n.manifesto)}”</p>` : ""}
           <div class="kv kv6"><div><b>${n.population}</b><span>dân</span></div><div><b>${Math.round(n.stock.food || 0)}</b><span>lương thực</span></div><div><b>${n.stability}</b><span>ổn định</span></div><div><b>${n.governed ?? n.tiles}/${n.tileLimit}</b><span>ô${n.waters ? ` (${n.waters} biển)` : ""}</span></div><div><b>${n.inventions.length}</b><span>phát minh</span></div><div><b>${n.reputation}</b><span>uy tín</span></div></div>
@@ -1264,7 +1265,7 @@
           ${(n.rejected || []).length ? `<h3>Hành động bị từ chối</h3><ul class="plain">${n.rejected.map(r => `<li><b>${esc(ACTION[r.action] ?? r.action)}</b>: ${esc(r.reason)}</li>`).join("")}</ul>` : ""}
           ${n.formerNames?.length ? `<p class="muted">Tên cũ: ${esc(n.formerNames.join(" → "))}</p>` : ""}
         </section>
-        <section data-sub="court"><p class="muted">${(n.officials || []).length}/${n.courtSlots ?? 0} chỗ quan chức.</p>${courtList(n)}</section>
+        <section data-sub="court"><p class="muted">${(n.officials || []).length}/${n.courtSlots ?? 0} chỗ quan chức.</p>${courtList(n)}${ministerList(n)}</section>
         ${(n.provinces || []).length > 1 ? `<section data-sub="provinces">${provinceList(n)}</section>` : ""}
         <section data-sub="build">${buildList(n)}</section>
         <section data-sub="economy">
@@ -1290,6 +1291,12 @@
       </div>`;
     initSubtabs($("#nation-detail"));
     for (const b of $("#nation-detail").querySelectorAll(".province [data-tile], .bld [data-tile]")) b.onclick = () => { d.close(); centerOn(Number(b.dataset.tile)); };
+    // §4.9 the Watcher dismisses a minister
+    for (const b of $("#nation-detail").querySelectorAll("button[data-dismiss-minister]")) b.onclick = async () => {
+      if (!confirm("Bãi nhiệm bộ trưởng này? Quốc gia sẽ được báo ở lượt sau và có thể xin lại.")) return;
+      try { await api(`/api/nation/${id}/ministers/${b.dataset.dismissMinister}/dismiss`, { method: "POST", body: { verdict: "" } }); d.close(); refresh(); }
+      catch (e) { b.textContent = e.message; }
+    };
     $("#nation-detail .flagbig").replaceWith(flagCanvas(n.flag, 72, 48));
     $("#dlg-close").onclick = () => d.close();
     if ($("#dlg-model")) {
@@ -1332,6 +1339,19 @@
       <div class="meta">Lượt trước: ${esc(o.lastAct)}</div></div></li>`).join("")}</ul>`;
   }
 
+  // §4.9 AI ministers: one more mind per field, with its own AP
+  const MINISTER_ICON = { economy: "⚒", war: "⚔", diplomacy: "🕊", learning: "📚", interior: "🏛" };
+  function ministerList(n) {
+    const c = n.ministers || [];
+    const head = `<h3>Bộ trưởng AI</h3><p class="muted">${c.length}/${n.ministerSeats ?? 0} ghế · mỗi bộ trưởng ${n.ministerAp ?? 0} AP riêng mỗi lượt${n.ministerNext ? ` · ghế tiếp theo từ ${n.ministerNext} dân (đang có ${n.population})` : ""}.</p>`;
+    if (!c.length) return `${head}<p class="note">Chưa có bộ trưởng nào. Quốc gia từ 500 dân được xin các vị thần một bộ trưởng (thêm ghế ở 1000, 2000, 4000 dân).</p>`;
+    return `${head}<ul class="court">${c.map(m => `<li><span class="i">${MINISTER_ICON[m.domain] || "👤"}</span><div style="flex:1"><b>${esc(m.title)} ${esc(m.name)}</b> <span class="muted">${esc(m.controller === "bot" ? "bot" : `Claude ${m.model}${m.effort ? ` · ${m.effort}` : ""}`)}</span>
+      <div class="meta">từ lượt ${m.since}${m.lastTick !== undefined ? ` · lần cuối ra lệnh lượt ${m.lastTick}` : ""}</div>
+      ${m.lastThought ? `<div class="meta">Suy nghĩ: “${esc(m.lastThought)}”</div>` : ""}
+      <div class="meta">Lượt trước: ${esc((m.lastOrders || []).join(" · ") || "chưa ra lệnh")}</div></div>
+      <button type="button" data-dismiss-minister="${m.id}">Bãi nhiệm</button></li>`).join("")}</ul>`;
+  }
+
   // ---------------------------------------------------------------- threats and resources (§9.4)
   const LEVEL = ["ghi nhận", "để ý", "nghiêm trọng", "khẩn cấp"];
   function threatList(list, empty) {
@@ -1362,7 +1382,7 @@
     petition: "Thỉnh nguyện", propose_invention: "Đề xuất phát minh", found_settlement: "Lập điểm định cư", rename_nation: "Đổi tên", sabotage: "Phá hoại", steal_tech: "Đánh cắp công nghệ",
     incite: "Kích động", message: "Gửi tin", trade_offer: "Đề nghị trao đổi", accept_trade: "Nhận trao đổi", treaty: "Đề nghị hiệp ước", accept_treaty: "Nhận hiệp ước",
     break_treaty: "Phá ước", declare_war: "Tuyên chiến", declare_independence: "Tuyên bố độc lập", attack: "Tấn công", raid: "Đột kích", clear_wild: "Đánh man di",
-    quarantine: "Cách ly",
+    quarantine: "Cách ly", request_minister: "Xin bộ trưởng AI",
   };
   const KEY = { tile: "ô", target: "nhắm", to: "gửi", warriors: "chiến binh", people: "người", direction: "hướng", from: "từ", invention: "phát minh", type_: "loại", building: "công trình", name: "tên", text: "nội dung", kind: "loại", duration: "thời hạn", offer: "đề nghị", give: "đưa", get: "nhận", horde: "bộ lạc", title: "tiêu đề", reason: "lý do", category: "loại", capital: "thủ đô", people_: "dân tộc", tribute: "cống phẩm", payer: "bên nộp" };
   function val(v) {
@@ -1531,12 +1551,43 @@
       box.append(el);
     }
   }
+  // §4.9 a nation asks for an AI minister: the Watcher grants it a mind (Claude model and effort, or the bot), or refuses
+  const MSTATUS = { pending: ["Xin bộ trưởng", "warn"], approved: ["Đã ban, nhậm chức lượt sau", "ok"], done: ["Đang tại chức", "ok"], refused: ["Không ban", "bad"], expired: ["Hết hạn", ""], ended: ["Đã thôi chức", ""] };
+  function renderMinisterRequests() {
+    const box = $("#minister-requests"); if (!box) return;
+    const list = (S.ministerRequests || []).slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id).slice(0, 30);
+    box.innerHTML = "";
+    for (const x of list) {
+      const [st, cls] = MSTATUS[x.status] || [x.status, ""], from = S.nations[x.nation];
+      const el = document.createElement("article"); el.className = "petition minister";
+      const models = [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot (không tốn lượt Claude)</option>`].join("");
+      const efforts = (S.claudeEfforts || []).map(e => `<option value="${esc(e)}"${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("");
+      el.innerHTML = `<div class="row"><h3></h3><span style="flex:1"></span><span class="pill ${cls}">${st}</span></div>
+        <div class="meta">Đơn #${x.id} · <b>${esc(from ? nationName(from) : "?")}</b> · lượt ${x.tick} · ${x.population} dân lúc xin, nay ${x.populationNow} (${x.seats} ghế bộ trưởng)${x.status === "pending" ? ` · còn ${x.waitLeft} lượt để quyết` : ""}</div>
+        <div class="body"></div>
+        ${x.status === "pending" ? `<p class="note">Nếu ban, từ lượt sau một trí tuệ AI riêng lo ${esc(x.desc)} cho quốc gia này mỗi lượt, với AP riêng, theo chỉ dẫn của người trị vì. Mỗi bộ trưởng Claude tốn thêm một lượt gọi Claude mỗi lượt chơi. Chọn trí tuệ cho bộ trưởng:</p>
+        <div class="row"><label class="sr-only" for="min-model-${x.id}">Model</label><select id="min-model-${x.id}">${models}</select><label class="sr-only" for="min-effort-${x.id}">Effort</label><select id="min-effort-${x.id}">${efforts}</select></div>
+        <textarea rows="2" placeholder="Lời các vị thần (gửi cho quốc gia này)"></textarea>
+        <div class="row"><button data-s="approved" class="primary">Ban bộ trưởng</button><button data-s="refused">Không ban</button></div>`
+        : `<div class="meta">${x.model ? `trí tuệ: ${esc(x.model === "bot" ? "bot" : `Claude ${x.model} · ${x.effort}`)} · ` : ""}Lời các vị thần: ${esc(x.verdict || "—")}</div>`}`;
+      el.querySelector("h3").textContent = `${from ? nationName(from) : "?"} xin ${x.title}`;
+      el.querySelector(".body").textContent = x.reason ? `Lý do: ${x.reason}` : "";
+      const model = el.querySelector("select[id^=min-model]"), effort = el.querySelector("select[id^=min-effort]");
+      if (model) model.onchange = () => { effort.disabled = model.value === "bot"; };
+      for (const b of el.querySelectorAll("button[data-s]")) b.onclick = async () => {
+        await api(`/api/ministers/requests/${x.id}`, { method: "POST", body: { status: b.dataset.s, model: model.value, effort: effort.value, verdict: el.querySelector("textarea").value } }).catch(e => alertMsg(e.message));
+        refresh();
+      };
+      box.append(el);
+    }
+  }
   function renderPetitions() {
     renderSchisms();
+    renderMinisterRequests();
     const list = S.petitions.slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id);
-    const pending = list.filter(p => p.status === "pending").length + (S.schisms || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
+    const pending = list.filter(p => p.status === "pending").length + (S.schisms || []).filter(x => x.status === "pending").length + (S.ministerRequests || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
     badge.hidden = !pending; badge.textContent = pending;
-    const box = $("#petitions"); box.innerHTML = list.length || (S.schisms || []).length ? "" : `<p class="note">Chưa có thỉnh nguyện nào.</p>`;
+    const box = $("#petitions"); box.innerHTML = list.length || (S.schisms || []).length || (S.ministerRequests || []).length ? "" : `<p class="note">Chưa có thỉnh nguyện nào.</p>`;
     for (const p of list) {
       const n = S.nations[p.nation], [st, cls] = PSTATUS[p.status];
       const el = document.createElement("article"); el.className = "petition";

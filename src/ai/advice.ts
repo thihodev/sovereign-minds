@@ -15,6 +15,7 @@ import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../cont
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
+import { ministerAdvice } from "../ministers.ts";
 import type { Nation, World } from "../types.ts";
 
 const xy = (i: number) => `(${col(i)}, ${row(i)})`;
@@ -173,6 +174,9 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Warriors that can no longer be (customs, age)
   if ((n.family?.fighters ?? "all") === "men" && n.labor.warrior > 0 && n.labor.warrior >= n.population * 0.3) say(1, `Chỉ đàn ông ra trận mà ${n.labor.warrior} chiến binh đã là ${Math.round(n.labor.warrior / n.population * 100)}% dân: thêm nữa sẽ hết người làm.`);
+
+  // §4.9 AI ministers: how far to the next seat, and when one can be asked for
+  for (const a of ministerAdvice(world, n)) say(a.level, a.text);
 
   return out.sort((a, b) => b.level - a.level).slice(0, 7);
 }

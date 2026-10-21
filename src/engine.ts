@@ -23,6 +23,7 @@ import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } fro
 import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
+import { ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import { ROLES, type Building, type RoadWork, type Schism, type ChronicleEntry, type Flag, type Nation, type Official, type ResKey, type Role, type Ruling, type Spy, type Tile, type TurnInput, type World } from "./types.ts";
@@ -570,6 +571,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     const word = { accepted: "chấp thuận", partial: "chấp thuận một phần", rejected: "bác bỏ", merged: "gộp vào thỉnh nguyện khác" }[p.status];
     n.lastEvents.push(`Các vị thần đã ${word} thỉnh nguyện "${p.title}"${p.verdict ? `: ${p.verdict}` : ""}`);
   }
+  ministerPhase(world, say); // §4.9 ministers granted, refused or dismissed by the Watcher; seats lost to a shrinking people
 
   // 2. Founding (tick 0). Priority order comes from the seed.
   const order = shuffle(alive.slice(), rngFor(world.seed, tick, "order"));
@@ -592,9 +594,10 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   const claims: Array<{ n: Nation; tile: number }> = [];
   const explorers = new Map<number, number>();
   const ctx: DiploCtx = { world, tick, L, say, strikes: [], sent: new Set(), accepts: [], treatyAccepts: [] };
+  const rioted = new Set<number>();
   for (const n of alive) {
     const inp = inputs[n.id];
-    if (n.riot) { n.riot = false; n.lastEvents.push("Nội loạn: lượt này các thủ lĩnh không ra được lệnh nào."); continue; }
+    if (n.riot) { n.riot = false; rioted.add(n.id); n.lastEvents.push("Nội loạn: lượt này các thủ lĩnh không ra được lệnh nào."); continue; }
     if (inp?.kind !== "ok") continue;
     // §3.2 a ruler gives at least one order a turn; a court that does nothing for long unsettles the people
     if (n.founded && tick > 0) {
@@ -625,6 +628,15 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       ap -= cost;
       n.turnOrders.push(`${orderLabel(a)} ✓`);
     }
+  }
+
+  // 3a. §4.9 The ministers: after the ruler, each from its own AP and only in its own field
+  for (const n of alive) {
+    if (!n.alive || !n.founded || tick === 0 || rioted.has(n.id) || !n.ministers?.length) continue;
+    ministersAct(world, n, inputs[n.id], {
+      run: (type, a) => ENGINE_ACTIONS.has(type) ? doAction(world, n, type, a, L, claims, explorers, ctx.strikes, say) : doDiplomacy(ctx, n, type, a),
+      labor: w => normalizeLabor(n, w), label: orderLabel,
+    });
   }
 
   // 3b. The court at work (§4.6): officials act on their own, without the ruler's AP
@@ -1387,7 +1399,7 @@ type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
   "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants",
-  "quarantine",
+  "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const OVER_LIMIT_MAX = 10;
@@ -1399,6 +1411,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
   const m = mods(world, n);
   switch (type) {
     case "quarantine": return orderQuarantine(world, n, a, say); // §9.5
+    case "request_minister": return requestMinister(world, n, a, say); // §4.9
     case "research": {
       const id = String(a.invention ?? a.id ?? "");
       const v = inv(world, id);

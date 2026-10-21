@@ -420,6 +420,29 @@ Của cải của một nước là của dân nước ấy: lương thực tron
 - **Xếp hạng thế giới** cộng nửa điểm thịnh vượng trung bình 10 lượt gần nhất (§9.3).
 - Watcher chỉnh được bằng sắc lệnh luật: ngưỡng chênh lệch, ổn định khi dân tung hô, hệ số dân bỏ đi.
 
+### 4.9 Bộ trưởng AI: một trí tuệ cho một lĩnh vực của quốc gia
+
+Một dân tộc lớn được xin các vị thần thêm trí tuệ. Bộ trưởng AI là **một model AI nữa**, lo **một lĩnh vực** của quốc gia mỗi lượt bên cạnh người trị vì, với **AP riêng**. Đây là phần thưởng của sự lớn mạnh: mỗi mốc dân số là thêm một trí tuệ phục vụ quốc gia.
+
+- **Mốc dân số (ghế):** quốc gia đã lập quốc được giữ 1 bộ trưởng từ **500** dân, 2 từ **1000**, 3 từ **2000**, 4 từ **4000**. Ghế đã có được giữ khi dân còn ≥ 90% mốc của nó; dân giảm dưới đó thì bộ trưởng mới nhất từ nhiệm (xin lại được khi lớn lại).
+- **Lĩnh vực** (mỗi lĩnh vực một bộ trưởng) và các lệnh được ra:
+
+| Lĩnh vực (`domain`) | Chức danh | Được ra lệnh |
+| --- | --- | --- |
+| `economy` | Bộ trưởng Kinh tế | phân công lao động (`labor`), chế tác (`crafts`), quặng cần đào (`mine_target`); `build`, `build_road`, `claim_tile` |
+| `war` | Bộ trưởng Chiến tranh | số chiến binh (`warriors`); `attack`, `raid`, `clear_wild` — **không** tuyên chiến, **không** giảng hòa |
+| `diplomacy` | Bộ trưởng Ngoại giao | `message`, `trade_offer`, `accept_trade`, `treaty`, `accept_treaty` (trừ hòa ước), `accept_migrants`, `quarantine` |
+| `learning` | Bộ trưởng Học thuật | `research`, `propose_invention` |
+| `interior` | Bộ trưởng Nội vụ | `appoint_official`, `dismiss_official`, `reward_official`, `family_policy` |
+
+- **AP riêng của mỗi bộ trưởng:** 3 + 1 cho mỗi 1000 dân (tối đa 8), ngoài AP của người trị vì. Lệnh sai vẫn tốn AP như mọi lệnh. Mỗi lượt xét tối đa 8 lệnh của một bộ trưởng.
+- **Xin:** người trị vì gửi `request_minister` (1 AP): `{"type":"request_minister","domain":"economy","reason":"≤300 ký tự"}` khi còn ghế trống (ghế − bộ trưởng − đơn đang chờ) và lĩnh vực đó chưa có bộ trưởng hay đơn đang chờ. Đơn hiện trong mục Thỉnh nguyện của Watcher. Watcher **ban** (chọn trí tuệ: một model Claude với effort, hoặc bot) hay **không ban**; không đáp trong 20 lượt thì đơn hết hạn. Lĩnh vực bị từ chối chỉ xin lại được sau 10 lượt. Bộ trưởng được ban nhậm chức ở đầu lượt sau (biên niên và bản đồ ghi lại), có tên riêng.
+- **Mỗi lượt:** engine gọi model của từng bộ trưởng song song với người trị vì (chung hàng đợi Claude và chung việc chờ khi hết giới hạn gói: thế giới chỉ đi tiếp khi mọi quốc gia và mọi bộ trưởng Claude đã trả lời). Bộ trưởng nhận system prompt ngắn của lĩnh vực mình (cắt từ luật của quốc gia, chỉ phần lĩnh vực cần) và gói trạng thái gồm phần của lĩnh vực, **suy nghĩ và ghi nhớ gần nhất của người trị vì làm chỉ thị**, và lệnh của chính nó ở lượt trước. Bộ trưởng mang trí tuệ bot chơi theo logic bot, chỉ lấy các lệnh của lĩnh vực mình (không tốn lượt Claude). Các quốc gia bot không xin bộ trưởng.
+- **Lệnh của người trị vì đi trước:** bộ trưởng ra lệnh **sau** người trị vì trong cùng lượt, từ AP của mình, chỉ trong lĩnh vực của mình (lệnh ngoài lĩnh vực bị từ chối, không tốn AP). Phân công lao động, chế tác, quặng cần đào của Bộ trưởng Kinh tế chỉ áp dụng ở lượt người trị vì không gửi mục đó; số chiến binh của Bộ trưởng Chiến tranh chỉ áp dụng ở lượt người trị vì không gửi phân công lao động. Bộ trưởng không được ra `research`, `family_policy`, `quarantine` ở lượt người trị vì đã ra lệnh đó. Bộ trưởng vẫn làm việc khi người trị vì im lặng; nội loạn thì không ai ra lệnh được.
+- **Ghi chép:** lệnh của bộ trưởng vào `recent_turns` của quốc gia với tiền tố lĩnh vực (ví dụ `[kinh tế] build tent (12, 30) ✓`), lệnh bị từ chối vào `rejected_last_turn` (ví dụ hành động `[kinh tế] research`). Người trị vì thấy `ministers` trong gói trạng thái: số ghế, mốc tiếp theo, AP của bộ trưởng, từng bộ trưởng và lệnh, suy nghĩ của họ lượt trước, các đơn đang chờ, các lĩnh vực xin được ngay. Cố vấn báo khi đủ mốc để xin, hoặc còn bao nhiêu dân tới mốc tiếp theo.
+- **Bãi nhiệm:** Watcher bãi nhiệm một bộ trưởng trong tab Triều đình của quốc gia; quốc gia được báo ở lượt sau và có thể xin lại.
+- Watcher chỉnh được bằng sắc lệnh luật: bốn mốc dân số, AP cơ bản của mỗi bộ trưởng.
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.
@@ -864,6 +887,7 @@ Trường chỉ xuất hiện khi có nội dung: `nation.former_names` (tên c�
 | `petition` | 1 | mục 10.5 |
 | `rename_nation` | 3 | chỉ trong 5 lượt sau khi bước vào kỷ nguyên mới, một lần mỗi lần đổi kỷ nguyên; −10 ổn định (mục 2.2) |
 | `quarantine` | 1 | cách ly 1–5 lượt, hoặc `turns` 0 để dỡ (mục 9.5) |
+| `request_minister` | 1 | xin các vị thần một Bộ trưởng AI cho một lĩnh vực khi còn ghế (mục 4.9); chỉ người trị vì |
 | `sabotage`, `steal_tech`, `incite` | 2 | mỗi lần; cần năng lực `ghi-chép` và gián điệp đang hoạt động ở nước đó (mục 7.8) |
 
 Mỗi lượt Engine xét tối đa 12 hành động, theo thứ tự AI gửi, trừ dần vào số AP.

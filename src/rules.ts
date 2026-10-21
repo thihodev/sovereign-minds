@@ -216,7 +216,7 @@ export const AP_COST: Record<string, number> = {
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
-  quarantine: 1,
+  quarantine: 1, request_minister: 1,
 };
 // §10.5 Petitions
 export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
@@ -670,6 +670,37 @@ export const OFFICIALS = {
   giftPerPoint: 2,
   /** A governor whose seat lies farther than this from the capital grows restless (−1 loyalty a turn). */
   farSeat: 10,
+};
+
+// §4.9 AI ministers: a nation big enough asks the gods for one more mind (an AI model) to run one field of the nation.
+export interface MinisterDomain {
+  /** For the Watcher and the record of turns, in Vietnamese. */
+  title: string; short: string; desc: string;
+  /** For the nations' AIs, in English. */
+  en: string;
+  /** The action types this minister may order (from its own AP). */
+  actions: string[];
+}
+export const MINISTER_DOMAINS: Record<string, MinisterDomain> = {
+  economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang", en: "labor, crafts, mine_target, build, build_road, claim_tile", actions: ["build", "build_road", "claim_tile"] },
+  war: { title: "Bộ trưởng Chiến tranh", short: "chiến tranh", desc: "số chiến binh, tấn công, đột kích, đánh man di (tuyên chiến và giảng hòa vẫn là việc của người trị vì)", en: "the number of warriors (\"warriors\"), attack, raid, clear_wild (never declare_war or peace)", actions: ["attack", "raid", "clear_wild"] },
+  diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine"] },
+  learning: { title: "Bộ trưởng Học thuật", short: "học thuật", desc: "chọn nghiên cứu, đề xuất phát minh", en: "research, propose_invention", actions: ["research", "propose_invention"] },
+  interior: { title: "Bộ trưởng Nội vụ", short: "nội vụ", desc: "bổ nhiệm, cách chức, ban thưởng quan chức; phong tục gia đình", en: "appoint_official, dismiss_official, reward_official, family_policy", actions: ["appoint_official", "dismiss_official", "reward_official", "family_policy"] },
+};
+export const MINISTERS = {
+  /** Milestones: a founded nation may hold one minister at at[0] people, two at at[1], and so on. */
+  at: [500, 1000, 2000, 4000],
+  /** A seated minister keeps its seat while the people stay at or above keep × its milestone; below, the newest steps down. */
+  keep: 0.9,
+  /** Each minister's own action points a turn: base + 1 per perPop people, at most max. */
+  ap: { base: 3, perPop: 1000, max: 8 },
+  /** Orders read from one minister a turn. */
+  maxOrders: 8,
+  /** The Watcher answers a request within waitTicks turns or it lapses; a refused field may be asked again after retryTicks. */
+  waitTicks: 20, retryTicks: 10,
+  /** Orders a minister may not give in a turn the ruler gave the same one (the ruler's word stands). */
+  rulerFirst: ["research", "family_policy", "quarantine"],
 };
 
 // §2.4 National traits: each nation is born with one character, chosen before the game.

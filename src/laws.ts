@@ -3,7 +3,7 @@
 // numbers in its rules). The values live in the world (its decrees), so a replay or a restart gives the
 // same world; applyLaws() writes them into the rule tables before anything reads them.
 
-import { BORDER, CONNECT, CONTAGION, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR, PROVINCE, PROSPERITY } from "./rules.ts";
+import { BORDER, CONNECT, CONTAGION, DEMO, ERA_TABLE, EVENTS, FLOOD, GROWTH, HAMLET, HORDES, HOUSING, MINISTERS, OFFICIALS, QUAKE, RESEARCH, ROADS, SCHISM, SEA, SETTLEMENT, START, TILES, TRADE, WAR, PROVINCE, PROSPERITY } from "./rules.ts";
 import type { World } from "./types.ts";
 
 export interface LawDef {
@@ -61,6 +61,11 @@ export const LAWS: LawDef[] = [
   { key: "schism.threshold", group: "Chiến tranh và trật tự", label: "Ổn định dưới mức này thì bất mãn tăng", desc: "", unit: "", min: 0, max: 80, step: 5, ...field(SCHISM, "threshold") },
   { key: "schism.minPop", group: "Chiến tranh và trật tự", label: "Dân tối thiểu để có phái ly khai", desc: "", unit: "người", min: 20, max: 500, step: 10, ...field(SCHISM, "minPop") },
   { key: "officials.perPop", group: "Chiến tranh và trật tự", label: "Thêm 1 quan chức mỗi", desc: "", unit: "người", min: 10, max: 300, step: 10, ...field(OFFICIALS, "perPop") },
+  { key: "ministers.first", group: "Bộ trưởng AI", label: "Dân cần cho Bộ trưởng AI thứ nhất", desc: "Từ chừng này dân, một quốc gia được xin các vị thần một trí tuệ nữa lo một lĩnh vực.", unit: "người", min: 50, max: 5000, step: 50, ...field(MINISTERS.at, 0) },
+  { key: "ministers.second", group: "Bộ trưởng AI", label: "Dân cần cho Bộ trưởng AI thứ hai", desc: "", unit: "người", min: 50, max: 10000, step: 50, ...field(MINISTERS.at, 1) },
+  { key: "ministers.third", group: "Bộ trưởng AI", label: "Dân cần cho Bộ trưởng AI thứ ba", desc: "", unit: "người", min: 50, max: 20000, step: 100, ...field(MINISTERS.at, 2) },
+  { key: "ministers.fourth", group: "Bộ trưởng AI", label: "Dân cần cho Bộ trưởng AI thứ tư", desc: "", unit: "người", min: 50, max: 40000, step: 100, ...field(MINISTERS.at, 3) },
+  { key: "ministers.apBase", group: "Bộ trưởng AI", label: "AP riêng của mỗi bộ trưởng", desc: "Mỗi lượt, cộng thêm 1 cho mỗi 1000 dân (tối đa 8).", unit: "AP", min: 1, max: 8, step: 1, ...field(MINISTERS.ap, "base") },
   { key: "events.winter", group: "Thiên tai", label: "Khả năng mùa đông khắc nghiệt", desc: "Mỗi lượt, trước các hệ số vùng lạnh.", unit: "", min: 0, max: 0.3, step: 0.01, ...field(EVENTS.winter, "chance") },
   { key: "events.plague", group: "Thiên tai", label: "Khả năng dịch bệnh", desc: "Mỗi lượt, trước các hệ số đông dân và thiếu nước.", unit: "", min: 0, max: 0.3, step: 0.01, ...field(EVENTS.plague, "chance") },
   { key: "contagion.border", group: "Thiên tai", label: "Khả năng dịch lây qua biên giới", desc: "Mỗi lượt nước có dịch còn lây, với mỗi láng giềng giáp biên (× (1 − y học của bên nhận)); cách ly chặn hẳn.", unit: "", min: 0, max: 1, step: 0.05, ...field(CONTAGION, "border") },

@@ -25,6 +25,7 @@ import { estimateProsperity, knownProsperity, prosperityRank } from "../prosperi
 import { freshWater, governed, maxOfficials, nextEraNeeds, roadLevelMax, roadNet, roadPlan } from "../engine.ts";
 import type { Nation, Tile, World } from "../types.ts";
 import { applyLaws, lawsKey } from "../laws.ts";
+import { ministersObs, ministersRules } from "../ministers.ts";
 
 /** The nations' rules (§8.1), with the numbers of the laws in force (§10.3). */
 function rulesText(): string {
@@ -66,6 +67,8 @@ ${ERA_TABLE.slice(1).map((e, i) => `  ${i + 1}. ${e.name}: ${[e.caps.join(" + ")
 Capabilities come from inventions: claim the one you are working towards in a proposal ("capabilities"), with prerequisites that truly lead there (the judge removes what is not earned). Each era raises the ceiling on trade bonuses by +50 points, gives +2 tiles to govern, +25% research, and every 2nd era one more housing building per centre and one more official, every 3rd era +1 AP. "era" in the observation says what your next gate still needs. New effect kinds open with the eras (see the list above). Coal, sulfur and oil are hidden until you reveal them (effect reveal); horses graze open land and your hunters bring them in once you hold capability "${HORSES.cap}"; with effect move ocean your ships and expeditions cross deep sea.
 
 YOUR COURT (officials): appoint people to run a field for you; each works every turn on their own, without your AP. Domains: ${Object.entries(OFFICIAL_DOMAINS).map(([k, d]) => `${k} (${d.title}): ${d.desc}`).join("; ")}. Slots: 1 + 1 per ${OFFICIALS.perPop} people + era and invention bonuses (max ${OFFICIALS.max}); one of each domain except governors (one per centre). Each costs ${OFFICIALS.upkeepBase} + skill food a turn; skill 1–5 grows every ${OFFICIALS.skillEvery} turns in office; loyalty 0–100 starts at ${OFFICIALS.start}, rises when your stability is ≥60, falls below 40, when unpaid, and for governors far (> ${OFFICIALS.farSeat} tiles) from the capital; below ${OFFICIALS.idle} they do nothing, at 0 they desert (stability −${OFFICIALS.desert}). Actions: appoint_official (${AP_COST.appoint_official}): {"type":"appoint_official","domain":"…","name":"…","seat":[col,row] (governor: your capital or a settlement)}; dismiss_official (0): {"type":"dismiss_official","official":id} (stability −${OFFICIALS.dismissStability}, the others lose 5 loyalty); reward_official (0): {"type":"reward_official","official":id,"goods":{"food":20}} (+1 loyalty per ${OFFICIALS.giftPerPoint} value given).
+
+${ministersRules()}
 
 RIVERS: river tiles hold fish, clay, reeds and floodplain plants, and flint gravel near the hills. Fields on a river give +${RIVER.fieldBonus * 100}%, on a delta +${RIVER.deltaBonus * 100}%. Fish runs bring extra fish to river land (${RIVER.runChance * 100}% a turn). Fresh water ("fresh_water"): a capital with no river, swamp, hot spring or Giếng (well, building "well") within ${RIVER.waterReach} tiles grows ×${RIVER.dryGrowth} as fast and catches plague ×${RIVER.dryPlague}. With boats (capability đi-nước) explorers spend half a step on river tiles. A river tile also houses one more family (hamlets) and, with a pier, is a road for boats. Rivers are worth reaching even a few tiles away: "nearest_river" shows the nearest one you have seen and the free tiles to claim, in order, to get there ("claimable" marks the first one toward_river).
 
@@ -264,6 +267,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     }),
     era: (() => { const next = nextEraNeeds(world, n); return { now: n.era, next: next?.era, still_needed: next?.missing }; })(),
     court: { slots: maxOfficials(world, n), officials: (n.officials ?? []).map(o => ({ id: o.id, title: OFFICIAL_DOMAINS[o.domain]?.title, domain: o.domain, name: o.name, seat: o.seat !== null ? xy(o.seat) : undefined, skill: o.skill, loyalty: o.loyalty, last_turn: o.lastAct })) },
+    ministers: ministersObs(world, n), // §4.9
     // §2.8 the provinces, once there is more than the capital's
     provinces: n.founded && n.settlements.length ? provinces(world, n).map(p => ({
       name: p.name, centre: xy(p.centre), capital: p.capital || undefined, tiles: p.tiles.length, people: p.people, housing: Math.round(p.housing),

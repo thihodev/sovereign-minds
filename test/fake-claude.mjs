@@ -14,7 +14,8 @@ if (args[0] === "-p") {
   const after = mode.match(/^limit-after-(\d+)$/);
   const turns = process.env.FAKE_CLAUDE_LOG ? readFileSync(process.env.FAKE_CLAUDE_LOG, "utf8").split("\n").filter(l => l.startsWith('["-p"')).length : 0;
   if (mode === "limit" || (after && turns > Number(after[1]))) { console.log(JSON.stringify({ is_error: true, result: `Claude AI usage limit reached|${Math.floor(Date.now() / 1000) + 3600}` })); process.exit(1); }
-  console.log(JSON.stringify({ is_error: false, result: JSON.stringify({ thought: "Giữ lửa và đi săn.", actions: [] }) }));
+  const minister = (args[args.indexOf("--system-prompt") + 1] || "").startsWith("You are a MINISTER"); // §4.9
+  console.log(JSON.stringify({ is_error: false, result: JSON.stringify(minister ? { thought: "Thần xin tuân lệnh.", actions: [] } : { thought: "Giữ lửa và đi săn.", actions: [] }) }));
   process.exit(0);
 }
 process.exit(2);
