@@ -75,3 +75,18 @@ test("high tension: incidents, and a dispute gives both sides a just cause", () 
   assert.ok(w.wars.some(x => x.a === a.id && x.b === b.id), JSON.stringify(a.lastRejected));
   assert.equal(a.reputation, rep, "no reputation lost");
 });
+
+test("a long dispute tears up a non-aggression pact; a just cause breaks a treaty for free", () => {
+  const w = touching("pact");
+  const [a, b] = w.nations;
+  w.treaties.push({ id: 91, type: "non_aggression", a: a.id, b: b.id, start: w.tick, end: null, active: true, tribute: {} } as never);
+  const st = borderOf(w, a.id, b.id);
+  const [div, max] = [BORDER.incidentDiv, BORDER.incidentMax];
+  BORDER.incidentMax = 0; // no incidents: only the dispute
+  try { for (let k = 0; k < BORDER.treatyBreakAfter + 1; k++) { st.tension = 95; turn(w); } } finally { BORDER.incidentDiv = div; BORDER.incidentMax = max; }
+  assert.equal(w.treaties.find(t => t.id === 91)!.active, false, "the pact fell apart");
+  const rep = a.reputation;
+  turn(w, { 0: { actions: [{ type: "declare_war", target: b.name }] } });
+  assert.ok(w.wars.some(x => x.a === a.id && x.b === b.id), JSON.stringify(a.lastRejected));
+  assert.equal(a.reputation, rep, "a just war");
+});

@@ -2,7 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.10 (đang làm)
+## v0.11 (đang làm)
+
+- **Tranh chấp biên giới không còn bị hiệp ước chặn mãi:**
+  - Căng thẳng từ 70 trở lên liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ. Liên minh và chư hầu vẫn giữ.
+  - Có chính nghĩa (tranh chấp, sự cố biên giới, bắt được gián điệp) thì xé hiệp ước không mất uy tín.
+  - Cố vấn nói rõ hiệp ước nào đang chặn chiến tranh và còn bao lâu nữa thì tan vỡ.
+
+## v0.10
 
 - **Thịnh vượng và tự tôn dân tộc (§4.7).**
   - **Điểm thịnh vượng 0–100**, gồm 4 phần, mỗi phần tối đa 25:

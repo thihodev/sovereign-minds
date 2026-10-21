@@ -15,7 +15,7 @@ import { mods, type Ledger } from "./engine.ts";
 import { quarantined } from "./contagion.ts";
 import type { Nation, World } from "./types.ts";
 
-export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number }
+export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number }
 export const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 export function borderOf(world: World, a: number, b: number): BorderState {
   const all = (world.borders ??= {}), k = pairKey(a, b);
@@ -95,12 +95,21 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     st.tension = Math.max(0, Math.min(100, Math.round(t * 10) / 10));
     // A dispute: both sides may fight with a just cause, and both peoples are uneasy
     if (st.tension >= BORDER.dispute) {
+      st.dispute = (st.dispute ?? 0) + 1;
       for (const [x, o] of [[a, b], [b, a]] as const) {
         x.casusBelli[String(o.id)] = Math.max(x.casusBelli[String(o.id)] ?? -1, tick + 1);
         x.stability = Math.max(0, x.stability - BORDER.disputeStability);
       }
       if (tick % 5 === 0) say(a.id, "border", `Biên giới ${a.name} – ${b.name} căng thẳng (${Math.round(st.tension)}/100): hai bên đều có chính nghĩa để tuyên chiến.`);
-    }
+      // A long dispute tears up the treaties that kept the peace (alliances and vassalage hold)
+      if (st.dispute >= BORDER.treatyBreakAfter) {
+        for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "peace", "passage"])) {
+          tr.active = false; tr.end = tick;
+          for (const x of [a, b]) x.lastEvents.push(`Hiệp ước ${tr.type === "peace" ? "hòa bình" : tr.type === "passage" ? "thông hành" : "bất tương xâm"} #${tr.id} với ${(x === a ? b : a).name} tan vỡ sau ${st.dispute} lượt tranh chấp biên giới. Hai bên có chính nghĩa: tuyên chiến không mất uy tín.`);
+          say(a.id, "treaty", `Tranh chấp biên giới kéo dài: hiệp ước giữa ${a.name} và ${b.name} tan vỡ.`);
+        }
+      }
+    } else st.dispute = 0;
   }
 }
 

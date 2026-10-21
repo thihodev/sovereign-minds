@@ -105,7 +105,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const st = borderOf(world, n.id, o.id), t = Math.round(st.tension), treaty = treatiesBetween(world, n.id, o.id).map(x => x.type);
     const cause = (n.casusBelli[String(o.id)] ?? -1) >= world.tick;
     if (activeWar(world, n.id, o.id)) continue;
-    if (t >= BORDER.dispute) say(3, `Biên giới với ${o.name} rất căng (${t}/100, ${border} ô giáp nhau): mỗi lượt −${BORDER.disputeStability} ổn định và hai bên đều có chính nghĩa để tuyên chiến. Hoặc hạ nhiệt (treaty non_aggression/peace, trade_offer, quà tặng), hoặc chuẩn bị chiến binh.`);
+    if (t >= BORDER.dispute) say(3, `Biên giới với ${o.name} rất căng (${t}/100, ${border} ô giáp nhau, ${st.dispute ?? 0} lượt tranh chấp): mỗi lượt −${BORDER.disputeStability} ổn định và hai bên đều có chính nghĩa để tuyên chiến. ${treaty.length ? `Hiệp ước ${treaty.join(", ")} đang chặn chiến tranh; nó sẽ tan vỡ sau ${BORDER.treatyBreakAfter} lượt tranh chấp liên tục, hoặc bạn xé nó ngay (break_treaty) mà không mất uy tín vì có chính nghĩa. ` : ""}Hoặc hạ nhiệt (trade_offer, quà tặng, dỡ cách ly), hoặc chuẩn bị chiến binh.`);
     else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}`);
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);

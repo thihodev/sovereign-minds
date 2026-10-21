@@ -180,9 +180,11 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       if (!t) return `Không có hiệp ước #${id} của bạn`;
       if (t.type === "vassal" && t.a === n.id) return "Chư hầu không phá ước được; dùng declare_independence";
       t.end = tick + 1; t.brokenBy = n.id;
-      n.reputation = Math.max(0, n.reputation - TREATY.breakPenalty);
       const o = world.nations[t.a === n.id ? t.b : t.a];
-      say(n.id, "treaty", `${n.name} xé hiệp ước ${TREATY_NAME[t.type]} với ${o.name}. Uy tín −${TREATY.breakPenalty}.`);
+      // §7.9 a just cause (a border dispute, an incident, a caught spy) excuses breaking the treaty
+      const just = (n.casusBelli[String(o.id)] ?? -1) >= tick;
+      if (!just) n.reputation = Math.max(0, n.reputation - TREATY.breakPenalty);
+      say(n.id, "treaty", `${n.name} xé hiệp ước ${TREATY_NAME[t.type]} với ${o.name}.${just ? " Có chính nghĩa, không mất uy tín." : ` Uy tín −${TREATY.breakPenalty}.`}`);
       o.lastEvents.push(`${n.name} xé hiệp ước ${TREATY_NAME[t.type]} #${t.id}; hết hiệu lực từ lượt sau.`);
       return null;
     }

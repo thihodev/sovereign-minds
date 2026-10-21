@@ -351,7 +351,7 @@ export interface World {
   /** Ticks each owned tile has been cut off from every centre (§2.3). */
   cutoff: Record<string, number>;
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
-  borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number }>;
+  borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it
 }
 

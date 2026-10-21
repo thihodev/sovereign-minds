@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.10";
+export const RULES_VERSION = "0.11";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -131,8 +131,9 @@ export const BORDER = {
   /** Incidents: chance a turn = tension / incidentDiv (at most incidentMax); each raises the tension and may give the victim a just cause for `causeTicks` turns. */
   incidentDiv: 250, incidentMax: 0.3, causeTicks: 6, poach: 30, crossers: 4,
   rise: { poach: 8, brawl: 15, crossing: 5 } as Record<string, number>,
-  /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn. */
-  dispute: 70, disputeStability: 1,
+  /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn; after
+   *  `treatyBreakAfter` turns of dispute in a row their non-aggression, peace and passage treaties fall apart. */
+  dispute: 70, disputeStability: 1, treatyBreakAfter: 5,
   /** The border market: while tension < marketBelow, up to `marketValue` worth of goods a side, from a good one has
    *  beyond what it keeps (food: two turns of eating; others: marketKeep) to a nation holding less than marketLack of it. */
   marketBelow: 60, marketValue: 12, marketKeep: 20, marketLack: 5,
