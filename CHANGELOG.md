@@ -2,7 +2,23 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.14 (đang làm)
+## v0.15 (đang làm)
+
+- **Bộ trưởng AI cho nước lớn (§4.9):** một quốc gia được thêm một "trí tuệ" (một model AI) quản một lĩnh vực:
+  - **Mốc:** 1 bộ trưởng ở 500 dân, 2 ở 1.000, 3 ở 2.000, 4 ở 4.000. Dân tụt dưới 90% mốc thì bộ trưởng mới nhất rời ghế.
+  - **Năm lĩnh vực**, mỗi lĩnh vực một bộ trưởng:
+    - kinh tế: lao động, chế tác, xây dựng, đường, chiếm đất
+    - quân sự: đánh, đột kích, dẹp man di; không được tuyên chiến hay giảng hòa
+    - ngoại giao: thư, buôn bán, hiệp ước, nhận dân, cách ly
+    - học thuật: nghiên cứu, đề xuất phát minh
+    - nội vụ: quan chức, phong tục
+  - Mỗi bộ trưởng có **AP riêng** (3 + 1 cho mỗi 1.000 dân, tối đa 8) và chỉ được ra lệnh trong lĩnh vực của mình. Vua luôn đi trước: lệnh của vua thắng nếu hai bên trùng việc.
+  - **Cách có bộ trưởng:** nước đủ dân dùng `request_minister` (1 AP) để xin. Watcher duyệt trong mục **Thỉnh nguyện**, chọn model và effort (hoặc bot).
+  - Mỗi lượt, bộ trưởng được gọi song song với vua, với prompt và gói trạng thái riêng của lĩnh vực đó. Vua thấy bộ trưởng đã làm gì lượt trước.
+  - Cố vấn báo khi đủ điều kiện xin, và còn bao nhiêu dân nữa tới mốc kế tiếp.
+  - Tab Triều đình có mục "Bộ trưởng AI", có nút bãi nhiệm.
+
+## v0.14
 
 - **Đất là sự sống (§2.9):**
   - Bỏ ô có người ở làm dân mất lòng; đất bị chiếm mang theo các gia đình sống trên đó, và cho bên mất chính nghĩa đòi lại trong 10 lượt.
