@@ -15,6 +15,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Sổ phát minh mô tả đủ công thức (nguyên liệu → sản phẩm) và công trình (vật liệu, tác dụng);
   - AI thấy `invention_hints` (hàng mình có mà chưa công thức nào dùng) và được nhắc nên phát minh ra sản phẩm thật, không chỉ "+10% một nghề".
 - **Bộ trưởng AI:** Watcher **ban thẳng** bộ trưởng trong tab Triều đình của một nước còn ghế trống, không cần chờ nước đó xin.
+- **0.23.1:** chip **🧠 N AI** trên thanh trên; bấm vào mở bảng mọi model AI đang chạy (quốc gia, bộ trưởng, trọng tài, sử gia), gom theo model, kèm effort, trạng thái và số lệnh gọi mỗi lượt.
 - **Sửa:** tên quan không còn lặp chức ("Bá tước Bá tước Đá Phong").
 
 ## v0.22

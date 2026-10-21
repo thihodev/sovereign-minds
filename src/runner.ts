@@ -304,6 +304,21 @@ export class Runner {
   }
 
   /** Why proposals are still waiting, for the Watcher. */
+  /** Every AI mind the world runs now: the nations', their ministers', the judge's and the historian's. */
+  minds(): Array<{ role: string; who: string; provider: string; model: string; effort: string; status: string; perTurn: number }> {
+    const w = this.world, out: Array<{ role: string; who: string; provider: string; model: string; effort: string; status: string; perTurn: number }> = [];
+    for (const n of w.nations) {
+      if (!n.alive || n.controller !== "ai") continue;
+      out.push({ role: "Quốc gia", who: n.founded ? n.name : `Bộ lạc ${n.id + 1}`, provider: n.provider, model: n.model, effort: n.effort ?? "", status: n.status, perTurn: 1 });
+      for (const m of n.ministers ?? []) if (m.controller !== "bot")
+        out.push({ role: "Bộ trưởng", who: `${MINISTER_DOMAINS[m.domain]?.title ?? m.domain} · ${n.name}`, provider: "claude", model: m.model ?? "", effort: m.effort ?? "", status: n.status, perTurn: 1 });
+    }
+    for (const p of this.cfg.judgeProviders) if (this.cfg.judgesPerTick > 0)
+      out.push({ role: "Trọng tài", who: "chấm phát minh", provider: p, model: p === "claude" ? process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5" : p, effort: "", status: (this.judgeSleep.get(p) || 0) > Date.now() ? "asleep" : "active", perTurn: this.cfg.judgesPerTick });
+    if (this.historian) out.push({ role: "Sử gia", who: "chép sử mỗi vài lượt", provider: "", model: this.historian.author, effort: "", status: "active", perTurn: 0 });
+    return out;
+  }
+
   judgeInfo(): { claudeSleepUntil: number | null; claudeWaitUntil: number | null; perTick: number; batch: number } {
     const sleep = this.judgeSleep.get("claude") || 0;
     return { claudeSleepUntil: sleep > Date.now() ? sleep : null, claudeWaitUntil: this.claudeWait.until > Date.now() ? this.claudeWait.until : null, perTick: this.cfg.judgesPerTick, batch: Math.max(1, Number(process.env.JUDGE_BATCH) || 4) };

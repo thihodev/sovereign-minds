@@ -1063,8 +1063,24 @@
     $("#world-summary").innerHTML =
       `<span class="stat" title="Quốc gia còn sống / tổng số"><b>${alive}</b>/${S.nations.length} quốc gia</span>` +
       `<span class="stat gate" title="${esc(gates.length ? gates.map(([e, t]) => `${e}: lượt ${t}`).join(" · ") : "Chưa quốc gia nào qua cổng kỷ nguyên")}">${latest ? `Cổng <b>${esc(latest[0])}</b> · lượt ${latest[1]}` : "Chưa qua cổng kỷ nguyên"}</span>` +
-      `<span class="stat${wars ? " hot" : ""}"><b>${wars}</b> cuộc chiến</span>`;
+      `<span class="stat${wars ? " hot" : ""}"><b>${wars}</b> cuộc chiến</span>` +
+      (() => { const m = S.minds || [], models = new Set(m.map(x => x.model)).size; return `<button type="button" class="stat minds-chip" id="minds-chip" title="${m.length} bộ não AI, ${models} model: bấm để xem từng cái">🧠 <b>${m.length}</b> AI</button>`; })();
+    $("#minds-chip").onclick = openMinds;
   }
+  // every AI mind running now, grouped by model
+  const MIND_ICON = { "Quốc gia": "🏛", "Bộ trưởng": "🎓", "Trọng tài": "⚖", "Sử gia": "📜" };
+  const MIND_STATE = { playing: ["đang chạy", "ok"], active: ["đang chạy", "ok"], asleep: ["đang ngủ (chờ hạn mức)", "warn"], error: ["lỗi", "bad"] };
+  function openMinds() {
+    const m = S.minds || [], by = new Map();
+    for (const x of m) { const k = x.model || x.provider || "?"; if (!by.has(k)) by.set(k, []); by.get(k).push(x); }
+    const perTurn = m.reduce((s, x) => s + x.perTurn, 0);
+    $("#minds-body").innerHTML = m.length ? `<p class="note">${m.length} bộ não AI, ${by.size} model; mỗi lượt khoảng ${perTurn} lệnh gọi (trọng tài chỉ gọi khi có đơn phát minh, sử gia mỗi vài lượt). Bot không tính.</p>
+      <div class="minds-sum">${[...by.entries()].sort((a, b) => b[1].length - a[1].length).map(([k, xs]) => `<div class="card2"><div class="row"><b>${esc(k)}</b><span style="flex:1"></span><span class="pill">×${xs.length}</span></div><div class="meta">${Object.entries(xs.reduce((o, x) => (o[x.role] = (o[x.role] || 0) + 1, o), {})).map(([r, c]) => `${MIND_ICON[r] || ""} ${esc(r)} ${c}`).join(" · ")}${xs.some(x => x.effort) ? ` · effort ${[...new Set(xs.map(x => x.effort).filter(Boolean))].map(esc).join("/")}` : ""}</div></div>`).join("")}</div>
+      <table class="res prod"><thead><tr><th>Vai</th><th>Ai</th><th>Model</th><th>Trạng thái</th></tr></thead><tbody>${m.map(x => { const [st, cls] = MIND_STATE[x.status] || [x.status, ""]; return `<tr><td>${MIND_ICON[x.role] || ""} ${esc(x.role)}</td><td>${esc(x.who)}</td><td>${esc(x.model)}${x.effort ? ` · ${esc(x.effort)}` : ""}</td><td><span class="pill ${cls}">${esc(st)}</span></td></tr>`; }).join("")}</tbody></table>`
+      : `<p class="note">Không có model AI nào đang chạy: mọi quốc gia đều là bot.</p>`;
+    $("#minds-dialog").showModal();
+  }
+  $("#minds-close").onclick = () => $("#minds-dialog").close();
   const togglePause = () => api("/api/control", { method: "POST", body: { action: window.__status?.paused ? "resume" : "pause" } }).then(applyStatus).catch(() => { });
   const stepTick = () => api("/api/control", { method: "POST", body: { action: "step" } }).catch(() => { });
   $("#btn-pause").onclick = togglePause;

@@ -147,6 +147,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       registry: w.registry,
       proposals: w.proposals.slice(-60).map(p => ({ ...p, inventionName: p.inventionId ? invName(w, p.inventionId) : undefined })),
       judge: runner.judgeInfo(),
+      minds: runner.minds(), // every AI mind running now
       // §6.2 everything the world can make: recipes and buildings, the invention each needs, and who can make it now
       products: (() => {
         const live = w.nations.filter(n => n.alive && n.founded), g = (x: Record<string, number>) => Object.entries(x).map(([k, q]) => `${q} ${goodName(w, k)}`).join(" + ");
