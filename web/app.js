@@ -601,38 +601,41 @@
   const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
   let treeMemo = null;
-  /** Each road tile's step toward the nearest centre (breadth first over road tiles of one kind, land or water). */
+  /** The road network as a spanning tree of each cluster of touching road tiles (land and water apart): every road
+   *  stays one connected line, without the mesh of every touching pair. Each centre touching a cluster is joined to it. */
   function roadTree(hubs) {
-    const key = S.tick + ":" + S.roads.length;
-    if (treeMemo?.key === key) return treeMemo.parent;
-    const parent = new Map(), queue = [];
-    for (const h of hubs) { parent.set(h, -1); queue.push(h); }
-    // water lanes grow from the piers' shores too: any water road next to land with a road or a centre
-    for (let q = 0; q < queue.length; q++) {
-      const i = queue[q];
-      for (const j of NB(i)) {
-        if (j < 0 || parent.has(j) || !(S.roads[j] || 0)) continue;
-        if (isWater(j) !== isWater(i) && !hubs.has(i)) continue;
-        parent.set(j, isWater(j) !== isWater(i) ? -1 : i); queue.push(j);
-      }
-    }
-    // roads cut off from every centre: link each to one road neighbour so they still read as a road
-    S.roads.forEach((lv, i) => { if (!lv || parent.has(i)) return; const j = NB(i).find(k => k >= 0 && (S.roads[k] || 0) && isWater(k) === isWater(i) && k < i); parent.set(i, j ?? -1); });
-    treeMemo = { key, parent };
-    return parent;
+    const key = S.tick + ":" + S.roads.length + ":" + hubs.size;
+    if (treeMemo?.key === key) return treeMemo;
+    const parent = new Map(), links = [], road = i => i >= 0 && (S.roads[i] || 0) > 0;
+    S.roads.forEach((lv, start) => {
+      if (!lv || parent.has(start)) return;
+      // the cluster, one kind of tile
+      const water = isWater(start), cluster = [start], seen = new Set([start]);
+      for (let q = 0; q < cluster.length; q++) for (const j of NB(cluster[q])) if (road(j) && !seen.has(j) && isWater(j) === water) { seen.add(j); cluster.push(j); }
+      // the centres it touches; the tree grows from a tile next to one of them, else from its first tile
+      const touching = new Map(); // hub -> one tile of the cluster beside it
+      if (!water) for (const i of cluster) for (const h of NB(i)) if (h >= 0 && hubs.has(h) && !seen.has(h) && !touching.has(h)) touching.set(h, i);
+      const root = touching.size ? [...touching.values()][0] : cluster.reduce((a, b) => Math.min(a, b));
+      parent.set(root, -1);
+      const queue = [root];
+      for (let q = 0; q < queue.length; q++) for (const j of NB(queue[q])) if (seen.has(j) && !parent.has(j)) { parent.set(j, queue[q]); queue.push(j); }
+      for (const [h, i] of touching) links.push([i, h]);
+    });
+    treeMemo = { key, parent, links };
+    return treeMemo;
   }
   function drawRoads(g, vis, s, z, px) {
     if (!S.roads || s * z < 3) return;
     const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
     // a road network drawn as branches from the centres, not as a mesh of every touching pair
-    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [], parent = roadTree(hubs);
+    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links } = roadTree(hubs);
     S.roads.forEach((lv, i) => {
       if (!lv || !vis(i)) return;
       const water = isWater(i), j = parent.get(i);
-      if (j === undefined || j < 0) { if (!hubs.has(i)) dots.push([i, lv, water]); return; }
-      const lj = S.roads[j] || 0;
-      segs[water ? "sea" : "land"][lj ? Math.min(lv, lj) : lv].push([i, j]);
+      if (j === undefined || j < 0) { if (!links.some(([a]) => a === i) && !NB(i).some(k => parent.get(k) === i)) dots.push([i, lv, water]); return; }
+      segs[water ? "sea" : "land"][Math.min(lv, S.roads[j] || lv)].push([i, j]);
     });
+    for (const [i, h] of links) if (vis(i) || vis(h)) segs.land[S.roads[i] || 1].push([i, h]); // a centre joined to its road
     const line = (list, width, color, dash) => {
       if (!list.length) return;
       g.beginPath();
