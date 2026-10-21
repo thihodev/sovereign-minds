@@ -7,7 +7,7 @@ import {
   type BuildingDef, type Invention, type Recipe,
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
-import { seedDeepResources } from "./worldgen.ts";
+import { seedDeepResources, seedVeins } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
 
@@ -33,6 +33,7 @@ export function migrate(world: World): World {
   world.treaties ??= []; world.treatyOffers ??= []; world.tradeOffers ??= []; world.caravans ??= [];
   world.wars ??= []; world.battles ??= []; world.nextId ??= 1; world.cutoff ??= {}; world.eraGates ??= {};
   if (!world.tiles.some(t => DEEP_RES.some(k => (t.cap[k] || 0) > 0) || (t.cap.horse || 0) > 0)) seedDeepResources(world.seed, world.tiles); // v0.5 resources
+  if (!world.tiles.some(t => t.vein)) seedVeins(world.seed, world.tiles); // v0.17 rich veins
   for (const n of world.nations) {
     n.officials ??= [];
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];

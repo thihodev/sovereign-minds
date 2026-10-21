@@ -16,6 +16,8 @@ import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, treatiesBetween } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
+import { goodVi, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
+import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
 const xy = (i: number) => `(${col(i)}, ${row(i)})`;
@@ -185,6 +187,27 @@ export function advice(world: World, n: Nation): Advice[] {
   if ((n.family?.fighters ?? "all") === "men" && n.labor.warrior > 0 && n.labor.warrior >= n.population * 0.3) say(1, `Chỉ đàn ông ra trận mà ${n.labor.warrior} chiến binh đã là ${Math.round(n.labor.warrior / n.population * 100)}% dân: thêm nữa sẽ hết người làm.`);
 
   // §4.9 AI ministers: how far to the next seat, and when one can be asked for
+  // §6.3 + §7.10 what the nation lacks, where it lies, and what it can sell
+  const known = n.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded);
+  const spare = surpluses(world, n);
+  for (const sh of shortages(world, n).slice(0, 2)) {
+    const name = goodVi(world, sh.good), ways: string[] = [];
+    const rich = known.filter(o => specialtiesOf(world, o, n).some(x => x.good === sh.good) || surpluses(world, o).some(x => x.good === sh.good));
+    if (rich.length) ways.push(`mua của ${rich.slice(0, 3).map(o => o.name).join(", ")}${spare.length ? ` (đổi ${goodVi(world, spare[0].good)} bạn đang dư, giá thế giới ${spare[0].world})` : ""} hoặc ký cống nạp bằng ${name}`);
+    const veins = veinsNear(world, n).filter(v => v.good === sh.good);
+    const free = veins.find(v => v.owner < 0), theirs = veins.find(v => v.owner >= 0);
+    if (free) ways.push(`chiếm mạch ${name} tự do ở ${xy(free.tile)}, cách ${free.distance} ô (mở rộng đất hoặc lập điểm định cư)`);
+    if (theirs) ways.push(`mạch ${name} của ${world.nations[theirs.owner].name} ở ${xy(theirs.tile)} sát biên giới: thương lượng, hoặc chiếm nếu có chính nghĩa và quân mạnh hơn`);
+    say(2, `Thiếu ${name}: cần ${sh.need}/lượt, có ${sh.have}; ở nước bạn giá ${sh.local}, giá thế giới ${sh.world}. ${ways.length ? `Cách có: ${ways.join("; ")}.` : "Chưa biết nước nào giàu thứ này: đi thám hiểm, gặp thêm nước."}`);
+  }
+  if (spare.length) {
+    const top = spare[0], buyers = known.filter(o => shortages(world, o).some(x => x.good === top.good));
+    say(1, `Dư ${top.spare} ${goodVi(world, top.good)} (giá thế giới ${top.world}${top.world > goodValue(world, top.good) ? ", đang đắt" : ""})${buyers.length ? `: ${buyers.slice(0, 3).map(o => o.name).join(", ")} đang thiếu, hãy bán cho họ (trade_offer)` : ": đem bán lấy thứ bạn thiếu"}.`);
+  }
+  const mine = specialtiesOf(world, n).filter(x => x.veins.length);
+  const exposed = mine.flatMap(x => x.veins.map(i => ({ good: x.good, i }))).find(v => world.nations.some(o => o.alive && o.founded && o.id !== n.id && activeWar(world, n.id, o.id) && world.tiles.some(t => t.owner === o.id && Math.abs(col(t.i) - col(v.i)) + Math.abs(row(t.i) - row(v.i)) <= 3)));
+  if (exposed) say(3, `Mạch ${goodVi(world, exposed.good)} của bạn ở ${xy(exposed.i)} nằm sát quân thù: đặt chiến binh, dựng hàng rào, đừng để mất nó.`);
+
   for (const a of ministerAdvice(world, n)) say(a.level, a.text);
 
   return out.sort((a, b) => b.level - a.level).slice(0, 7);

@@ -45,6 +45,8 @@ export interface Tile {
   wall?: number;
   /** §2.5 A road on land, a sea lane on water: 1–3 (none when absent). It stays when the tile changes hands. */
   road?: number;
+  /** §2.10 a rich vein of this good: far larger reserves, +50% to whoever works it */
+  vein?: ResKey;
 }
 
 export interface Flag {
@@ -124,6 +126,8 @@ export interface Nation {
   /** Tick until which declaring war on a nation costs no reputation (caught spy). */
   casusBelli: Record<string, number>;
   /** Extra centres founded with found_settlement (§2.3). */
+  /** §6.3 what the nation made and used of each good, remembered over a few turns: [made, used] per turn */
+  flow?: Record<string, [number, number]>;
   settlements: Array<{ tile: number; name: string; tick: number; /** §2.5 joined to the capital by road */ road?: boolean }>;
   /** Completed trades with each nation (§7.3, §7.8). */
   trades: Record<string, number>;
@@ -412,6 +416,8 @@ export interface World {
   /** §7.9 tension, incidents and market between neighbours, keyed "a-b" (a < b) */
   borders?: Record<string, { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; dispute?: number }>;
   eraGates: Record<string, number>; // era -> first tick a nation crossed it
+  /** §6.3 world prices in food units, and last turn's for the trend (worlds before v0.17 have none) */
+  market?: { prices: Record<string, number>; prev: Record<string, number> };
 }
 
 export interface CustomCatalog {

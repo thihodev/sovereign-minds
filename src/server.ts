@@ -1,12 +1,13 @@
 // Watcher HTTP server: the web UI, a JSON API, a live event stream (SSE),
 // Claude login and the Claude chat. Meant for a local machine.
 
+import { shortages, specialtiesOf, surpluses, techEdge } from "./market.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
 import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
-import { allBuildings, allInventions, buildingOf, depthOf, inv, invName, describeEffects } from "./catalog.ts";
+import { allBuildings, allInventions, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
@@ -114,7 +115,15 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         // §4.9 AI ministers: seats, the next milestone, each minister's own AP
         ministers: (n.ministers ?? []).map(m => ({ ...m, title: MINISTER_DOMAINS[m.domain]?.title ?? m.domain })),
         ministerSeats: ministerSeats(n.population), ministerNext: nextMilestone(n.population), ministerAp: ministerAp(n),
+        // §6.3 + §7.10 riches, edge, lacks (the Watcher sees every ore)
+        market: n.alive && n.founded ? (() => { const e = techEdge(w, n); return {
+          specialties: specialtiesOf(w, n, null).map(x => ({ good: x.good, name: goodName(w, x.good), share: x.share, veins: x.veins.length })),
+          edge: { inventions: e.inventions.map(id => invName(w, id)), products: e.products.map(g => goodName(w, g)) },
+          shortages: shortages(w, n).map(x => ({ ...x, name: goodName(w, x.good) })), surpluses: surpluses(w, n).map(x => ({ ...x, name: goodName(w, x.good) })),
+        }; })() : null,
       })),
+      // §6.3 world prices
+      prices: Object.entries(w.market?.prices ?? {}).map(([g, p]) => ({ good: g, name: goodName(w, g), price: p, standard: goodValue(w, g), prev: w.market?.prev[g] ?? p })),
       hordes: (w.hordes ?? []).map(h => ({ ...h, strength: Math.round(h.strength) })),
       lastFx: runner.lastFx,
       spies: w.spies,
@@ -161,6 +170,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           terrain: w.tiles.map(t => t.terrain), zone: w.tiles.map(t => t.zone), region: w.tiles.map(t => t.region),
           river: w.tiles.map(t => t.river ? 1 : 0), delta: w.tiles.map(t => t.delta ? 1 : 0),
           wonders: w.wonders, rivers: w.rivers, wild: w.wild, herd: w.herd,
+          veins: w.tiles.filter(t => t.vein).map(t => ({ i: t.i, good: t.vein, name: goodName(w, t.vein!) })),
         });
       }
       if (path === "/api/state") return send(res, 200, statePayload());

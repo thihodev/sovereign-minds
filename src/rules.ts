@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.16";
+export const RULES_VERSION = "0.17";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -508,6 +508,19 @@ export const GOOD_VALUE: Record<string, number> = {
   copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
 };
 export const TOOL_LIFE = 10; // ticks
+/** §2.10 Rich veins: a few deposits of each good hold `mult` times the reserves and yield +`yield` to whoever works them.
+ *  `count` per good on the whole map, at least `apart` tiles from another vein of the same good. */
+export const VEIN = {
+  count: { copper: 12, tin: 8, iron: 8, salt: 8, flint: 10, clay: 6, coal: 8, sulfur: 6, oil: 6, horse: 8 } as Record<string, number>,
+  mult: 4, yield: 0.5, apart: 12,
+};
+/** §6.3 Prices, in units of food. A good's world price is its standard value × √(demand / supply), within
+ *  [`min`, `max`] × the standard value, moving `pace` of the way each turn. Demand is what the nations used
+ *  (food eaten, materials built with, inputs crafted, tools worn) or want for the recipes they know
+ *  (`recipeWant` turns of each input); supply is what they made plus their stores spread over `stockTurns` turns.
+ *  `flow` is how fast the remembered flows follow this turn's. A nation is rich in a land good (§7.10) when it holds a vein
+ *  of it, or `specialtyShare` times a fair share of what all the nations' lands hold (at least `specialtyMin`). */
+export const MARKET = { min: 0.25, max: 4, pace: 0.25, flow: 0.3, stockTurns: 10, recipeWant: 2, k: 2, specialtyShare: 1.5, specialtyMin: 50, dear: 1.6, cheap: 0.6 };
 
 // §2.2 Founding
 export const FLAG_LAYOUTS = ["plain", "h2", "h3", "v2", "v3", "cross", "diagonal", "border"];

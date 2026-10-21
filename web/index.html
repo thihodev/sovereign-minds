@@ -166,7 +166,7 @@
     </div>
 
     <div class="panel subtabs" id="tab-diplomacy" data-key="diplomacy" hidden>
-      <nav class="seg" role="tablist" aria-label="Ngoại giao"><button data-sub="relations">Quan hệ</button><button data-sub="war">Chiến sự <span class="cnt" data-count="war"></span></button><button data-sub="treaties">Hiệp ước <span class="cnt" data-count="treaties"></span></button><button data-sub="hordes">Man di <span class="cnt" data-count="hordes"></span></button><button data-sub="trade">Đoàn buôn <span class="cnt" data-count="trade"></span></button></nav>
+      <nav class="seg" role="tablist" aria-label="Ngoại giao"><button data-sub="relations">Quan hệ</button><button data-sub="war">Chiến sự <span class="cnt" data-count="war"></span></button><button data-sub="treaties">Hiệp ước <span class="cnt" data-count="treaties"></span></button><button data-sub="hordes">Man di <span class="cnt" data-count="hordes"></span></button><button data-sub="trade">Đoàn buôn <span class="cnt" data-count="trade"></span></button><button data-sub="market">Thị trường</button></nav>
       <section data-sub="relations">
         <details class="rel-legend"><summary>Chú thích ký hiệu</summary>
           <ul class="plain legend-list">
@@ -185,6 +185,11 @@
       <section data-sub="treaties"><div id="treaties"></div></section>
       <section data-sub="hordes"><div id="hordes"></div></section>
       <section data-sub="trade"><div id="caravans"></div></section>
+      <section data-sub="market">
+        <p class="note">Giá thế giới tính bằng lương thực: giá chuẩn × √(cầu ÷ cung), từ ×0,25 tới ×4. Cầu là thứ các nước dùng và cần cho công thức họ biết; cung là thứ họ làm ra cộng với kho. ◆ trên bản đồ là mạch giàu: trữ lượng gấp 4, khai thác +50%.</p>
+        <h3 class="sub">Đặc sản, thế mạnh và chỗ thiếu</h3><div id="market-nations"></div>
+        <h3 class="sub">Giá thế giới</h3><div id="prices"></div>
+      </section>
     </div>
 
     <div class="panel subtabs" id="tab-stats" data-key="stats" hidden>

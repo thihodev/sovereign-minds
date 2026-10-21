@@ -2,7 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.16 (đang làm)
+## v0.17 (đang làm)
+
+- **Mạch giàu (§2.10).** Mỗi loại hàng (đồng, thiếc, sắt, muối, đá lửa, đất sét, than, lưu huỳnh, dầu, ngựa) có 6–12 mạch rải khắp bản đồ, cách nhau ≥ 12 ô. Mỗi mạch có trữ lượng gấp 4 và cho +50% khi khai thác. Chiếm ô là chiếm mạch. Bản đồ đánh dấu ◆. Thế giới cũ được thêm mạch khi nạp lại.
+- **Giá cả (§6.3).** Giá thế giới (tính bằng lương thực) = giá chuẩn × √(cầu ÷ cung), từ ×0,25 tới ×4. Cầu là thứ đã dùng hoặc cần cho công thức; cung là thứ làm ra cộng kho. Mỗi nước còn có giá riêng, cho biết nó thiếu hay dư gì. Chợ biên giới và bot đổi hàng theo giá này. Đề nghị trao đổi kèm `worth`.
+- **Đặc sản, thế mạnh, chỗ thiếu (§7.10).**
+  - AI thấy `market`: đặc sản, phát minh và hàng hiếm của mình, chỗ thiếu kèm nước giàu thứ đó, hàng dư, mạch gần (tự do hay của láng giềng), và các nước khác giàu gì, giỏi gì, thiếu gì.
+  - Lời cố vấn chỉ cách có thứ còn thiếu: mua, ký cống nạp, chiếm mạch tự do, hoặc chiếm mạch của láng giềng khi có chính nghĩa.
+  - Bot quý ô có mạch, và ưu tiên đánh nước yếu có mạch sát biên giới.
+- **Watcher:** Ngoại giao → **Thị trường** (giá thế giới, bảng đặc sản và chỗ thiếu của từng nước); mục "Đặc sản & thị trường" trong tab Kinh tế; chú thích ◆ trên bản đồ.
+
+## v0.16
 
 - **Sắc lệnh đổi tên có hiệu lực (§10.6).** Trước đây sắc lệnh văn bản như "đổi mọi tên sang tiếng Việt" chỉ được báo cho AI, rồi bị quên.
   - Loại sắc lệnh mới **Đổi tên**, có thời hạn (mặc định 10 lượt). Sắc lệnh văn bản có chữ "đổi tên" cũng tự thành loại này, và "trong N lượt" đặt thời hạn.

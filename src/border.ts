@@ -14,6 +14,7 @@ import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
+import { price } from "./market.ts";
 import type { Nation, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number }
@@ -54,7 +55,7 @@ function spare(world: World, n: Nation): Array<[string, number]> {
     const keep = g === "food" ? mouths(n) * mods(world, n).foodPerPerson * 2 : BORDER.marketKeep;
     if (q - keep >= 3) out.push([g, q - keep]);
   }
-  return out.sort((a, b) => b[1] * GOOD_VALUE[b[0]] - a[1] * GOOD_VALUE[a[0]] || a[0].localeCompare(b[0]));
+  return out.sort((a, b) => b[1] * price(world, b[0]) - a[1] * price(world, a[0]) || a[0].localeCompare(b[0]));
 }
 const lacks = (n: Nation, g: string) => (n.stock[g] || 0) < BORDER.marketLack;
 
@@ -78,8 +79,10 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     if (t < BORDER.marketBelow && !quarantined(a, tick) && !quarantined(b, tick)) {
       const sa = spare(world, a).find(([g]) => lacks(b, g)), sb = spare(world, b).find(([g]) => lacks(a, g));
       if (sa && sb) {
-        const value = Math.min(BORDER.marketValue, sa[1] * GOOD_VALUE[sa[0]], sb[1] * GOOD_VALUE[sb[0]]);
-        const qa = Math.floor(value / GOOD_VALUE[sa[0]]), qb = Math.floor(value / GOOD_VALUE[sb[0]]);
+        // §6.3 at world prices
+        const pa = price(world, sa[0]), pb = price(world, sb[0]);
+        const value = Math.min(BORDER.marketValue, sa[1] * pa, sb[1] * pb);
+        const qa = Math.floor(value / pa), qb = Math.floor(value / pb);
         if (qa >= 1 && qb >= 1) {
           L.stock(a, sa[0], -qa, "market"); L.stock(b, sa[0], qa, "market");
           L.stock(b, sb[0], -qb, "market"); L.stock(a, sb[0], qb, "market");

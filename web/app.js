@@ -649,6 +649,13 @@
       g.closePath(); g.fillStyle = "#ffd84a"; g.fill(); g.lineWidth = px; g.strokeStyle = "#3a2a00"; g.stroke();
       if (s * z >= 14) label(g, w.name, x, y + R + 8 * px, small, "#ffe9a0", 500, px);
     }
+    // §2.10 rich veins: a small diamond in the good's colour
+    if (s * z >= 3) for (const v of ST.veins || []) {
+      const [x, y] = center(v.i), R = clamp(s * .45 * z, 3, 8) * px;
+      g.beginPath(); g.moveTo(x, y - R); g.lineTo(x + R * .75, y); g.lineTo(x, y + R); g.lineTo(x - R * .75, y); g.closePath();
+      g.fillStyle = VEIN_COLOR[v.good] || "#ddd"; g.fill(); g.lineWidth = px; g.strokeStyle = "#1a1a1a"; g.stroke();
+      if (s * z >= 16) label(g, `Mạch ${v.name}`, x, y + R + 7 * px, small, "#f0e6d0", 500, px);
+    }
     // barbarian hordes (§9.4): a dark camp-fire marker with their strength
     for (const h of S.hordes || []) {
       const [x, y] = center(h.tile), R = clamp(s * 1.1 * z, 7, 16) * px;
@@ -1080,6 +1087,7 @@
     openRight("inspect"); renderInspector();
     if (n.alive) centerOn(n.capital); else scheduleRender();
   }
+  const VEIN_COLOR = { copper: "#d9822b", tin: "#b8c4cc", iron: "#7a4a3a", salt: "#ffffff", flint: "#3d3d4a", clay: "#b5653c", coal: "#222222", sulfur: "#e8d84a", oil: "#111111", horse: "#a0703a" };
   function nationBlock(n, tile) {
     const el = document.createElement("section"); el.className = "insp-nation";
     const pct = n.research ? Math.min(100, n.research.progress / n.research.cost * 100) : 0;
@@ -1125,6 +1133,7 @@
     let t; try { t = await api(`/api/tile?i=${i}`); } catch (e) { box.innerHTML = `<p class="note">Không tải được ô: ${esc(e.message)}</p>`; return; }
     if (my !== inspReq || inspect?.kind !== "tile" || inspect.i !== i) return;
     const owner = t.owner >= 0 ? S.nations[t.owner] : null, w = ST.wonders.find(x => x.i === i);
+    const vein = (ST.veins || []).find(x => x.i === i);
     const capOf = S.nations.find(n => n.alive && n.capital === i), stl = S.nations.flatMap(n => (n.settlements || []).filter(x => x.tile === i))[0];
     const keys = [...new Set([...Object.keys(t.cap || {}), ...Object.keys(t.res || {})])].filter(k => (t.cap?.[k] || 0) >= .5 || (t.res?.[k] || 0) >= .5);
     const battles = (S.battles || []).filter(b => b.tile === i).slice().reverse();
@@ -1132,7 +1141,7 @@
     el.innerHTML = `<div class="head"><span class="swatch" style="background:${TERRAIN[t.terrain][1]}"></span><div class="grow"><h3>${esc(TERRAIN[t.terrain][0])}</h3>
         <div class="meta">ô ${i % geo.N}, ${(i / geo.N) | 0} · ${ZONE[t.zone]} · ${esc(REGION[t.region] || "ngoài khơi")}${typeof t.elev === "number" ? ` · độ cao ${t.elev.toFixed(2)}` : ""}</div></div>
         <button type="button" class="icon" data-act="unpin" aria-label="Bỏ chọn ô" title="Bỏ chọn (Esc)">×</button></div>
-      <div class="chips">${t.river ? "<span>Sông</span>" : ""}${t.delta ? "<span>Châu thổ</span>" : ""}${t.land ? "" : "<span>Biển</span>"}${t.road ? `<span>🛤 ${esc(t.land ? S.roadLevels[t.road - 1].name : S.roadLevels[t.road - 1].lane)}</span>` : ""}${capOf ? `<span>Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>` : ""}${stl ? `<span>Điểm định cư ${esc(stl.name)}</span>` : ""}${inWild(i) ? "<span>Vùng hoang</span>" : ""}${ST.herd?.includes(i) ? "<span>Điểm dừng đàn bò rừng</span>" : ""}${w ? `<span class="wonder">Kỳ quan: ${esc(w.name)}</span>` : ""}</div>
+      <div class="chips">${t.river ? "<span>Sông</span>" : ""}${t.delta ? "<span>Châu thổ</span>" : ""}${t.land ? "" : "<span>Biển</span>"}${t.road ? `<span>🛤 ${esc(t.land ? S.roadLevels[t.road - 1].name : S.roadLevels[t.road - 1].lane)}</span>` : ""}${capOf ? `<span>Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>` : ""}${stl ? `<span>Điểm định cư ${esc(stl.name)}</span>` : ""}${inWild(i) ? "<span>Vùng hoang</span>" : ""}${ST.herd?.includes(i) ? "<span>Điểm dừng đàn bò rừng</span>" : ""}${w ? `<span class="wonder">Kỳ quan: ${esc(w.name)}</span>` : ""}${vein ? `<span class="wonder">◆ Mạch ${esc(vein.name)}</span>` : ""}</div>
       <h4>Trữ lượng</h4>
       ${keys.length ? `<table class="res"><tr><th>Tài nguyên</th><th>Hiện có</th><th>Tối đa</th></tr>${keys.map(k => `<tr><td>${esc(RES[k] ?? k)}${HIDDEN_RES.has(k) ? ` <span class="pill">ẩn với AI</span>` : ""}</td><td class="mono">${Math.round(t.res?.[k] || 0)}</td><td class="mono">${Math.round(t.cap?.[k] || 0)}</td></tr>`).join("")}</table>` : `<p class="note">Không có trữ lượng.</p>`}
       <h4>Mối đe dọa ở ô này</h4>${threatList(t.threats || [], "Không có gì đáng ngại.")}
@@ -1272,6 +1281,7 @@
           <h3>Lao động</h3>${chipsOf(labor)}
           <h3>Kho</h3>${chipsOf(stock)}
           <h3>Tài nguyên</h3>${resTable(n)}
+          ${n.market ? `<h3>Đặc sản & thị trường</h3><p class="note">Đặc sản: ${n.market.specialties.map(x => `${esc(x.name)}${x.veins ? ` ◆${x.veins} mạch` : ""} (${Math.round(x.share * 100)}% trữ lượng các nước)`).join(", ") || "—"}<br>Thế mạnh: ${[...n.market.edge.inventions, ...n.market.edge.products].map(esc).join(", ") || "—"}<br>Thiếu: ${n.market.shortages.map(x => `${esc(x.name)} (giá ở đây ${x.local}, thế giới ${x.world})`).join(", ") || "—"}<br>Dư: ${n.market.surpluses.map(x => `${esc(x.name)} +${x.spare} (giá ${x.world})`).join(", ") || "—"}</p>` : ""}
           <h3>Điểm định cư</h3>${chipsOf((n.settlements || []).map(x => { const l = n.links?.[x.tile]; return `${x.name} ${({ road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" })[l] ?? "✗ cô lập"}`; }))}
           ${n.roadNet ? `<h3>Đường sá & lãnh hải</h3><p class="note">${n.roadNet.tiles} ô đường nối các trung tâm (+${Math.min(10, Math.floor(n.roadNet.tiles / 4))} giới hạn ô) · ${n.roadNet.linked.length}/${(n.settlements || []).length} điểm định cư đã nối thủ đô (🛤) · cấp tối đa: ${esc(S.roadLevels[n.roadNet.level - 1].name)} / ${esc(S.roadLevels[n.roadNet.level - 1].lane)}${n.roadNet.works ? ` · ${n.roadNet.works} ô đang làm` : ""}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}</p>` : ""}
           <h3>Phát minh (${n.inventions.length})</h3>${chipsOf(n.inventions.map(v => v.name))}
@@ -1829,6 +1839,13 @@
     $("#hordes").innerHTML = (S.hordes || []).map(h => `<div class="card2 horde${h.alive ? "" : " gone"}"><div class="row"><b>☠ ${esc(h.name)}</b><span style="flex:1"></span><button type="button" class="link" data-tile="${h.tile}" title="Xem trên bản đồ">(${h.tile % ST.n}, ${(h.tile / ST.n) | 0}) ↗</button></div>
       ${h.alive ? `<div class="bar" title="sức mạnh ${h.strength}"><i style="width:${Math.round(h.strength / maxH * 100)}%;background:var(--bad)"></i></div><div class="meta">sức mạnh <b>${h.strength}</b>${h.lastRaid ? ` · lượt ${h.lastRaid.tick} cướp ${esc(nm(h.lastRaid.nation))}: ${h.lastRaid.won ? "thắng" : "bị đẩy lui"}` : " · chưa cướp ai"}</div>` : `<div class="meta">đã bị đánh tan, trở lại lượt ${h.returns}</div>`}</div>`).join("") || `<p class="note">Thế giới này không có man di.</p>`;
     for (const b of document.querySelectorAll("#hordes [data-tile]")) b.onclick = () => centerOn(+b.dataset.tile);
+    // §6.3 + §7.10 the market: prices, and what each nation is rich in, good at and short of
+    const pr = (S.prices || []).slice().sort((a, b) => b.price / b.standard - a.price / a.standard || a.name.localeCompare(b.name));
+    $("#prices").innerHTML = pr.length ? `<table class="res prices"><thead><tr><th>Hàng</th><th>Giá</th><th>Chuẩn</th><th>Xu hướng</th></tr></thead><tbody>${pr.map(p => { const r = p.price / p.standard, d = p.price - p.prev; return `<tr><td>${esc(p.name)}</td><td class="${r >= 1.6 ? "bad" : r <= 0.6 ? "good" : ""}"><b>${p.price}</b></td><td class="meta">${p.standard}</td><td>${Math.abs(d) < 0.01 ? "" : d > 0 ? "↑" : "↓"}</td></tr>`; }).join("")}</tbody></table>` : `<p class="note">Chưa có giá: thị trường mở sau lượt đầu.</p>`;
+    $("#market-nations").innerHTML = alive.filter(n => n.market).map(n => { const m = n.market; return `<div class="card2"><div class="row"><i class="sw" style="background:${esc(n.flag.colors[0])}"></i><b>${esc(n.name)}</b></div>
+      <div class="meta">Đặc sản: ${m.specialties.length ? m.specialties.map(x => `${esc(x.name)}${x.veins ? ` ◆${x.veins}` : ""} (${Math.round(x.share * 100)}%)`).join(", ") : "—"}</div>
+      <div class="meta">Thế mạnh: ${[...m.edge.inventions, ...m.edge.products].map(esc).join(", ") || "—"}</div>
+      <div class="meta">Thiếu: ${m.shortages.length ? m.shortages.map(x => `<span class="bad">${esc(x.name)}</span> ${x.local}`).join(", ") : "—"} · Dư: ${m.surpluses.length ? m.surpluses.map(x => `${esc(x.name)} +${x.spare}`).join(", ") : "—"}</div></div>`; }).join("") || `<p class="note">Chưa có quốc gia nào lập quốc.</p>`;
     const cars = S.caravans || [];
     $("#caravans").innerHTML = cars.map(c => `<div class="card2"><div class="row"><b>${c.mode === "water" ? "⛵" : "🐂"} ${esc(nm(c.from))} → ${esc(nm(c.to))}</b><span style="flex:1"></span><span class="meta">tới lượt ${c.arrive}</span></div>
       <div class="meta">${esc(Object.entries(c.goods || {}).map(([k, q]) => `${Math.round(q * 10) / 10} ${RES[k] ?? k}`).join(", "))}${c.porters ? ` · ${c.porters} người khuân vác` : ""}${c.boats ? ` · ${c.boats} thuyền` : ""}</div></div>`).join("") || `<p class="note">Không có đoàn buôn nào trên đường.</p>`;
@@ -2090,7 +2107,8 @@
   }
   function legend() {
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
-      `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>`;
+      `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>` +
+      `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>`;
   }
   for (const b of document.querySelectorAll("#chron-filter button")) b.onclick = () => {
     for (const x of document.querySelectorAll("#chron-filter button")) x.classList.toggle("on", x === b);

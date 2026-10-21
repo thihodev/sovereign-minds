@@ -189,6 +189,24 @@ Lãnh thổ chia thành các tỉnh, mỗi trung tâm một tỉnh: tỉnh thủ
 - **Ô bị cắt rời quá lâu mà thành đất hoang:** −1 ổn định.
 - **Dân giữ nhà:** khi phòng thủ một ô có người ở (thôn xóm từ 2 người, hoặc có công trình), bên phòng thủ mạnh hơn 25%.
 
+### 2.10 Mạch giàu
+
+Không vùng đất nào có đủ mọi thứ. Lúc tạo thế giới, sau khi đã chọn điểm khai sinh (để khởi đầu vẫn công bằng), Engine chọn trong các mỏ sẵn có một số **mạch giàu** cho mỗi loại hàng, rải khắp bản đồ và cách nhau ít nhất 12 ô:
+
+| Hàng | Số mạch | Hàng | Số mạch |
+| --- | --- | --- | --- |
+| quặng đồng | 12 | đất sét | 6 |
+| quặng thiếc | 8 | than đá | 8 |
+| sắt | 8 | lưu huỳnh | 6 |
+| muối | 8 | dầu mỏ | 6 |
+| đá lửa | 10 | ngựa | 8 |
+
+- Một mạch giàu có **trữ lượng gấp 4** mỏ thường, và ai khai thác nó cũng được **+50%** cho cùng một công sức.
+- Mạch quặng ẩn (đồng, thiếc, sắt, than, dầu, lưu huỳnh) vẫn ẩn với AI cho tới khi nước đó có năng lực nhìn thấy loại quặng ấy (mục 2.1).
+- Mạch nằm trên ô, nên đổi chủ theo ô: chiếm ô là chiếm mạch.
+- Thế giới tạo trước v0.17 được thêm mạch giàu khi nạp lại.
+- Trên bản đồ, mạch giàu là dấu ◆ màu theo loại hàng.
+
 ## 3. Thời gian và vòng lượt
 
 Thế giới chạy theo lượt (tick). Tất cả quốc gia hành động đồng thời, không ai đi trước. 1 lượt = 10 năm lịch sử: dân số, tuổi và kỷ nguyên tính theo thang này. Một "trận đánh", một "đoàn buôn" hay một "chuyến thám hiểm" trong luật là gộp những gì xảy ra trong thập kỷ đó, không phải một ngày.
@@ -643,6 +661,25 @@ Mọi công thức trừ Gốm làm ở Bãi chế tác. Dây thừng từ da (c
   - Công cụ mở: xem mục 5.3.
 - **Đơn chế tác:** AI ghi trong trường `crafts` công thức và số lượng mỗi lượt (tối đa 50 mỗi công thức); đơn giữ nguyên cho tới khi AI đổi. Công thức chạy tự động theo thứ tự đã ghi, trong giới hạn công của thợ chế tác (và chỗ chế tác). Thiếu đầu vào hoặc thiếu công trình thì công thức dừng, không nợ.
 
+### 6.3 Giá cả
+
+Mỗi loại hàng có một **giá thế giới**, tính bằng đơn vị lương thực, cập nhật cuối mỗi lượt:
+
+- **Công thức:** giá mục tiêu = giá chuẩn (mục 6.2) × √(cầu ÷ cung), trong khoảng ×0,25 tới ×4 giá chuẩn. Mỗi lượt giá đi một phần tư quãng đường tới giá mục tiêu.
+- **Cầu** của một nước là cái lớn hơn trong hai thứ:
+  - thứ nó **đã dùng**: ăn, xây, làm đường, chế tác, hao mòn công cụ, lập điểm định cư, chiếm ô, trả quan chức;
+  - thứ nó **cần** cho các công thức nó biết: 2 lượt đầu vào của mỗi công thức.
+- **Cung** của một nước là thứ nó **làm ra** (hái lượm, săn, đánh cá, khai thác, mỏ, chế tác, trồng trọt) cộng với **kho** chia cho 10 lượt.
+- Cả hai được nhớ theo trung bình trượt (30% lượt mới). Hàng di chuyển giữa các nước (buôn bán, cống nạp, cướp) không tính.
+- **Giá ở mỗi nước** dùng cùng công thức với cầu và cung của riêng nước đó:
+  - **thiếu:** giá ở nước mình từ 1,6 lần giá chuẩn trở lên;
+  - **dư:** giá ở nước mình không quá 0,6 lần giá chuẩn, và kho còn ≥ 10 sau khi chừa 10 lượt dùng.
+- **Giá dùng vào đâu:**
+  - chợ biên giới (mục 7.9) đổi hàng theo giá thế giới;
+  - bot định giá trao đổi theo giá ở nước mình (thiếu thì quý, dư thì rẻ);
+  - mỗi đề nghị trao đổi gửi tới một nước kèm `worth`, tức giá trị hai bên theo giá thế giới;
+  - AI thấy giá trong `market.prices`, gồm giá, giá chuẩn và xu hướng.
+
 ## 7. Quan hệ quốc gia: ngoại giao, giao thương, chiến tranh
 
 Một quốc gia chỉ có thể nhắn tin, đề nghị trao đổi, ký ước hay tuyên chiến với nước khác sau khi **đã gặp** nước đó, tức là đã thấy ít nhất một ô lãnh thổ của họ (hoặc bắt được người thám hiểm của họ, hoặc bị kéo vào chiến tranh với họ). "Đã gặp" là một chiều: A thấy B chưa chắc B đã thấy A. Mọi cam kết có hiệu lực đều là điều khoản máy đọc được, do Engine thi hành. Lời nói suông không ràng buộc ai.
@@ -794,6 +831,23 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
 - **Quan sát:** gói trạng thái có `neighbours` (đường biên, quan hệ, căng thẳng, số phiên chợ, sự cố gần nhất, chính nghĩa đang có), và cố vấn nhắc khi một biên giới cần quyết định.
 - **Quà tặng:** `trade_offer` chỉ có "give" và "get" rỗng là một món quà.
 - Watcher chỉnh được độ căng thẳng mỗi ô, ngưỡng tranh chấp và chợ biên giới bằng sắc lệnh luật.
+
+### 7.10 Đặc sản, thế mạnh và chỗ thiếu
+
+Mỗi nước giàu một thứ, giỏi một nghề và thiếu một thứ khác. Đó là lý do để buôn bán, ký hiệp ước, hay chiếm đất. Engine tính và cho mỗi AI thấy trong `market`:
+
+- **Đặc sản** (`my_specialties`): hàng của đất mà nước đó có mạch giàu, hoặc giữ từ 1,5 lần phần chia đều trở lên trong tổng trữ lượng trên đất các nước (ít nhất 50 đơn vị). Ví dụ có 6 nước thì là từ 25% trở lên.
+- **Thế mạnh công nghệ** (`my_edge`): phát minh mà không quá một phần ba các nước khác có, và hàng chỉ nước đó (hoặc rất ít nước) làm được.
+- **Chỗ thiếu** (`my_shortages`): hàng cần mà đắt ở nước mình (mục 6.3), kèm tên các nước quen biết giàu thứ đó.
+- **Dư** (`my_surpluses`): hàng đem bán được.
+- **Mạch gần** (`veins_near`): mạch tự do trong vòng 8 ô, và mạch của nước khác trong vòng 3 ô quanh đất mình.
+- **Các nước quen biết** (`nations`): họ giàu gì, giỏi làm gì, thiếu gì.
+- **Lời cố vấn:**
+  - nêu hai thứ thiếu nhất và cách có chúng: mua của nước giàu thứ đó (trả bằng hàng dư), ký cống nạp, chiếm mạch tự do, hoặc với chính nghĩa và quân mạnh hơn thì chiếm mạch của láng giềng;
+  - nêu thứ đang dư và ai đang thiếu nó;
+  - báo động khi mạch của mình nằm sát quân thù.
+- **Bot:** quý ô có mạch giàu khi chiếm đất hay lập điểm định cư. Khi chọn đánh một láng giềng yếu, bot ưu tiên nước có mạch giàu sát biên giới mình.
+- **Watcher** thấy tất cả trong Ngoại giao → Thị trường (giá thế giới và bảng đặc sản, thế mạnh, chỗ thiếu của từng nước) và trong tab Kinh tế của từng nước.
 
 ## 8. Giao thức AI
 

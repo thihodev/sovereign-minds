@@ -5,7 +5,7 @@
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
 import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
-import { RIVER, WONDER_DEFS } from "./rules.ts";
+import { RIVER, VEIN, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
 const AX = Math.sqrt(3) / 1.5;
@@ -281,6 +281,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     if (d >= 12 * SCALE * 0.75 && d <= 20 * SCALE * 0.8 && tiles[p].region === tiles[q].region) { herd = [p, q]; break; }
   }
 
+  seedVeins(seedStr, tiles); // §2.10 after the spawns: fair starts are weighed without them
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
 
@@ -288,6 +289,22 @@ export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone
 
 /** §2.1 Coal, oil, sulfur (hidden) and wild horses, laid with their own random stream so the rest of the
  *  map is unchanged; also run once on worlds made before they existed. Sets reserves and caps. */
+/** §2.10 Rich veins: a few of each good's deposits, spread over the map, hold far more and yield more. */
+export function seedVeins(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "veins");
+  for (const [k, count] of Object.entries(VEIN.count) as Array<[ResKey, number]>) {
+    const picked: number[] = [];
+    for (const t of shuffle(tiles.filter(t => t.land && !t.vein && (t.cap[k] || 0) > 0).map(t => t.i), rand)) {
+      if (picked.length >= count) break;
+      if (picked.some(j => dist(j, t) < VEIN.apart)) continue;
+      const x = tiles[t]; picked.push(t);
+      x.vein = k;
+      const more = Math.round((x.cap[k] || 0) * (VEIN.mult - 1));
+      x.res[k] = (x.res[k] || 0) + more; x.cap[k] = (x.cap[k] || 0) + more;
+    }
+  }
+}
+
 export function seedDeepResources(seed: string, tiles: Tile[]): void {
   const rand = rngFor(seed, "deep-resources"), jit = (v: number) => Math.round(v * (0.7 + rand() * 0.6));
   const volcano = tiles.find(t => t.wonder === "volcano");

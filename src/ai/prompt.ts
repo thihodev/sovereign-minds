@@ -4,13 +4,14 @@
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
 import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, ANNALS, LAND, KIN, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RENAME_DECREE, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, unrenamed, workers } from "../engine.ts";
-import { allBuildings, allRecipes, buildingOf, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
+import { allBuildings, allRecipes, buildingOf, budgetFor, depthOf, EFFECT_KINDS, goodName, goodValue, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
 import { tileValue } from "../worldgen.ts";
 import { nationResources, nationThreats } from "../threats.ts";
 import { landDistance, liveHordes } from "../wild.ts";
 import { busy, planRoute } from "../routes.ts";
-import { DEMO } from "../rules.ts";
+import { DEMO, MARKET, VEIN } from "../rules.ts";
+import { landReserves, localPrice, price, shortages, specialtiesOf, surpluses, techEdge, trend, veinsNear, worth } from "../market.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
 import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
@@ -84,6 +85,8 @@ PROSPERITY AND NATIONAL PRIDE: your nation's resources exist to serve your own p
 
 A CONNECTED REALM: your stores are one, but goods reach them only along a way. A settlement is joined to your capital by a short walk over your own land (≤ ${CONNECT.walk} tiles), by a road, or by water between your piers (a Bến thuyền within ${RIVER.pierReach} tiles of each); "nation.settlements[].way_to_capital" says which. A settlement with no way is cut off: what its land yields reaches your stores only ${CONNECT.isolatedYield * 100}%, and it adds ${CONNECT.isolatedDiscontent} discontent a turn. Land more than ${CONNECT.reach} tiles from any centre with no road on or beside it yields ${CONNECT.farYield * 100}%. Your people work the land nearest home first. So found settlements where a road or water can reach, and build that road (see "roads.suggested").
 PROVINCES: your land is divided into provinces, one per centre (the capital's and each settlement's); a tile belongs to the nearest centre. Your people live where the housing is, so each province holds a share of them in proportion to its housing (its centre's shelter, housing buildings on its land, hamlets). "provinces" in the observation lists each with its people, way to the capital, governor and unrest (0–100). A province's unrest rises each turn: +${PROVINCE.cutOff} while it is cut off from the capital, +${PROVINCE.ungoverned} while it lies more than ${PROVINCE.far} tiles from the capital with no loyal governor (loyalty ≥ ${OFFICIALS.idle}), +${PROVINCE.crowded} while its people outnumber its housing; it falls by ${PROVINCE.fade} a turn, and by ${PROVINCE.calm} × skill more with a loyal governor seated there (appoint_official governor, "seat" its centre), whose province's land also yields +${PROVINCE.yield * 100}% per skill level. A province at ${PROVINCE.restless}+ unrest adds ${PROVINCE.pressure} to your discontent each turn. When your discontent reaches 100, the unhappiest settlement province at ${PROVINCE.secede}+ unrest that is cut off or far and ungoverned (with ${PROVINCE.minPeople}+ people) is the faction: if the gods let it go, it leaves WITH its settlement, its land, the buildings on it and the people living there. Govern your far provinces: a governor and a road home keep them yours.
+
+RICHES, PRICES AND WHAT EACH NATION IS GOOD AT: no land holds everything. A few deposits of each good are RICH VEINS (${Object.entries(VEIN.count).map(([g, k]) => `${k} of ${g}`).join(", ")} on the whole map): ${VEIN.mult}× the reserves, and whoever works one gets +${VEIN.yield * 100}% from it. Every good has a WORLD PRICE in food units ("market.prices", with its standard value and trend): its standard value × √(what the nations use and want / what they make and hold), between ×${MARKET.min} and ×${MARKET.max}, moving a quarter of the way each turn. What a nation uses (food eaten, materials built with, inputs crafted, tools worn) and wants (${MARKET.recipeWant} turns of each input of every recipe it knows) is demand; what it makes, plus its stores spread over ${MARKET.stockTurns} turns, is supply. So a good few can make or dig up is dear, and a heap nobody needs is cheap. "market" shows: your specialties (land goods you hold a vein of, or ${MARKET.specialtyShare}× a fair share of), your edge in knowledge (inventions few others have, goods only you or few can make), your shortages (needed goods dear to you, at least ×${MARKET.dear}: your price and the world price) with who is rich in them, your surpluses to sell, the rich veins near you (free ones to claim or settle, others' near your border), and what the nations you know are rich in, good at and short of. The border market and the bots trade at these prices; "worth" on trade offers is their value at world prices. Use it: sell what you are rich in to those who lack it, buy what you lack from those who have it, make treaties (tribute in the good you need) with those who hold your shortages, or, if they will not trade and you have a just cause and the stronger army, take the land with the vein. Guard your own veins: others want them too.
 
 NEIGHBOURS AND BORDERS: peoples whose lands touch do not live side by side in silence. "neighbours" lists every nation within ${BORDER.near} tiles. Each border carries a tension (0–100): +${BORDER.friction} per border tile a turn (at most +${BORDER.frictionMax}), −${BORDER.fade} a turn, less with each treaty (non-aggression −${BORDER.treatyCalm.non_aggression}, peace −${BORDER.treatyCalm.peace}, alliance −${BORDER.treatyCalm.alliance}), each trade you agree (−${BORDER.tradeCalm}; the border market −${BORDER.marketCalm}) and a shared language (−${BORDER.languageCalm}). Tension brings border incidents (poaching, felling, brawls that kill, families crossing to the calmer side); the victim of poaching or a brawl gets a just cause for war for ${BORDER.causeTicks} turns. At ${BORDER.dispute}+ both sides have a just cause and both lose ${BORDER.disputeStability} stability a turn; after ${BORDER.treatyBreakAfter} turns of dispute in a row their non-aggression, peace and passage treaties fall apart, and with a just cause breaking a treaty costs no reputation. While tension is below ${BORDER.marketBelow} a small border market swaps, each turn and on its own, a good one side has to spare for one the other lacks (up to ${BORDER.marketValue} worth): it counts as a trade (toward a shared language and cheaper learning). A neighbour is a chance and a danger: trade with it, sign treaties, send gifts (trade_offer with "give" only and an empty "get"), or, with a just cause and the stronger army, take its land.
 
@@ -311,7 +314,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     my_spies: spies.length ? spies.map(s => ({ in: world.nations[s.target].name, since: s.since })) : undefined,
     stolen_tech: stolen.length ? stolen.map(id => ({ id, name: invName(world, id), rp: inventionCost(world, n, id) })) : undefined,
     inbox: n.inbox.length ? n.inbox.map(msg => ({ from: world.nations[msg.from]?.name, gesture: msg.gesture || undefined, untrusted_text: msg.text })) : undefined,
-    trade_offers_to_me: world.tradeOffers.filter(o => o.to === n.id && o.status === "open").map(o => ({ offer: o.id, from: world.nations[o.from].name, they_give: o.give, they_want: o.get })),
+    trade_offers_to_me: world.tradeOffers.filter(o => o.to === n.id && o.status === "open").map(o => ({ offer: o.id, from: world.nations[o.from].name, they_give: o.give, they_want: o.get, worth: { they_give: worth(world, o.give), they_want: worth(world, o.get) } })),
     treaty_offers_to_me: world.treatyOffers.filter(o => o.to === n.id).map(o => ({ offer: o.id, from: world.nations[o.from].name, kind: o.type, duration: o.duration, tribute: o.tribute, payer: world.nations[o.payer]?.name, cede: o.cede.map(xy) })),
     treaties: world.treaties.filter(t => t.active && (t.a === n.id || t.b === n.id)).map(t => ({ id: t.id, kind: t.type, with: world.nations[t.a === n.id ? t.b : t.a].name, tribute: Object.keys(t.tribute).length ? t.tribute : undefined, payer: Object.keys(t.tribute).length ? world.nations[t.a].name : undefined, until: t.end })),
     wars: warSummary(world, n),
@@ -322,11 +325,31 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     events: n.lastEvents,
     rejected_last_turn: n.lastRejected,
     gods_rename_order: (() => { const d = world.renameDecree; if (!d || d.done || world.tick < d.from || world.tick > d.until) return undefined; const u = unrenamed(world, n); return { code: d.code, text: d.text, until: d.until, names_not_yet_changed: u.left, obeyed: u.changed }; })(),
+    market: marketView(world, n),
     world_laws: world.decrees.filter(d => d.effectiveTick <= world.tick).slice(-10).map(d => ({ code: d.code, text: d.text })),
     my_petitions: world.petitions.filter(p => p.nation === n.id).slice(-5).map(p => ({ title: p.title, status: p.status, verdict: p.verdict || undefined })),
     memory: n.memory,
   };
   return obs;
+}
+
+/** §6.3 + §7.10 prices, riches and lacks as the nation sees them. */
+function marketView(world: World, n: Nation) {
+  if (!n.founded) return undefined;
+  const short = shortages(world, n), reserves = landReserves(world);
+  const known = n.met.map(id => world.nations[id]).filter(o => o?.alive && o.founded);
+  const richIn = (o: Nation) => specialtiesOf(world, o, n).map(s => s.good);
+  const goods = new Set([...Object.keys(n.stock).filter(g => (n.stock[g] || 0) >= 1), ...short.map(s => s.good), ...Object.keys(world.market?.prices ?? {}).filter(g => canSeeRes(world, n, g) && Math.abs(price(world, g) / goodValue(world, g) - 1) >= 0.3)]);
+  return {
+    prices: Object.fromEntries([...goods].filter(g => world.market?.prices[g] !== undefined).sort().map(g => [g, { price: price(world, g), standard: goodValue(world, g), trend: trend(world, g) }])),
+    my_specialties: specialtiesOf(world, n).map(s => ({ good: s.good, share_of_world_reserves: s.share, reserve: s.amount, veins: s.veins.map(xy) })),
+    my_edge: (() => { const e = techEdge(world, n); return { inventions: e.inventions.map(id => invName(world, id)), products: e.products }; })(),
+    my_shortages: short.map(s => ({ good: s.good, my_price: s.local, world_price: s.world, need_per_turn: s.need, have_per_turn: s.have,
+      rich_in_it: known.filter(o => richIn(o).includes(s.good) || (reserves.get(o.id)?.[s.good]?.amount ?? 0) > 0 && localPrice(world, o, s.good) < goodValue(world, s.good)).map(o => o.name).slice(0, 4) })),
+    my_surpluses: surpluses(world, n),
+    veins_near: veinsNear(world, n).map(v => ({ tile: xy(v.tile), good: v.good, owner: v.owner < 0 ? "free" : world.nations[v.owner].name, distance: v.distance })),
+    nations: known.map(o => ({ nation: o.name, rich_in: richIn(o), edge: techEdge(world, o).products, short_of: shortages(world, o).map(s => s.good).filter(g => canSeeRes(world, n, g)) })),
+  };
 }
 
 export { budgetFor };

@@ -11,7 +11,8 @@
 // a front against a clearly weaker neighbour, fight where the odds are good, and
 // take tribute or make peace.
 
-import { AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, GOOD_VALUE, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { localPrice, price, veinsNear } from "../market.ts";
+import { HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
@@ -106,13 +107,15 @@ function sustain(world: World, n: Nation, tiles: Tile[], key: ResKey, share: (i:
   }
   return s;
 }
+const HIDDEN = new Set<string>([...HIDDEN_ORES, ...DEEP_RES]);
 function tileWorth(v: View, t: Tile): number {
   const R = t.res, see = (k: ResKey) => v.m.reveal.has(k);
   let food = (t.cap.game || 0) * (REGEN.game || 0) + (t.cap.plants || 0) * (REGEN.plants || 0) + (t.cap.fish || 0) * (REGEN.fish || 0);
   if (!t.land) food *= 0.7;
   return food + Math.min(5, (R.wood || 0) / 40) + Math.min(3, (R.stone || 0) / 100) + Math.min(4, (R.flint || 0) / 10) + Math.min(3, (R.clay || 0) / 50)
     + (see("copper") && R.copper ? 6 : 0) + (t.river ? 4 : 0) + (t.terrain === "grass" || t.terrain === "coast" ? 2 : 0)
-    + (t.land && v.house - v.pop <= 3 ? (HAMLET.people[t.terrain] || 0) * 1.5 : 0); // §4.2 room for hamlets when the people is out of housing
+    + (t.land && v.house - v.pop <= 3 ? (HAMLET.people[t.terrain] || 0) * 1.5 : 0) // §4.2 room for hamlets when the people is out of housing
+    + (t.vein && (!HIDDEN.has(t.vein) || see(t.vein)) ? 3 + price(v.world, t.vein) : 0); // §2.10 a rich vein
 }
 
 function look(world: World, n: Nation): View {
@@ -197,7 +200,10 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // A much weaker neighbour close by that nothing protects: a possible war of conquest (§7.4)
   const canWage = n.founded && !atWar && tick >= 60 && v.pop >= 30 && n.stability >= 60 && v.food >= v.need * 0.5
     && !world.wars.some(w => w.a === n.id && tick - w.declared < 80);
-  const prey = canWage ? others.filter(o => weakNeighbour(v, o)).sort((a, b) => a.id - b.id)[0] : undefined;
+  // §7.10 among the weak, the one sitting on rich veins near our border first
+  const weak = canWage ? others.filter(o => weakNeighbour(v, o)) : [];
+  const covet = weak.length > 1 ? veinsNear(world, n) : [];
+  const prey = weak.sort((a, b) => covet.filter(x => x.owner === b.id).length - covet.filter(x => x.owner === a.id).length || a.id - b.id)[0];
 
   // 0. Too much land: give up the poorest, far from any centre — §2.9 an empty one first: giving up a lived-in tile shakes the people
   const extra = Math.ceil(Math.max(v.held - v.limit, settleNow ? v.held + ring - (v.limit + 3) : 0));
@@ -650,8 +656,9 @@ function warPlan(v: View): WarPlan | null {
 
 // ---------------------------------------------------------------- trade
 
-function valueOf(world: World, g: Record<string, number>): number {
-  return Object.entries(g).reduce((s, [k, q]) => s + q * (GOOD_VALUE[k] ?? world.custom.goods[k]?.value ?? 1), 0);
+/** §6.3 what goods are worth to us: dear what we lack, cheap what piles up */
+function valueOf(v: View, g: Record<string, number>): number {
+  return Object.entries(g).reduce((s, [k, q]) => s + q * localPrice(v.world, v.n, k), 0);
 }
 /** How much of each good we want to keep for our own plans. */
 function keep(v: View): Record<string, number> {
@@ -669,7 +676,7 @@ function tradeIdea(v: View): { give: Record<string, number>; get: Record<string,
   const wants = [...(v.has("P8") ? ["hide", "wood"] : []), "stone", "flint", "wood", "hide", "clay", "fiber"];
   const short = wants.find(g => (k[g] || 0) > 0 && v.stock(g) < (k[g] || 0) * (canMake(g) ? 0.3 : 1));
   if (!short) return null;
-  const val = (g: string) => GOOD_VALUE[g] ?? 1;
+  const val = (g: string) => price(v.world, g); // §6.3 world prices
   const surplus = ["food", "stone", "wood", "bone", "hide", "flint", "clay", "salt", "fiber", "stone_tool", "hide_coat"]
     .filter(g => g !== short && v.stock(g) > (k[g] || 0) * 1.5 + 5).sort((a, b) => (v.stock(b) - (k[b] || 0)) * val(b) - (v.stock(a) - (k[a] || 0)) * val(a) || a.localeCompare(b))[0];
   if (!surplus) return null;
@@ -684,7 +691,7 @@ function fairTrade(v: View, give: Record<string, number>, get: Record<string, nu
   const k = keep(v);
   if (!Object.entries(get).every(([g, q]) => v.stock(g) - q >= (k[g] || 0))) return false;
   const useful = Object.keys(give).some(g => v.stock(g) < (k[g] || 0) * 1.5);
-  return valueOf(v.world, give) >= valueOf(v.world, get) * (useful ? 0.8 : 1.05);
+  return valueOf(v, give) >= valueOf(v, get) * (useful ? 0.8 : 1.05);
 }
 
 // ---------------------------------------------------------------- labour

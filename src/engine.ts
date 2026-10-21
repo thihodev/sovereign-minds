@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -16,6 +16,7 @@ import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
+import { noteFlow, updateMarket } from "./market.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -36,6 +37,8 @@ export class Ledger {
   before: Record<string, number>;
   flows: Record<string, number> = {};
   reasons: Record<string, number> = {};
+  /** §6.3 what each nation made and used of each good this turn */
+  byNation = new Map<number, Record<string, [number, number]>>();
   constructor(world: World) { this.before = totals(world); }
   tile(t: Tile, key: ResKey, delta: number, reason: string): void {
     if (!delta) return;
@@ -47,6 +50,7 @@ export class Ledger {
     n.stock[key] = (n.stock[key] || 0) + delta;
     if (Math.abs(n.stock[key]) < 1e-9) n.stock[key] = 0;
     this.note(key, delta, reason);
+    noteFlow(this.byNation, n, key, delta, reason);
   }
   /** Goods taken from a stock now ride in a caravan. */
   toCaravan(g: Record<string, number>): void { for (const [k, q] of Object.entries(g)) this.note(k, q, "caravan"); }
@@ -791,6 +795,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       say(n.id, "decree", `${n.name} trái lệnh ${rd.code} của các vị thần.`);
     }
   }
+  updateMarket(world, L); // §6.3 prices follow what the nations made, used and hold
   writeAnnals(world, chronicle); // §8.2 each nation's story, chapter by chapter
   world.tick++;
   return { chronicle, audit: L.audit(world), fx: fxEnd() };
@@ -827,7 +832,8 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     let got = 0, home = 0;
     // the land whose yield reaches home first (§2.7), then the richest
     const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (share(b.i) - share(a.i)) || (b.res[key]! - a.res[key]!) || a.i - b.i);
-    for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; home += x * share(t.i); }
+    // §2.10 a rich vein yields more for the same work
+    for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; home += x * share(t.i) * (t.vein === key ? 1 + VEIN.yield : 1); }
     taken = got;
     return home;
   };
