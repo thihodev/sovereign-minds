@@ -4,6 +4,18 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.34
 
+- **0.34.1, bản đồ 3D (Three.js):** nút **3D** cạnh nút phóng to chuyển giữa bản đồ 2D và 3D (trình duyệt nhớ lựa chọn).
+  - **Địa hình:** mỗi ô là một khối lục giác cao theo độ cao thật. Đồi nhô lên, núi có đỉnh (tuyết trên đỉnh cao), Tường Băng là vách trắng. Biển nông và sâu có sóng; sông chảy theo thung lũng. Rừng, rừng lá kim, rừng rậm có cây.
+  - **Lãnh thổ:** đất tô màu cờ, viền thấp theo biên giới. Mặt trận giữa hai nước đang đánh nhau là dải sọc vàng đen, có khói ở chỗ vừa giao tranh. Bấm một nước thì các nước khác tối đi.
+  - **Làng, thị trấn, thành phố:** cụm nhà mái màu cờ lớn dần theo cấp đô thị; thủ đô có lâu đài và cờ bay trong gió.
+  - **Công trình:** ruộng, chuồng có gia súc, bến thuyền, cảng, bến cá, ruộng muối, đền, bàn thờ, hàng rào, giếng, chợ, lò gốm, bãi chế tác; công trình đang xây có giàn giáo. Đường sá đổi màu theo cấp; đường biển nhạt trên mặt nước.
+  - **Vật chuyển động:** người đi làm từ trung tâm ra chỗ làm, thuyền đánh cá ra khơi, thuyền neo ở bến, đoàn buôn đi theo đường thật (xe bò trên bộ, thuyền buồm trên nước).
+  - **Khác:** trại man di, kỳ quan, mạch giàu; tên các nước, thủ đô, điểm định cư hiện rõ và tự ẩn khi ở xa.
+  - **Sự kiện của lượt:** hiện ngay trên ô (vòng sáng, chữ bay lên, lửa và khói khi đánh nhau). Bấm một tin trong bản tin thì camera bay tới đó.
+  - **Điều khiển:** kéo để di chuyển, chuột phải hoặc hai ngón để xoay và nghiêng, lăn để phóng to, nhấp đúp để bay tới ô. Bấm ô thì mở khung Chi tiết như bản 2D. Lớp phủ mối đe dọa và tài nguyên vẫn dùng được.
+  - **Hiệu năng:** Three.js đóng gói sẵn trong `web/vendor/three` (giấy phép MIT), chỉ tải khi bật 3D. Bóng đổ chỉ tính lại khi bản đồ đổi; trên điện thoại thì tắt bóng đổ.
+- **Sửa lỗi:** điểm định cư của nước đã diệt vong, hay nằm trên đất đã mất, không còn hiện trên bản đồ.
+
 - **Các tầng lớp xã hội (§4.15):** nông dân, thợ thủ công, thương nhân, tăng lữ và học giả, quan lại, binh lính.
   - Mỗi tầng lớp có mức hài lòng đi theo điều họ muốn: đủ ăn, thuế, việc làm, buôn bán, đền thờ, lương bằng tiền, thắng trận.
   - Hài lòng thì làm việc tốt hơn. Bất bình thì mất ổn định. Dưới 15 thì đình công (việc của họ giảm 30%; quan lại đình công thì chỉ thu được nửa thuế).

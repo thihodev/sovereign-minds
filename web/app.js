@@ -23,6 +23,7 @@
   const ROLE = { gather: "hái lượm", hunt: "săn", fish: "cá", farm: "nông", wood: "gỗ", stone: "đá", flint: "đá lửa", clay: "đất sét", mine: "khai mỏ", craft: "chế tác", build: "xây", research: "nghiên cứu", warrior: "chiến binh" };
 
   let ST = null, S = null, geo = null, hoverI = -1;
+  let M3 = null, is3D = false; // the 3D map, when the Watcher turns it on (web/map3d.js)
   const cv = $("#map"), ctx = cv.getContext("2d");
   const base = document.createElement("canvas"), bctx = base.getContext("2d");
 
@@ -166,13 +167,14 @@
   let layerKind = "", layerData = null, layerMax = 1, layerReq = 0;
   async function loadLayer() {
     const my = ++layerReq;
-    if (!layerKind) { layerData = null; showLayerScale(); scheduleRender(); return; }
+    if (!layerKind) { layerData = null; showLayerScale(); scheduleRender(); M3?.setLayer(null); return; }
     let r; try { r = await api(`/api/layer?kind=${encodeURIComponent(layerKind)}`); } catch { return; }
     if (my !== layerReq) return;
     layerData = r.values;
     if (layerKind in THREAT_LAYERS) layerMax = 5;
     else { const pos = layerData.filter(v => v > 0).sort((a, b) => a - b); layerMax = pos.length ? pos[Math.floor(pos.length * 0.95)] || pos[pos.length - 1] : 1; }
     showLayerScale(); scheduleRender();
+    M3?.setLayer(layerData, layerMax, layerKind in THREAT_LAYERS);
   }
   function showLayerScale() {
     const box = $("#layer-scale"); box.hidden = !layerData;
@@ -217,6 +219,7 @@
     if (!list?.length) return;
     const t0 = performance.now(), gap = clamp(14000 / list.length, 150, 1000);
     ANIM.queue = list.slice(0, 400).map((f, k) => ({ ...f, t0: t0 + k * gap, dur: FX_DUR[f.kind] || FX_DEFAULT }));
+    if (is3D && M3) M3.playFx(list);
     showTicker(list);
     ensureAnim();
   }
@@ -244,6 +247,7 @@
   function flyTo(f) {
     const focus = f.path?.length ? f.path[Math.floor(f.path.length / 2)] : f.tile; // a journey: look at its middle
     if (focus === undefined) return;
+    if (is3D && M3) { M3.focus(focus, true); M3.playFx([f]); return; }
     centerOn(focus, Math.max(view.z, (f.path?.length > 8 ? 18 : 28) / geo.s)); ANIM.queue.push({ ...f, t0: performance.now() + 350, dur: FX_DUR[f.kind] || FX_DEFAULT }); ensureAnim();
   }
   function showTicker(list) {
@@ -796,6 +800,7 @@
 
   function render() {
     if (!geo || !S) return;
+    if (is3D && M3) { M3.setSelected(inspect?.kind === "nation" ? inspect.id : -1); M3.setPinned(pinnedI); return; }
     const g = ctx, s = geo.s, z = view.z, px = 1 / z, dpr = geo.dpr;
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = "#10283a"; g.fillRect(0, 0, cv.width, cv.height);
     g.setTransform(dpr * z, 0, 0, dpr * z, dpr * view.tx, dpr * view.ty);
@@ -950,7 +955,9 @@
       label(g, nationName(n), x + fs * .22, y + fs * 1.15, fs, "#fff", 700, px);
       if (n.status === "asleep" || n.status === "error") label(g, n.status === "asleep" ? "đang ngủ" : "lỗi key", x, y + fs * 2.3, fs * .85, "#ffd0a0", 500, px);
     }
-    for (const n of S.nations) for (const st of n.settlements || []) {
+    // a fallen nation's settlements, and settlements on land lost to another, are no longer on the map
+    for (const n of S.nations) if (n.alive && n.founded) for (const st of n.settlements || []) {
+      if (S.owners[st.tile] !== n.id) continue;
       const [x, y] = center(st.tile); g.beginPath(); g.arc(x, y, clamp(s * .7 * z, 4, 10) * px, 0, 7); g.fillStyle = n.flag.colors[0]; g.fill(); g.lineWidth = 1.5 * px; g.strokeStyle = "#0b1a22"; g.stroke();
       if (s * z >= 4) tag(g, st.name, x, y + small * 1.5, small, "#fff", 500, px);
     }
@@ -1023,9 +1030,10 @@
     const z = clamp(view.z * factor, geo.zmin, geo.zmax), wx = (sx - view.tx) / view.z, wy = (sy - view.ty) / view.z;
     setView({ z, tx: sx - wx * z, ty: sy - wy * z }, animate);
   }
-  const zoomBy = f => { if (!geo) return; const R = visibleRect(); zoomAt(R.x + R.w / 2, R.y + R.h / 2, f, true); };
-  const fitWorld = () => geo && setView(fitView(), true);
+  const zoomBy = f => { if (is3D && M3) return M3.zoom(f); if (!geo) return; const R = visibleRect(); zoomAt(R.x + R.w / 2, R.y + R.h / 2, f, true); };
+  const fitWorld = () => { if (is3D && M3) return M3.fit(); if (geo) setView(fitView(), true); };
   function centerOn(i, z) {
+    if (is3D && M3) { M3.focus(i, z !== undefined); return; }
     if (!geo || i < 0) return;
     const R = visibleRect(), fz = fitView().z;
     z = clamp(z ?? Math.max(view.z, fz * 3), geo.zmin, geo.zmax);
@@ -1236,7 +1244,7 @@
     b.title = b.getAttribute("aria-label");
     b.querySelector(".ico-sun").hidden = !dark; b.querySelector(".ico-moon").hidden = dark;
   }
-  function themeChanged() { syncThemeButton(); if (DOCKS.right.open && curTab === "stats" && statsCache) drawChart(); }
+  function themeChanged() { syncThemeButton(); M3?.theme(); if (DOCKS.right.open && curTab === "stats" && statsCache) drawChart(); }
   $("#btn-theme").onclick = () => {
     const next = effectiveTheme() === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
@@ -2537,9 +2545,39 @@
   $("#btn-help").onclick = () => $("#help-dialog").showModal();
   $("#help-close").onclick = () => $("#help-dialog").close();
 
+  // ---------------------------------------------------------------- the 3D map (Three.js, loaded on demand)
+  const btn3d = $("#view-3d");
+  async function set3D(on) {
+    if (on && !window.WebGLRenderingContext) { btn3d.title = "Trình duyệt này không hỗ trợ WebGL để xem 3D"; return; }
+    is3D = on;
+    try { localStorage.setItem("sm-3d", on ? "1" : "0"); } catch { }
+    btn3d.setAttribute("aria-pressed", String(on)); btn3d.classList.toggle("on", on); btn3d.title = on ? "Về bản đồ 2D" : "Xem bản đồ 3D";
+    if (on && !M3) {
+      btn3d.disabled = true;
+      try {
+        const mod = await import("/map3d.js");
+        M3 = mod.create($("#map3d"), {
+          terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor,
+          onPick: i => pinTile(i), onHover: (i, ev) => hoverCard(i, ev),
+          fxWord: f => FX_WORD[f.kind]?.(f) ?? f.kind, fxTone, fxDur: f => FX_DUR[f.kind] || FX_DEFAULT,
+          isDark: () => effectiveTheme() === "dark", anim: () => ANIM.on,
+        });
+        M3.setStatic(ST);
+      } catch (e) { is3D = false; btn3d.classList.remove("on"); btn3d.setAttribute("aria-pressed", "false"); btn3d.title = `Không mở được bản đồ 3D: ${e.message}`; console.error("[3D]", e); try { localStorage.setItem("sm-3d", "0"); } catch { } return; }
+      finally { btn3d.disabled = false; }
+    }
+    cv.hidden = on;
+    M3?.show(on);
+    if (on) { M3.setState(S); M3.setLayer(layerData, layerMax, layerKind in THREAT_LAYERS); M3.setAnim(ANIM.on); render(); }
+    else { hoverCard(-1); scheduleRender(); }
+    document.body.classList.toggle("view-3d", on);
+  }
+  btn3d.onclick = () => set3D(!is3D);
+
   // ---------------------------------------------------------------- data flow
   async function refresh() {
     S = await api("/api/state");
+    if (is3D && M3) M3.setState(S);
     applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderProducts(); renderIdeas(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
     if (DOCKS.right.open && curTab === "stats") renderStats();
     renderTrees();
@@ -2563,6 +2601,7 @@
     if (S.lastFx?.fx?.length && S.lastFx.tick >= S.tick - 1) showTicker(S.lastFx.fx); // the last turn's news, after a reload
     addChronicle(await api("/api/chronicle?limit=200"), false);
     ensureAnim();
+    try { if (localStorage.getItem("sm-3d") === "1") set3D(true); } catch { }
     const es = new EventSource("/api/events");
     es.addEventListener("status", e => applyStatus(JSON.parse(e.data)));
     es.addEventListener("tick", e => { const d = JSON.parse(e.data); addChronicle(d.chronicle); refresh().then(() => playFx(d.fx)); if (layerKind) loadLayer(); });

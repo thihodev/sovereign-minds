@@ -16,6 +16,7 @@
 <!-- The world map fills the screen; everything else floats over its edges. -->
 <main class="stage" id="mapview">
   <canvas id="map" tabindex="0" role="img" aria-label="Bản đồ thế giới Nguyên Địa" aria-describedby="map-help"></canvas>
+  <div id="map3d" class="map3d" hidden></div>
   <p class="sr-only" id="map-help">Kéo để di chuyển, cuộn chuột hoặc chụm hai ngón để phóng to, nhấp vào một ô để xem chi tiết ở khung bên phải (nhấp lại hoặc Esc để bỏ chọn). Khi bản đồ đang được chọn: phím mũi tên để di chuyển, Enter để chọn ô ở giữa.</p>
 </main>
 <div class="tileinfo" id="tileinfo" hidden></div>
@@ -77,6 +78,7 @@
 <div class="error wait" id="claude-wait" role="status" hidden></div>
 
 <div class="mapctl" role="toolbar" aria-label="Điều khiển bản đồ">
+  <button type="button" id="view-3d" class="v3d" aria-pressed="false" title="Xem bản đồ 3D">3D</button>
   <button type="button" id="zoom-in" aria-label="Phóng to bản đồ" title="Phóng to (+)" aria-keyshortcuts="+">+</button>
   <span class="zl mono" id="zoom-level" aria-live="polite">1.0×</span>
   <button type="button" id="zoom-out" aria-label="Thu nhỏ bản đồ" title="Thu nhỏ (−)" aria-keyshortcuts="-">−</button>
@@ -329,6 +331,7 @@
   </dl>
   <p class="note">Phím tắt không chạy khi bạn đang gõ chữ.</p>
 </dialog>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.min.js", "three/addons/": "/vendor/three/addons/" } }</script>
 <script src="/app.js"></script>
 </body>
 </html>

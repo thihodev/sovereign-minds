@@ -247,6 +247,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           seed: w.seed, n: N,
           terrain: w.tiles.map(t => t.terrain), zone: w.tiles.map(t => t.zone), region: w.tiles.map(t => t.region),
           river: w.tiles.map(t => t.river ? 1 : 0), delta: w.tiles.map(t => t.delta ? 1 : 0),
+          elev: w.tiles.map(t => Math.round(t.elev * 100)), // §2.1 heights for the 3D map
           wonders: w.wonders, rivers: w.rivers, wild: w.wild, herd: w.herd,
           veins: w.tiles.filter(t => t.vein).map(t => ({ i: t.i, good: t.vein, name: goodName(w, t.vein!) })),
         });

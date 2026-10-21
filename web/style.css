@@ -638,3 +638,20 @@ ul.needs li.no b { color: var(--ink); }
 .orders .bar { grid-column: 3; grid-row: 1; margin: 0; }
 .orders .mono { grid-column: 3; grid-row: 2; font-size: 11.5px; color: var(--muted); }
 .orders .pill { grid-column: 3; grid-row: 2; justify-self: end; }
+
+/* the 3D map (web/map3d.js) */
+.map3d { position: absolute; inset: 0; }
+.map3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.map3d-canvas:active { cursor: grabbing; }
+.map3d-canvas:focus-visible { outline: 3px solid #ffd84a; outline-offset: -3px; }
+.map3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.m3-label { font: 600 12px "Be Vietnam Pro", system-ui, sans-serif; color: #fff; text-shadow: 0 0 3px #08141c, 0 0 6px #08141c; white-space: nowrap; text-align: center; line-height: 1.15; }
+.m3-label small { display: block; font-weight: 500; font-size: 10.5px; color: #fff7d6; }
+.m3-capital { font-size: 14px; font-weight: 800; }
+.m3-town { font-size: 11px; opacity: .92; }
+.m3-wonder { color: #ffe68a; font-size: 11px; }
+.m3-horde { color: #ff9a8a; font-size: 11px; }
+.m3-fx { font: 700 12.5px "Be Vietnam Pro", system-ui, sans-serif; padding: 2px 8px; border-radius: 99px; background: rgba(8,20,28,.78); color: #fff; white-space: nowrap; border: 1px solid rgba(255,255,255,.18); }
+.m3-fx.bad { border-color: #ef6b60; } .m3-fx.good { border-color: #4cc283; }
+.mapctl .v3d { font-weight: 800; font-size: 12px; letter-spacing: .02em; }
+.mapctl .v3d.on { background: var(--accent); color: var(--accent-ink); }
