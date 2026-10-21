@@ -592,3 +592,12 @@ table.prod td { font-size: 12.5px; }
 #minds-dialog { width: min(720px, calc(100vw - 16px)); }
 .minds { padding: 12px 16px 16px; display: grid; gap: 10px; }
 .minds-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+/* §7.4 wars: a chip to the front, cards and battles that fly there */
+.summary .war-chip { cursor: pointer; font: inherit; font-size: 12px; font-weight: 500; padding: 0 9px; }
+.summary .war-chip:disabled { cursor: default; opacity: 1; }
+.summary .war-chip.hot { animation: warpulse 1.6s ease-in-out infinite; }
+@keyframes warpulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 30%, transparent); } }
+.war-card { border-left: 3px solid var(--bad); }
+#battles li.clickable { cursor: pointer; border-radius: 6px; }
+#battles li.clickable:hover { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+@media (prefers-reduced-motion: reduce) { .summary .war-chip.hot { animation: none; } }

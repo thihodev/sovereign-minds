@@ -9,6 +9,10 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - ruộng ven sông +50%, ruộng châu thổ +100%; mỗi ô sông thêm 2 gia đình;
   - hai nước láng giềng cùng giữ một con sông thì biên giới căng thêm mỗi lượt (tranh chấp nguồn nước);
   - AI thấy `rivers_contested` và được cố vấn; bot nhắm vào đất ven sông của nước yếu.
+- **0.25.1, vùng chiến sự:**
+  - mặt trận (biên giới giữa hai nước đang chiến tranh) vẽ vạch vàng đen nhấp nháy, tâm mặt trận có huy hiệu ⚔;
+  - chip "⚔ N cuộc chiến" trên thanh trên bấm được: một cuộc chiến thì bay tới mặt trận và phát lại các trận gần nhất, nhiều cuộc thì mở danh sách;
+  - trong Ngoại giao → Chiến sự, mỗi cuộc chiến có nút "Xem mặt trận", và mỗi trận đánh bấm được để bay tới và xem lại.
 - **Bảng model AI:** trọng tài hiện là **một** dòng, kèm danh sách dự phòng. Trước đây mỗi nhà cung cấp dự phòng bị hiện thành một trọng tài riêng, dù mỗi đơn chỉ có một trọng tài chấm.
 
 ## v0.24

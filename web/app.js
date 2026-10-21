@@ -601,6 +601,66 @@
   // §2.5 roads on land (track, packed earth, pale paving) and sea lanes (dashed channels, beacons on the best)
   const ROAD_STYLE = [null, { c: "#b08458", w: .09, dash: [.45, .3] }, { c: "#8a5a2e", w: .13 }, { c: "#efe4c8", w: .17 }];
   const isWater = i => ST.terrain[i] === "ocean" || ST.terrain[i] === "shallow";
+  // §7.4 war fronts: the borders between nations at war, in red, with crossed swords at the heart of each front
+  let frontMemo = null;
+  function warFronts() {
+    const key = `${S.tick}:${(S.wars || []).map(w => w.id).join(",")}`;
+    if (frontMemo?.key === key) return frontMemo.fronts;
+    const fronts = (S.wars || []).filter(w => w.start <= S.tick).map(w => {
+      const edges = [], tiles = [];
+      S.owners.forEach((o, i) => {
+        if (o !== w.a) return;
+        NB(i).forEach((j, k) => { if (j >= 0 && S.owners[j] === w.b) { edges.push([i, k]); tiles.push(i, j); } });
+      });
+      const last = (S.battles || []).filter(b => (b.attacker === w.a && b.defender === w.b) || (b.attacker === w.b && b.defender === w.a)).at(-1);
+      // the heart of the front: the last battle, else the front tile nearest the middle of it
+      let heart = last?.tile ?? -1;
+      if (heart < 0 && tiles.length) { const [mx, my] = tiles.map(center).reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(v => v / tiles.length); heart = tiles.reduce((a, b) => { const [ax, ay] = center(a), [bx, by] = center(b); return (bx - mx) ** 2 + (by - my) ** 2 < (ax - mx) ** 2 + (ay - my) ** 2 ? b : a; }); }
+      if (heart < 0) { const A = S.nations[w.a], B = S.nations[w.b]; heart = A?.alive ? A.capital : B?.capital ?? -1; }
+      return { war: w, edges, heart, last };
+    });
+    frontMemo = { key, fronts };
+    return fronts;
+  }
+  function drawFronts(g, s, z, px) {
+    const pulse = .55 + .45 * Math.sin(performance.now() / 260);
+    for (const f of warFronts()) {
+      if (f.edges.length) {
+        g.save(); g.beginPath();
+        for (const [i, k] of f.edges) {
+          const [x, y] = center(i), a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
+          g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
+        }
+        // a hazard line: amber and black, unlike any flag colour
+        g.lineCap = "butt"; g.lineWidth = Math.max(4 * px, s * .34); g.strokeStyle = `rgba(255,200,40,${.25 + .25 * pulse})`; g.stroke();
+        g.lineWidth = Math.max(2.4 * px, s * .16); g.strokeStyle = "#16120a"; g.stroke();
+        g.setLineDash([s * .28, s * .22]); g.strokeStyle = "#ffc828"; g.stroke();
+        g.restore();
+      }
+      if (f.heart >= 0) {
+        const [x, y] = center(f.heart), R = clamp(s * .9 * z, 9, 16) * px;
+        g.beginPath(); g.arc(x, y, R * (1.5 + .5 * pulse), 0, 7); g.fillStyle = `rgba(255,200,40,${.22 * pulse})`; g.fill();
+        g.beginPath(); g.arc(x, y, R, 0, 7); g.fillStyle = "#16120a"; g.fill(); g.lineWidth = 2 * px; g.strokeStyle = "#ffc828"; g.stroke();
+        // crossed swords, drawn
+        g.save(); g.translate(x, y); g.strokeStyle = "#ffe9a8"; g.lineWidth = Math.max(1.5 * px, R * .16); g.lineCap = "round";
+        for (const d of [1, -1]) { g.beginPath(); g.moveTo(-R * .55 * d, R * .55); g.lineTo(R * .55 * d, -R * .55); g.moveTo(-R * .62 * d + R * .12, R * .3); g.lineTo(-R * .3 * d, R * .62 - R * .12 * 0); g.stroke(); }
+        g.restore();
+      }
+    }
+    if (warFronts().length && ANIM.on) ensureAnim();
+  }
+  /** Fly to a war's front and replay its last battles there. */
+  function goToWar(w) {
+    const f = warFronts().find(x => x.war.id === w.id); if (!f || f.heart < 0) return;
+    centerOn(f.heart, Math.max(view.z, 26 / geo.s));
+    const recent = (S.battles || []).filter(b => ((b.attacker === w.a && b.defender === w.b) || (b.attacker === w.b && b.defender === w.a)) && b.tick >= S.tick - 3);
+    recent.forEach((b, k) => replayBattle(b, 400 + k * 900));
+  }
+  function replayBattle(b, delay = 350) {
+    const home = S.owners.reduce((best, o, i) => o === b.attacker && (best < 0 || hexDist(i, b.tile) < hexDist(best, b.tile)) ? i : best, -1);
+    ANIM.queue.push({ kind: "battle", tile: b.tile, nation: b.attacker, from: home >= 0 ? home : b.tile, n: Math.max(4, b.lossA * 3), text: `${b.won ? "won" : "lost"}:${b.kind}:${nm(b.defender)}`, t0: performance.now() + delay, dur: FX_DUR.battle });
+    ensureAnim();
+  }
   let treeMemo = null;
   /** The road network as a spanning tree of each cluster of touching road tiles (land and water apart): every road
    *  stays one connected line, without the mesh of every touching pair. Each centre touching a cluster is joined to it. */
@@ -741,6 +801,7 @@
       g.setLineDash([3 * px, 3 * px]); g.lineWidth = 1.2 * px; g.strokeStyle = "rgba(255,255,255,.75)"; g.stroke(); g.restore();
     }
     drawRoads(g, vis, s, z, px);
+    drawFronts(g, s, z, px);
     // the capitals' names come first: every other label steps around them
     placed = [];
     const small = clamp(s * .95 * z, 9, 13) * px, fs = clamp(s * 1.1 * z, 11, 16) * px;
@@ -1063,9 +1124,14 @@
     $("#world-summary").innerHTML =
       `<span class="stat" title="Quốc gia còn sống / tổng số"><b>${alive}</b>/${S.nations.length} quốc gia</span>` +
       `<span class="stat gate" title="${esc(gates.length ? gates.map(([e, t]) => `${e}: lượt ${t}`).join(" · ") : "Chưa quốc gia nào qua cổng kỷ nguyên")}">${latest ? `Cổng <b>${esc(latest[0])}</b> · lượt ${latest[1]}` : "Chưa qua cổng kỷ nguyên"}</span>` +
-      `<span class="stat${wars ? " hot" : ""}"><b>${wars}</b> cuộc chiến</span>` +
+      `<button type="button" class="stat war-chip${wars ? " hot" : ""}" id="war-chip" ${wars ? `title="Bấm để bay tới mặt trận"` : "disabled"}>${wars ? "⚔ " : ""}<b>${wars}</b> cuộc chiến</button>` +
       (() => { const m = S.minds || [], models = new Set(m.map(x => x.model)).size; return `<button type="button" class="stat minds-chip" id="minds-chip" title="${m.length} bộ não AI, ${models} model: bấm để xem từng cái">🧠 <b>${m.length}</b> AI</button>`; })();
     $("#minds-chip").onclick = openMinds;
+    $("#war-chip").onclick = () => {
+      const ws = S.wars || []; if (!ws.length) return;
+      if (ws.length === 1) goToWar(ws[0]);
+      else { openRight("diplomacy"); document.querySelector('#tab-diplomacy .seg button[data-sub="war"]')?.click(); }
+    };
   }
   // every AI mind running now, grouped by model
   const MIND_ICON = { "Quốc gia": "🏛", "Bộ trưởng": "🎓", "Trọng tài": "⚖", "Sử gia": "📜" };
@@ -2042,10 +2108,12 @@
       <div class="meta">${esc(Object.entries(c.goods || {}).map(([k, q]) => `${Math.round(q * 10) / 10} ${RES[k] ?? k}`).join(", "))}${c.porters ? ` · ${c.porters} người khuân vác` : ""}${c.boats ? ` · ${c.boats} thuyền` : ""}</div></div>`).join("") || `<p class="note">Không có đoàn buôn nào trên đường.</p>`;
     setCount("diplomacy", "war", (S.wars || []).length); setCount("diplomacy", "treaties", (S.treaties || []).length);
     setCount("diplomacy", "hordes", (S.hordes || []).filter(h => h.alive).length); setCount("diplomacy", "trade", cars.length);
-    $("#wars").innerHTML = (S.wars || []).map(w => `<div class="card2"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}</span></div>`).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
+    $("#wars").innerHTML = (S.wars || []).map(w => { const bs = (S.battles || []).filter(b => (b.attacker === w.a && b.defender === w.b) || (b.attacker === w.b && b.defender === w.a)); return `<div class="card2 war-card"><div class="row"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span style="flex:1"></span><button type="button" class="primary" data-war="${w.id}">⚔ Xem mặt trận</button></div><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}${bs.length ? ` · ${bs.length} trận gần đây, trận cuối lượt ${bs.at(-1).tick}` : " · chưa giao tranh"}</span></div>`; }).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
+    for (const b of document.querySelectorAll("#wars [data-war]")) b.onclick = () => { const w = (S.wars || []).find(x => x.id === +b.dataset.war); if (w) goToWar(w); };
     const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
     $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;
-    $("#battles").innerHTML = (S.battles || []).slice().reverse().map(b => `<li><span class="t">${b.tick}</span><span>${esc(nm(b.attacker))} ${b.kind === "raid" ? "đột kích" : "tấn công"} ${esc(nm(b.defender))}: ${b.won ? "thắng" : "thua"} (${b.a} vs ${b.d}), thương vong ${b.lossA}/${b.lossD}${b.note ? ` · ${esc(b.note)}` : ""}</span></li>`).join("") || `<li class="note">Chưa có trận đánh.</li>`;
+    $("#battles").innerHTML = (S.battles || []).slice().reverse().map((b, k) => `<li class="clickable" data-battle="${(S.battles || []).length - 1 - k}" title="Bấm để bay tới và xem lại trận"><span class="t">${b.tick}</span><span>${esc(nm(b.attacker))} ${b.kind === "raid" ? "đột kích" : "tấn công"} ${esc(nm(b.defender))}: ${b.won ? "thắng" : "thua"} (${b.a} vs ${b.d}), thương vong ${b.lossA}/${b.lossD}${b.note ? ` · ${esc(b.note)}` : ""} <span class="link">📍</span></span></li>`).join("") || `<li class="note">Chưa có trận đánh.</li>`;
+    for (const li of document.querySelectorAll("#battles [data-battle]")) li.onclick = () => { const b = S.battles[+li.dataset.battle]; if (b) { centerOn(b.tile, Math.max(view.z, 26 / geo.s)); replayBattle(b); } };
   }
 
   // ---------------------------------------------------------------- stats
@@ -2298,7 +2366,7 @@
   }
   function legend() {
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
-      `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>` +
+      `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span><span><i style="height:4px;background:repeating-linear-gradient(90deg,#ffc828 0 5px,#16120a 5px 9px);border-radius:0"></i>Mặt trận (nước đang chiến tranh)</span>` +
       `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>` +
       `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (đất vô chủ, không nối trung tâm nào; xuống cấp dần)</span>`;
   }
