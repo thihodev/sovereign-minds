@@ -2299,12 +2299,28 @@
         ${h.outcome.length > 40 ? `<div class="meta">${esc(h.outcome)}</div>` : ""}
         <div class="meta">lượt ${h.start}${h.end !== null ? `–${h.end}` : " tới nay"} · ${h.battles} trận${tallied ? ` · ${h.a.clashes + h.b.clashes} lần giao tranh biên giới` : ""}${h.reason ? ` · ${esc(h.reason)}` : ""}</div>
         ${peaceLine ? `<div class="meta">${peaceLine}</div>` : ""}
+        ${treatyTerms(h)}
         <table class="res tally"><thead><tr><th></th><th>${esc(h.a.name)}</th><th>${esc(h.b.name)}</th></tr></thead><tbody>
           ${tallied ? row("Điểm chiến tranh", "score") + row("Giao tranh biên giới thắng", "clashes") : ""}${row("Trận thắng", "won")}${row(tallied ? "Người chết (trận và giao tranh)" : "Người chết trong trận", "dead", true)}${h.brawl ? `<tr><td>Chết vì xô xát trước chiến tranh</td><td class="${h.brawl.a > h.brawl.b ? "bad" : ""}">${h.brawl.a}</td><td class="${h.brawl.b > h.brawl.a ? "bad" : ""}">${h.brawl.b}</td></tr>` : ""}${row("Ô chiếm được", "tiles")}${row("Trung tâm chiếm được", "centres")}${row("Đột kích thành công", "raids")}
           <tr><td>Ô bị mất</td><td class="${lostA > lostB ? "bad" : ""}">${lostA}</td><td class="${lostB > lostA ? "bad" : ""}">${lostB}</td></tr>
         </tbody></table>
         ${h.lastTile !== null ? `<button type="button" class="link" data-tally-tile="${h.lastTile}">📍 Tới nơi giao tranh gần nhất</button>` : ""}</div>`;
     }).join("") || `<p class="note">Chưa có cuộc chiến nào.</p>`;
+    function treatyTerms(h) {
+      const t = h.treaty, talks = h.talks || [];
+      const rows = [];
+      if (t) {
+        rows.push(["Hòa ước", `#${t.id}${t.by ? `, do ${esc(t.by)} đề nghị` : ""}`]);
+        rows.push(["Thời hạn", `từ lượt ${t.start}${t.end !== null ? ` tới lượt ${t.end} (${t.end - t.start} lượt)` : ", vĩnh viễn"} · ${t.active ? "đang hiệu lực" : t.brokenBy ? `<span class="bad">bị ${esc(t.brokenBy)} xé bỏ</span>` : t.endedBy ? `<span class="bad">${esc(t.endedBy)}</span>` : "đã hết hạn"}`]);
+        if (t.tribute) rows.push(["Cống nạp", `${esc(t.payer)} nộp ${esc(t.receiver)} ${esc(t.tribute)} mỗi lượt · đã nộp đủ ${t.paid} lượt${t.missed ? `, <span class="bad">thiếu ${t.missed} lượt</span>` : ""}`]);
+        if (t.cede) rows.push(["Nhượng đất", `${esc(t.payer)} nhượng ${t.cede} ô cho ${esc(t.receiver)}`]);
+        if (!t.tribute && !t.cede) rows.push(["Điều khoản", "không có: hòa trắng"]);
+      }
+      if (h.peace?.reparations || h.peace?.tiles) rows.push(["Bồi thường theo điểm", `${h.peace.reparations ? esc(h.peace.reparations) : ""}${h.peace.tiles ? `${h.peace.reparations ? " và " : ""}${h.peace.tiles} ô biên giới` : ""}`]);
+      const KIND = { offer: "📜 đề nghị", message: "✉ thư", signed: "✅ ký" };
+      const log = talks.length ? `<details class="talks"><summary>Thương lượng giữa hai nước (${talks.length})</summary><ul class="plain">${talks.map(x => `<li><span class="t mono">L${x.tick}</span> <b>${esc(x.fromName)}</b> ${KIND[x.kind] || ""}: ${esc(x.text)}</li>`).join("")}</ul></details>` : "";
+      return rows.length || log ? `<div class="terms">${rows.length ? `<table class="res terms-t"><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</tbody></table>` : ""}${log}</div>` : "";
+    }
     for (const b of document.querySelectorAll("#war-history [data-tally-tile]")) b.onclick = () => centerOn(+b.dataset.tallyTile, Math.max(view.z, 26 / geo.s));
     const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
     $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;

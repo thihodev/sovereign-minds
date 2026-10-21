@@ -330,6 +330,12 @@ export interface Treaty {
   end: number | null;
   active: boolean;
   brokenBy: number | null;
+  /** who proposed it (a is the payer when there is tribute) */
+  by?: number;
+  /** turns of tribute paid in full, and turns it fell short */
+  paid?: number; missed?: number;
+  /** why it ended before its term, when nobody tore it up */
+  endedBy?: string;
 }
 export interface TreatyOffer { id: number; from: number; to: number; type: TreatyType; duration: number | null; tribute: Record<string, number>; cede: number[]; payer: number; tick: number }
 export interface TradeOffer { id: number; from: number; to: number; give: Record<string, number>; get: Record<string, number>; tick: number; status: "open" | "done" | "expired" | "failed" }
@@ -352,7 +358,12 @@ export interface War { id: number; a: number; b: number; declared: number; start
   /** §7.4b the last tile fought over (a battle or a border clash), for the Watcher */
   lastTile?: number;
   /** §7.4b how the peace was made: the winner by the score, what the loser paid, or a white peace */
-  peace?: WarPeace }
+  peace?: WarPeace;
+  /** the talks between the two while they fought: peace offers with their terms, letters, the signing */
+  talks?: WarTalk[];
+  /** the peace treaty that ended it */
+  treaty?: number }
+export interface WarTalk { tick: number; from: number; kind: "offer" | "message" | "signed"; text: string }
 export interface WarSide { score: number; dead: number; clashes: number; battles: number; tiles: number; centres: number; raids: number }
 export interface WarPeace { tick: number; winner: number | null; lead: number; reparations: Record<string, number>; tiles: number; white: boolean;
   /** what the treaty itself carried: tribute a turn, tiles ceded, by whom */

@@ -10,6 +10,13 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - tự mở cứu đói khi thiếu ăn;
   - điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa;
   - AI biết luật mới; lời cố vấn gợi ý xây kho khi lương thực ít hay có điểm định cư bị cắt đường.
+- **0.36.1, điều khoản và thương lượng trong tổng kết chiến tranh:**
+  - **Hòa ước của mỗi cuộc chiến:**
+    - số hiệu, bên đề nghị;
+    - thời hạn, trạng thái: còn hiệu lực, hết hạn, bị ai xé bỏ, hay tan vỡ vì sao (tranh chấp biên giới, xô xát dẫn tới chiến tranh, một bên không còn…);
+    - cống nạp: ai nộp ai, bao nhiêu mỗi lượt, đã nộp đủ bao nhiêu lượt, thiếu bao nhiêu;
+    - nhượng đất, bồi thường theo điểm.
+  - **Thương lượng giữa hai nước khi đang đánh nhau:** mọi đề nghị hòa kèm điều khoản, thư và cử chỉ, và lúc ký. Trước đây thư bị xóa sau mỗi lượt và đề nghị chỉ giữ 2 lượt; giờ chúng được ghi lại theo cuộc chiến (40 dòng gần nhất).
 
 ## v0.35
 

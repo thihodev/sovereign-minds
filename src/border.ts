@@ -134,7 +134,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       const might = (x: Nation) => x.labor.warrior + workers(x) * WAR.militiaShare * WAR.militiaStrength;
       const [avenger, foe] = might(a) > might(b) || (might(a) === might(b) && lost(a) >= lost(b)) ? [a, b] : [b, a];
       foe.casusBelli[String(avenger.id)] = Math.max(foe.casusBelli[String(avenger.id)] ?? -1, tick + BORDER.causeTicks);
-      for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "passage"])) { tr.active = false; tr.end = tick; }
+      for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "passage"])) { tr.active = false; tr.end = tick; tr.endedBy = "tan vỡ vì xô xát biên giới dẫn tới chiến tranh"; }
       avenger.casusBelli[String(foe.id)] = Math.max(avenger.casusBelli[String(foe.id)] ?? -1, tick + BORDER.causeTicks);
       startWar(world, avenger, foe, tick, `${recent.length} vụ xô xát biên giới trong ${BORDER.brawlWindow} lượt (${lost(a)} người ${a.name}, ${lost(b)} người ${b.name} đã chết)`, say);
       const war = pendingOrActiveWar(world, a.id, b.id)!; war.brawlDead = { [a.id]: lost(a), [b.id]: lost(b) }; // not an ally's war that joined after it
@@ -154,7 +154,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       // A long dispute tears up the treaties that kept the peace (alliances and vassalage hold)
       if (st.dispute >= BORDER.treatyBreakAfter) {
         for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "peace", "passage"])) {
-          tr.active = false; tr.end = tick;
+          tr.active = false; tr.end = tick; tr.endedBy = `tan vỡ sau ${st.dispute} lượt tranh chấp biên giới`;
           for (const x of [a, b]) x.lastEvents.push(`Hiệp ước ${tr.type === "peace" ? "hòa bình" : tr.type === "passage" ? "thông hành" : "bất tương xâm"} #${tr.id} với ${(x === a ? b : a).name} tan vỡ sau ${st.dispute} lượt tranh chấp biên giới. Hai bên có chính nghĩa: tuyên chiến không mất uy tín.`);
           say(a.id, "treaty", `Tranh chấp biên giới kéo dài: hiệp ước giữa ${a.name} và ${b.name} tan vỡ.`);
         }

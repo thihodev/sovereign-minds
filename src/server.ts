@@ -217,7 +217,16 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const peace = p ? { winner: p.winner === null ? null : w.nations[p.winner]?.name, lead: p.lead, white: p.white, terms: p.terms ?? null, tiles: p.tiles,
           reparations: Object.keys(p.reparations).length ? fmtGoods(w, p.reparations) : null } : null;
         const brawl = x.brawlDead ? { a: x.brawlDead[String(x.a)] ?? 0, b: x.brawlDead[String(x.b)] ?? 0 } : null;
-        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: x.tally ? A.won + B.won : bs.length, a: A, b: B, brawl, peace, lastTile: x.lastTile ?? bs.at(-1)?.tile ?? null };
+        // the peace treaty itself, and the talks that led to it
+        const tr = x.treaty !== undefined ? w.treaties.find(t => t.id === x.treaty) : x.end !== null ? w.treaties.find(t => t.type === "peace" && ((t.a === x.a && t.b === x.b) || (t.a === x.b && t.b === x.a)) && Math.abs(t.start - x.end!) <= 1) : undefined;
+        const nm = (id: number | null | undefined) => (id === null || id === undefined ? null : w.nations[id]?.name ?? "?");
+        const treaty = tr ? {
+          id: tr.id, by: nm(tr.by), payer: Object.keys(tr.tribute).length || tr.cede.length ? nm(tr.a) : null, receiver: Object.keys(tr.tribute).length || tr.cede.length ? nm(tr.b) : null,
+          tribute: Object.keys(tr.tribute).length ? fmtGoods(w, tr.tribute) : null, cede: tr.cede.length, start: tr.start, end: tr.end, active: tr.active, brokenBy: nm(tr.brokenBy), endedBy: tr.endedBy ?? null,
+          paid: tr.paid ?? 0, missed: tr.missed ?? 0, due: Object.keys(tr.tribute).length ? Math.max(0, Math.min(w.tick, tr.end ?? w.tick) - tr.start - (tr.active ? 0 : 0)) : 0,
+        } : null;
+        const talks = (x.talks ?? []).map(t => ({ ...t, fromName: nm(t.from) }));
+        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: x.tally ? A.won + B.won : bs.length, a: A, b: B, brawl, peace, treaty, talks, lastTile: x.lastTile ?? bs.at(-1)?.tile ?? null };
       }),
       caravans: w.caravans,
       borders: w.borders ?? {},

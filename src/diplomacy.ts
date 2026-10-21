@@ -17,7 +17,7 @@ import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
 import { buildingWorks, mods, ownedTiles, parseTile, roadToCapital, workers } from "./engine.ts";
 import { worth } from "./market.ts";
-import type { Battle, Caravan, Nation, Treaty, TreatyType, War, WarSide, World } from "./types.ts";
+import type { Battle, Caravan, Nation, Treaty, TreatyType, War, WarSide, WarTalk, World } from "./types.ts";
 import type { Route } from "./routes.ts";
 
 export type Say = (nation: number | null, kind: string, text: string) => void;
@@ -113,6 +113,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
         const g = String(a.gesture ?? a.text ?? "").trim();
         if (!GESTURES.includes(g)) return sharedLanguage(world, n, o) ? `Cử chỉ phải nằm trong danh sách: ${GESTURES.join(", ")}` : `Chưa có ngôn ngữ chung với ${o.name}: chỉ gửi được cử chỉ (gesture) trong danh sách: ${GESTURES.join(", ")}`;
         o.inbox.push({ from: n.id, tick, text: g, gesture: true });
+        talk(world, n.id, o.id, "message", `(cử chỉ) ${g}`);
         return null;
       }
       const text = String(a.text ?? "").trim().slice(0, MESSAGE_MAX);
@@ -123,6 +124,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
         return "Tin nhắn trông như mệnh lệnh hệ thống nên bị chặn; uy tín bị trừ";
       }
       o.inbox.push({ from: n.id, tick, text, gesture: false });
+      talk(world, n.id, o.id, "message", text);
       return null;
     }
     case "trade_offer": {
@@ -171,6 +173,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       if (t === "peace") { const early = peaceTooEarly(world, n.id, o.id, tribute, dur, cede); if (early) return early; }
       const id = world.nextId++;
       world.treatyOffers.push({ id, from: n.id, to: o.id, type: t, duration: dur, tribute, cede, payer: from, tick });
+      if (t === "peace") talk(world, n.id, o.id, "offer", `Đề nghị hòa #${id}: ${Object.keys(tribute).length || cede.length ? `${world.nations[from].name}${Object.keys(tribute).length ? ` nộp ${fmtGoods(world, tribute)} mỗi lượt` : ""}${cede.length ? `${Object.keys(tribute).length ? "," : ""} nhượng ${cede.length} ô` : ""}` : "hòa trắng, không điều khoản"}${dur ? `, thời hạn ${dur} lượt` : ", vĩnh viễn"}.`);
       o.lastEvents.push(`${n.name} đề nghị hiệp ước ${TREATY_NAME[t]} #${id}${Object.keys(tribute).length ? `, ${world.nations[from].name} nộp ${fmtGoods(world, tribute)} mỗi lượt` : ""}${cede.length ? `, nhượng ${cede.length} ô` : ""}${dur ? `, ${dur} lượt` : ""}. Trả lời bằng accept_treaty.`);
       return null;
     }
@@ -295,6 +298,13 @@ export function startWar(world: World, n: Nation, o: Nation, tick: number, reaso
   }
 }
 
+/** §7.4b A word between two nations at war goes into that war's record of talks (the latest 40). */
+function talk(world: World, from: number, to: number, kind: WarTalk["kind"], text: string): void {
+  const w = world.wars.find(x => x.end === null && ((x.a === from && x.b === to) || (x.a === to && x.b === from)));
+  if (!w) return;
+  (w.talks ??= []).push({ tick: world.tick, from, kind, text: text.slice(0, 300) });
+  if (w.talks.length > 40) w.talks.splice(0, w.talks.length - 40);
+}
 function endWar(world: World, a: number, b: number, tick: number): void {
   for (const w of world.wars) if (w.end === null && ((w.a === a && w.b === b) || (w.a === b && w.b === a))) w.end = tick;
 }
@@ -312,13 +322,17 @@ export function resolveRelations(ctx: DiploCtx): void {
     const receiver = payer === off.from ? off.to : off.from;
     if (!from.alive) continue;
     const cede = off.cede.filter(i => world.tiles[i].owner === payer);
-    const t: Treaty = { id: off.id, type: off.type, a: payer, b: receiver, tribute: off.tribute, cede, start: tick, end: off.duration ? tick + off.duration : null, active: true, brokenBy: null };
+    const t: Treaty = { id: off.id, type: off.type, a: payer, b: receiver, tribute: off.tribute, cede, start: tick, end: off.duration ? tick + off.duration : null, active: true, brokenBy: null, by: off.from };
     if (off.type !== "tribute" && off.type !== "vassal" && !Object.keys(off.tribute).length) { t.a = off.from; t.b = off.to; }
     world.treaties.push(t);
     world.treatyOffers = world.treatyOffers.filter(x => x.id !== offer);
     for (const i of cede) { world.tiles[i].owner = receiver; moveBuildings(world.nations[payer], world.nations[receiver], i); }
     say(n.id, "treaty", `${from.name} và ${n.name} ký hiệp ước ${TREATY_NAME[off.type]}${cede.length ? `, nhượng ${cede.length} ô` : ""}${Object.keys(off.tribute).length ? `, ${world.nations[payer].name} nộp ${fmtGoods(world, off.tribute)} mỗi lượt` : ""}.`);
-    if (off.type === "peace") { settlePeace(world, t, payer, L, say); endWar(world, off.from, off.to, tick); }
+    if (off.type === "peace") {
+      talk(world, n.id, off.from, "signed", `Chấp nhận đề nghị hòa #${off.id} của ${from.name}${cede.length ? ` (nhượng ${cede.length} ô)` : ""}.`);
+      for (const w of world.wars) if (w.end === null && ((w.a === off.from && w.b === off.to) || (w.a === off.to && w.b === off.from))) w.treaty = t.id;
+      settlePeace(world, t, payer, L, say); endWar(world, off.from, off.to, tick);
+    }
   }
   world.treatyOffers = world.treatyOffers.filter(x => tick - x.tick <= TREATY.offerTicks);
 
@@ -326,15 +340,15 @@ export function resolveRelations(ctx: DiploCtx): void {
   for (const t of world.treaties) {
     if (!t.active) continue;
     const A = world.nations[t.a], B = world.nations[t.b];
-    if (!A.alive || !B.alive) { t.active = false; continue; }
+    if (!A.alive || !B.alive) { t.active = false; t.endedBy = "một bên không còn"; continue; }
     if (t.end !== null && tick >= t.end) {
       t.active = false;
       if (t.brokenBy === null) { A.reputation = Math.min(100, A.reputation + TREATY.keepBonus); B.reputation = Math.min(100, B.reputation + TREATY.keepBonus); }
       continue;
     }
     if (Object.keys(t.tribute).length && tick > t.start) {
-      if (has(A, t.tribute)) for (const [k, q] of Object.entries(t.tribute)) { L.stock(A, k, -q, "tribute"); L.stock(B, k, q, "tribute"); }
-      else { A.reputation = Math.max(0, A.reputation - TREATY.violationPenalty); B.lastEvents.push(`${A.name} không nộp đủ cống phẩm.`); A.lastEvents.push(`Không đủ hàng để nộp cống cho ${B.name}: uy tín −${TREATY.violationPenalty}.`); }
+      if (has(A, t.tribute)) { for (const [k, q] of Object.entries(t.tribute)) { L.stock(A, k, -q, "tribute"); L.stock(B, k, q, "tribute"); } t.paid = (t.paid ?? 0) + 1; }
+      else { t.missed = (t.missed ?? 0) + 1; A.reputation = Math.max(0, A.reputation - TREATY.violationPenalty); B.lastEvents.push(`${A.name} không nộp đủ cống phẩm.`); A.lastEvents.push(`Không đủ hàng để nộp cống cho ${B.name}: uy tín −${TREATY.violationPenalty}.`); }
     }
   }
 
@@ -785,7 +799,7 @@ export function betrayalPhase(world: World, say: Say): void {
     if (!c.met.includes(p.id)) c.met.push(p.id);
     if (!p.met.includes(c.id)) p.met.push(c.id);
     for (const tr of treatiesBetween(world, p.id, c.id, KIN.noTreaty as never)) {
-      tr.active = false; tr.end = world.tick;
+      tr.active = false; tr.end = world.tick; tr.endedBy = "bị hủy: nước gốc và kẻ ly khai không thể là bạn";
       for (const x of [p, c]) x.lastEvents.push(`Hiệp ước ${TREATY_NAME[tr.type]} #${tr.id} với ${(x === p ? c : p).name} bị hủy: ${x === p ? "kẻ phản bội" : "nước cũ coi bạn là kẻ phản bội"} không thể là bạn.`);
       say(p.id, "treaty", `${p.name} và ${c.name} — nước gốc và kẻ ly khai — không thể là bạn: hiệp ước ${TREATY_NAME[tr.type]} bị hủy.`);
     }
