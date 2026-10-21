@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.40";
+export const RULES_VERSION = "0.41";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1049,3 +1049,6 @@ export const HERB_GARDEN = { near: 2, perCentre: 2, zones: ["temp", "trop"] as s
 // §7.9 Border gate markets (a nation's idea, partly taken up): the border market of the two neighbours stays open
 // up to `below` more tension, trades `value` × as much, and each market calms `calm` more per side with a gate
 export const GATE = { below: 10, value: 1.25, calm: 1 };
+
+// §2.11 Rock salt (a nation's idea, taken up in part): a seam of salt in some hills and deserts, regrowing very slowly
+export const ROCK_SALT = { chance: { hill: 0.15, desert: 0.3 } as Record<string, number>, min: 20, max: 40, regen: 0.01 };

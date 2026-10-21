@@ -1019,6 +1019,16 @@ Mỗi loại hàng có một **giá thế giới**, tính bằng đơn vị lư�
 - **Tỉnh bị cắt đường:** điểm định cư bị cắt đường về thủ đô mà có kho riêng thì bất mãn tăng chậm một nửa.
 - Kho không giảm hư hỏng (việc của Hố trữ). Lương thực vẫn là kho chung của cả nước.
 
+### 6.5b Muối mỏ (sáng kiến của một quốc gia, chấp thuận một phần)
+
+Ngoài muối ven biển, một số ô có mỏ muối đá:
+- 15% số ô đồi và 30% số ô sa mạc;
+- mỗi mỏ 20–40 muối, tái tạo 1% mỗi lượt;
+- thợ mỏ đào như mọi mỏ muối khác (1 đơn vị mỗi người mỗi lượt), không cần phát minh;
+- thế giới cũ được thêm mỏ muối khi tải.
+
+Muối giữ thực phẩm lâu hơn và đáp ứng nhu cầu "Muối, gia vị" của mức sống từ thời Đồ Đá Mới. Nhờ vậy dân sâu trong lục địa cũng có muối.
+
 ### 6.6 Thảo dược đồng và Vườn thảo dược (hai sáng kiến của các quốc gia)
 
 **Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt (chậm hơn thảo dược rừng, 8%).

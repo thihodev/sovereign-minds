@@ -31,7 +31,7 @@ test("every grass and hill tile holds a few herbs that regrow slowly; old worlds
   for (const t of old.tiles) if (MEADOW_HERBS.terrains.includes(t.terrain)) { delete t.res.herbs; delete t.cap.herbs; }
   old.riches = 3;
   migrate(old);
-  assert.equal(old.riches, 4);
+  assert.ok(old.riches >= 4);
   assert.ok(old.tiles.filter(t => MEADOW_HERBS.terrains.includes(t.terrain)).every(t => (t.cap.herbs || 0) >= MEADOW_HERBS.min));
   assert.match(systemPrompt(w), /herb_garden/);
 });
@@ -50,4 +50,23 @@ test("a herb garden grows on warm land near a centre, two to a centre, and gives
   const before = n.stock.herbs || 0;
   turn(w, { 0: { labor: n.labor, actions: [{ type: "research", invention: "P2" }] } });
   assert.ok((n.stock.herbs || 0) - before >= 0.9, `${before} → ${n.stock.herbs}`);
+});
+
+test("rock salt: seams in some hills and deserts, regrowing slowly; old worlds gain them on load", async () => {
+  const { ROCK_SALT } = await import("../src/rules.ts");
+  const w = createWorld("rock-salt", bots(1));
+  const inland = w.tiles.filter(t => t.terrain in ROCK_SALT.chance);
+  const salty = inland.filter(t => (t.cap.salt || 0) >= ROCK_SALT.min);
+  assert.ok(salty.length > 10 && salty.length < inland.length * 0.5, `${salty.length}/${inland.length}`);
+  // it regrows a little each turn
+  const t = salty[0]; t.res.salt = 0;
+  step(w, {});
+  assert.ok((t.res.salt || 0) > 0 && (t.res.salt || 0) <= (t.cap.salt || 0) * ROCK_SALT.regen + 1e-9, `${t.res.salt}`);
+  // an old save without them
+  const old = JSON.parse(JSON.stringify(w)) as World;
+  for (const x of old.tiles) if (x.terrain in ROCK_SALT.chance) { delete x.res.salt; delete x.cap.salt; }
+  old.riches = 4;
+  migrate(old);
+  assert.equal(old.riches, 5);
+  assert.ok(old.tiles.some(x => x.terrain in ROCK_SALT.chance && (x.cap.salt || 0) >= ROCK_SALT.min));
 });

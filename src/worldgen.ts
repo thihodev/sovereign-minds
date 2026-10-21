@@ -5,7 +5,7 @@
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
 import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
-import { MEADOW_HERBS, RIVER, VEIN, WONDER_DEFS } from "./rules.ts";
+import { MEADOW_HERBS, RIVER, ROCK_SALT, VEIN, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
 const AX = Math.sqrt(3) / 1.5;
@@ -285,6 +285,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   seedAnimals(seedStr, tiles); // §6.4
   seedRiverPlenty(seedStr, tiles); // §2.1
   seedMeadowHerbs(seedStr, tiles); // §2.11 a nation's idea
+  seedRockSalt(seedStr, tiles); // §2.11 a nation's idea
   seedVeins(seedStr, tiles);
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
@@ -375,6 +376,17 @@ export function seedMeadowHerbs(seed: string, tiles: Tile[]): void {
     if (!MEADOW_HERBS.terrains.includes(t.terrain)) continue;
     const x = MEADOW_HERBS.min + Math.floor(rand() * (MEADOW_HERBS.max - MEADOW_HERBS.min + 1));
     t.res.herbs = (t.res.herbs || 0) + x; t.cap.herbs = (t.cap.herbs || 0) + x;
+  }
+}
+
+/** §2.11 Rock salt (a nation's idea): some hills and deserts hold a seam of salt, so inland peoples can salt their food too. */
+export function seedRockSalt(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "rock-salt");
+  for (const t of tiles) {
+    const p = ROCK_SALT.chance[t.terrain]; if (!p) continue;
+    if (rand() >= p) continue;
+    const x = ROCK_SALT.min + Math.floor(rand() * (ROCK_SALT.max - ROCK_SALT.min + 1));
+    t.res.salt = (t.res.salt || 0) + x; t.cap.salt = (t.cap.salt || 0) + x;
   }
 }
 

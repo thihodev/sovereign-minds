@@ -7,7 +7,7 @@ import {
   type BuildingDef, type Invention, type Recipe,
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
-import { seedAnimals, seedDeepResources, seedRiches, seedMeadowHerbs, seedRiverPlenty, seedVeins } from "./worldgen.ts";
+import { seedAnimals, seedDeepResources, seedRiches, seedMeadowHerbs, seedRiverPlenty, seedRockSalt, seedVeins } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
 
@@ -42,6 +42,7 @@ export function migrate(world: World): World {
   if ((world.riches ?? 0) < 2) { seedAnimals(world.seed, world.tiles); world.riches = 2; } // v0.23 wild herds
   if ((world.riches ?? 0) < 3) { seedRiverPlenty(world.seed, world.tiles); world.riches = 3; } // v0.25 the river's plenty
   if ((world.riches ?? 0) < 4) { seedMeadowHerbs(world.seed, world.tiles); world.riches = 4; } // v0.37 meadow herbs
+  if ((world.riches ?? 0) < 5) { seedRockSalt(world.seed, world.tiles); world.riches = 5; } // v0.41 rock salt
   for (const n of world.nations) {
     n.officials ??= [];
     n.settlements ??= []; n.trades ??= {}; n.mineTarget ??= ""; n.peakPopulation ??= n.population; n.inbox ??= [];

@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.41
+
+- **Muối mỏ (§6.5b), sáng kiến của một quốc gia, chấp thuận một phần:**
+  - 15% số ô đồi và 30% số ô sa mạc có mỏ muối đá (20–40 đơn vị), tái tạo 1% mỗi lượt;
+  - thợ mỏ đào như muối ven biển;
+  - thế giới cũ được thêm khi tải.
+  - Dân sâu trong lục địa có muối để giữ thực phẩm và đáp ứng nhu cầu gia vị.
+
 ## v0.40
 
 - **Dân số tăng theo đời sống, không theo lệnh vua (§4.2):**
