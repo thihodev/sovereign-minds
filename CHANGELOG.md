@@ -4,6 +4,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.27 (đang làm)
 
+- **0.27.1, thuyền trên bản đồ:** ngư dân ngoài khơi chèo thuyền từ bến hay cảng ra biển, thả lưới rồi về; ngư dân ở ô ven biển ra ô nước sát bờ; trên sông có thuyền độc mộc; thuyền trong kho neo ở bến và cảng. Thuyền mang màu cờ của nước đó.
 - **Tiêu chuẩn sống (§4.11):** mỗi kỷ nguyên dân đòi hỏi thêm nhu cầu, từ đủ ăn, chỗ ở, nước ngọt tới quần áo, công cụ, gốm, muối, rồi xa xỉ phẩm, đền thờ, thuốc, đường sá, đồ kim loại, chữ viết, buôn bán, hàng đa dạng, năng lượng, y tế.
   - Mức sống cao: nghiên cứu tối đa +8%, ổn định +1. Mức sống thấp: bất mãn +1.
   - Từ Đồ Sắt, cổng kỷ nguyên cần mức sống tối thiểu.

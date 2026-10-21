@@ -421,6 +421,13 @@
       const wm = walkMaps(n);
       for (const w of n.work || []) {
         working += w.n;
+        // §2.11 fishers on the water go by boat, from the nearest pier or shore of their own
+        if (w.role === "fish") {
+          if (isWater(w.tile)) { drawBoats(g, n, harbourFor(n, w.tile), w.tile, w, now, s, z, px, vis, unit); continue; }
+          const sea = NB(w.tile).find(j => j >= 0 && isWater(j));
+          if (sea !== undefined) drawBoats(g, n, w.tile, sea, w, now, s, z, px, vis, unit); // off the shore
+          else if (ST.river[w.tile]) drawCanoes(g, n, w, now, s, z, px, vis, unit); // on the river
+        }
         // home centre → work, tile by tile over their own ground or a road; never across the wild
         const path = walkRoute(wm, w.tile);
         if (!path) continue;
@@ -448,6 +455,13 @@
           figure(g, x, y, r, color, px);
         }
       }
+      // §2.11 boats at rest at the piers and harbours
+      if ((n.stock?.boat || 0) >= 1 && s * z >= 7) for (const b of (n.buildings || []).filter(b => b.done && (b.type === "pier" || b.type === "harbor"))) {
+        if (!vis(b.tile)) continue;
+        const sea = NB(b.tile).find(j => j >= 0 && isWater(j)), [px0, py0] = center(b.tile), [sx, sy] = sea !== undefined ? center(sea) : [px0 + s * .6, py0];
+        const moored = Math.min(3, Math.floor(n.stock.boat));
+        for (let k = 0; k < moored; k++) boat(g, px0 + (sx - px0) * .55 + (k - 1) * s * .28, py0 + (sy - py0) * .55 + Math.sin(now / 600 + k) * s * .02, clamp(s * .26 * z, 3, 6) * px, n.flag.colors[0], px, 1, false);
+      }
       // The rest of the people: at home round the capital and the settlements, a little smaller
       // homes: their tiles within 2 of each centre (the capital's count twice), so the crowd spreads round the flag, not under it
       const hearth = c => { if (c < 0 || !wm.pass[c]) return []; const near = new Set([c]); for (const j of NB(c)) if (j >= 0) { near.add(j); for (const k of NB(j)) if (k >= 0) near.add(k); } return [c, ...[...near].filter(j => j !== c && S.owners[j] === n.id)]; };
@@ -468,6 +482,44 @@
     }
   }
 
+
+  /** A small boat: a hull in the nation's colour, a pale sail; `heading` −1 or 1. */
+  function boat(g, x, y, r, color, px, heading = 1, sail = true) {
+    g.save(); g.translate(x, y); g.scale(heading, 1);
+    g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.lineTo(r * .65, r * .45); g.lineTo(-r * .7, r * .45); g.closePath();
+    g.fillStyle = color; g.fill(); g.lineWidth = px; g.strokeStyle = "#0b1a22"; g.stroke();
+    if (sail) { g.beginPath(); g.moveTo(-r * .05, -r * 1.25); g.lineTo(-r * .05, 0); g.lineTo(r * .7, -r * .15); g.closePath(); g.fillStyle = "#f4efe2"; g.fill(); g.stroke(); }
+    g.restore();
+  }
+  // the shore each boat puts out from: a pier or harbour of the nation, else its land nearest the water
+  const harbourMemo = new Map();
+  function harbourFor(n, tile) {
+    const key = `${n.id}:${tile}:${S.tick}`; if (harbourMemo.has(key)) return harbourMemo.get(key);
+    const ports = (n.buildings || []).filter(b => b.done && (b.type === "pier" || b.type === "harbor" || b.type === "fish_dock")).map(b => b.tile);
+    let best = -1, bd = Infinity;
+    for (const c of ports.length ? ports : S.owners.map((o, i) => o === n.id && !isWater(i) && NB(i).some(j => j >= 0 && isWater(j)) ? i : -1).filter(i => i >= 0)) { const d = hexDist(c, tile); if (d < bd) { bd = d; best = c; } }
+    harbourMemo.set(key, best); if (harbourMemo.size > 400) harbourMemo.clear();
+    return best;
+  }
+  function drawCanoes(g, n, w, now, s, z, px, vis, unit) {
+    if (!vis(w.tile)) return;
+    const [x, y] = center(w.tile), r = clamp(s * .26 * z, 3, 6) * px, k2 = Math.min(2, Math.max(1, Math.round(w.n / unit / 3)));
+    for (let k = 0; k < k2; k++) { const ph = hash(w.tile, k, n.id, 41), a = (reduceMotion.matches ? 0 : now / (9000 + ph * 4000) + ph) * Math.PI * 2; boat(g, x + Math.cos(a) * s * .35, y + Math.sin(a) * s * .2, r, n.flag.colors[0], px, Math.cos(a + Math.PI / 2) >= 0 ? 1 : -1, false); }
+  }
+  function drawBoats(g, n, from, to, w, now, s, z, px, vis, unit) {
+    if (from < 0 || (!vis(from) && !vis(to))) return;
+    const a = center(from), b = center(to), r = clamp(s * .42 * z, 5, 11) * px, still = reduceMotion.matches;
+    const boats = Math.min(4, Math.max(1, Math.round(w.n / unit / 2)));
+    for (let k = 0; k < boats; k++) {
+      const ph = hash(w.tile, k, n.id, 31), period = 11000 + ph * 6000, t = still ? .5 : ((now / period) + ph) % 1;
+      // out, a long while at the nets, back
+      const leg = t < .3 ? ease(t / .3) : t < .75 ? 1 : 1 - ease((t - .75) / .25);
+      const off = (k - (boats - 1) / 2) * s * .35, [x, y] = lerp(a, b, leg);
+      const bob = still ? 0 : Math.sin(now / 420 + k * 1.7) * s * .04;
+      boat(g, x + off * leg, y + bob + off * .3 * leg, r, n.flag.colors[0], px, (t < .3 || t >= .75 ? (b[0] >= a[0] ? 1 : -1) * (t < .3 ? 1 : -1) : 1), t < .3 || t >= .75);
+      if (leg === 1 && s * z >= 9 && !still) { g.beginPath(); g.arc(x + off + r * 1.4, y + bob + r * .6, r * (.5 + .3 * Math.sin(now / 300 + k)), 0, 7); g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = px; g.stroke(); } // the net
+    }
+  }
 
   function drawEvents(g, now, s, z, px) {
     if (!ANIM.queue.length) return;
