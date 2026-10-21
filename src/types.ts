@@ -113,6 +113,8 @@ export interface Nation {
   renameTick: number | null;
   /** How the nation ended, when it has: taken by another, returned to the nation it split from, or perished on its own. */
   fate?: { tick: number; cause: "conquest" | "reunited" | "perished"; by?: number; why?: string };
+  /** §4.12 the great people serving the nation, and the turn it last tried to lure one */
+  greats?: Great[]; invited?: number;
   /** §10.5 petitions the gods took up: the nation's honoured ideas */
   initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */
@@ -285,6 +287,9 @@ export interface Demography {
 }
 
 export interface RoadWork { tile: number; level: number; progress: number }
+
+/** §4.12 A great person: born to a nation, serving it until `dies`. */
+export interface Great { id: number; name: string; kind: string; born: number; dies: number; from?: number }
 
 /** §4.6 An official: works a field every turn on the ruler's behalf. */
 export interface Official {

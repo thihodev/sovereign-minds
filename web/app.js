@@ -1556,6 +1556,7 @@
           ${n.exodus && n.exodus.recent ? `<h3>Dân bỏ đi</h3><p class="note ${n.exodus.alarm ? "warn" : ""}">${n.exodus.recent} người trong ${10} lượt qua (${Math.round(n.exodus.share * 100)}% dân)${n.exodus.lastTurn ? `, ${n.exodus.lastTurn} người lượt vừa rồi` : ""} · ${esc(Object.entries(n.exodus.why).map(([w, k]) => `${k} vì ${w}`).join(", "))}${Object.keys(n.exodus.to).length ? ` · sang ${esc(Object.entries(n.exodus.to).map(([o, k]) => `${o} ${k}`).join(", "))}` : ""}${n.exodus.alarm ? " · quá 3%: ổn định, uy tín và hạng đang giảm" : ""}</p>` : ""}
           ${n.recent?.length ? `<h3>Các lượt gần đây (AI thấy mục này)</h3><ul class="plain recent">${n.recent.slice().reverse().map(r => `<li><b>L${r.tick}</b> · dân ${r.pop} · lương thực ${r.food} · ổn định ${r.stab}<div class="meta">Lệnh: ${esc(r.orders.join(" · ") || "(không ra lệnh)")}</div></li>`).join("")}</ul>` : ""}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${greatsBlock(n)}
           ${livingBlock(n)}
           ${prosperityBlock(n)}
           ${n.alive && n.founded ? `<h3>Bất mãn</h3><div class="bar discontent" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${n.discontent}" aria-label="Bất mãn"><i style="width:${n.discontent}%"></i></div><p class="note">${n.discontent}/100 · tới 100 (khi có từ 60 dân) một phái sẽ xin bỏ đi lập quốc riêng; giảm khi ổn định ≥ 60.</p>` : ""}
@@ -1632,6 +1633,12 @@
   const PROSP_PARTS = [["food", "Lương thực", "#c9a227"], ["goods", "Hàng hóa", "#3fb3cf"], ["room", "Chỗ ở", "#4cc283"], ["health", "Sức khỏe & yên bình", "#ff8f6b"]];
   // §4.11 the standard of living: each need of the people's era (and the next), met or not
   const ERA_NAMES = ["Đồ Đá Cũ", "Đồ Đá Mới", "Đồ Đồng", "Đồ Sắt", "Cổ Đại", "Trung Đại", "Cận Đại", "Công Nghiệp", "Hiện Đại", "Nguyên Tử"];
+  // §4.12 great people
+  const GREAT_ICON = { scholar: "📚", general: "⚔", merchant: "🪙", artisan: "🔨", prophet: "🔥", explorer: "🧭" };
+  function greatsBlock(n) {
+    const g = n.greats || []; if (!g.length) return "";
+    return `<h3>Danh nhân</h3><ul class="court">${g.map(x => `<li><span class="i">${GREAT_ICON[x.kind] || "⭐"}</span><div><b>${esc(x.title)} ${esc(x.name)}</b>${x.fromName ? ` <span class="muted">(mời từ ${esc(x.fromName)})</span>` : ""}<div class="meta">${esc(x.gift)} · từ lượt ${x.born}, phụng sự tới lượt ${x.dies}</div></div></li>`).join("")}</ul>`;
+  }
   function livingBlock(n) {
     const l = n.living; if (!l) return "";
     const color = l.score >= 75 ? "var(--good)" : l.score >= 40 ? "var(--warn)" : "var(--bad)";

@@ -15,7 +15,7 @@ import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
-import { MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
+import { GREATS, MINISTERS, MINISTER_DOMAINS } from "./rules.ts";
 import { freeDomains, freeSeats, ministerAp, ministerSeats, nextMilestone } from "./ministers.ts";
 import { WHY_VI, exodusOf } from "./exodus.ts";
 import { annalsFor } from "./annals.ts";
@@ -123,6 +123,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         sea: n.alive && n.founded ? seaView(w, n) : null,
         herds: n.alive && n.founded ? herdView(w, n) ?? null : null, // §6.4
         living: n.alive && n.founded ? livingStandard(w, n) : null, // §4.11
+        greats: n.alive && n.founded ? (n.greats ?? []).filter(g => g.dies > w.tick).map(g => ({ ...g, title: GREATS.kinds[g.kind]?.name, gift: GREATS.kinds[g.kind]?.desc, fromName: g.from !== undefined ? w.nations[g.from]?.name : undefined })) : [], // §4.12
         // §4.10 missions out and the last festival
         missions: (n.missions ?? []).filter(x => x.until >= w.tick).map(x => ({ ...x, place: x.where < 0 ? "trong nước" : w.nations[x.where]?.name })),
         festival: n.festival ?? null,

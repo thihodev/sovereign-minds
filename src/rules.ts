@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.28";
+export const RULES_VERSION = "0.29";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -233,7 +233,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -628,6 +628,19 @@ export const LAND_COLORS: Record<string, string> = {
 export const FLAG_LAND_DELTA_E = 15;
 /** §2.2 Renaming: only in the first ticks after entering a new era, once per era change. */
 export const RENAME = { windowTicks: 5, stability: 10 };
+/** §4.12 Great people. Each turn a chance `base` × (standard of living/100) × √(people/100) that one is born (at most
+ *  `max` alive), of a kind drawn by what the nation does; they serve `life` turns. An invitation (`invite`) lures one from
+ *  another nation with a gift of `giftWorth` (world prices): chance `inviteBase` + `inviteLife` × (our living − theirs)/100,
+ *  between `inviteMin` and `inviteMax`; once every `inviteEvery` turns. */
+export const GREATS = { base: 0.012, max: 3, life: [4, 7], giftWorth: 40, inviteBase: 0.3, inviteLife: 0.5, inviteMin: 0.05, inviteMax: 0.8, inviteEvery: 5,
+  kinds: {
+    scholar: { name: "danh sĩ", desc: "nghiên cứu +15%" },
+    general: { name: "danh tướng", desc: "chiến đấu +12%" },
+    merchant: { name: "thương gia", desc: "đoàn buôn +30%, chợ biên giới +50%" },
+    artisan: { name: "thợ cả", desc: "chế tác +25%, xây dựng +15%" },
+    prophet: { name: "nhà tiên tri", desc: "+1 ổn định mỗi lượt, truyền giáo thu hút gấp rưỡi" },
+    explorer: { name: "nhà thám hiểm", desc: "thám hiểm xa thêm 3 ô" },
+  } as Record<string, { name: string; desc: string }> };
 /** §4.11 The standard of living (0–100: the share of the needs of the people's era and the next that are met).
  *  Research ×(1 + `rp` × score/100); at `content`+ stability +1 a turn, below `restless` discontent +`unrest` a turn.
  *  `gate[k]`: the score era k's gate asks for (from the Iron Age on). The thresholds of each need: one per `perX` people. */

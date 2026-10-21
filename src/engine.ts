@@ -22,6 +22,7 @@ import { blessing, holdFestival, missionPhase, priestsAway, startMission } from 
 import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
 import { vietError, vietPerson, vietPlace } from "./names.ts";
 import { eraLivingNeed, leisure, livingStandard } from "./living.ts";
+import { greatMods, greatPhase, inviteGreat } from "./greats.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -203,6 +204,7 @@ export function mods(world: World, n: Nation): Mods {
     else if (o.domain === "explorer") m.explore += 2 * k;
     else if (o.domain === "governor") m.tiles += 1;
   }
+  greatMods(n, m, world.tick); // §4.12 the great people serving it
   m.medicine = Math.min(0.8, m.medicine);
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
@@ -739,6 +741,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   for (const n of world.nations) for (const [o, k] of Object.entries(n.trades)) if (k > (tradesBefore.get(n.id)?.[o] ?? 0)) traded.add(pairKey(n.id, Number(o)));
   betrayalPhase(world, say); // §4.5 the old nation and the traitors
   missionPhase(world, say); // §4.10 priests at work
+  greatPhase(world, say); // §4.12 great people born and passing
   borderPhase(world, L, say, traded);
 
   // 5b. The wild: hordes grow, raid and come back (§9.4)
@@ -1532,7 +1535,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital", "invite_great",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1874,6 +1877,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     case "mission": return startMission(world, n, a, L, explorers.get(n.id) || 0, to => findTarget(world, n, to));
     case "festival": return holdFestival(world, n, a, L);
     case "cull": return cull(n, a, L); // §6.4
+    case "invite_great": return inviteGreat(world, n, a, to => findTarget(world, n, to), (from, to, goods) => { for (const [k, q] of Object.entries(goods)) { L.stock(from, k, -q, "trade"); L.stock(to, k, q, "trade"); } }); // §4.12
     case "move_capital": {
       // §2.3 the capital moves to one of the nation's settlements; the old capital becomes a settlement
       if (n.capitalMoved !== undefined && world.tick - n.capitalMoved < CAPITAL_MOVE.every) return `Vừa dời đô ở lượt ${n.capitalMoved}: lần tới từ lượt ${n.capitalMoved + CAPITAL_MOVE.every}`;

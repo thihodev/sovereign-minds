@@ -11,6 +11,7 @@ import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { provinces } from "./provinces.ts";
 import { fx } from "./fx.ts";
+import { hasGreat } from "./greats.ts";
 import { rngFor } from "./rng.ts";
 import type { Nation, World } from "./types.ts";
 
@@ -104,7 +105,7 @@ export function missionPhase(world: World, say: Say): void {
       }
       o.stability = Math.max(0, o.stability - MISSION.foreignStability);
       // the restless and the poor listen most
-      const chance = MISSION.convert * (o.stability < PROVINCE.restless ? 1.5 : 1);
+      const chance = MISSION.convert * (o.stability < PROVINCE.restless ? 1.5 : 1) * (hasGreat(n, "prophet", tick) ? 1.5 : 1); // §4.12 a prophet's words
       if (r() < chance && o.population > 15) {
         const k = Math.min(1 + Math.floor(r() * MISSION.converts), o.population - 15);
         if (k > 0) {

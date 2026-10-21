@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -20,6 +20,7 @@ import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } 
 import { seaAdvice } from "../sea.ts";
 import { herdView } from "../herds.ts";
 import { livingStandard } from "../living.ts";
+import { greatsView } from "../greats.ts";
 import { goodValue } from "../catalog.ts";
 import type { Nation, World } from "../types.ts";
 
@@ -279,6 +280,14 @@ export function advice(world: World, n: Nation): Advice[] {
   {
     const l = livingStandard(world, n), next = nextEraNeeds(world, n);
     if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
+  }
+
+  // §4.12 great people: a richer life draws the great ones of a poorer neighbour
+  {
+    const gv = greatsView(world, n), mineL = n.living ?? 50;
+    const lure = gv?.others?.map(g => ({ g, o: world.nations.find(x => x.name === g.nation)! })).filter(x => x.o && mineL - (x.o.living ?? 50) >= 20)[0];
+    if (lure && (n.invited === undefined || world.tick - n.invited >= GREATS.inviteEvery))
+      say(1, `${GREATS.kinds[lure.g.kind].name} ${lure.g.name} của ${lure.o.name} (${GREATS.kinds[lure.g.kind].desc}): dân ta sống tốt hơn họ, có thể mời sang (invite_great, lễ vật đáng ≥ ${GREATS.giftWorth} theo giá thế giới; lễ vật thuộc về họ dù người ấy có nhận lời hay không).`);
   }
 
   // §2.11 the sea, and the fine things that calm a people

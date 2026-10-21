@@ -15,6 +15,7 @@ import { mods, workers, type Ledger } from "./engine.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
+import { hasGreat } from "./greats.ts";
 import type { Nation, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number;
@@ -105,7 +106,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       if (sa && sb) {
         // §6.3 at world prices
         const pa = price(world, sa[0]), pb = price(world, sb[0]);
-        const value = Math.min(BORDER.marketValue * (roadAtBorder(world, a.id, b.id) ? 1 + ROADS.market : 1), sa[1] * pa, sb[1] * pb); // §2.5 a market on the highway
+        const value = Math.min(BORDER.marketValue * (roadAtBorder(world, a.id, b.id) ? 1 + ROADS.market : 1) * (hasGreat(a, "merchant", tick) || hasGreat(b, "merchant", tick) ? 1.5 : 1), sa[1] * pa, sb[1] * pb); // §2.5 a market on the highway, §4.12 a merchant at it
         const qa = Math.floor(value / pa), qb = Math.floor(value / pb);
         if (qa >= 1 && qb >= 1) {
           L.stock(a, sa[0], -qa, "market"); L.stock(b, sa[0], qa, "market");

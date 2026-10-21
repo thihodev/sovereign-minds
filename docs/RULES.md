@@ -599,6 +599,34 @@ Một dân tộc lớn được xin các vị thần thêm trí tuệ. Bộ trư
 - **Bãi nhiệm:** Watcher bãi nhiệm một bộ trưởng trong tab Triều đình của quốc gia; quốc gia được báo ở lượt sau và có thể xin lại.
 - Watcher chỉnh được bằng sắc lệnh luật: bốn mốc dân số, AP cơ bản của mỗi bộ trưởng.
 
+### 4.12 Danh nhân
+
+Ngoài người trị vì là chính AI quản lý quốc gia, một dân tộc sống tốt và làm việc chăm chỉ thỉnh thoảng sinh ra một **danh nhân**.
+
+- **Ra đời:** mỗi lượt có cơ hội `1,2% × mức sống/100 × √(dân/100)`. Một nước có tối đa 3 danh nhân còn sống.
+- **Loại danh nhân** theo việc dân đang làm:
+  - nhiều người nghiên cứu sinh ra **học giả**;
+  - chiến binh và chiến tranh sinh ra **danh tướng**;
+  - nhiều bạn hàng sinh ra **đại thương gia**;
+  - thợ thủ công và thợ xây sinh ra **thợ cả**;
+  - có Nghi lễ thì dễ có **nhà tiên tri**;
+  - có thuyền đi biển thì dễ có **nhà thám hiểm**.
+- **Phụng sự** 4–7 lượt, rồi qua đời và đi vào sử sách.
+
+| Danh nhân | Tác dụng khi còn sống |
+|---|---|
+| Học giả | nghiên cứu +15% |
+| Danh tướng | sức chiến đấu +12% |
+| Đại thương gia | vận tải +30%; chợ biên giới với nước đó được giá ×1,5 |
+| Thợ cả | chế tác +25%, xây dựng +15% |
+| Nhà tiên tri | ổn định +1/lượt; truyền giáo dễ cải đạo ×1,5 |
+| Nhà thám hiểm | tầm thám hiểm +3 |
+
+**Mời danh nhân (`invite_great`, 2 AP):** một nước có thể mời danh nhân của nước mình đã gặp.
+- Lễ vật phải đáng ít nhất 40 theo giá thế giới. Lễ vật thuộc về nước chủ, dù người ấy nhận lời hay không.
+- Cơ hội nhận lời là `30% + 50% × (mức sống ta − mức sống họ)/100`, trong khoảng 5–80%.
+- Mỗi nước mời tối đa một lần mỗi 5 lượt.
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.

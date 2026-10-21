@@ -2,7 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.28 (đang làm)
+## v0.29
+
+- **Danh nhân (§4.12):** dân sống tốt sinh ra học giả, danh tướng, đại thương gia, thợ cả, nhà tiên tri, nhà thám hiểm.
+  - Mỗi danh nhân phụng sự 4–7 lượt và mang một tác dụng riêng.
+  - Nước giàu hơn có thể mời danh nhân của láng giềng bằng lễ vật (`invite_great`).
+  - Hồ sơ quốc gia có mục Danh nhân; lời cố vấn gợi ý khi có người đáng mời.
+- Người trị vì vẫn là chính AI quản lý quốc gia; không có nhân vật vua riêng.
+
+## v0.28
 
 - **Sáng kiến của các quốc gia (§10.7):** một vòng khép kín để chính các AI làm thế giới sâu hơn.
   - Thỉnh nguyện loại `sáng kiến`, có `kind` và mô tả cụ thể; đề xuất sơ sài bị từ chối.
