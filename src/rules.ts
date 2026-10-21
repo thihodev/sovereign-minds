@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.31";
+export const RULES_VERSION = "0.32";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -372,6 +372,24 @@ export const WAR = {
   lootShare: 0.15, centreLoot: 0.5,
   /** A capital or settlement falls once the attacker holds this many of its land neighbours (all of them if it has fewer). */
   centreFallsAt: 4,
+  /** §7.4b Border clashes (v0.32): every turn of a war, the two armies fight on their own wherever their lands touch.
+   *  Each side sends `engage` of its warriors and of its militia (militiaShare of workers, half strength), in the share
+   *  of its front that faces this enemy. The weaker side loses `lose` of the men engaged (at least 1), the stronger `win`;
+   *  a side `push`× as strong takes one border tile that is not a centre. */
+  clash: { engage: 0.5, win: [0.03, 0.08], lose: [0.1, 0.2], push: 2 },
+  /** §7.4b War score: points for each border clash won, battle won (raids too), tile taken, centre taken, enemy dead. */
+  score: { clash: 1, battle: 2, tile: 3, centre: 10, perDead: 0.25 },
+  /** §7.4b Peace has a price. A white peace (no tribute, no tiles) only after `peaceAfter` turns of fighting; before that a
+   *  peace must carry terms: tribute worth ≥ earlyTribute a turn (world prices) for ≥ earlyTurns turns, or ≥ 1 ceded tile.
+   *  When a peace is signed and one side leads the score by ≥ decisive, the loser pays reparations at once: `perPoint` of
+   *  every good in its stores per point of lead (at most `maxShare`), and one border tile per `tileEvery` points (at most
+   *  maxTiles). A white peace with no winner costs the side that declared `whiteStability` stability: blood for nothing. */
+  peaceAfter: 5, earlyTribute: 5, earlyTurns: 10, decisive: 8,
+  reparation: { perPoint: 0.012, maxShare: 0.35, tileEvery: 12, maxTiles: 3 },
+  whiteStability: 4,
+  /** §7.4b War weariness: from the first turn, the side behind by ≥ losingBy points loses 1 stability and gains 1 discontent
+   *  a turn; after weariAfter turns both sides lose 1 stability a turn. */
+  losingBy: 4,
 };
 
 // §2.3 Settlements

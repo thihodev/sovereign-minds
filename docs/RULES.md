@@ -998,7 +998,7 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Cướp:** bên công thắng một trận `raid` thì mỗi chiến binh mang về tối đa 5 đơn vị, lấy tối đa 30% mỗi loại hàng trong kho của cả nước bị cướp, lương thực trước, rồi các loại khác theo thứ tự chữ cái.
 - **Thủ đô và điểm định cư** chỉ bị chiếm (khi bên công thắng một trận `attack` vào chính ô đó) nếu bên công đã giữ **ít nhất 4 ô đất liền kề** của nó (hoặc mọi ô đất liền kề, nếu nó có ít hơn 4). Mất thủ đô thì điểm định cư lập sớm nhất thành thủ đô mới. Không còn định cư nào thì quốc gia diệt vong.
 - **Tù binh:** khi bên công thắng, 50% số người bên thủ tử trận trở thành dân của bên thắng, ổn định bên thắng −1 mỗi 5 tù binh.
-- **Kết thúc:** hiệp ước hòa bình (có thể kèm nhượng ô và cống nạp), hoặc diệt vong. Đầu hàng thành chư hầu ngay giữa chiến tranh (chưa có trong engine: phải ký hòa bình trước rồi mới ký chư hầu). Từ lượt thứ 5 tính từ khi giao tranh bắt đầu, chiến tranh gây −1 ổn định mỗi lượt cho cả hai bên.
+- **Kết thúc:** hiệp ước hòa bình (có thể kèm nhượng ô và cống nạp; giá của hòa bình ở mục 7.4b), hoặc diệt vong. Đầu hàng thành chư hầu ngay giữa chiến tranh (chưa có trong engine: phải ký hòa bình trước rồi mới ký chư hầu). Từ lượt thứ 5 tính từ khi giao tranh bắt đầu, chiến tranh gây −1 ổn định mỗi lượt cho cả hai bên.
 
 **Một nước sụp đổ (v0.22):** khi thủ đô thất thủ mà không còn điểm định cư nào, quốc gia diệt vong.
 - **Dân:** 1/5 số người còn sống chạy nạn sang nước yên ổn nhất mà họ quen (tính vào số dân bỏ đi của nước sụp đổ). Số còn lại thành dân của nước thắng.
@@ -1006,6 +1006,41 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Nước thắng:** −3 ổn định, vì dân mới chưa phục.
 - **AI của nước sụp đổ được giải phóng:** Engine không gọi model đó nữa, kể cả các bộ trưởng.
 - Nếu nước thắng là nước gốc chiếm lại nước tách ra từ nó, cả nước nhập lại trọn vẹn, không ai chạy nạn (mục 4.5).
+
+### 7.4b Chiến tranh thật: giao tranh biên giới, điểm chiến tranh, giá của hòa bình (v0.32)
+
+Chiến tranh không phải một cuộc cãi nhau. Đã có chiến tranh là có người chết, có bên thắng bên thua, và hòa bình phải trả giá.
+
+- **Giao tranh biên giới.** Mỗi lượt chiến tranh, ở mọi nơi hai lãnh thổ giáp nhau (đất hay nước), quân hai bên tự đánh nhau, không cần ai ra lệnh `attack`.
+  - Mỗi bên đưa ra **50% chiến binh và 50% dân quân** (dân quân = 10% số lao động, tính nửa sức), nhân với phần mặt trận của mình hướng về kẻ thù này (số ô giáp nước đó / số ô giáp mọi kẻ thù). Ít nhất 1 dân quân.
+  - Sức mạnh tính như một trận đánh (vũ khí, thưởng chiến binh, ổn định, may rủi 0,8–1,2), nhưng không có lợi thế sân nhà. Nước gốc đánh kẻ phản bội mạnh hơn (mục 4.5).
+  - **Bên yếu hơn** mất 10–20% số người ra trận, ít nhất 1. **Bên mạnh hơn** mất 3–8%. Chiến binh chết thì mất vũ khí. Không có chiến binh thì dân quân, tức nông dân, chết thay.
+  - **Bên mạnh gấp đôi** đẩy lùi biên giới: chiếm một ô giáp ranh của bên kia (ô kề nhiều đất mình nhất), không bao giờ là thủ đô hay điểm định cư. Mất ô như mất ô trong trận (mục 2.9).
+  - Hai nước không giáp nhau thì không có giao tranh biên giới; chỉ đánh được bằng `attack` và `raid` trong tầm.
+- **Điểm chiến tranh** của mỗi bên, tính riêng cho từng cuộc chiến:
+
+| Sự kiện | Điểm |
+| --- | --- |
+| Thắng một lần giao tranh biên giới | +1 |
+| Thắng một trận `attack` hay `raid` (khi đánh hay khi giữ) | +2 |
+| Chiếm một ô | +3 |
+| Chiếm một trung tâm | +10 |
+| Mỗi người địch chết | +0,25 |
+
+- **Giá của hòa bình:**
+  - **Không hòa trắng sớm.** Hòa ước không có cống nạp, không nhượng ô chỉ đề nghị được từ lượt thứ 5 tính từ khi giao tranh bắt đầu. Trước đó, muốn dừng thì hòa ước phải có điều khoản: cống nạp đáng ≥ 5 (theo giá thế giới) mỗi lượt trong ≥ 10 lượt (hoặc vĩnh viễn), hoặc nhượng ít nhất 1 ô. Đó là xin hàng.
+  - **Bên thua bồi thường.** Khi hòa ước được ký mà một bên dẫn ≥ 8 điểm, bên thua bồi thường ngay cho bên thắng 1,2% mọi thứ trong kho (lương thực, hàng, tiền) cho mỗi điểm dẫn, tối đa 35%. Bên thua còn nhượng 1 ô biên giới cho mỗi 12 điểm dẫn, tối đa 3 ô, không bao giờ là trung tâm. Ô đã nhượng trong chính hòa ước được trừ vào số này. Điều khoản của hòa ước (cống nạp, nhượng ô) vẫn áp dụng thêm.
+  - **Hòa trắng có giá.** Hòa ước không có điều khoản mà không bên nào dẫn đủ 8 điểm: bên tuyên chiến mất 4 ổn định, vì máu đã đổ mà không được gì.
+- **Mỏi mệt:** ngay từ lượt đầu, bên kém ≥ 4 điểm mất 1 ổn định và thêm 1 bất mãn mỗi lượt. Từ lượt thứ 5, cả hai bên mất thêm 1 ổn định mỗi lượt (mục 7.4).
+- **AI thấy:** mục `wars` trong gói trạng thái cho mỗi cuộc chiến:
+  - điểm, số người chết, số lần thắng giao tranh và thắng trận, số ô đã chiếm;
+  - số ô mặt trận;
+  - lượt sớm nhất được hòa trắng;
+  - giá của hòa bình nếu ký ngay: ai thắng, bồi thường bao nhiêu phần kho và bao nhiêu ô;
+  - các ô địch đáng đánh (kề nhiều ô của mình nhất).
+  
+  Lời cố vấn nhắc lại những điều này bằng tiếng Việt.
+- **Watcher thấy:** bảng "Tổng kết các cuộc chiến" có điểm chiến tranh, số lần giao tranh biên giới, số người chết trong trận và giao tranh, và kết cục: ai thắng, bên thua bồi thường gì và mấy ô, điều khoản của hòa ước, hay hòa trắng.
 
 ### 7.5 Lan truyền tri thức
 

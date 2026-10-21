@@ -137,8 +137,10 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "passage"])) { tr.active = false; tr.end = tick; }
       avenger.casusBelli[String(foe.id)] = Math.max(avenger.casusBelli[String(foe.id)] ?? -1, tick + BORDER.causeTicks);
       startWar(world, avenger, foe, tick, `${recent.length} vụ xô xát biên giới trong ${BORDER.brawlWindow} lượt (${lost(a)} người ${a.name}, ${lost(b)} người ${b.name} đã chết)`, say);
-      const war = world.wars.at(-1)!; war.brawlDead = { [a.id]: lost(a), [b.id]: lost(b) };
-      avenger.lastEvents.push(`Máu đổ ở biên giới quá nhiều lần (${recent.length} vụ xô xát, ${lost(avenger)} người ta chết): ta mạnh hơn, dân đòi ra tay, ${avenger.name} tuyên chiến với ${foe.name} (có chính nghĩa). Muốn dừng: ký hòa bình (treaty peace).`);
+      const war = pendingOrActiveWar(world, a.id, b.id)!; war.brawlDead = { [a.id]: lost(a), [b.id]: lost(b) }; // not an ally's war that joined after it
+      const terms = `Từ lượt sau quân hai bên giao tranh ở biên giới mỗi lượt, kể cả khi không ai ra lệnh tấn công; hòa trắng chỉ ký được từ lượt ${tick + 1 + WAR.peaceAfter}, và khi ký hòa bên kém điểm chiến tranh ${WAR.decisive}+ phải bồi thường.`;
+      avenger.lastEvents.push(`Máu đổ ở biên giới quá nhiều lần (${recent.length} vụ xô xát, ${lost(avenger)} người ta chết): ta mạnh hơn, dân đòi ra tay, ${avenger.name} tuyên chiến với ${foe.name} (có chính nghĩa). ${terms}`);
+      foe.lastEvents.push(`${avenger.name} mạnh hơn và đòi nợ máu sau ${recent.length} vụ xô xát biên giới. ${terms}`);
       st.brawls = [];
     }
     // A dispute: both sides may fight with a just cause, and both peoples are uneasy

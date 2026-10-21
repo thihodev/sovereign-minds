@@ -16,7 +16,8 @@ import { noteExodus } from "./exodus.ts";
 import { buildingOf, goodName, knownGood, recipeOf } from "./catalog.ts";
 import type { Ledger } from "./engine.ts";
 import { buildingWorks, mods, ownedTiles, parseTile, roadToCapital, workers } from "./engine.ts";
-import type { Battle, Caravan, Nation, Treaty, TreatyType, War, World } from "./types.ts";
+import { worth } from "./market.ts";
+import type { Battle, Caravan, Nation, Treaty, TreatyType, War, WarSide, World } from "./types.ts";
 import type { Route } from "./routes.ts";
 
 export type Say = (nation: number | null, kind: string, text: string) => void;
@@ -167,6 +168,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const payerIsMe = String(a.payer ?? "me") !== "them";
       const from = payerIsMe ? n.id : o.id;
       if (cede.some(i => world.tiles[i].owner !== from)) return "Chỉ nhượng được ô thuộc bên trả";
+      if (t === "peace") { const early = peaceTooEarly(world, n.id, o.id, tribute, dur, cede); if (early) return early; }
       const id = world.nextId++;
       world.treatyOffers.push({ id, from: n.id, to: o.id, type: t, duration: dur, tribute, cede, payer: from, tick });
       o.lastEvents.push(`${n.name} đề nghị hiệp ước ${TREATY_NAME[t]} #${id}${Object.keys(tribute).length ? `, ${world.nations[from].name} nộp ${fmtGoods(world, tribute)} mỗi lượt` : ""}${cede.length ? `, nhượng ${cede.length} ô` : ""}${dur ? `, ${dur} lượt` : ""}. Trả lời bằng accept_treaty.`);
@@ -280,14 +282,14 @@ export function fmtGoods(world: World, g: Record<string, number>): string {
 }
 
 export function startWar(world: World, n: Nation, o: Nation, tick: number, reason: string, say: Say): void {
-  world.wars.push({ id: world.nextId++, a: n.id, b: o.id, declared: tick, start: tick + 1, end: null, reason });
+  world.wars.push({ id: world.nextId++, a: n.id, b: o.id, declared: tick, start: tick + 1, end: null, reason, tally: {} });
   say(n.id, "war", `${n.name} tuyên chiến với ${o.name}${reason ? ` (${reason})` : ""}. Chiến sự bắt đầu từ lượt sau.`);
   o.lastEvents.push(`${n.name} tuyên chiến với chúng ta! Chiến sự bắt đầu từ lượt sau.`);
   // Allies and the overlord of the defender join (§7.4, §7.7)
   for (const ally of allies(world, o.id)) {
     const A = world.nations[ally];
     if (!A.alive || ally === n.id || pendingOrActiveWar(world, ally, n.id)) continue;
-    world.wars.push({ id: world.nextId++, a: ally, b: n.id, declared: tick, start: tick + 1, end: null, reason: `bảo vệ ${o.name}` });
+    world.wars.push({ id: world.nextId++, a: ally, b: n.id, declared: tick, start: tick + 1, end: null, reason: `bảo vệ ${o.name}`, tally: {} });
     if (!A.met.includes(n.id)) A.met.push(n.id);
     say(ally, "war", `${A.name} tham chiến để bảo vệ ${o.name}, chống lại ${n.name}.`);
   }
@@ -314,9 +316,9 @@ export function resolveRelations(ctx: DiploCtx): void {
     if (off.type !== "tribute" && off.type !== "vassal" && !Object.keys(off.tribute).length) { t.a = off.from; t.b = off.to; }
     world.treaties.push(t);
     world.treatyOffers = world.treatyOffers.filter(x => x.id !== offer);
-    for (const i of cede) world.tiles[i].owner = receiver;
-    if (off.type === "peace") endWar(world, off.from, off.to, tick);
+    for (const i of cede) { world.tiles[i].owner = receiver; moveBuildings(world.nations[payer], world.nations[receiver], i); }
     say(n.id, "treaty", `${from.name} và ${n.name} ký hiệp ước ${TREATY_NAME[off.type]}${cede.length ? `, nhượng ${cede.length} ô` : ""}${Object.keys(off.tribute).length ? `, ${world.nations[payer].name} nộp ${fmtGoods(world, off.tribute)} mỗi lượt` : ""}.`);
+    if (off.type === "peace") { settlePeace(world, t, payer, L, say); endWar(world, off.from, off.to, tick); }
   }
   world.treatyOffers = world.treatyOffers.filter(x => tick - x.tick <= TREATY.offerTicks);
 
@@ -481,12 +483,7 @@ export function resolveBattles(ctx: DiploCtx): void {
     /** (armed men + militia at half strength) × bonuses × morale × luck; defenders also get home, terrain, walls and river. */
     const strength = (n: Nation, men: number, militiaMen: number, defending: boolean) => {
       if (men + militiaMen <= 0) return 0;
-      const m = mods(world, n);
-      let weapons = 0, left = men;
-      for (const [k, bonus] of Object.entries(WAR.weapon)) { const k2 = Math.min(left, Math.floor(n.stock[k] || 0)); weapons += k2 * bonus; left -= k2; }
-      // Weapons a nation invented itself (recipe tools for warriors)
-      for (const [k, q] of Object.entries(n.stock)) { const use = recipeOf(world, k)?.use; if (use?.role !== "warrior" || left <= 0) continue; const k2 = Math.min(left, Math.floor(q) * use.per); weapons += k2 * use.bonus * 2; left -= k2; }
-      let v = (men + weapons + militiaMen * WAR.militiaStrength) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5) * luck();
+      let v = armyStrength(world, n, men, militiaMen) * luck();
       if (defending) {
         const t = world.tiles[s.tile];
         const wall = n.buildings.filter(b => buildingWorks(world, b) && (b.tile === s.tile || dist(b.tile, s.tile) <= 1)).reduce((x, b) => Math.max(x, buildingOf(world, b.type)?.effect.defense || 0), 0);
@@ -510,8 +507,7 @@ export function resolveBattles(ctx: DiploCtx): void {
     const lossD = Math.min(D.population, lossDW + lossDM);
     take(A, lossA, "war"); A.labor.warrior = Math.max(0, A.labor.warrior - lossA);
     // The fallen lose their weapons (bows first, then spears)
-    const loseWeapons = (n: Nation, k: number) => { for (const w of Object.keys(WAR.weapon)) { if (k <= 0) break; const q = Math.min(k, Math.floor(n.stock[w] || 0)); if (q) { L.stock(n, w, -q, "battle"); k -= q; } } };
-    loseWeapons(A, lossA); loseWeapons(D, lossDW);
+    loseWeapons(L, A, lossA); loseWeapons(L, D, lossDW);
     // §4.2 warriors fall by the defender's custom; the militia is the whole village
     const fallenD = take(D, Math.min(lossDW, lossD), "war"), fallenM = take(D, lossD - Math.min(lossDW, lossD), "raid");
     D.labor.warrior = Math.max(0, D.labor.warrior - lossDW);
@@ -550,6 +546,18 @@ export function resolveBattles(ctx: DiploCtx): void {
       }
     }
     world.battles.push({ tick, attacker: A.id, defender: D.id, tile: s.tile, kind: s.kind, a: Math.round(aStr * 10) / 10, d: Math.round(dStr * 10) / 10, won, lossA, lossD, note } as Battle);
+    // §7.4b the war score
+    const war = activeWar(world, A.id, D.id);
+    if (war) {
+      const sa = bumpSide(war, A.id), sd = bumpSide(war, D.id), sw = won ? sa : sd;
+      war.lastTile = s.tile;
+      sw.battles++; sw.score += WAR.score.battle;
+      sa.dead += lossA; sd.dead += lossD; sa.score += lossD * WAR.score.perDead; sd.score += lossA * WAR.score.perDead;
+      if (won && s.kind === "raid") sa.raids++;
+      if (won && s.kind === "attack" && world.tiles[s.tile].owner === A.id) {
+        if (/trung tâm/.test(note)) { sa.centres++; sa.score += WAR.score.centre; } else { sa.tiles++; sa.score += WAR.score.tile; }
+      }
+    }
     const where = `(${col(s.tile)}, ${row(s.tile)})`;
     say(A.id, "battle", `${A.name} ${s.kind === "raid" ? "đột kích" : "tấn công"} ${D.name} tại ${where}: ${won ? "thắng" : "thua"}. Thương vong ${lossA} / ${lossD}${dMen <= 0 ? " (dân quân)" : ""}${prisoners ? `, bắt ${prisoners} tù binh` : ""}${note ? `; ${note}` : ""}.`);
     D.lastEvents.push(`Bị ${A.name} ${s.kind === "raid" ? "đột kích" : "tấn công"} tại ${where}: ta ${won ? "thua" : "thắng"}, mất ${lossD} người.`);
@@ -557,12 +565,159 @@ export function resolveBattles(ctx: DiploCtx): void {
   }
   world.battles = world.battles.slice(-300);
 
-  // War weariness (§7.4)
+  // §7.4b Border clashes: wherever the two lands touch, the armies fight every turn on their own
+  borderClashes(world, tick, L, say);
+
+  // War weariness (§7.4, §7.4b): the side that is losing feels it from the first turn
   for (const w of world.wars) {
     if (w.end !== null || w.start > tick) continue;
     const A = world.nations[w.a], B = world.nations[w.b];
     if (!A.alive || !B.alive) { w.end = tick; continue; }
+    const lead = warLead(w, A.id);
+    if (Math.abs(lead) >= WAR.losingBy) {
+      const loser = lead > 0 ? B : A;
+      loser.stability -= 1; loser.discontent = Math.min(100, (loser.discontent ?? 0) + 1);
+      loser.lastEvents.push(`Đang thua cuộc chiến với ${(loser === A ? B : A).name} (kém ${Math.abs(lead)} điểm chiến tranh): dân mỏi mệt, −1 ổn định, +1 bất mãn.`);
+    }
     if (tick - w.start >= WAR.weariAfter) { A.stability -= 1; B.stability -= 1; }
+  }
+}
+
+/** Armed men + weapons + militia at half strength, × warrior bonuses × morale (stability); no luck, no home ground. */
+export function armyStrength(world: World, n: Nation, men: number, militiaMen: number): number {
+  if (men + militiaMen <= 0) return 0;
+  const m = mods(world, n);
+  let weapons = 0, left = men;
+  for (const [k, bonus] of Object.entries(WAR.weapon)) { const k2 = Math.min(left, Math.floor(n.stock[k] || 0)); weapons += k2 * bonus; left -= k2; }
+  // Weapons a nation invented itself (recipe tools for warriors)
+  for (const [k, q] of Object.entries(n.stock)) { const use = recipeOf(world, k)?.use; if (use?.role !== "warrior" || left <= 0) continue; const k2 = Math.min(left, Math.floor(q) * use.per); weapons += k2 * use.bonus * 2; left -= k2; }
+  return (men + weapons + militiaMen * WAR.militiaStrength) * (1 + (m.role.warrior || 0) + (m.combat || 0)) * (n.stability / 100 + 0.5);
+}
+/** The fallen lose their weapons (horses, bows, then spears). */
+function loseWeapons(L: Ledger, n: Nation, k: number): void {
+  for (const w of Object.keys(WAR.weapon)) { if (k <= 0) break; const q = Math.min(k, Math.floor(n.stock[w] || 0)); if (q) { L.stock(n, w, -q, "battle"); k -= q; } }
+}
+
+// ---------------------------------------------------------------- §7.4b real war: clashes, score, the price of peace
+
+const NO_SIDE: WarSide = { score: 0, dead: 0, clashes: 0, battles: 0, tiles: 0, centres: 0, raids: 0 };
+/** One side's tally in a war (read only: zeros for a side with none yet). */
+export function warSide(w: War, id: number): WarSide { return w.tally?.[String(id)] ?? NO_SIDE; }
+function bumpSide(w: War, id: number): WarSide { return ((w.tally ??= {})[String(id)] ??= { ...NO_SIDE }); }
+/** The war score lead of `id` over its enemy in this war (negative: behind). */
+export function warLead(w: War, id: number): number {
+  const foe = w.a === id ? w.b : w.a;
+  return Math.round((warSide(w, id).score - warSide(w, foe).score) * 10) / 10;
+}
+/** Tiles of `a` that touch land or water of `b`. */
+export function touching(world: World, a: number, b: number): number[] {
+  const out: number[] = [];
+  for (const t of world.tiles) if (t.owner === a && NEIGHBORS[t.i].some(j => world.tiles[j].owner === b)) out.push(t.i);
+  return out;
+}
+/** §7.4b Why a peace offered now is too early, or null: a white peace waits WAR.peaceAfter turns of fighting. */
+export function peaceTooEarly(world: World, a: number, b: number, tribute: Record<string, number>, duration: number | null, cede: number[]): string | null {
+  const w = pendingOrActiveWar(world, a, b);
+  if (!w) return null;
+  const from = w.start + WAR.peaceAfter;
+  if (world.tick >= from || cede.length) return null;
+  if (worth(world, tribute) >= WAR.earlyTribute && (duration === null || duration >= WAR.earlyTurns)) return null;
+  return `Chiến tranh mới bắt đầu: hòa trắng chỉ ký được từ lượt ${from}. Muốn dừng sớm hơn, hòa ước phải có điều khoản: cống nạp đáng ≥ ${WAR.earlyTribute} (giá thế giới) mỗi lượt trong ≥ ${WAR.earlyTurns} lượt (tribute, duration), hoặc nhượng ít nhất 1 ô (cede)`;
+}
+/** §7.4b What a peace signed now would bring, seen from `id`: the winner by the score, the share of stores and the tiles the loser pays. */
+export function peaceOutlook(w: War, id: number): { lead: number; winner: number | null; share: number; tiles: number; whiteFrom: number } {
+  const lead = warLead(w, id), foe = w.a === id ? w.b : w.a, k = Math.abs(lead), R = WAR.reparation;
+  const winner = lead >= WAR.decisive ? id : lead <= -WAR.decisive ? foe : null;
+  return { lead, winner, share: winner === null ? 0 : Math.min(R.maxShare, k * R.perPoint), tiles: winner === null ? 0 : Math.min(R.maxTiles, Math.floor(k / R.tileEvery)), whiteFrom: w.start + WAR.peaceAfter };
+}
+/** §7.4b A peace is signed: the war score decides who won; the loser pays reparations at once (stores and border tiles);
+ *  a peace with no winner and no terms costs the side that declared. */
+function settlePeace(world: World, t: Treaty, payer: number, L: Ledger, say: Say): void {
+  const w = pendingOrActiveWar(world, t.a, t.b);
+  if (!w) return;
+  const A = world.nations[w.a], B = world.nations[w.b], o = peaceOutlook(w, A.id);
+  const P = world.nations[payer];
+  const terms = [Object.keys(t.tribute).length ? `${P.name} nộp ${fmtGoods(world, t.tribute)} mỗi lượt${t.end !== null ? ` trong ${t.end - t.start} lượt` : ""}` : "", t.cede.length ? `${P.name} nhượng ${t.cede.length} ô` : ""].filter(Boolean).join("; ");
+  const reparations: Record<string, number> = {};
+  let tiles = 0;
+  const score = (id: number) => Math.round(warSide(w, id).score);
+  if (o.winner !== null) {
+    const W = world.nations[o.winner], Lo = o.winner === A.id ? B : A;
+    for (const k of Object.keys(Lo.stock).sort()) {
+      const q = Math.floor((Lo.stock[k] || 0) * o.share * 10) / 10;
+      if (q < 0.5) continue;
+      L.stock(Lo, k, -q, "reparation"); L.stock(W, k, q, "reparation"); reparations[k] = q;
+    }
+    // border tiles (never a centre), less any the treaty itself already ceded to the winner
+    const centres = new Set([Lo.capital, ...Lo.settlements.map(x => x.tile)]);
+    const owe = Math.max(0, o.tiles - (payer === Lo.id ? t.cede.length : 0));
+    const near = (i: number) => NEIGHBORS[i].filter(j => world.tiles[j].owner === W.id).length;
+    const edge = touching(world, Lo.id, W.id).filter(i => !centres.has(i) && world.tiles[i].land).sort((x, y) => near(y) - near(x) || x - y);
+    for (const i of edge.slice(0, owe)) { world.tiles[i].owner = W.id; moveBuildings(Lo, W, i); tiles++; }
+    const what = `${Object.keys(reparations).length ? `${Math.round(o.share * 100)}% kho (${fmtGoods(world, reparations)})` : "kho trống, không có gì để bồi thường"}${tiles ? ` và ${tiles} ô biên giới` : ""}`;
+    say(W.id, "treaty", `Hòa ước kết thúc chiến tranh ${A.name} – ${B.name}: ${W.name} thắng (điểm chiến tranh ${score(W.id)} – ${score(Lo.id)}). ${Lo.name} bồi thường ${what}.`);
+    W.lastEvents.push(`Thắng cuộc chiến với ${Lo.name}: họ bồi thường ${what}.`);
+    Lo.lastEvents.push(`Thua cuộc chiến với ${W.name}: ta bồi thường ${what}.`);
+  } else if (!terms) {
+    // blood for nothing: the side that declared answers to its people
+    A.stability = Math.max(0, A.stability - WAR.whiteStability);
+    A.lastEvents.push(`Hòa trắng với ${B.name}: máu đã đổ mà không được gì, dân oán (−${WAR.whiteStability} ổn định).`);
+    say(A.id, "treaty", `Chiến tranh ${A.name} – ${B.name} kết thúc bằng hòa trắng: không bên nào thắng (điểm ${score(A.id)} – ${score(B.id)}).`);
+  }
+  w.peace = { tick: world.tick, winner: o.winner, lead: Math.abs(o.lead), reparations, tiles, white: o.winner === null && !terms, ...(terms ? { terms } : {}) };
+}
+
+/** §7.4b Every turn of a war, wherever the two lands touch, their armies clash on their own: each sends WAR.clash.engage of
+ *  its warriors and of its militia, in the share of its front that faces this enemy. The weaker side bleeds more; a side
+ *  WAR.clash.push× as strong takes a border tile. Nobody has to give an order for men to die at a front. */
+function borderClashes(world: World, tick: number, L: Ledger, say: Say): void {
+  for (const w of world.wars) {
+    if (w.end !== null || w.start > tick) continue;
+    const A = world.nations[w.a], B = world.nations[w.b];
+    if (!A.alive || !B.alive) continue;
+    const edgeA = touching(world, A.id, B.id), edgeB = touching(world, B.id, A.id);
+    if (!edgeA.length || !edgeB.length) continue;
+    const r = rngFor(world.seed, tick, "clash", w.id);
+    const side = (x: Nation, len: number, foe: Nation) => {
+      const share = Math.min(1, len / Math.max(1, borderTiles(world, x.id)));
+      const men = Math.floor(x.labor.warrior * share * WAR.clash.engage);
+      const militia = Math.max(1, Math.floor(workers(x) * WAR.militiaShare * share * WAR.clash.engage));
+      // §4.5 the old nation fights the traitors harder
+      const str = armyStrength(world, x, men, militia) * (foe.origin?.from === x.id ? 1 + KIN.vengeance : 1) * (WAR.luck[0] + r() * (WAR.luck[1] - WAR.luck[0]));
+      return { x, men, militia, str };
+    };
+    const sa = side(A, edgeA.length, B), sb = side(B, edgeB.length, A);
+    const [win, lose] = sa.str >= sb.str ? [sa, sb] : [sb, sa];
+    const kill = (s: typeof sa, [lo, hi]: number[], min: number) => {
+      const engaged = s.men + s.militia;
+      const k = Math.min(engaged, Math.max(0, s.x.population - 5), Math.max(min, Math.round(engaged * (lo + r() * (hi - lo)))));
+      const gone = take(s.x, k, "war"), dead = gone.m.reduce((a, b) => a + b, 0) + gone.f.reduce((a, b) => a + b, 0);
+      const kw = Math.min(s.men, dead, Math.round(dead * s.men / Math.max(1, engaged)));
+      s.x.labor.warrior = Math.max(0, s.x.labor.warrior - kw); loseWeapons(L, s.x, kw);
+      return dead;
+    };
+    const dl = kill(lose, WAR.clash.lose, 1), dw = kill(win, WAR.clash.win, 0);
+    const sw = bumpSide(w, win.x.id), sl = bumpSide(w, lose.x.id);
+    sw.clashes++; sw.score += WAR.score.clash + dl * WAR.score.perDead; sw.dead += dw;
+    sl.score += dw * WAR.score.perDead; sl.dead += dl;
+    // where: a tile of the loser on the line
+    const edge = win === sa ? edgeB : edgeA, at = edge[Math.floor(r() * edge.length)];
+    const from = NEIGHBORS[at].find(j => world.tiles[j].owner === win.x.id) ?? win.x.capital;
+    fx({ kind: "battle", tile: at, nation: win.x.id, from, n: win.men + win.militia, text: `won:clash:${lose.x.name}` });
+    w.lastTile = at;
+    fxDeath(at, lose.x.id, dl, "battle"); fxDeath(at, win.x.id, dw, "battle");
+    // twice as strong: the line moves, a border tile changes hands (never a centre)
+    let took = "";
+    if (win.str >= WAR.clash.push * lose.str) {
+      const centres = new Set([lose.x.capital, ...lose.x.settlements.map(x => x.tile)]);
+      const near = (i: number) => NEIGHBORS[i].filter(j => world.tiles[j].owner === win.x.id).length;
+      const tile = edge.filter(i => !centres.has(i) && world.tiles[i].land).sort((x, y) => near(y) - near(x) || x - y)[0];
+      if (tile !== undefined) { captureTile(world, win.x, lose.x, tile, say, L); sw.tiles++; sw.score += WAR.score.tile; took = ` và đẩy lùi biên giới, chiếm ô (${col(tile)}, ${row(tile)})`; }
+    }
+    const S = (x: number) => Math.round(x * 10) / 10;
+    say(win.x.id, "battle", `Giao tranh biên giới ${win.x.name} – ${lose.x.name}: ${win.x.name} thắng (${S(win.str)} vs ${S(lose.str)}), thương vong ${dw} / ${dl}${took}.`);
+    win.x.lastEvents.push(`Giao tranh biên giới với ${lose.x.name}: ta thắng (${win.men} chiến binh + ${win.militia} dân quân, sức ${S(win.str)} vs ${S(lose.str)}), ta mất ${dw} người, họ mất ${dl}${took}.`);
+    lose.x.lastEvents.push(`Giao tranh biên giới với ${win.x.name}: ta thua (${lose.men} chiến binh + ${lose.militia} dân quân, sức ${S(lose.str)} vs ${S(win.str)}), ta mất ${dl} người, họ mất ${dw}${took ? "; họ đẩy lùi biên giới, chiếm một ô của ta" : ""}. Cần thêm chiến binh ở biên giới, hoặc cầu hòa.`);
   }
 }
 
@@ -662,7 +817,27 @@ function moveBuildings(from: Nation, to: Nation, tile: number): void {
   to.buildings.push(...taken);
 }
 
+/** §7.4b A nation's wars as it sees them: the score, the dead, the front, what a peace now would bring, and targets. */
 export function warSummary(world: World, n: Nation): Array<Record<string, unknown>> {
-  return world.wars.filter(w => w.end === null && (w.a === n.id || w.b === n.id)).map(w => ({ id: w.id, enemy: world.nations[w.a === n.id ? w.b : w.a].name, started: w.start, active: w.start <= world.tick, we_declared: w.a === n.id }));
+  return world.wars.filter(w => w.end === null && (w.a === n.id || w.b === n.id)).map(w => {
+    const foe = world.nations[w.a === n.id ? w.b : w.a], us = warSide(w, n.id), them = warSide(w, foe.id), o = peaceOutlook(w, n.id);
+    const front = touching(world, n.id, foe.id).length;
+    const centres = new Set([foe.capital, ...foe.settlements.map(s => s.tile)]);
+    const targets = touching(world, foe.id, n.id).filter(i => world.tiles[i].land).map(i => ({ i, ours: NEIGHBORS[i].filter(j => world.tiles[j].owner === n.id).length }))
+      .sort((a, b) => b.ours - a.ours || a.i - b.i).slice(0, 4)
+      .map(({ i, ours }) => ({ tile: [col(i), row(i)], terrain: world.tiles[i].terrain, centre: centres.has(i), front_cap: frontCap(world, n.id, i), our_tiles_touching: ours }));
+    const r1 = (x: number) => Math.round(x * 10) / 10;
+    const peace = o.winner === null
+      ? world.tick < o.whiteFrom ? `no white peace before turn ${o.whiteFrom}: until then a peace needs terms (tribute worth ≥ ${WAR.earlyTribute}/turn for ≥ ${WAR.earlyTurns} turns, or ≥ 1 ceded tile)` : `a peace now would be a white peace (no winner)${w.a === n.id ? `: you declared, so you would lose ${WAR.whiteStability} stability` : ""}`
+      : `a peace now: ${o.winner === n.id ? `you WIN and ${foe.name} pays` : `you LOSE and pay ${foe.name}`} reparations of ${Math.round(o.share * 100)}% of every good in store${o.tiles ? ` and ${o.tiles} border tile(s)` : ""}`;
+    return {
+      id: w.id, enemy: foe.name, started: w.start, active: w.start <= world.tick, we_declared: w.a === n.id, reason: w.reason || undefined,
+      turns: Math.max(0, world.tick - w.start), score: { us: r1(us.score), them: r1(them.score), lead: o.lead },
+      dead: { us: us.dead, them: them.dead }, clashes_won: { us: us.clashes, them: them.clashes }, battles_won: { us: us.battles, them: them.battles }, tiles_taken: { us: us.tiles + us.centres, them: them.tiles + them.centres },
+      front_tiles: front, peace_if_signed_now: peace, white_peace_from: o.whiteFrom,
+      losing: o.lead <= -WAR.losingBy ? `behind by ${-o.lead}: −1 stability and +1 discontent every turn` : undefined,
+      targets: targets.length ? targets : undefined,
+    };
+  });
 }
 export { within };

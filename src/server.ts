@@ -11,7 +11,7 @@ import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
 import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allBuildings, allInventions, allRecipes, buildingEffectText, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
-import { relation } from "./diplomacy.ts";
+import { fmtGoods, relation, warSide } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
@@ -177,8 +177,11 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const bs = w.battles.filter(b => pair(b) && b.tick >= x.start - 1 && (x.end === null || b.tick <= x.end));
         const side = (id: number) => {
           const atk = bs.filter(b => b.attacker === id), def = bs.filter(b => b.defender === id);
+          const base = { id, name: w.nations[id]?.name ?? "?", alive: !!w.nations[id]?.alive };
+          // §7.4b wars since v0.30 keep their own tally (border clashes included, nothing lost to the battle log's limit)
+          if (x.tally) { const t = warSide(x, id); return { ...base, won: t.battles, dead: t.dead, tiles: t.tiles, centres: t.centres, raids: t.raids, clashes: t.clashes, score: Math.round(t.score * 10) / 10 }; }
           return {
-            id, name: w.nations[id]?.name ?? "?", alive: !!w.nations[id]?.alive,
+            ...base, clashes: null as number | null, score: null as number | null,
             won: atk.filter(b => b.won).length + def.filter(b => !b.won).length,
             dead: atk.reduce((s, b) => s + b.lossA, 0) + def.reduce((s, b) => s + b.lossD, 0),
             tiles: atk.filter(b => b.won && b.kind === "attack" && /chiếm được/.test(b.note)).length,
@@ -197,9 +200,14 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         };
         const outcome = x.end === null ? "đang diễn ra"
           : !A.alive && B.alive ? fell(A, B) : !B.alive && A.alive ? fell(B, A)
+          : x.peace ? (x.peace.winner !== null ? `${w.nations[x.peace.winner]?.name} thắng, ${(x.peace.winner === x.a ? B : A).name} bồi thường` : x.peace.white ? "hòa trắng: không ai thắng" : "hòa ước có điều khoản")
           : w.treaties.some(t => t.type === "peace" && ((t.a === x.a && t.b === x.b) || (t.a === x.b && t.b === x.a)) && Math.abs(t.start - x.end!) <= 1) ? "kết thúc bằng hòa ước" : "đã dừng";
+        // §7.4b what the peace changed: reparations, tiles, the treaty's own terms
+        const p = x.peace;
+        const peace = p ? { winner: p.winner === null ? null : w.nations[p.winner]?.name, lead: p.lead, white: p.white, terms: p.terms ?? null, tiles: p.tiles,
+          reparations: Object.keys(p.reparations).length ? fmtGoods(w, p.reparations) : null } : null;
         const brawl = x.brawlDead ? { a: x.brawlDead[String(x.a)] ?? 0, b: x.brawlDead[String(x.b)] ?? 0 } : null;
-        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: bs.length, a: A, b: B, brawl, lastTile: bs.at(-1)?.tile ?? null };
+        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: x.tally ? A.won + B.won : bs.length, a: A, b: B, brawl, peace, lastTile: x.lastTile ?? bs.at(-1)?.tile ?? null };
       }),
       caravans: w.caravans,
       borders: w.borders ?? {},

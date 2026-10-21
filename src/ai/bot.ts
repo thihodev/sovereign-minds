@@ -24,7 +24,7 @@ import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
-import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween } from "../diplomacy.ts";
+import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween, warLead, warSide } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
 
@@ -247,25 +247,43 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 2. War: fight, then make peace (§7.4)
   const war = n.founded ? warPlan(v) : null;
   if (war) {
-    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && (!Object.keys(o.tribute).length || o.payer === o.from) && tick - o.tick <= 2)) {
+    // §7.4b Peace has a price: the score decides who pays, a white peace waits a few turns of fighting
+    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && tick - o.tick <= 2)) {
       const w = v.wars.find(x => x.a === off.from || x.b === off.from);
-      const mineWar = w && w.a === n.id && !w.reason.startsWith("bảo vệ");
-      // The aggressor takes a peace that pays at once, a plain one only after a few turns of fighting
-      const pays = Object.keys(off.tribute).length > 0;
-      if (!w || !mineWar || tick - w.start >= (pays ? 1 : 4)) spend("accept_treaty", { offer: off.id });
+      if (!w) continue;
+      const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ"), age = tick - w.start, lead = warLead(w, n.id);
+      const iPay = off.payer === n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
+      const theyPay = off.payer !== n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
+      // terms in our favour: take them; we pay only when losing or worn out; a white peace once our war has paid or tired us
+      const ok = theyPay || (iPay ? lead <= -WAR.losingBy || age >= 12 : !aggressor || age >= 8 || Math.abs(lead) >= WAR.decisive);
+      if (ok) spend("accept_treaty", { offer: off.id });
     }
     for (const w of v.wars) {
       const enemy = world.nations[w.a === n.id ? w.b : w.a];
       const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ");
-      const age = tick - w.start;
+      const age = tick - w.start, lead = warLead(w, n.id);
       const lost = world.battles.filter(b => b.tick >= w.start && b.attacker === n.id && b.defender === enemy.id && !b.won).length;
-      const tilesLost = world.battles.filter(b => b.tick >= w.start && b.attacker === enemy.id && b.defender === n.id && b.won && b.note.startsWith("chiếm")).length;
-      const wantPeace = aggressor ? age >= 8 || lost >= 3 : age >= 0;
-      if (wantPeace && (tick + n.id) % 2 === 0 && !world.treatyOffers.some(o => o.from === n.id && o.to === enemy.id && o.type === "peace")) {
-        // A defender that is losing land buys peace with tribute (§7.2)
-        const tribute = !aggressor && tilesLost >= 1 ? { food: Math.min(50, Math.round(v.need * 0.2), Math.max(5, Math.round(v.need * 0.05 * tilesLost))) } : undefined;
-        spend("treaty", { to: enemy.name, kind: "peace", ...(tribute ? { duration: 20, tribute, payer: "me" } : { duration: 40 }) });
-      }
+      const tilesLost = warSide(w, enemy.id).tiles + warSide(w, enemy.id).centres;
+      const losing = lead <= -WAR.losingBy || tilesLost >= 1;
+      // a people gives in early only when clearly beaten: land lost, or nearly the lead that makes it pay reparations
+      const beaten = lead <= -(WAR.decisive - 2) || tilesLost >= 1;
+      const white = age >= WAR.peaceAfter;
+      // the aggressor stops once it has won enough (the loser pays at once), lost too often, or tired;
+      // the defender asks once a white peace is allowed, or buys it earlier when losing
+      const wantPeace = aggressor ? age >= 8 || lost >= 3 || lead >= WAR.decisive || (white && losing) : white || losing;
+      if (!wantPeace || (tick + n.id) % 2 !== 0 || world.treatyOffers.some(o => o.from === n.id && o.to === enemy.id && o.type === "peace")) continue;
+      if (beaten) {
+        // buy it: coin from the treasury (§4.13) or food, enough to count as terms (§7.4b), or else a border tile
+        const coin = Math.ceil(WAR.earlyTribute / Math.max(0.1, price(world, "coin")) * Math.max(1, tilesLost));
+        const food = Math.ceil(WAR.earlyTribute / Math.max(0.1, price(world, "food")) * Math.max(1, tilesLost));
+        if (coin <= 50 && v.stock("coin") >= coin * WAR.earlyTurns) spend("treaty", { to: enemy.name, kind: "peace", duration: WAR.earlyTurns, tribute: { coin }, payer: "me" });
+        else if (food <= 50 && v.food - food * WAR.earlyTurns * 0.3 >= v.need) spend("treaty", { to: enemy.name, kind: "peace", duration: WAR.earlyTurns, tribute: { food }, payer: "me" });
+        else {
+          const centres = new Set(v.centres);
+          const edge = ownedTiles(world, n.id).filter(t => !centres.has(t.i) && NEIGHBORS[t.i].some(j => world.tiles[j].owner === enemy.id)).sort((a, b) => tileWorth(v, a) - tileWorth(v, b) || a.i - b.i)[0];
+          if (edge) spend("treaty", { to: enemy.name, kind: "peace", duration: 40, cede: [xy(edge.i)], payer: "me" });
+        }
+      } else if (white) spend("treaty", { to: enemy.name, kind: "peace", duration: 40 });
     }
     for (const s of war.strikes) spend("attack", { tile: xy(s.tile), warriors: s.warriors });
     if (war.bridge !== undefined && v.food >= CLAIM_FOOD) spend("claim_tile", { tile: xy(war.bridge) });
@@ -634,10 +652,9 @@ function warPlan(v: View): WarPlan | null {
   const warriors = Math.max(2, Math.round(v.workers * (aggressor ? 0.3 : 0.25)));
   const strikes: WarPlan["strikes"] = [];
   let bridge: number | undefined;
-  if (!aggressor) return { warriors, strikes };
+  // §7.4b attacker and defender alike strike where the odds are good (the border clashes go on either way)
   for (const w of v.activeWars) {
-    if (w.a !== n.id) continue;
-    const enemy = world.nations[w.b];
+    const enemy = world.nations[w.a === n.id ? w.b : w.a];
     const report = v.n.intel[String(enemy.id)]?.report;
     const theirPop = typeof report?.population_est === "number" ? report.population_est : estPop(v, enemy) ?? v.pop * 0.5;
     const theirWarriors = typeof report?.warriors_est === "number" ? report.warriors_est : theirPop * 0.7 * 0.25;

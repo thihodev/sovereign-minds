@@ -5,7 +5,7 @@ import { settlementPayment, createWorld, step, ownedTiles, mods, baseCost, inven
 import { inv, costFor } from "../src/catalog.ts";
 import { activeWar, treatiesBetween } from "../src/diplomacy.ts";
 import { col, row, NEIGHBORS, dist } from "../src/hex.ts";
-import { PROSPERITY } from "../src/rules.ts";
+import { PROSPERITY, WAR } from "../src/rules.ts";
 import type { AIResponse, Ruling, TurnInput, World, Nation } from "../src/types.ts";
 
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
@@ -153,7 +153,8 @@ test("treaties: tribute is paid each tick; breaking costs reputation", ctx => {
   assert.equal(t.active, false);
 });
 
-test("war: declare, wait a tick, attack and take a tile; allies join; peace ends it", () => {
+test("war: declare, wait a tick, attack and take a tile; allies join; peace ends it", ctx => {
+  const push = WAR.clash.push; WAR.clash.push = Infinity; ctx.after(() => { WAR.clash.push = push; }); // §7.4b the border clashes must not take the tile first
   const w = founded(3, "war-seed"); meet(w);
   const [a, b, c] = w.nations;
   // b and c are allies
@@ -180,7 +181,10 @@ test("war: declare, wait a tick, attack and take a tile; allies join; peace ends
   assert.deepEqual(a.lastRejected, []);
   assert.equal(w.battles.length, 1);
   assert.equal(w.tiles[target.i].owner, a.id, "tile taken from a defenceless enemy");
-  // peace
+  // peace: a white one only after WAR.peaceAfter turns of fighting (§7.4b)
+  turn(w, { 0: { actions: [{ type: "treaty", to: b.name, kind: "peace", duration: 20 }] } });
+  assert.match(a.lastRejected[0].reason, /hòa trắng chỉ ký được từ lượt/);
+  while (w.tick < war.start + WAR.peaceAfter) turn(w, {});
   turn(w, { 0: { actions: [{ type: "treaty", to: b.name, kind: "peace", duration: 20 }] } });
   turn(w, { 1: { actions: [{ type: "accept_treaty", offer: w.treatyOffers.find(o => o.type === "peace")!.id }] } });
   assert.equal(activeWar(w, a.id, b.id), undefined);

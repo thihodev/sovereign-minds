@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, BUILDING_BY_TYPE, ROYALS, TREASURY, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, ROYALS, TREASURY, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -14,7 +14,7 @@ import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
-import { activeWar, hostile, treatiesBetween } from "../diplomacy.ts";
+import { activeWar, hostile, peaceOutlook, touching, treatiesBetween, warSide } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
 import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
 import { seaAdvice } from "../sea.ts";
@@ -257,6 +257,32 @@ export function advice(world: World, n: Nation): Advice[] {
     const recent = (st?.brawls ?? []).filter(x => world.tick - x.tick < BORDER.brawlWindow);
     if (recent.length >= BORDER.brawlsToWar - 1 && !activeWar(world, n.id, o.id))
       say(3, `Biên giới với ${o.name} đã có ${recent.length} vụ xô xát chết người trong ${BORDER.brawlWindow} lượt: thêm một vụ nữa là chiến tranh. Hạ căng thẳng ngay (hiệp ước, buôn bán, quà tặng) hoặc chuẩn bị chiến binh ở biên giới.`);
+  }
+
+  // §7.4b at war: the score, the dead, the border clashes, the price of peace, and where to strike
+  for (const w of world.wars.filter(x => x.end === null && (x.a === n.id || x.b === n.id))) {
+    const foe = world.nations[w.a === n.id ? w.b : w.a], front = touching(world, n.id, foe.id).length;
+    if (w.start > world.tick) {
+      say(3, `${w.a === n.id ? `Ta đã tuyên chiến với ${foe.name}` : `${foe.name} đã tuyên chiến với ta`}: chiến sự bắt đầu từ lượt ${w.start}.${front ? ` Hai nước giáp nhau ${front} ô: từ lượt đó quân hai bên tự giao tranh ở biên giới mỗi lượt; thiếu chiến binh thì dân quân chết thay. Phân thêm chiến binh (labor warrior) và rèn vũ khí ngay.` : ""} Hòa trắng chỉ ký được từ lượt ${w.start + WAR.peaceAfter}.`);
+      continue;
+    }
+    const us = warSide(w, n.id), them = warSide(w, foe.id), o = peaceOutlook(w, n.id), r1 = (x: number) => Math.round(x * 10) / 10;
+    const parts = [`Đang chiến tranh với ${foe.name} (lượt thứ ${world.tick - w.start + 1}): điểm chiến tranh ta ${r1(us.score)} – họ ${r1(them.score)}; ta mất ${us.dead} người, họ mất ${them.dead}; ta chiếm ${us.tiles + us.centres} ô, họ chiếm ${them.tiles + them.centres} ô.`];
+    parts.push(front
+      ? `Hai nước giáp nhau ${front} ô: mỗi lượt quân hai bên tự giao tranh ở biên giới (${WAR.clash.engage * 100}% chiến binh và dân quân ở mặt trận này); bên yếu hơn chết nhiều hơn, bên mạnh gấp ${WAR.clash.push} lần đẩy lùi biên giới và chiếm một ô. Ta có ${n.labor.warrior} chiến binh.`
+      : `Hai nước chưa giáp nhau nên không có giao tranh biên giới: chỉ đánh được bằng attack/raid trong tầm.`);
+    if (o.lead <= -WAR.losingBy) parts.push(`Ta đang thua ${-o.lead} điểm: mỗi lượt −1 ổn định, +1 bất mãn.`);
+    parts.push(o.winner === null
+      ? world.tick < o.whiteFrom
+        ? `Chưa được hòa trắng trước lượt ${o.whiteFrom}; muốn dừng sớm hơn thì hòa ước phải có điều khoản: cống nạp đáng ≥ ${WAR.earlyTribute}/lượt (giá thế giới) trong ≥ ${WAR.earlyTurns} lượt, hoặc nhượng ít nhất 1 ô.`
+        : `Ký hòa bây giờ là hòa trắng${w.a === n.id ? `: ta tuyên chiến nên dân oán, −${WAR.whiteStability} ổn định` : ""}. Bên nào dẫn ${WAR.decisive}+ điểm khi ký hòa thì bên kia phải bồi thường.`
+      : o.winner === n.id
+        ? `Ta đang thắng: ký hòa bây giờ thì ${foe.name} phải bồi thường ngay ${Math.round(o.share * 100)}% mọi thứ trong kho${o.tiles ? ` và ${o.tiles} ô biên giới` : ""}; đánh tiếp thì được nhiều hơn (tối đa ${WAR.reparation.maxShare * 100}%).`
+        : `Ta đang thua nặng: ký hòa bây giờ ta phải bồi thường ${Math.round(o.share * 100)}% mọi thứ trong kho${o.tiles ? ` và ${o.tiles} ô biên giới` : ""}. Đánh tiếp để gỡ điểm, hoặc cầu hòa sớm trước khi mất thêm.`);
+    const centres = new Set([foe.capital, ...foe.settlements.map(s => s.tile)]);
+    const targets = touching(world, foe.id, n.id).filter(i => world.tiles[i].land && !centres.has(i)).sort((a, b) => NEIGHBORS[b].filter(j => world.tiles[j].owner === n.id).length - NEIGHBORS[a].filter(j => world.tiles[j].owner === n.id).length || a - b).slice(0, 2);
+    if (targets.length) parts.push(`Ô đáng đánh (attack, kề nhiều ô của ta nên mặt trận rộng): ${targets.map(i => `${xy(i)} ${world.tiles[i].terrain}`).join(", ")}; thắng thì chiếm ô, thu chiến lợi phẩm và +${WAR.score.battle + WAR.score.tile} điểm.`);
+    say(3, parts.join(" "));
   }
 
   // §4.5 betrayal: the old nation and the traitors

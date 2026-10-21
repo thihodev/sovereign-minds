@@ -2,6 +2,24 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.32
+
+- **Chiến tranh thật (§7.4b):** trước đây chiến tranh bùng ra (thường do 3 vụ xô xát biên giới) rồi kết thúc bằng hòa ước sau 1–2 lượt: không trận nào, không ai chết, không ai thắng. Giờ chiến tranh có giá.
+  - **Giao tranh biên giới:** mỗi lượt chiến tranh, ở nơi hai nước giáp nhau, quân hai bên tự đánh nhau, không cần lệnh `attack`. Mỗi bên đưa một nửa chiến binh và dân quân ở mặt trận đó. Bên yếu hơn mất 10–20% số người ra trận (ít nhất 1), bên mạnh hơn mất 3–8%. Bên mạnh gấp đôi đẩy lùi biên giới, chiếm một ô (không bao giờ là trung tâm). Không có chiến binh thì dân quân chết thay.
+  - **Điểm chiến tranh:** thắng giao tranh +1, thắng trận hay đột kích +2, chiếm ô +3, chiếm trung tâm +10, mỗi người địch chết +0,25.
+  - **Hòa bình có giá:**
+    - không được hòa trắng trong 5 lượt đầu; muốn dừng sớm, hòa ước phải có cống nạp đáng ≥ 5 mỗi lượt trong ≥ 10 lượt, hoặc nhượng ít nhất 1 ô;
+    - khi ký hòa mà một bên dẫn ≥ 8 điểm, bên thua bồi thường ngay 1,2% mọi thứ trong kho (kể cả tiền) cho mỗi điểm dẫn, tối đa 35%, và 1 ô biên giới cho mỗi 12 điểm, tối đa 3 ô;
+    - hòa trắng không ai thắng làm bên tuyên chiến mất 4 ổn định.
+  - **Mỏi mệt:** bên kém ≥ 4 điểm mất 1 ổn định và thêm 1 bất mãn mỗi lượt, ngay từ lượt đầu.
+  - **AI thấy:** mục `wars` có điểm, số chết, số ô chiếm, số ô mặt trận, giá của hòa bình nếu ký ngay, và các ô đáng đánh. Có thêm luật bằng tiếng Anh và lời cố vấn.
+  - **Watcher thấy:** bảng Tổng kết các cuộc chiến có điểm chiến tranh, số lần giao tranh biên giới, số chết (trận và giao tranh) và kết cục hòa ước: ai thắng, bồi thường gì, nhượng mấy ô, hay hòa trắng. Giao tranh biên giới hiện trên bản đồ.
+  - **Bot:** bên phòng thủ cũng tấn công khi có cửa thắng. Bot cầu hòa đúng luật mới, trả bằng tiền hoặc lương thực, hoặc nhượng ô khi đang thua.
+  - **Công cụ `tools/pace.ts`:** từ lượt 300, ngay khi có hai nước giáp nhau, hai nước có biên giới dài nhất phải vào một cuộc chiến. Hai chỉ tiêu mới kiểm tra cuộc chiến đó: số lượt và số người chết. Thế giới không có hai nước nào giáp nhau thì hai chỉ tiêu này không áp dụng.
+- **Sửa lỗi:**
+  - Ô nhượng trong hiệp ước giờ chuyển cả công trình trên ô.
+  - Số chết vì xô xát được ghi vào đúng cuộc chiến, không ghi nhầm vào cuộc chiến của đồng minh.
+
 ## v0.31
 
 - **Hoàng tộc và hôn nhân (§4.14):** người trị vì vẫn là chính AI. Mỗi nước có một hoàng tộc với hoàng tử, công chúa.

@@ -340,7 +340,17 @@ export interface Caravan {
 }
 export interface War { id: number; a: number; b: number; declared: number; start: number; end: number | null; reason: string;
   /** §7.9 the dead of the border brawls that led to it, by nation id */
-  brawlDead?: Record<string, number> }
+  brawlDead?: Record<string, number>;
+  /** §7.4b the war's own tally by nation id (v0.30; wars from before have none) */
+  tally?: Record<string, WarSide>;
+  /** §7.4b the last tile fought over (a battle or a border clash), for the Watcher */
+  lastTile?: number;
+  /** §7.4b how the peace was made: the winner by the score, what the loser paid, or a white peace */
+  peace?: WarPeace }
+export interface WarSide { score: number; dead: number; clashes: number; battles: number; tiles: number; centres: number; raids: number }
+export interface WarPeace { tick: number; winner: number | null; lead: number; reparations: Record<string, number>; tiles: number; white: boolean;
+  /** what the treaty itself carried: tribute a turn, tiles ceded, by whom */
+  terms?: string }
 export interface Battle { tick: number; attacker: number; defender: number; tile: number; kind: "attack" | "raid"; a: number; d: number; won: boolean; lossA: number; lossD: number; note: string }
 
 export interface Intel {
