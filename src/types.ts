@@ -140,6 +140,12 @@ export interface Nation {
   demo?: Demography;
   /** §4.2 family customs chosen by the nation's AI */
   family?: { births: string; fighters: string };
+  /** §4.8 the people who left, by turn: how many, to which nation, why */
+  exodus?: Array<{ tick: number; k: number; to: number | null; why: string }>;
+  /** §8.2 the last turns in brief, for the nation's own observation */
+  recent?: Array<{ tick: number; pop: number; food: number; stab: number; orders: string[]; events: string[] }>;
+  /** §8.2 what it ordered this turn and what came of it */
+  turnOrders?: string[];
   /** §3.2 turns in a row with no order given */
   idleStreak?: number;
   /** §4.5 discontent 0–100: at 100 a faction wants to leave */

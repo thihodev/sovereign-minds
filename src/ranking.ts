@@ -4,7 +4,8 @@
 import { depthOf, inv } from "./catalog.ts";
 import { ownedTiles } from "./engine.ts";
 import { prosperityAverage } from "./prosperity.ts";
-import { PROSPERITY } from "./rules.ts";
+import { EXODUS, PROSPERITY } from "./rules.ts";
+import { exodusOf } from "./exodus.ts";
 import type { World } from "./types.ts";
 
 export interface Rank { nation: number; name: string; score: number; alive: boolean; parts: Record<string, number> }
@@ -22,6 +23,7 @@ export function ranking(world: World): Rank[] {
       inventor: invented,
       honour: n.reputation,
       prosperity: n.alive ? Math.round(prosperityAverage(n) * PROSPERITY.rankWeight) : 0, // §4.7 how well the people lives
+      exodus: -Math.round(exodusOf(n, world.tick).recent * EXODUS.rankPerPerson), // §4.8 the people it could not keep
       age: Math.floor((n.alive ? world.tick : (n.peakPopulation ? world.tick : 0)) / 10),
     };
     return { nation: n.id, name: n.name, alive: n.alive, score: Object.values(parts).reduce((a, b) => a + b, 0), parts };

@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, CONNECT, DEMO, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, CONNECT, DEMO, EXODUS, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -16,6 +16,7 @@ import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
 import { applyLaws } from "./laws.ts";
+import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
 import { borderPhase, pairKey } from "./border.ts";
@@ -501,6 +502,14 @@ function normalizeLabor(n: Nation, wanted: Partial<Record<Role, number>> | undef
   }
 }
 
+/** An order in a few words, for the nation's record of its own turns (§8.2). */
+function orderLabel(a: Record<string, unknown> | null | undefined): string {
+  if (!a) return "?";
+  const arg = a.building ?? a.invention ?? a.target ?? a.to ?? a.domain ?? a.kind ?? a.name ?? (a.births || a.fighters ? `${a.births ?? ""}/${a.fighters ?? ""}` : undefined) ?? a.turns;
+  const tile = Array.isArray(a.tile) ? `(${a.tile.join(", ")})` : Array.isArray(a.path) ? `${a.path.length} ô` : "";
+  return [String(a.type ?? "?"), arg !== undefined ? String(arg).slice(0, 40) : "", tile].filter(Boolean).join(" ");
+}
+
 /** Centres a tile must stay connected to (§2.3). */
 function centres(n: Nation): number[] { return [n.capital, ...n.settlements.map(s => s.tile)]; }
 
@@ -601,10 +610,11 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (tick === 0) continue; // tick 0 is for founding only
     let ap = actionPoints(world, n);
     const acts = Array.isArray(inp.response.actions) ? inp.response.actions.slice(0, 12) : [];
+    n.turnOrders = [];
     for (const a of acts) {
       const type = String(a?.type ?? "");
       if (type === "found_nation") continue;
-      const reject = (reason: string) => { n.lastRejected.push({ action: type || "?", reason }); n.stats.invalid++; };
+      const reject = (reason: string) => { n.lastRejected.push({ action: type || "?", reason }); n.stats.invalid++; n.turnOrders!.push(`${orderLabel(a)} ✗ ${reason.slice(0, 90)}`); };
       if (NOT_YET[type]) { reject(`Chưa có trong phiên bản engine này (luật ${NOT_YET[type]})`); continue; }
       const cost = AP_COST[type];
       if (cost === undefined) { reject("Không có hành động này"); continue; }
@@ -612,6 +622,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       const err = ENGINE_ACTIONS.has(type) ? doAction(world, n, type, a, L, claims, explorers, ctx.strikes, say) : doDiplomacy(ctx, n, type, a);
       if (err) { reject(err); ap -= Math.min(cost, ap); continue; } // §1 rule 2: AP is spent anyway
       ap -= cost;
+      n.turnOrders.push(`${orderLabel(a)} ✓`);
     }
   }
 
@@ -714,6 +725,13 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
     n.peakPopulation = Math.max(n.peakPopulation, n.population);
     if (n.founded) n.lastEvents.push(bookLine(n)); // §4.2 where the people went, every turn
+    // §8.2 the turn in brief, for the nation's next observations: what it ordered, what came of it, how its people fared
+    if (n.founded && tick > 0) {
+      const brief = n.lastEvents.filter(e => !/^Dân số \d/.test(e)).slice(0, 5).map(e => e.length > 150 ? `${e.slice(0, 147)}…` : e);
+      (n.recent ??= []).push({ tick, pop: n.population, food: Math.round(n.stock.food || 0), stab: n.stability, orders: n.turnOrders ?? [], events: [bookLine(n), ...brief] });
+      if (n.recent.length > 6) n.recent.shift();
+      n.turnOrders = [];
+    }
     const owned = ownedTiles(world, n.id);
     // Eras only move forward (§5.6): a shrinking people keeps its era.
     let era = n.era;
@@ -998,11 +1016,19 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Too many centres to govern from one hearth (§4.4)
   const sprawl = n.settlements.length - roadNet(world, n).linked.length - SETTLEMENT.freeCentres; // §2.5 a road to the capital holds a settlement close
   if (sprawl > 0) n.stability -= sprawl * SETTLEMENT.sprawlStability;
+  // §4.8 a people that keeps losing its own blames its rulers
+  const ex = exodusOf(n, tick);
+  if (ex.share > EXODUS.alarm) {
+    n.stability -= EXODUS.stability;
+    if (tick % EXODUS.repEvery === 0) n.reputation = Math.max(0, n.reputation - EXODUS.reputation);
+    n.lastEvents.push(`${ex.recent} người đã bỏ xứ ra đi trong ${EXODUS.window} lượt qua (${Math.round(ex.share * 100)}% dân): dân còn lại mất lòng tin (−${EXODUS.stability} ổn định mỗi lượt, uy tín giảm dần). Giữ dân là trách nhiệm đầu tiên của triều đình.`);
+  }
   n.stability = Math.max(0, Math.min(100, Math.round(n.stability)));
   if (n.stability < 15 && n.population > 0) {
     const leave = Math.max(1, Math.floor(n.population * 0.05));
     const gone = takePeople(n, leave, "migrate");
     const dest = n.met.map(o => world.nations[o]).filter(o => o?.alive).sort((a, b) => b.stability - a.stability || a.id - b.id)[0];
+    noteExodus(n, tick, leave, dest?.id ?? null, "unrest");
     if (dest) addPeople(dest, gone); // whole families move
     fx({ kind: "migrate", tile: n.capital, nation: n.id, n: leave, to: dest?.capital });
     n.lastEvents.push(`${leave} người bỏ đi${dest ? ` sang ${dest.name}` : ""} vì bất ổn.`);
@@ -1126,6 +1152,7 @@ function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): v
   if (x.site < 0 || parent.population < 20) { x.status = "refused"; x.verdict = (x.verdict ? x.verdict + " " : "") + "(không còn đất trống để đi)"; return; }
   const share = prov ? prov.people / parent.population : x.share, k = Math.max(10, Math.min(parent.population - 10, prov ? prov.people : Math.round(parent.population * share)));
   const gone = takePeople(parent, k, "migrate");
+  noteExodus(parent, world.tick, k, world.nations.length, "schism");
   const child = newNation(world.nations.length, { controller: x.controller ?? "bot", provider: x.provider ?? "bot", model: x.model ?? "bot", effort: x.effort, trait: parent.trait }, x.site);
   world.nations.push(child);
   child.demo = { m: gone.m, f: gone.f }; child.population = gone.m.reduce((a, b) => a + b, 0) + gone.f.reduce((a, b) => a + b, 0);
@@ -1457,6 +1484,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const k = Math.min(x.people, Math.max(0, from.population - 10));
       if (k <= 0) { x.status = "returned"; return "Nhóm này không còn ai để đi"; }
       const gone = takePeople(from, k, "migrate");
+      noteExodus(from, world.tick, k, n.id, "faction");
       addPeople(n, gone);
       x.status = "emigrated";
       from.discontent = 0; from.stability = Math.min(100, from.stability + Math.round(SCHISM.calmAfter / 2));

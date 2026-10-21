@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.11";
+export const RULES_VERSION = "0.12";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -158,6 +158,10 @@ export const PROSPERITY = {
    *  `rankWeight` × the average over them (§9.3). */
   sayEvery: 15, history: 10, rankWeight: 0.5,
 };
+/** §4.8 People who leave: counted for `keep` turns. When more than `alarm` of the people left in the last
+ *  `window` turns, the rulers lose `stability` a turn and `reputation` every `repEvery` turns; the ranking
+ *  takes `rankPerPerson` points for each one who left in the window. */
+export const EXODUS = { keep: 30, window: 10, alarm: 0.03, stability: 1, reputation: 1, repEvery: 3, rankPerPerson: 0.5 };
 /** §3.2 Every turn a ruler gives at least one order: from the `after`-th idle turn in a row, stability −`stability` a turn. */
 export const IDLE = { after: 2, stability: 2 };
 /** §4.2 Hamlets: families also live out on the land. Each land tile of the nation (not a centre) houses

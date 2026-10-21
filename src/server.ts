@@ -10,7 +10,8 @@ import { allBuildings, allInventions, buildingOf, depthOf, inv, invName, describ
 import { relation } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers } from "./engine.ts";
-import { DEMO, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
+import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
+import { WHY_VI, exodusOf } from "./exodus.ts";
 import { demo, fighters, households, mouths } from "./people.ts";
 import { CLAUDE_EFFORTS, CLAUDE_MODELS, chat, claudeStatus, login, logout } from "./claude.ts";
 import { layer, nationResources, nationThreats, tileThreats, workSites } from "./threats.ts";
@@ -77,6 +78,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
         prosperity: n.alive && n.prosperity ? { ...n.prosperity, rank: prosperityRank(w, n), others: knownProsperity(w, n).map(x => ({ id: x.o.id, name: x.o.name, score: x.score })) } : null, // §4.7
+        exodus: n.alive ? (() => { const ex = exodusOf(n, w.tick); return { ...ex, to: Object.fromEntries(Object.entries(ex.to).map(([id, k]) => [w.nations[Number(id)]?.name ?? "?", k])), why: Object.fromEntries(Object.entries(ex.why).map(([k2, v]) => [WHY_VI[k2 as keyof typeof WHY_VI], v])), alarm: ex.share > EXODUS.alarm }; })() : null,
+        recent: n.recent ?? [],
         discontent: Math.round(n.discontent ?? 0), advice: n.alive && n.founded ? advice(w, n) : [], idleStreak: n.idleStreak ?? 0, origin: n.origin ? { ...n.origin, fromName: w.nations[n.origin.from]?.name } : null,
         population: n.population, workers: workers(n),
         demo: n.alive ? (() => { const d = demo(n); return { m: d.m, f: d.f, born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, households: households(n), fighters: fighters(n), mouths: mouths(n) }; })() : null,

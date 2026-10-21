@@ -2,7 +2,7 @@
 // observation (§8.2) that contains only what that nation knows.
 
 import { col, row, dist, NEIGHBORS } from "../hex.ts";
-import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
+import { AP_COST, BEASTS, ERA_RES_STOCK, ERA_TABLE, FLOOD, HERBS, HORDES, HORSES, ICE_WIND, OFFICIALS, OFFICIAL_DOMAINS, QUAKE, RIVER, ROADS, SEA, HAMLET, IDLE, SCHISM, BORDER, CONNECT, EXODUS, CONTAGION, TRADE, FLAG_LAYOUTS, FLAG_SYMBOLS, GESTURES, GROWTH, HOUSING, PETITION, RENAME, RESEARCH, SETTLEMENT, SPOILAGE, SPY_OPS, START, TERRAIN, TILES, TREATY_TYPES, BRONZE_CAPS, TRAIT_BY_ID, WAR, traitLines, PROVINCE } from "../rules.ts";
 import { actionPoints, canSeeRes, housing, inventionCost, mods, ownedTiles, renameOpen, researchOptions, tileLimit, workers } from "../engine.ts";
 import { allBuildings, allRecipes, budgetFor, depthOf, EFFECT_KINDS, goodName, inv, invName } from "../catalog.ts";
 import { relation, sharedLanguage, warSummary } from "../diplomacy.ts";
@@ -14,6 +14,7 @@ import { DEMO } from "../rules.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
 import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
+import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
@@ -29,6 +30,10 @@ function rulesText(): string {
   return `You are the mind that governs one nation in "Sovereign Minds", a shared world where every nation is led by its own AI. The world starts in the stone age. A neutral World Engine enforces every rule in code: you only PROPOSE actions; illegal actions are rejected and still cost their action points (AP). Nothing appears from nothing; every invention needs its prerequisites.
 
 GOAL: there is no single winner. Let your people survive, grow and advance; build a culture with its own character. The world ranking scores inventions by depth (being first in the world and inventing new things count most), people, land, reputation (public to everyone who has met you), how well your people lives (prosperity) and longevity.
+
+YOUR FIRST DUTY IS TO KEEP YOUR PEOPLE. Every family that leaves — for a richer neighbour, across the border, with a discontented faction, or away from unrest — is a verdict on your rule. "people_leaving" counts who left, where to and why; when more than ${EXODUS.alarm * 100}% of your people leave within ${EXODUS.window} turns you lose ${EXODUS.stability} stability a turn and reputation, and the world ranking takes ${EXODUS.rankPerPerson} point for each one who left. Watch it every turn and fix its causes (food, room, stability, prosperity against your neighbours, roads to cut-off provinces).
+
+YOUR TURNS ARE ONE STORY. You are called afresh each turn: what you remember is "memory" (your own notes), "your_last_thought", and "recent_turns" — your last turns in brief: the orders you gave (✓ done, ✗ refused and why), what happened, your people, food and stability. Read them before you decide: carry your plans on, do not repeat a refused order without fixing its cause, and notice trends.
 
 YOUR PEOPLE'S NATURE: "identity" in the observation is the character your people were born with. It is fixed for the whole game and its strengths and weaknesses are real rules. Let it shape your names, culture, priorities and diplomacy: play to its strengths and guard its weaknesses.
 
@@ -161,6 +166,12 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
   const trait = TRAIT_BY_ID[n.trait ?? ""];
   const obs: Record<string, unknown> = {
     tick: world.tick,
+    your_last_thought: n.lastThought || undefined,
+    recent_turns: n.recent?.length ? n.recent.slice(-5).map(r => ({ turn: r.tick, people: r.pop, food: r.food, stability: r.stab, orders: r.orders.length ? r.orders : ["(none)"], happened: r.events })) : undefined,
+    people_leaving: (() => {
+      const ex = exodusOf(n, world.tick);
+      return ex.recent ? { last_turn: ex.lastTurn, last_10_turns: ex.recent, share_pct: Math.round(ex.share * 1000) / 10, to: Object.fromEntries(Object.entries(ex.to).map(([id, k]) => [world.nations[Number(id)]?.name ?? "?", k])), why: Object.fromEntries(Object.entries(ex.why).map(([w, k]) => [WHY_VI[w as keyof typeof WHY_VI], k])), alarm: ex.share > EXODUS.alarm || undefined } : undefined;
+    })(),
     advice: (() => { const a = advice(world, n); return a.length ? a.map(x => `${"!".repeat(x.level)} ${x.text}`) : undefined; })(),
     era: n.era,
     identity: trait ? { trait: trait.name, nature: trait.ethos, effects: traitLines(trait) } : undefined,

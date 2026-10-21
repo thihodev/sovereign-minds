@@ -4,6 +4,7 @@
 // renown); poorer, it envies its neighbours, grumbles, and families leave for the richer land next door.
 // People are not in the ledger; goods are, and nothing here touches a stock.
 
+import { noteExodus } from "./exodus.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
 import { PROSPERITY } from "./rules.ts";
@@ -114,6 +115,7 @@ function emigrate(world: World, n: Nation, known: Array<{ o: Nation; score: numb
   const to = near.o, k = Math.max(2, Math.min(PROSPERITY.envyPeople, Math.round(n.population * PROSPERITY.envyShare)));
   const who = takePeople(n, k, "migrate");
   addPeople(to, who);
+  noteExodus(n, world.tick, k, to.id, "envy");
   fx({ kind: "migrate", tile: n.capital, nation: n.id, n: k, to: to.capital });
   n.lastEvents.push(`${k} người bỏ sang ${to.name}, nơi dân sống sung túc hơn (thịnh vượng ${near.score} so với ${p.score} của ta).`);
   to.lastEvents.push(`${k} người ${n.name} dọn sang sống với ta vì ở đây sung túc hơn.`);

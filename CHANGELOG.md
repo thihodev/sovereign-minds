@@ -2,7 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.11 (đang làm)
+## v0.12 (đang làm)
+
+- **Giữ dân là trách nhiệm đầu tiên (§4.8):**
+  - Mọi lần dân bỏ đi đều được ghi lại: bao nhiêu người, sang nước nào, vì sao (bất ổn, ganh tị với nước giàu hơn, vượt biên, phái bất mãn, ly khai).
+  - Trong 10 lượt mà hơn 3% dân bỏ đi thì mỗi lượt −1 ổn định, uy tín giảm dần, và bảng xếp hạng trừ 0,5 điểm cho mỗi người đã đi.
+  - Prompt nói rõ đây là bổn phận đầu tiên của triều đình. AI thấy `people_leaving`; cố vấn chỉ nguyên nhân và cách giữ dân. Hồ sơ quốc gia có mục "Dân bỏ đi".
+- **AI thấy các lượt gần đây của mình:** mỗi lượt có lệnh đã ra (✓ hay ✗ kèm lý do), chuyện đã xảy ra, dân, lương thực, ổn định; kèm suy nghĩ lượt trước. Prompt dặn đọc các mục này trước khi quyết định để giữ mạch kế hoạch.
+
+## v0.11
 
 - **Tranh chấp biên giới không còn bị hiệp ước chặn mãi:**
   - Căng thẳng từ 70 trở lên liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ. Liên minh và chư hầu vẫn giữ.

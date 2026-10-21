@@ -3,11 +3,12 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, row } from "../hex.ts";
-import { AP_COST, BORDER, CONNECT, CONTAGION, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, BORDER, CONNECT, CONTAGION, EXODUS, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, workers } from "../engine.ts";
 import { mouths } from "../people.ts";
+import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
@@ -25,6 +26,18 @@ export function advice(world: World, n: Nation): Advice[] {
   const out: Advice[] = [], m = mods(world, n), owned = ownedTiles(world, n.id);
   const need = mouths(n) * m.foodPerPerson, food = n.stock.food || 0, roof = housing(world, n), hp = housingParts(world, n);
   const say = (level: number, text: string) => out.push({ level, text });
+
+  // §4.8 people who left: the ruler's first duty
+  const ex = exodusOf(n, world.tick);
+  if (ex.recent) {
+    const where = Object.entries(ex.to).map(([id, k]) => `${k} sang ${world.nations[Number(id)]?.name ?? "?"}`).join(", ");
+    const why = Object.entries(ex.why).map(([w, k]) => `${k} vì ${WHY_VI[w as keyof typeof WHY_VI]}`).join(", ");
+    const fix: string[] = [];
+    if (ex.why.envy) fix.push("nâng thịnh vượng (lương thực dự trữ, hàng hóa, chỗ ở)");
+    if (ex.why.unrest || ex.why.border) fix.push("nâng ổn định (đủ ăn, không vượt giới hạn đất, bàn thờ, hạ căng thẳng biên giới)");
+    if (ex.why.faction || ex.why.schism) fix.push("hạ bất mãn (đường tới tỉnh cô lập, bá tước, ổn định ≥ 60)");
+    say(ex.share > EXODUS.alarm ? 3 : ex.lastTurn ? 2 : 1, `${ex.recent} người đã bỏ đi trong ${EXODUS.window} lượt qua (${Math.round(ex.share * 100)}% dân${ex.lastTurn ? `, ${ex.lastTurn} người lượt vừa rồi` : ""}): ${why}${where ? `; ${where}` : ""}.${ex.share > EXODUS.alarm ? ` Đã quá ${EXODUS.alarm * 100}%: mỗi lượt −${EXODUS.stability} ổn định, uy tín và hạng giảm.` : ""} Giữ dân: ${fix.join("; ") || "giữ cho dân đủ ăn, có chỗ ở và yên ổn"}.`);
+  }
 
   // Food
   if (food < need) say(3, `Lương thực ${Math.round(food)} không đủ một lượt ăn (${Math.round(need)}): thiếu thì người chết đói và không trẻ nào ra đời. Dồn người vào hái lượm, săn, đánh cá ngay.`);

@@ -470,3 +470,4 @@ ul.advice li.lv1 { border-color: var(--accent); }
 .bld .row { gap: 8px; align-items: center; flex-wrap: wrap; }
 .bcat td { font-size: 12.5px; }
 .seg .cnt.warmcnt { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+ul.recent li { padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }

@@ -12,6 +12,7 @@ import { activeWar, sharedLanguage, treatiesBetween } from "./diplomacy.ts";
 import { goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
 import { mods, type Ledger } from "./engine.ts";
+import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import type { Nation, World } from "./types.ts";
 
@@ -141,7 +142,7 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
     // Families cross from the restless side to the calmer one
     const [from, to] = a.stability < b.stability ? [a, b] : [b, a];
     const k = Math.min(BORDER.crossers, Math.max(0, from.population - 10));
-    if (k > 0) { const who = takePeople(from, k, "migrate"); addPeople(to, who); fx({ kind: "migrate", tile: from.capital, nation: from.id, n: k, to: to.capital }); }
+    if (k > 0) { const who = takePeople(from, k, "migrate"); addPeople(to, who); noteExodus(from, world.tick, k, to.id, "border"); fx({ kind: "migrate", tile: from.capital, nation: from.id, n: k, to: to.capital }); }
     text = `${k} người ${from.name} vượt biên sang sống ở ${to.name}`;
     rise = BORDER.rise.crossing;
   }
