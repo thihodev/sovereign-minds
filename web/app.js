@@ -628,12 +628,14 @@
     if (!S.roads || s * z < 3) return;
     const hubs = new Set(); for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
     // a road network drawn as branches from the centres, not as a mesh of every touching pair
-    const segs = { land: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links } = roadTree(hubs);
+    // roads on land no one holds any more (abandoned, gone wild) are drawn faint
+    const segs = { land: [[], [], [], []], wild: [[], [], [], []], sea: [[], [], [], []] }, dots = [], { parent, links } = roadTree(hubs);
+    const kind = (i, j) => isWater(i) ? "sea" : S.owners[i] < 0 && S.owners[j] < 0 ? "wild" : "land";
     S.roads.forEach((lv, i) => {
       if (!lv || !vis(i)) return;
       const water = isWater(i), j = parent.get(i);
       if (j === undefined || j < 0) { if (!links.some(([a]) => a === i) && !NB(i).some(k => parent.get(k) === i)) dots.push([i, lv, water]); return; }
-      segs[water ? "sea" : "land"][Math.min(lv, S.roads[j] || lv)].push([i, j]);
+      segs[kind(i, j)][Math.min(lv, S.roads[j] || lv)].push([i, j]);
     });
     for (const [i, h] of links) if (vis(i) || vis(h)) segs.land[S.roads[i] || 1].push([i, h]); // a centre joined to its road
     const line = (list, width, color, dash) => {
@@ -645,6 +647,7 @@
     g.save(); g.lineCap = "round";
     for (let lv = 1; lv <= 3; lv++) {
       const st = ROAD_STYLE[lv], w = Math.max(1.1 * px, s * st.w * (s * z < 8 ? .7 : 1));
+      g.globalAlpha = .38; line(segs.wild[lv], w * .7, st.c, [.3, .25]); g.globalAlpha = 1;
       line(segs.land[lv], w + 1.6 * px, "rgba(30,20,10,.45)");
       line(segs.land[lv], w, st.c, st.dash);
       line(segs.sea[lv], Math.max(1 * px, s * .07) + 2 * px, "rgba(10,40,70,.5)");
@@ -2253,7 +2256,8 @@
   function legend() {
     $("#legend").innerHTML = Object.entries(TERRAIN).filter(([k]) => k !== "ocean").map(([, [n, c]]) => `<span><i style="background:${c}"></i>${n}</span>`).join("") + `<span><i style="background:#5fb4e6"></i>Sông</span><span><i style="background:#ffd84a;border-radius:50%"></i>Kỳ quan</span>` +
       `<span><i class="lg-wild"></i>Vùng hoang</span><span><i class="lg-herd"></i>Tuyến bò rừng</span><span><i class="lg-caravan"></i>Đoàn buôn</span><span><i class="lg-battle">×</i>Trận đánh</span>` +
-      `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>`;
+      `<span><i style="background:#d9822b;transform:rotate(45deg) scale(.7)"></i>Mạch giàu (màu theo loại)</span>` +
+      `<span><i style="height:3px;background:#8a5a2e;border-radius:2px"></i>Đường</span><span><i style="height:2px;background:repeating-linear-gradient(90deg,#8a5a2e88 0 4px,transparent 4px 7px);border-radius:0"></i>Đường bỏ hoang (trên đất vô chủ)</span>`;
   }
   for (const b of document.querySelectorAll("#chron-filter button")) b.onclick = () => {
     for (const x of document.querySelectorAll("#chron-filter button")) x.classList.toggle("on", x === b);

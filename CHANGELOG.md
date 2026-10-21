@@ -4,6 +4,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.20 (đang làm)
 
+- **0.20.2:** đường trên đất vô chủ (đất đã mất hoặc thành hoang, đường vẫn ở lại) vẽ mờ, mảnh và đứt nét như đường bỏ hoang. Chú giải bản đồ có thêm mục đường.
 - **Sửa (0.20.1):** đường sá không còn bị đứt khúc. Mỗi cụm ô đường liền nhau được vẽ thành một cây liền mạch, kể cả đường không chạm trung tâm hay làm dở, và mọi trung tâm chạm cụm đều được nối vào.
 - **Cải tổ giao diện:**
   - **Thanh điều hướng dọc** bên trái thay hàng tab, và thanh trên gọn còn một dòng, nên bản đồ rộng hơn.
