@@ -2,6 +2,25 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.30
+
+- **Ngân khố, thuế và công trình công cộng (§4.13):** mỗi nước có ngân khố bằng tiền (`coin`), và mọi hoạt động kinh tế đi qua đó.
+  - **Nguồn thu:**
+    - thuế sản xuất trên giá trị dân làm ra;
+    - thuế chợ biên giới;
+    - thuế quan trên hàng nhập, do ngân khố nước gửi hàng trả;
+    - phí qua đất trả bằng tiền;
+    - thu nhập của công trình công cộng: Chợ (mới), Bến thuyền, Cảng, và đường sá.
+  - **Khoản chi:**
+    - lương quan lại trả bằng tiền trước;
+    - ngân khố tự mua gỗ, đá và vật liệu thường còn thiếu khi xây công trình hay làm đường;
+    - lệnh `invest` thuê nhân công cho công trình đang xây, hoặc nuôi học giả cho nghiên cứu.
+  - Lệnh `tax` định thuế sản xuất và thuế quan. Thuế nặng làm mất ổn định, thuế nhẹ được dân quý. Đồng minh và chư hầu không đánh thuế quan nhau. Kho tiền đầy quá 150 thì thất thoát dần.
+  - Phát minh tự đề xuất có thể tạo công trình công cộng mới có thu nhập.
+  - **AI thấy:** mục `treasury` (tiền, thuế suất, sổ thu chi lượt trước, thuế quan của các nước quen), luật bằng tiếng Anh, và lời cố vấn.
+  - **Watcher thấy:** mục Ngân khố trong hồ sơ quốc gia, với sổ thu chi.
+  - Bot xây chợ và dùng tiền dư thuê thợ.
+
 ## v0.29
 
 - **Danh nhân (§4.12):** dân sống tốt sinh ra học giả, danh tướng, đại thương gia, thợ cả, nhà tiên tri, nhà thám hiểm.

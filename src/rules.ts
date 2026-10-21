@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.29";
+export const RULES_VERSION = "0.30";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -44,7 +44,7 @@ export const RES_NAME: Record<string, string> = {
   dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
-  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải",
+  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền",
 };
 
 // §4 Population and production
@@ -233,7 +233,7 @@ export function apFor(population: number, bonus: number): number {
 }
 export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
-  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
+  found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
   message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
@@ -505,7 +505,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §2.11 fishing +share; salt from the sea a turn; a harbour reaches further over the water */
   fish?: number; seaSalt?: number; harbor?: number;
   /** §6.4 animals a pen holds */
-  herd?: number }
+  herd?: number;
+  /** §4.13 coin a public work earns the treasury each turn while it stands (a market also takes a share of the people and of each trading partner) */
+  income?: number; market?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -520,13 +522,14 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
   { type: "pen", name: "Chuồng", needs: "P15", cost: { wood: 10, rope: 4 }, work: 6, perTile: true, desc: "2 người chăn × 2 lương thực; nhốt được 10 con gia súc.", effect: { farmSlots: 2, farmFood: 2, herd: 10 } },
   { type: "well", name: "Giếng", needs: "stone_tools", cost: { stone: 10, wood: 4 }, work: 5, desc: "Nước ngọt cho thủ đô xa sông (trong vòng 2 ô).", effect: { water: 1 } },
-  { type: "pier", name: "Bến thuyền", needs: "P16", cost: { wood: 12, rope: 2 }, work: 5, perTile: true, terrains: ["coast"], river: true, desc: "Thuyền ra vào: buôn bằng đường thủy; quân có thuyền vượt sông.", effect: { port: 1 } },
+  { type: "pier", name: "Bến thuyền", needs: "P16", cost: { wood: 12, rope: 2 }, work: 5, perTile: true, terrains: ["coast"], river: true, desc: "Thuyền ra vào: buôn bằng đường thủy; quân có thuyền vượt sông. Thu 1 tiền/lượt.", effect: { port: 1, income: 1 } },
   { type: "kiln", name: "Lò gốm", needs: "P13", cost: { clay: 10, stone: 5 }, work: 5, perTile: true, desc: "Làm gốm; thêm 4 chỗ chế tác.", effect: { craftSlots: 4 } },
   // §2.11 the sea
   { type: "fish_dock", name: "Bến cá", needs: "P9", cost: { wood: 10, rope: 3 }, work: 5, perTile: true, max: 2, terrains: ["coast"], river: true, desc: "Phơi lưới, kéo thuyền: đánh cá +25% (tối đa 2 bến).", effect: { fish: 0.25 } },
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
-  { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%.", effect: { port: 1, harbor: 3, fish: 0.1 } },
+  { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "market", name: "Chợ", needs: "P12", cost: { wood: 10, stone: 6 }, work: 6, max: 3, desc: "Công trình công cộng: dân họp chợ, ngân khố thu 2 tiền/lượt, thêm 1 tiền mỗi 50 dân và 1 tiền mỗi bạn hàng.", effect: { income: 2, market: 1 } },
   { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
@@ -555,7 +558,7 @@ export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
   copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6,
   dog: 4, goat: 4, cattle: 8, pig: 4, fowl: 1,
-  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5,
+  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5, coin: 1,
 };
 export const TOOL_LIFE = 10; // ticks
 /** §6.4 Animals. `wild`: the wild kind on the map that hunters bring home alive (with the capability `cap`); `breed`: growth
@@ -819,7 +822,7 @@ export interface MinisterDomain {
   actions: string[];
 }
 export const MINISTER_DOMAINS: Record<string, MinisterDomain> = {
-  economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang", en: "labor, crafts, mine_target, build, build_road, claim_tile", actions: ["build", "build_road", "claim_tile"] },
+  economy: { title: "Bộ trưởng Kinh tế", short: "kinh tế", desc: "phân công lao động, chế tác, quặng cần đào, xây dựng, làm đường, khai hoang, thuế và đầu tư từ ngân khố", en: "labor, crafts, mine_target, build, build_road, claim_tile, tax, invest", actions: ["build", "build_road", "claim_tile", "tax", "invest"] },
   war: { title: "Bộ trưởng Chiến tranh", short: "chiến tranh", desc: "số chiến binh, tấn công, đột kích, đánh man di (tuyên chiến và giảng hòa vẫn là việc của người trị vì)", en: "the number of warriors (\"warriors\"), attack, raid, clear_wild (never declare_war or peace)", actions: ["attack", "raid", "clear_wild"] },
   diplomacy: { title: "Bộ trưởng Ngoại giao", short: "ngoại giao", desc: "thư từ, trao đổi hàng, hiệp ước (trừ hòa ước), nhận dân di cư, cách ly", en: "message, trade_offer, accept_trade, treaty and accept_treaty (never a peace treaty), accept_migrants, quarantine", actions: ["message", "trade_offer", "accept_trade", "treaty", "accept_treaty", "accept_migrants", "quarantine"] },
   learning: { title: "Bộ trưởng Học thuật", short: "học thuật", desc: "chọn nghiên cứu, đề xuất phát minh", en: "research, propose_invention", actions: ["research", "propose_invention"] },
@@ -920,3 +923,31 @@ export function traitLines(t: TraitDef): string[] {
   if (t.start?.stability) out.push(`ổn định khởi đầu +${t.start.stability}`);
   return out;
 }
+
+// §4.13 The treasury: coin from taxes, duties and public works; paid out to officials, for materials, hands and scholars
+export const TREASURY = {
+  /** coin in the treasury when it opens */
+  start: 20,
+  /** share of the value the people make each turn (world prices) paid in tax; the most a ruler may ask */
+  tax: 0.1, taxMax: 0.4,
+  /** above `fair` each `step` costs 1 stability and `discontent` a turn; at or under `light` the people are glad (+1) */
+  fair: 0.1, step: 0.05, discontent: 1, light: 0.03,
+  /** the most duty a nation may ask on goods from abroad and on caravans crossing its land (it starts at TRADE.toll) */
+  tariffMax: 0.5,
+  /** treaties under which no duty is paid */
+  freeTrade: ["alliance", "vassal"] as string[],
+  /** a market: coin per person and per trading partner, on top of its base */
+  marketPerPerson: 0.02, marketPerPartner: 1,
+  /** coin per road tile of the nation's network, a turn */
+  roadToll: 0.05,
+  /** the common materials the treasury may buy for a work, at world price × markup */
+  buyable: ["wood", "stone", "reeds", "clay", "rope", "hide", "fiber", "food", "flint"] as string[],
+  markup: 1.5,
+  /** coin for one point of building work hired, at most hireShare of the builders' work (hireMin) a turn;
+   *  coin for one research point, at most studyShare of the researchers' RP (studyMin) a turn */
+  coinPerWork: 4, hireShare: 0.5, hireMin: 3, coinPerRP: 3, studyShare: 0.5, studyMin: 3,
+  /** coin above `safe` loses `leak` of the excess a turn (clerks and thieves): spend it, don't hoard it */
+  safe: 150, leak: 0.03,
+  /** border market: the tax each side's treasury takes on the value its merchants sold */
+  marketTax: 0.1,
+};

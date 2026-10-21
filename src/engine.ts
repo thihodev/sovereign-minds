@@ -9,6 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
+  TREASURY,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -23,6 +24,7 @@ import { cull, dogBonus, herdTurn, ploughBonus } from "./herds.ts";
 import { vietError, vietPerson, vietPlace } from "./names.ts";
 import { eraLivingNeed, leisure, livingStandard } from "./living.ts";
 import { greatMods, greatPhase, inviteGreat } from "./greats.ts";
+import { buyCost, buyShortfall, invest, setTax, spend, treasuryPhase } from "./treasury.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -866,6 +868,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       say(n.id, "decree", `${n.name} trái lệnh ${rd.code} của các vị thần.`);
     }
   }
+  treasuryPhase(world, L); // §4.13 taxes and public works fill the treasury
   updateMarket(world, L); // §6.3 prices follow what the nations made, used and hold
   writeAnnals(world, chronicle); // §8.2 each nation's story, chapter by chapter
   world.tick++;
@@ -1385,7 +1388,8 @@ function officialsAct(world: World, n: Nation, L: Ledger, claims: Array<{ n: Nat
     o.skill = Math.min(5, 1 + Math.floor((tick - o.since) / OFFICIALS.skillEvery));
     // Upkeep, then loyalty
     const upkeep = OFFICIALS.upkeepBase + o.skill;
-    if ((n.stock.food || 0) >= upkeep) L.stock(n, "food", -upkeep, "officials"); else o.loyalty -= 5;
+    if (spend(L, n, upkeep, "officials")) { /* §4.13 paid from the treasury */ }
+    else if ((n.stock.food || 0) >= upkeep) L.stock(n, "food", -upkeep, "officials"); else o.loyalty -= 5;
     o.loyalty += n.stability >= 60 ? 1 : n.stability < 40 ? -1 : 0;
     if (o.seat !== null && dist(o.seat, n.capital) > OFFICIALS.farSeat) o.loyalty -= 1;
     o.loyalty = Math.max(0, Math.min(100, o.loyalty));
@@ -1535,7 +1539,7 @@ function wildPhase(world: World, L: Ledger, say: Say): void {
 type Say = (nation: number | null, kind: string, text: string) => void;
 const ENGINE_ACTIONS = new Set([
   "research", "build", "claim_tile", "abandon_tile", "explore", "plant_spy", "petition", "propose_invention", "found_settlement",
-  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital", "invite_great",
+  "rename_nation", "sabotage", "steal_tech", "incite", "clear_wild", "appoint_official", "dismiss_official", "reward_official", "build_road", "family_policy", "accept_migrants", "rename", "mission", "festival", "cull", "move_capital", "invite_great", "tax", "invest",
   "quarantine", "request_minister",
 ]);
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
@@ -1620,7 +1624,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (n.buildings.some(b => b.tile === tile && buildingOf(world, b.type)?.perTile)) return "Ô này đã có công trình sản xuất";
         if (def.terrains && !(def.terrains.includes(t.terrain) || (def.river && t.river))) return `${def.name} cần ô ${def.terrains.join("/")}${def.river ? " hoặc ô có sông" : ""}`;
       }
-      for (const [k, q] of Object.entries(def.cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)}`;
+      buyShortfall(world, L, n, def.cost); // §4.13 the treasury buys common materials the stores lack
+      for (const [k, q] of Object.entries(def.cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)}${TREASURY.buyable.includes(k) ? ` (ngân khố cũng không đủ tiền mua: cần ${buyCost(world, n, def.cost).coin} tiền)` : ""}`;
       for (const [k, q] of Object.entries(def.cost)) L.stock(n, k, -q, "build");
       n.buildings.push({ id: world.nextBuildingId++, type: def.type, tile, progress: 0, done: false, hp: 100 });
       n.lastEvents.push(`Khởi công ${def.name} ở (${col(tile)}, ${row(tile)}): cần ${def.work} công xây${def.desc ? ` (${def.desc})` : ""}.`);
@@ -1692,6 +1697,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         for (const [k, q] of Object.entries(world.tiles[i].land ? def.cost : def.laneCost)) cost[k] = (cost[k] || 0) + q;
       }
       if (!todo.length) return "Các ô này đã có đường cấp đó hoặc đang làm";
+      buyShortfall(world, L, n, cost); // §4.13
       for (const [k, q] of Object.entries(cost)) if ((n.stock[k] || 0) < q) return `Thiếu ${fmt(q - (n.stock[k] || 0))} ${goodName(world, k)} (${todo.length} ô cần ${Object.entries(cost).map(([g, x]) => `${x} ${goodName(world, g)}`).join(", ")})`;
       for (const [k, q] of Object.entries(cost)) L.stock(n, k, -q, "road");
       for (const i of todo) works.push({ tile: i, level, progress: 0 });
@@ -1877,6 +1883,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     case "mission": return startMission(world, n, a, L, explorers.get(n.id) || 0, to => findTarget(world, n, to));
     case "festival": return holdFestival(world, n, a, L);
     case "cull": return cull(n, a, L); // §6.4
+    case "tax": return setTax(n, a); // §4.13
+    case "invest": return invest(world, L, n, a, () => n.research && inv(world, n.research.id) ? inventionCost(world, n, n.research.id) : null, say);
     case "invite_great": return inviteGreat(world, n, a, to => findTarget(world, n, to), (from, to, goods) => { for (const [k, q] of Object.entries(goods)) { L.stock(from, k, -q, "trade"); L.stock(to, k, q, "trade"); } }); // §4.12
     case "move_capital": {
       // §2.3 the capital moves to one of the nation's settlements; the old capital becomes a settlement

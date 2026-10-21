@@ -115,6 +115,8 @@ export interface Nation {
   fate?: { tick: number; cause: "conquest" | "reunited" | "perished"; by?: number; why?: string };
   /** §4.12 the great people serving the nation, and the turn it last tried to lure one */
   greats?: Great[]; invited?: number;
+  /** §4.13 tax rates and this turn's and last turn's books (the coin itself is stock.coin) */
+  treasury?: import("./treasury.ts").Treasury;
   /** §10.5 petitions the gods took up: the nation's honoured ideas */
   initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */

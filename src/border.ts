@@ -15,6 +15,7 @@ import { mods, workers, type Ledger } from "./engine.ts";
 import { noteExodus } from "./exodus.ts";
 import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
+import { importDuty, marketTax } from "./treasury.ts";
 import { hasGreat } from "./greats.ts";
 import type { Nation, World } from "./types.ts";
 
@@ -54,7 +55,7 @@ export function neighbours(world: World, n: Nation): Array<{ o: Nation; border: 
 function spare(world: World, n: Nation): Array<[string, number]> {
   const out: Array<[string, number]> = [];
   for (const [g, q] of Object.entries(n.stock)) {
-    if (!GOOD_VALUE[g]) continue;
+    if (!GOOD_VALUE[g] || g === "coin") continue;
     const keep = g === "food" ? mouths(n) * mods(world, n).foodPerPerson * 2 : BORDER.marketKeep;
     if (q - keep >= 3) out.push([g, q - keep]);
   }
@@ -113,6 +114,9 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
           L.stock(b, sb[0], -qb, "market"); L.stock(a, sb[0], qb, "market");
           a.trades[String(b.id)] = (a.trades[String(b.id)] || 0) + 1; b.trades[String(a.id)] = (b.trades[String(a.id)] || 0) + 1;
           st.market++; t -= BORDER.marketCalm;
+          // §4.13 each side's treasury taxes what its merchants sold, and the other side's duty is paid on it
+          marketTax(L, a, qa * pa); marketTax(L, b, qb * pb);
+          importDuty(world, L, a, b, { [sa[0]]: qa }); importDuty(world, L, b, a, { [sb[0]]: qb });
           const line = (x: Nation, give: [string, number], gq: number, get: [string, number], tq: number, o: Nation) => x.lastEvents.push(`Chợ biên giới với ${o.name}: đổi ${gq} ${goodName(world, give[0])} lấy ${tq} ${goodName(world, get[0])}.`);
           line(a, sa, qa, sb, qb, b); line(b, sb, qb, sa, qa, a);
           if (st.market === 1 || st.market % 20 === 0) say(a.id, "trade", `Chợ biên giới giữa ${a.name} và ${b.name} họp lần thứ ${st.market}.`);

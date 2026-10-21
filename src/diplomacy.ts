@@ -1,6 +1,7 @@
 // §7 Relations between nations: messages, treaties, trade, war, vassals.
 // Called by engine.step(); everything here is deterministic.
 
+import { importDuty, tollInCoin, tollRate } from "./treasury.ts";
 import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
@@ -357,13 +358,21 @@ export function resolveRelations(ctx: DiploCtx): void {
     for (const { from, to, g, road: r } of legs) {
       const road = r as Route;
       for (const [k, q] of Object.entries(g)) L.stock(from, k, -q, "trade");
-      if (road.mode === "near") { for (const [k, q] of Object.entries(g)) L.stock(to, k, q, "trade"); continue; }
+      if (road.mode === "near") { for (const [k, q] of Object.entries(g)) L.stock(to, k, q, "trade"); importDuty(world, L, from, to, g); continue; } // §4.13 duty at the border
       const load = { ...g };
       // Tolls to every third nation crossed without a passage or alliance treaty
       for (const o of road.tolls) {
         const toller = world.nations[o], cut: Record<string, number> = {};
         // the sender already gave the whole load (−q above); the toller gets its cut and the caravan carries the rest
-        const rate = TRADE.toll * ((from.officials ?? []).some(x => x.domain === "merchant" && x.loyalty >= OFFICIALS.idle) ? 0.5 : 1); // §4.6 a merchant halves tolls
+        const rate = tollRate(toller) * ((from.officials ?? []).some(x => x.domain === "merchant" && x.loyalty >= OFFICIALS.idle) ? 0.5 : 1); // §4.13 the toller's tariff; §4.6 a merchant halves tolls
+        // §4.13 a sender with coin pays the toll from its treasury and the goods ride on whole
+        const paid = tollInCoin(world, L, from, toller, load, rate);
+        if (paid) {
+          toller.lastEvents.push(`Đoàn buôn của ${from.name} đi qua đất mình nộp ${paid} tiền phí.`);
+          from.lastEvents.push(`Đoàn buôn tới ${to.name} nộp ${paid} tiền phí qua đất ${toller.name}.`);
+          fx({ kind: "toll", tile: road.path.find(i => world.tiles[i].owner === o) ?? road.path[0], nation: o, from: from.id });
+          continue;
+        }
         for (const [k, q] of Object.entries(load)) { const x = Math.floor(q * rate * 10) / 10; if (x > 0) { cut[k] = x; load[k] = q - x; L.stock(toller, k, x, "toll"); } }
         if (Object.keys(cut).length) {
           toller.lastEvents.push(`Đoàn buôn của ${from.name} đi qua đất mình nộp phí: ${fmtGoods(world, cut)}.`);
@@ -394,6 +403,7 @@ export function resolveRelations(ctx: DiploCtx): void {
       continue;
     }
     for (const [k, q] of Object.entries(c.goods)) { L.caravanLoss(k, q); if (to.alive) L.stock(to, k, q, "caravan"); }
+    if (to.alive && from.alive) importDuty(world, L, from, to, c.goods); // §4.13 duty paid where the goods come in
     if (to.alive) to.lastEvents.push(`Đoàn buôn từ ${world.nations[c.from].name} tới nơi: ${fmtGoods(world, c.goods)}.`);
   }
   world.caravans = world.caravans.filter(c => c.arrive > tick);

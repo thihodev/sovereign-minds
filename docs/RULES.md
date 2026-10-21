@@ -627,6 +627,46 @@ Ngoài người trị vì là chính AI quản lý quốc gia, một dân tộc 
 - Cơ hội nhận lời là `30% + 50% × (mức sống ta − mức sống họ)/100`, trong khoảng 5–80%.
 - Mỗi nước mời tối đa một lần mỗi 5 lượt.
 
+### 4.13 Ngân khố, thuế và công trình công cộng
+
+Mỗi nước có **ngân khố**. Tiền nằm trong kho dưới dạng hàng `coin` ("tiền"):
+- luôn đáng 1 lương thực;
+- không hư hỏng;
+- đem tặng, trao đổi hay nộp cống được như mọi thứ hàng.
+
+Khi lập quốc, ngân khố có sẵn **20 tiền**.
+
+**Nguồn thu**
+
+| Nguồn | Cách tính |
+|---|---|
+| Thuế sản xuất | thuế suất × giá trị (giá thế giới) mọi thứ dân làm ra trong lượt. Mặc định 10%, tối đa 40% |
+| Thuế chợ biên giới | 10% giá trị hàng thương nhân nước mình bán ở chợ biên giới |
+| Thuế quan | thuế quan của nước mình × giá trị hàng từ nước khác vào (đoàn buôn, trao đổi qua biên giới, chợ biên giới). Ngân khố nước gửi hàng trả bằng tiền, trong chừng nó còn tiền |
+| Phí qua đất | đoàn buôn nước khác đi qua đất mình mà không có hiệp ước thông hành hay liên minh thì nộp theo thuế quan của mình: trả bằng tiền nếu nước gửi có đủ tiền, nếu không thì nộp bằng hàng như trước |
+| Công trình công cộng | công trình có thu nhập nộp tiền mỗi lượt khi còn hoạt động: Bến thuyền 1, Cảng 4, **Chợ** 2 + 0,02 mỗi người dân + 1 mỗi bạn hàng (tối đa 3 chợ, cần Ký hiệu P12, 10 gỗ 6 đá) |
+| Đường sá | 0,05 tiền mỗi ô đường trong mạng đường của nước, mỗi lượt |
+
+- Đồng minh, và chư hầu với nước chủ, không đánh thuế quan nhau.
+- Phát minh tự đề xuất có thể tạo công trình mới có `income` (0–2, thêm 1 mỗi kỷ nguyên), tức một công trình công cộng mới.
+
+**Khoản chi**
+
+- **Lương quan lại:** trả bằng tiền trước. Chỉ khi ngân khố cạn mới trả bằng lương thực.
+- **Mua vật liệu:** khi xây công trình hay làm đường mà kho thiếu vật liệu thường (gỗ, đá, sậy, đất sét, dây thừng, da, sợi, lương thực, đá lửa), ngân khố tự mua phần thiếu với giá thế giới × 1,5. Kim loại, đá quý và xa xỉ phẩm thì không mua được.
+- **Đầu tư (`invest`, 1 AP):**
+  - `in: "building"`: thuê nhân công, 4 tiền mỗi công xây. Mỗi lượt tối đa thêm 50% sức thợ xây của nước (ít nhất 3 công).
+  - `in: "research"`: nuôi học giả, 3 tiền mỗi RP. Mỗi lượt tối đa thêm 50% RP của người nghiên cứu (ít nhất 3 RP).
+- **Thất thoát:** phần tiền vượt 150 mất 3% mỗi lượt (kho đầy dễ sinh tham ô). Tiền là để chi, không phải để giữ.
+
+**Định thuế (`tax`, 1 AP):** `{"type":"tax","rate":0–0.4,"tariff":0–0.5}`.
+- Thuế sản xuất trên 10%: mỗi 5 điểm vượt trừ 1 ổn định và cộng 1 bất mãn mỗi lượt.
+- Thuế sản xuất từ 3% trở xuống: dân vui, +1 ổn định mỗi lượt.
+- Thuế quan cao làm đầy ngân khố bằng tiền của thương nhân nước ngoài, nhưng bạn hàng phải trả cho từng chuyến hàng gửi tới. Mỗi nước thấy thuế quan của các nước mình quen (`others_tariffs`).
+- Thuế quan mặc định bằng phí qua đất trong luật của Watcher.
+
+Bộ trưởng Kinh tế được định thuế và đầu tư.
+
 ## 5. Hệ thống phát minh mở
 
 AI được tự nghĩ ra phát minh mới, nhưng mỗi phát minh phải đứng trên vai những phát minh đã có, qua kiểm tra cứng của Engine và qua Trọng tài. Engine định giá chi phí, AI không được tự đặt. Phát minh được duyệt sẽ vào **Sổ Phát Minh Thế Giới** (mã `X1`, `X2`…) và trở thành tri thức chung mà quốc gia khác cũng có thể nghiên cứu.

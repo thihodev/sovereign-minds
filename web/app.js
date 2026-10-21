@@ -1556,6 +1556,7 @@
           ${n.exodus && n.exodus.recent ? `<h3>Dân bỏ đi</h3><p class="note ${n.exodus.alarm ? "warn" : ""}">${n.exodus.recent} người trong ${10} lượt qua (${Math.round(n.exodus.share * 100)}% dân)${n.exodus.lastTurn ? `, ${n.exodus.lastTurn} người lượt vừa rồi` : ""} · ${esc(Object.entries(n.exodus.why).map(([w, k]) => `${k} vì ${w}`).join(", "))}${Object.keys(n.exodus.to).length ? ` · sang ${esc(Object.entries(n.exodus.to).map(([o, k]) => `${o} ${k}`).join(", "))}` : ""}${n.exodus.alarm ? " · quá 3%: ổn định, uy tín và hạng đang giảm" : ""}</p>` : ""}
           ${n.recent?.length ? `<h3>Các lượt gần đây (AI thấy mục này)</h3><ul class="plain recent">${n.recent.slice().reverse().map(r => `<li><b>L${r.tick}</b> · dân ${r.pop} · lương thực ${r.food} · ổn định ${r.stab}<div class="meta">Lệnh: ${esc(r.orders.join(" · ") || "(không ra lệnh)")}</div></li>`).join("")}</ul>` : ""}
           ${n.origin ? `<p class="note">Ly khai từ <b>${esc(n.origin.fromName || "?")}</b> ở lượt ${n.origin.tick}, theo thủ lĩnh ${esc(n.origin.leader)}.</p>` : ""}
+          ${treasuryBlock(n)}
           ${greatsBlock(n)}
           ${livingBlock(n)}
           ${prosperityBlock(n)}
@@ -1635,6 +1636,16 @@
   const ERA_NAMES = ["Đồ Đá Cũ", "Đồ Đá Mới", "Đồ Đồng", "Đồ Sắt", "Cổ Đại", "Trung Đại", "Cận Đại", "Công Nghiệp", "Hiện Đại", "Nguyên Tử"];
   // §4.12 great people
   const GREAT_ICON = { scholar: "📚", general: "⚔", merchant: "🪙", artisan: "🔨", prophet: "🔥", explorer: "🧭" };
+  function treasuryBlock(n) {
+    const t = n.treasury; if (!t) return "";
+    const pct = x => `${Math.round(x * 100)}%`, f = x => (Math.round(x * 10) / 10).toLocaleString("vi-VN");
+    const book = (b, sign) => Object.entries(b || {}).sort((a, c) => c[1] - a[1]).map(([k, v]) => `<li><span>${esc(t.lines[k] || k)}</span><b class="mono ${sign > 0 ? "up" : "down"}">${sign > 0 ? "+" : "−"}${f(v)}</b></li>`).join("");
+    const sum = b => Object.values(b || {}).reduce((s, v) => s + v, 0);
+    const net = t.last ? sum(t.last.in) - sum(t.last.out) : 0;
+    return `<h3>Ngân khố: ${f(t.coin)} tiền${t.last ? ` <span class="muted">(lượt trước ${Math.abs(net) < 0.05 ? "±0" : `${net > 0 ? "+" : "−"}${f(Math.abs(net))}`})</span>` : ""}</h3>
+      <p class="note">Thuế sản xuất <b>${pct(t.tax)}</b>${t.tax > t.fair ? ` <span class="pill bad">nặng</span>` : ""} · thuế quan và phí qua đất <b>${pct(t.tariff)}</b>${t.coin > t.safe ? ` · <span class="pill bad">kho đầy, đang thất thoát</span>` : ""}</p>
+      ${t.last ? `<div class="books"><div><h4>Thu</h4><ul>${book(t.last.in, 1) || `<li class="muted">—</li>`}</ul></div><div><h4>Chi</h4><ul>${book(t.last.out, -1) || `<li class="muted">—</li>`}</ul></div></div>` : ""}`;
+  }
   function greatsBlock(n) {
     const g = n.greats || []; if (!g.length) return "";
     return `<h3>Danh nhân</h3><ul class="court">${g.map(x => `<li><span class="i">${GREAT_ICON[x.kind] || "⭐"}</span><div><b>${esc(x.title)} ${esc(x.name)}</b>${x.fromName ? ` <span class="muted">(mời từ ${esc(x.fromName)})</span>` : ""}<div class="meta">${esc(x.gift)} · từ lượt ${x.born}, phụng sự tới lượt ${x.dies}</div></div></li>`).join("")}</ul>`;

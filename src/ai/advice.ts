@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, BUILDING_BY_TYPE, TREASURY, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -280,6 +280,17 @@ export function advice(world: World, n: Nation): Advice[] {
   {
     const l = livingStandard(world, n), next = nextEraNeeds(world, n);
     if (l.missing.length) say(l.score < LIVING.restless ? 2 : 1, `Mức sống ${l.score}/100 (dân thời này mong: ${l.expected.length} nhu cầu, đáp ứng ${l.expected.length - l.missing.length}). Còn thiếu: ${l.missing.slice(0, 4).map(x => `${x.name} (có ${x.have}, cần ${x.want}: ${x.how})`).join("; ")}. Mức sống cao thì nghiên cứu nhanh hơn (tới +${LIVING.rp * 100}%) và dân yên${next && /mức sống/.test(next.missing.join(" ")) ? `; cổng ${next.era} cần mức sống cao hơn` : ""}.`);
+  }
+
+  // §4.13 the treasury: spend it, keep the tax fair, build what earns
+  if (n.founded && n.treasury) {
+    const t = n.treasury, purse = n.stock.coin || 0, last = t.last;
+    const net = last ? Object.values(last.in).reduce((x, y) => x + y, 0) - Object.values(last.out).reduce((x, y) => x + y, 0) : 0;
+    const canMarket = (n.inventions.includes("P12") || m.unlocked.has("market")) && !n.buildings.some(b => b.type === "market");
+    if (t.tax > TREASURY.fair + 1e-9) say(2, `Thuế sản xuất ${Math.round(t.tax * 100)}% vượt mức dân chịu được (${Math.round(TREASURY.fair * 100)}%): mỗi lượt mất ổn định và thêm bất mãn. Hạ thuế (tax) khi ngân khố đã đủ.`);
+    if (purse > TREASURY.safe) say(1, `Ngân khố ${Math.round(purse)} tiền: quá ${TREASURY.safe} thì mỗi lượt thất thoát ${TREASURY.leak * 100}% phần dư. Hãy chi: thuê thợ cho công trình đang xây (invest building, ${TREASURY.coinPerWork} tiền/công), nuôi học giả (invest research, ${TREASURY.coinPerRP} tiền/RP), xây chợ, làm đường (ngân khố tự mua gỗ, đá còn thiếu), hoặc mua hàng của nước khác bằng tiền (trade_offer give coin).`);
+    else if (purse < 10 && net < 0) say(2, `Ngân khố cạn (${Math.round(purse)} tiền, lượt trước hụt ${Math.round(-net)}): lương quan lại sẽ phải trả bằng lương thực. Xây công trình sinh lợi (chợ, bến thuyền, cảng), làm đường, hoặc tăng thuế một chút.`);
+    if (canMarket) say(1, `Xây Chợ (build market): công trình công cộng thu ${BUILDING_BY_TYPE.market?.effect.income ?? 2} tiền/lượt, thêm 1 tiền mỗi 50 dân và mỗi bạn hàng.`);
   }
 
   // §4.12 great people: a richer life draws the great ones of a poorer neighbour

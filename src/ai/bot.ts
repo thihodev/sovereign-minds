@@ -316,6 +316,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const pitMax = buildingOf(world, "pit")?.max ?? 2;
     if (can("pit") && count("pit") < pitMax && !pendingType("pit") && avail("stone") >= 9) queue("pit");
     if (can("altar") && !built("altar") && avail("stone") >= 14) queue("altar");
+    if (can("market") && !count("market") && avail("wood") >= 12 && avail("stone") >= 8) queue("market"); // §4.13 a market fills the treasury
     if (can("kiln") && !built("kiln") && avail("clay") >= 10) {
       const spot = v.owned.find(t => t.land && t.terrain !== "mountain" && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
       if (spot) queue("kiln", spot.i);
@@ -451,6 +452,10 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const sulky = court.find(o => o.loyalty < 45);
     if (sulky && v.food >= v.need * 2 + 20) spend("reward_official", { official: sulky.id, goods: { food: 20 } });
   }
+
+  // §4.13 coin beyond a reserve hires hands for the work in progress
+  const purse = v.stock("coin");
+  if (n.founded && tick > 0 && purse > 80 && pending.length) spend("invest", { in: "building", building: pending[0].id, amount: Math.min(24, Math.floor(purse - 60)) });
 
   // §3.2 never a turn without an order: study something, or send a scout out (the labour plan keeps a hand for it)
   if (n.founded && !actions.length && ap >= 1) {

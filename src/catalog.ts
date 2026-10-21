@@ -76,7 +76,7 @@ export const EFFECT_KINDS: Record<string, string> = {
   role_bonus: '{"kind":"role_bonus","role":"hunt|gather|fish|farm|wood|stone|flint|clay|mine|craft|build|research|warrior|extract","percent":10|20|30} — 2 points per 10%',
   spoilage: '{"kind":"spoilage","percent":10|20|30} — food spoils that much less; 1 point per 10%',
   recipe: '{"kind":"recipe","id":"slug","name":"…","input":{"good":qty},"output_qty":1-3,"work":1-3,"at":"workshop|kiln|<your building id>","tool":{"role":"…","percent":10-30,"per":1-4}?} — a NEW good made from goods that exist; 3 points (+2 per 10% if it is a tool)',
-  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2}} (caps grow with your era: housing +5, craft_slots +1, defense +10, farm_slots +1 per era, farm_food +1 every 3 eras) — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3, craft slots 1/2',
+  building: '{"kind":"building","id":"slug","name":"…","cost":{"good":qty},"work":3-12,"effect":{"housing":0-15,"stability":0-1,"spoilage":0-10,"craft_slots":0-4,"defense":0-40,"farm_slots":0-6,"farm_food":0-2,"income":0-2}} (caps grow with your era: housing +5, craft_slots +1, defense +10, farm_slots +1, income +1 per era, farm_food +1 every 3 eras; income = coin a public work earns the treasury a turn) — 3 points + housing 2/5, stability 4, spoilage 1/10%, defense 3/10%, farming 3, craft slots 1/2, income 2 per coin',
   stability: '{"kind":"stability","per_tick":1|2} — 4 points each',
   ap: '{"kind":"ap","amount":1} — 5 points',
   combat: '{"kind":"combat","percent":10|20|30} — 3 points per 10%',
@@ -167,9 +167,9 @@ export function parseEffects(world: World, raw: Array<Record<string, unknown>>, 
         const work = Math.max(3, Math.min(12, Math.round(Number(e.work ?? 6))));
         const f = (e.effect ?? {}) as Record<string, unknown>, n = (k: string, max: number) => Math.max(0, Math.min(max, Math.round(Number(f[k] ?? 0))));
         // §5.3 later eras build bigger: homes, workshops, farms and walls grow with the era
-        const effect = { housing: n("housing", 15 + 5 * era), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4 + era), defense: n("defense", 40 + 10 * era) / 100, farmSlots: n("farm_slots", 6 + era), farmFood: n("farm_food", 2 + Math.floor(era / 3)) };
+        const effect = { housing: n("housing", 15 + 5 * era), stability: n("stability", 1), spoilage: n("spoilage", 10) / 100, craftSlots: n("craft_slots", 4 + era), defense: n("defense", 40 + 10 * era) / 100, farmSlots: n("farm_slots", 6 + era), farmFood: n("farm_food", 2 + Math.floor(era / 3)), income: n("income", 2 + era) }; // §4.13 a public work that earns coin
         if (effect.farmSlots && !effect.farmFood) effect.farmSlots = 0;
-        out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0) + Math.ceil(effect.craftSlots / 2);
+        out.power += 3 + Math.ceil(effect.housing / 5) * 2 + effect.stability * 4 + Math.round(effect.spoilage * 10) + Math.round(effect.defense * 10) * 3 + (effect.farmSlots ? 3 : 0) + Math.ceil(effect.craftSlots / 2) + effect.income * 2;
         if (!Object.keys(cost).length && !effect.farmSlots) { err(`${at}: công trình phải tốn ít nhất một vật liệu`); break; }
         out.buildings.push({ type: id, name, needs: "", cost, work, desc: describeBuilding(effect), effect }); break;
       }
@@ -213,6 +213,7 @@ export function describeBuilding(e: BuildingDef["effect"]): string {
   if (e.craftSlots) p.push(`${e.craftSlots} chỗ chế tác`);
   if (e.defense) p.push(`phòng thủ +${Math.round(e.defense * 100)}%`);
   if (e.farmSlots) p.push(`${e.farmSlots} người × ${e.farmFood} lương thực`);
+  if (e.income) p.push(`công trình công cộng: thu ${e.income} tiền/lượt`);
   return p.join(", ") || "không có tác dụng";
 }
 
@@ -233,6 +234,7 @@ export function buildingEffectText(e: BuildingDef["effect"]): string {
   if (e.fish) p.push(`đánh cá +${Math.round(e.fish * 100)}%`);
   if (e.seaSalt) p.push(`+${e.seaSalt} muối/lượt`);
   if (e.harbor) p.push(`lãnh hải xa thêm ${e.harbor} ô`);
+  if (e.income) p.push(`thu ${e.income} tiền/lượt${e.market ? " + theo dân và bạn hàng" : ""}`);
   return p.join(", ");
 }
 export function describeEffects(world: World, e: Invention["effects"]): string {

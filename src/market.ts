@@ -23,7 +23,7 @@ export function noteFlow(flows: Map<number, Record<string, [number, number]>>, n
   if (delta > 0) x[0] += delta; else x[1] -= delta;
 }
 
-const goods = (world: World) => [...Object.keys(GOOD_VALUE), ...Object.keys(world.custom.goods)];
+const goods = (world: World) => [...Object.keys(GOOD_VALUE), ...Object.keys(world.custom.goods)].filter(g => g !== "coin"); // §4.13 coin is the measure, not a good to price
 const live = (world: World) => world.nations.filter(n => n.alive && n.founded);
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
@@ -66,7 +66,7 @@ export function updateMarket(world: World, L: Ledger): void {
 }
 
 /** A good's world price, in food. */
-export function price(world: World, g: string): number { return world.market?.prices[g] ?? goodValue(world, g); }
+export function price(world: World, g: string): number { return g === "coin" ? 1 : world.market?.prices[g] ?? goodValue(world, g); }
 /** What a bundle of goods is worth at world prices. */
 export function worth(world: World, g: Record<string, number>): number {
   return Math.round(Object.entries(g).reduce((s, [k, q]) => s + q * price(world, k), 0) * 10) / 10;
