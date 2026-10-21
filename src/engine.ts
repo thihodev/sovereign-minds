@@ -7,7 +7,7 @@ import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
-  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
+  ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -619,6 +619,28 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     if (!n?.alive) continue;
     const word = { accepted: "chấp thuận", partial: "chấp thuận một phần", rejected: "bác bỏ", merged: "gộp vào thỉnh nguyện khác" }[p.status];
     n.lastEvents.push(`Các vị thần đã ${word} thỉnh nguyện "${p.title}"${p.verdict ? `: ${p.verdict}` : ""}`);
+    // §10.5 an idea the gods take up is honoured, once
+    const prize = p.status === "accepted" ? INITIATIVE.accepted : p.status === "partial" ? INITIATIVE.partial : null;
+    if (prize && !p.rewarded) {
+      p.rewarded = true; n.initiatives = (n.initiatives ?? 0) + 1;
+      n.reputation = Math.min(100, n.reputation + prize.reputation); n.stability = Math.min(100, n.stability + prize.stability);
+      let rp = 0;
+      if (n.research && inv(world, n.research.id)) { rp = Math.round(inventionCost(world, n, n.research.id) * prize.inspiration); n.research.progress += rp; }
+      n.lastEvents.push(`Sáng kiến được các vị thần ghi nhận: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP cho ${invName(world, n.research!.id)}` : ""}. Đây là sáng kiến thứ ${n.initiatives} của ${n.name}.`);
+      say(n.id, "petition", `Các vị thần ghi nhận sáng kiến "${p.title}" của ${n.name}.`);
+    }
+  }
+  // §10.5 an idea the gods built into the world: the greatest honour
+  for (const p of world.petitions) {
+    if (!p.implemented || p.honoured) continue;
+    p.honoured = true;
+    const n = world.nations[p.nation]; if (!n?.alive) continue;
+    const prize = INITIATIVE.implemented;
+    n.reputation = Math.min(100, n.reputation + prize.reputation); n.stability = Math.min(100, n.stability + prize.stability);
+    let rp = 0;
+    if (n.research && inv(world, n.research.id)) { rp = Math.round(inventionCost(world, n, n.research.id) * prize.inspiration); n.research.progress += rp; }
+    n.lastEvents.push(`Sáng kiến "${p.title}" của ta đã được các vị thần đưa vào thế giới${p.implementedNote ? ` (${p.implementedNote})` : ""}: +${prize.reputation} uy tín, +${prize.stability} ổn định${rp ? `, cảm hứng +${rp} RP` : ""}, và tên ta được ghi vào sử sách.`);
+    say(n.id, "petition", `Sáng kiến "${p.title}" của ${n.name} trở thành một phần của thế giới.`);
   }
   ministerPhase(world, say); // §4.9 ministers granted, refused or dismissed by the Watcher; seats lost to a shrinking people
 
@@ -1989,6 +2011,13 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!title || title.length > PETITION.titleMax) return `Tiêu đề 1–${PETITION.titleMax} ký tự`;
       if (!text || text.length > PETITION.textMax) return `Nội dung 1–${PETITION.textMax} ký tự`;
       if (reason.length > PETITION.reasonMax) return `Lý do tối đa ${PETITION.reasonMax} ký tự`;
+      // §10.5 an initiative names its kind and is concrete
+      const kind = cat === "sáng kiến" ? String(a.kind ?? "").trim() : undefined;
+      if (cat === "sáng kiến") {
+        if (!(INITIATIVE.kinds as readonly string[]).includes(kind!)) return `Sáng kiến cần "kind": một trong ${INITIATIVE.kinds.join(", ")}`;
+        if (text.length < INITIATIVE.minText) return `Sáng kiến phải cụ thể: mô tả ít nhất ${INITIATIVE.minText} ký tự (nó là gì, hoạt động ra sao, con số nào)`;
+        if (!reason) return "Sáng kiến cần lý do: nó làm thế giới sâu và thật hơn ra sao cho mọi nước";
+      }
       const mine = world.petitions.filter(p => p.nation === n.id);
       if (mine.filter(p => p.status === "pending").length >= PETITION.maxPending) return `Đã có ${PETITION.maxPending} thỉnh nguyện đang chờ`;
       const last = mine.at(-1);
@@ -1996,7 +2025,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       world.petitions.push({
         id: world.petitions.length + 1, nation: n.id, tick: world.tick, category: cat, title, text, reason,
         context: { population: n.population, stability: n.stability, food: Math.round(n.stock.food || 0), tiles: ownedTiles(world, n.id).length, era: n.era },
-        status: "pending", verdict: "", decidedTick: null, mergedInto: null, delivered: false,
+        status: "pending", verdict: "", decidedTick: null, mergedInto: null, delivered: false, ...(kind ? { kind } : {}),
       });
       say(n.id, "petition", `${n.name} dâng thỉnh nguyện lên các vị thần: "${title}".`);
       return null;

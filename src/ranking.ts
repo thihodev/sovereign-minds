@@ -4,7 +4,7 @@
 import { depthOf, inv } from "./catalog.ts";
 import { ownedTiles } from "./engine.ts";
 import { prosperityAverage } from "./prosperity.ts";
-import { EXODUS, PROSPERITY } from "./rules.ts";
+import { EXODUS, INITIATIVE, PROSPERITY } from "./rules.ts";
 import { exodusOf } from "./exodus.ts";
 import type { World } from "./types.ts";
 
@@ -24,6 +24,8 @@ export function ranking(world: World): Rank[] {
       honour: n.reputation,
       prosperity: n.alive ? Math.round(prosperityAverage(n) * PROSPERITY.rankWeight) : 0, // §4.7 how well the people lives
       exodus: -Math.round(exodusOf(n, world.tick).recent * EXODUS.rankPerPerson), // §4.8 the people it could not keep
+      // §10.5 ideas for the world: taken up by the gods, and built into it
+      ideas: world.petitions.filter(p => p.nation === n.id).reduce((s, p) => s + (p.implemented ? INITIATIVE.rank : p.rewarded ? INITIATIVE.rankTaken : 0), 0),
       age: Math.floor((n.alive ? world.tick : (n.peakPopulation ? world.tick : 0)) / 10),
     };
     return { nation: n.id, name: n.name, alive: n.alive, score: Object.values(parts).reduce((a, b) => a + b, 0), parts };

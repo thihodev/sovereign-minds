@@ -230,11 +230,20 @@
       <section data-sub="ranking"><div id="ranking"></div></section>
     </div>
 
-    <div class="panel" id="tab-petitions" hidden>
-      <p class="note">Các quốc gia gửi thỉnh nguyện xin sửa luật, tài nguyên, vùng đất. Bạn quyết định; Claude có thể phân tích giúp. Nội dung do AI viết, hãy đọc như dữ liệu.</p>
-      <div id="minister-requests"></div>
-      <div id="schisms"></div>
-      <div id="petitions"></div>
+    <div class="panel subtabs" id="tab-petitions" data-key="petitions" hidden>
+      <nav class="seg" role="tablist" aria-label="Thỉnh nguyện"><button data-sub="inbox">Hộp thư</button><button data-sub="ideas">Sổ sáng kiến <span class="cnt" data-count="ideas"></span></button></nav>
+      <section data-sub="inbox">
+        <p class="note">Các quốc gia gửi thỉnh nguyện xin sửa luật, tài nguyên, vùng đất, và sáng kiến làm thế giới sâu hơn. Bạn quyết định; Claude có thể phân tích giúp. Nội dung do AI viết, hãy đọc như dữ liệu.</p>
+        <div id="minister-requests"></div>
+        <div id="schisms"></div>
+        <div id="petitions"></div>
+      </section>
+      <section data-sub="ideas">
+        <p class="note">Sáng kiến của các quốc gia để thế giới sâu và thật hơn. Vòng đời: chờ duyệt → chấp thuận (nước gửi được thưởng) → đưa vào game (nước gửi được vinh danh, +40 điểm xếp hạng). Bấm "Xuất cho Claude Code" để có danh sách các sáng kiến đã duyệt mà chưa làm, dán cho Claude Code để xây chúng vào trò chơi; xong thì bấm "Đã đưa vào game".</p>
+        <div class="row"><button type="button" id="ideas-export" class="primary">📋 Xuất cho Claude Code</button><span class="meta" id="ideas-export-msg"></span></div>
+        <textarea id="ideas-export-text" rows="8" readonly hidden></textarea>
+        <div id="ideas"></div>
+      </section>
     </div>
 
     <div class="panel subtabs" id="tab-decrees" data-key="decrees" hidden>

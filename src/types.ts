@@ -113,6 +113,8 @@ export interface Nation {
   renameTick: number | null;
   /** How the nation ended, when it has: taken by another, returned to the nation it split from, or perished on its own. */
   fate?: { tick: number; cause: "conquest" | "reunited" | "perished"; by?: number; why?: string };
+  /** §10.5 petitions the gods took up: the nation's honoured ideas */
+  initiatives?: number;
   /** §4.11 the standard of living, worked out each turn (0–100) */
   living?: number;
   /** §2.3 the turn the capital last moved (it may move again CAPITAL_MOVE.every turns later) */
@@ -357,6 +359,10 @@ export interface Petition {
   decidedTick: number | null;
   mergedInto: number | null;
   delivered: boolean;
+  /** §10.5 the reward was given (once, whatever the gods decide later) */
+  rewarded?: boolean;
+  /** §10.5 an initiative: what kind of depth it adds; the turn it was built into the world, and whether its honour was given */
+  kind?: string; implemented?: number | null; implementedNote?: string; honoured?: boolean;
 }
 
 /** A world-wide law issued by the Watcher (§10.2). */

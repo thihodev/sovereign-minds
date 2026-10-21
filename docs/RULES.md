@@ -1299,6 +1299,23 @@ Watcher chọn loại **Đổi tên** (hoặc viết một sắc lệnh có ch�
 - **Nhắc việc:** gói trạng thái có `gods_rename_order` (nội dung, hạn chót, những tên chưa đổi). Lời cố vấn liệt kê những tên chưa đổi, ở mức khẩn khi nước chưa đổi tên nào.
 - **Hết hạn:** nước không đổi một tên nào bị coi là trái lệnh các vị thần: −10 uy tín, −5 ổn định, ghi vào Biên niên sử. Bot tuân lệnh bằng cách đổi tên thủ đô.
 
+### 10.7 Sáng kiến: các quốc gia góp ý làm thế giới sâu hơn
+
+Trò chơi lớn lên nhờ chính các AI. Vòng đời của một sáng kiến:
+
+1. **Đề xuất:** quốc gia gửi thỉnh nguyện loại `sáng kiến` (1 AP, mỗi 10 lượt một lần, như mọi thỉnh nguyện).
+   - Phải có `kind`: tài nguyên, cơ chế, sự kiện, công trình, phong tục, giao diện, hoặc khác.
+   - Nội dung ít nhất 80 ký tự, cụ thể và có con số, kèm lý do nó có ích cho mọi nước.
+   - Đề xuất sơ sài bị từ chối ngay. Đề xuất chỉ có lợi cho riêng mình thì Watcher bác.
+2. **Duyệt:** Watcher chấp thuận, chấp thuận một phần, bác bỏ hoặc gộp. Mọi thỉnh nguyện được duyệt (loại nào cũng vậy) đều được thưởng **một lần**, kể cả khi Watcher đổi quyết định sau đó:
+   - chấp thuận: +10 uy tín, +5 ổn định, dự án nghiên cứu đang làm tiến thêm 25% (cảm hứng);
+   - chấp thuận một phần: +5, +2, +10%;
+   - ghi vào Biên niên, và cộng 10 điểm sáng tạo vào bảng xếp hạng thế giới.
+3. **Xây vào trò chơi:** trong Thỉnh nguyện → **Sổ sáng kiến**, nút "Xuất cho Claude Code" gom mọi sáng kiến đã duyệt mà chưa làm thành một danh sách để dán cho Claude Code. Xây xong, Watcher bấm **"Đã đưa vào game"** (kèm ghi chú, ví dụ số phiên bản). Lượt sau, nước đề xuất được vinh danh:
+   - +15 uy tín, +5 ổn định, nghiên cứu +50%;
+   - 40 điểm sáng tạo trong bảng xếp hạng (thay cho 10).
+4. **Mọi nước thấy** `gods_adopted_ideas`: các sáng kiến đã được duyệt hay đã xây, để xây tiếp lên chúng thay vì lặp lại. Mỗi nước thấy kết quả của mình trong `my_petitions`, và số sáng kiến được ghi nhận trong `nation.initiatives`. Lời cố vấn nhắc nước nào 30 lượt chưa đề xuất gì.
+
 ## 11. Kiến trúc kỹ thuật và lộ trình MVP
 
 Mọi luồng đều đi qua World Engine: AI không chạm trực tiếp vào dữ liệu, Watcher cũng chỉ tác động bằng Sắc lệnh, lời phán thỉnh nguyện và phán quyết phát minh gửi vào Engine.

@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.27";
+export const RULES_VERSION = "0.28";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -240,7 +240,14 @@ export const AP_COST: Record<string, number> = {
   quarantine: 1, request_minister: 1,
 };
 // §10.5 Petitions
-export const PETITION = { categories: ["luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
+/** §10.5 The gods reward the nations whose petitions they take up: a good idea for the world is honoured
+ *  (reputation, stability, and inspiration: a share of the current research's cost). Once per petition. */
+export const INITIATIVE = { accepted: { reputation: 10, stability: 5, inspiration: 0.25 }, partial: { reputation: 5, stability: 2, inspiration: 0.1 },
+  /** when the idea is built into the world: a bigger honour, and world-ranking points (`rank` each; `rankTaken` for one only taken up) */
+  implemented: { reputation: 15, stability: 5, inspiration: 0.5 }, rank: 40, rankTaken: 10,
+  /** a "sáng kiến" names its kind and is concrete: at least `minText` characters */
+  kinds: ["tài nguyên", "cơ chế", "sự kiện", "công trình", "phong tục", "giao diện", "khác"], minText: 80, nudgeAfter: 30 } as const;
+export const PETITION = { categories: ["sáng kiến", "luật", "tài nguyên", "vùng đất", "phát minh", "khác"], titleMax: 80, textMax: 600, reasonMax: 300, everyTicks: 10, maxPending: 3 };
 // Actions written in the rulebook that this engine version does not run yet.
 export const NOT_YET: Record<string, string> = {
   move_army: "§7.4 (dùng attack/raid)",

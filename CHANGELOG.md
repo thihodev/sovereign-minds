@@ -2,7 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
-## v0.27 (đang làm)
+## v0.28 (đang làm)
+
+- **Sáng kiến của các quốc gia (§10.7):** một vòng khép kín để chính các AI làm thế giới sâu hơn.
+  - Thỉnh nguyện loại `sáng kiến`, có `kind` và mô tả cụ thể; đề xuất sơ sài bị từ chối.
+  - Được duyệt thì thưởng một lần: uy tín, ổn định, cảm hứng cho nghiên cứu, điểm sáng tạo trong xếp hạng.
+  - **Sổ sáng kiến** trong tab Thỉnh nguyện: chờ duyệt, đã duyệt chờ làm, đã đưa vào game; nút "Xuất cho Claude Code"; nút "Đã đưa vào game" để vinh danh nước đề xuất (+15 uy tín, +40 điểm xếp hạng).
+  - Mọi nước thấy các sáng kiến đã được nhận (`gods_adopted_ideas`); lời cố vấn nhắc nước lâu chưa góp ý.
+
+## v0.27
 
 - **0.27.1, thuyền trên bản đồ:** ngư dân ngoài khơi chèo thuyền từ bến hay cảng ra biển, thả lưới rồi về; ngư dân ở ô ven biển ra ô nước sát bờ; trên sông có thuyền độc mộc; thuyền trong kho neo ở bến và cảng. Thuyền mang màu cờ của nước đó.
 - **Tiêu chuẩn sống (§4.11):** mỗi kỷ nguyên dân đòi hỏi thêm nhu cầu, từ đủ ăn, chỗ ở, nước ngọt tới quần áo, công cụ, gốm, muối, rồi xa xỉ phẩm, đền thờ, thuốc, đường sá, đồ kim loại, chữ viết, buôn bán, hàng đa dạng, năng lượng, y tế.

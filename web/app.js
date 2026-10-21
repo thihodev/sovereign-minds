@@ -1925,6 +1925,29 @@
       box.append(el);
     }
   }
+  // §10.5 the book of initiatives: waiting, taken up, built into the world
+  const IDEA_STATE = p => p.implemented ? ["đã đưa vào game", "ok"] : p.status === "accepted" || p.status === "partial" ? ["đã duyệt, chờ làm", "warn"] : p.status === "pending" ? ["chờ duyệt", ""] : [PSTATUS[p.status]?.[0] ?? p.status, "bad"];
+  function renderIdeas() {
+    const ideas = (S.petitions || []).filter(p => p.category === "sáng kiến").slice().reverse();
+    setCount("petitions", "ideas", ideas.filter(p => !p.implemented && (p.status === "accepted" || p.status === "partial")).length || "");
+    const order = p => p.implemented ? 2 : p.status === "accepted" || p.status === "partial" ? 0 : p.status === "pending" ? 1 : 3;
+    $("#ideas").innerHTML = ideas.length ? ideas.sort((a, b) => order(a) - order(b) || b.id - a.id).map(p => { const [st, cls] = IDEA_STATE(p); return `<article class="petition idea">
+      <div class="row"><b>${esc(p.title)}</b><span class="pill">${esc(p.kind || "khác")}</span><span style="flex:1"></span><span class="pill ${cls}">${esc(st)}</span></div>
+      <div class="meta">#${p.id} · ${esc(S.nations[p.nation]?.name ?? "?")} · lượt ${p.tick}${p.implemented ? ` · đưa vào game lượt ${p.implemented}${p.implementedNote ? `: ${esc(p.implementedNote)}` : ""}` : ""}</div>
+      <div class="body">${esc(p.text)}</div><div class="meta">Lý do: ${esc(p.reason || "—")}${p.verdict ? ` · Lời phán: ${esc(p.verdict)}` : ""}</div>
+      ${(p.status === "accepted" || p.status === "partial") && !p.implemented ? `<div class="row"><input type="text" placeholder="Ghi chú (ví dụ: bản 0.30)" data-note="${p.id}"><button type="button" class="primary" data-built="${p.id}">✅ Đã đưa vào game</button></div>` : ""}
+      ${p.implemented && !p.honoured ? `<div class="row"><button type="button" data-unbuilt="${p.id}">Hoàn tác</button><span class="meta">nước gửi sẽ được vinh danh ở lượt sau</span></div>` : ""}
+    </article>`; }).join("") : `<p class="note">Chưa có sáng kiến nào. Các AI được nhắc gửi sáng kiến (thỉnh nguyện loại "sáng kiến") và được thưởng khi bạn chấp thuận.</p>`;
+    for (const b of document.querySelectorAll("#ideas [data-built]")) b.onclick = async () => { const note = document.querySelector(`#ideas [data-note="${b.dataset.built}"]`)?.value || ""; await api(`/api/petitions/${b.dataset.built}/implemented`, { method: "POST", body: { done: true, note } }).catch(e => alertMsg(e.message)); refresh(); };
+    for (const b of document.querySelectorAll("#ideas [data-unbuilt]")) b.onclick = async () => { await api(`/api/petitions/${b.dataset.unbuilt}/implemented`, { method: "POST", body: { done: false } }).catch(e => alertMsg(e.message)); refresh(); };
+  }
+  $("#ideas-export").onclick = () => {
+    const todo = (S.petitions || []).filter(p => p.category === "sáng kiến" && (p.status === "accepted" || p.status === "partial") && !p.implemented);
+    const text = todo.length ? `Các sáng kiến của các quốc gia đã được duyệt, cần xây vào Sovereign Minds (mỗi cái: làm luật trong engine, cho AI biết, hiện trên UI, viết test, cập nhật docs/RULES.md và CHANGELOG):\n\n${todo.map(p => `- #${p.id} [${p.kind || "khác"}] ${p.title} (của ${S.nations[p.nation]?.name ?? "?"}${p.status === "partial" ? ", chấp thuận một phần" : ""})\n  Nội dung: ${p.text}\n  Lý do: ${p.reason || "—"}${p.verdict ? `\n  Lời phán của Watcher: ${p.verdict}` : ""}`).join("\n")}\n\nXong cái nào, tôi sẽ bấm "Đã đưa vào game" cho cái đó trong Sổ sáng kiến.` : "";
+    const ta = $("#ideas-export-text"); ta.hidden = !text; ta.value = text;
+    if (text) { ta.select(); navigator.clipboard?.writeText(text).then(() => { $("#ideas-export-msg").textContent = `Đã chép ${todo.length} sáng kiến vào bộ nhớ tạm.`; }, () => { $("#ideas-export-msg").textContent = "Chọn và chép đoạn bên dưới."; }); }
+    else $("#ideas-export-msg").textContent = "Không có sáng kiến nào đã duyệt mà chưa làm.";
+  };
   function renderPetitions() {
     renderSchisms();
     renderMinisterRequests();
@@ -1935,10 +1958,11 @@
     for (const p of list) {
       const n = S.nations[p.nation], [st, cls] = PSTATUS[p.status];
       const el = document.createElement("article"); el.className = "petition";
-      el.innerHTML = `<div class="row"><h3></h3><span style="flex:1"></span><span class="pill ${cls}">${st}</span></div>
+      el.innerHTML = `<div class="row"><h3></h3>${p.category === "sáng kiến" ? `<span class="pill ok">💡 sáng kiến</span>` : ""}<span style="flex:1"></span>${p.rewarded ? `<span class="pill ok" title="Nước này đã được thưởng cho thỉnh nguyện này">🏅 đã thưởng</span>` : ""}<span class="pill ${cls}">${st}</span></div>
         <div class="meta">#${p.id} · ${esc(n?.name)} · lượt ${p.tick} · loại ${esc(p.category)} · lúc gửi: ${p.context.population} dân, ${p.context.food} lương thực, ổn định ${p.context.stability}, ${p.context.tiles} ô</div>
         <div class="body"></div><div class="meta reason"></div>
         ${p.status === "pending" ? `<textarea rows="2" placeholder="Lời phán của các vị thần (gửi lại cho quốc gia này)"></textarea>
+        <p class="note">Chấp thuận: nước gửi được +10 uy tín, +5 ổn định, nghiên cứu đang làm +25%. Một phần: +5, +2, +10%. Thưởng một lần.</p>
         <div class="row"><button data-s="accepted" class="primary">Chấp thuận</button><button data-s="partial">Một phần</button><button data-s="rejected">Bác bỏ</button><button data-act="decree">Soạn Sắc lệnh</button><button data-act="ask">Hỏi Claude</button></div>`
         : `<div class="meta">Lời phán: ${esc(p.verdict || "—")}</div>`}`;
       el.querySelector("h3").textContent = p.title;
@@ -2457,7 +2481,7 @@
   // ---------------------------------------------------------------- data flow
   async function refresh() {
     S = await api("/api/state");
-    applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderProducts(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
+    applyStatus(S); render(); renderSummary(); renderBoard(); renderNations(); renderProducts(); renderIdeas(); renderPetitions(); renderDecrees(); renderInventions(); renderDiplomacy();
     if (DOCKS.right.open && curTab === "stats") renderStats();
     renderTrees();
     if (DOCKS.right.open && curTab === "inspect") renderInspector();

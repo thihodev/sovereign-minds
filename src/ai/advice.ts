@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { AP_COST, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { AP_COST, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -289,6 +289,13 @@ export function advice(world: World, n: Nation): Advice[] {
     const onLand = LUXURY.goods.filter(g => !lux.kinds.includes(g) && (res[g]?.amount ?? 0) > 0 && canSeeRes(world, n, g)).map(g => goodVi(world, g));
     const sellers = known.filter(o => LUXURY.goods.some(g => surpluses(world, o).some(x => x.good === g))).map(o => o.name);
     say(1, `Xa xỉ phẩm: dân đang dùng ${lux.kinds.length ? lux.kinds.map(g => goodVi(world, g)).join(", ") : "không thứ nào"} (+${lux.stability} ổn định/lượt). Mỗi loại có đủ ${lux.need} trong kho cho thêm +${LUXURY.stability}/lượt (tối đa +${LUXURY.max}).${onLand.length ? ` Trên đất bạn có: ${onLand.join(", ")} (hái lượm, săn, đánh cá hay đào mỏ để lấy).` : ""}${sellers.length ? ` Mua của ${sellers.slice(0, 3).join(", ")}.` : ""}`);
+  }
+
+  // §10.5 an idea for the world, now and then: the gods reward the ones they take up
+  {
+    const last = world.petitions.filter(p => p.nation === n.id).at(-1);
+    if (world.tick > 20 && (!last || world.tick - last.tick >= INITIATIVE.nudgeAfter) && world.tick % 10 === n.id % 10)
+      say(1, `Các vị thần thưởng sáng kiến làm thế giới sâu và chi tiết hơn (petition, loại "sáng kiến": một tài nguyên, cơ chế, sự kiện, công trình hay phong tục mới, cụ thể, có con số). Được chấp thuận: +${INITIATIVE.accepted.reputation} uy tín, +${INITIATIVE.accepted.stability} ổn định, nghiên cứu +${INITIATIVE.accepted.inspiration * 100}%.`);
   }
 
   for (const a of ministerAdvice(world, n)) say(a.level, a.text);

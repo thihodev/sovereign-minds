@@ -95,3 +95,47 @@ test("runner: a text decree that orders new names becomes a renaming decree, and
     r.store.close?.();
   } finally { process.env = prev; rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("a petition the gods take up is rewarded once: reputation, stability, inspiration", async () => {
+  const { INITIATIVE } = await import("../src/rules.ts");
+  const w = founded("initiative"), [a] = w.nations;
+  a.met = []; a.reputation = 50; a.stability = 50; a.research = { id: "P2", progress: 0 } as never;
+  turn(w, { 0: { actions: [{ type: "petition", category: "sáng kiến", kind: "sự kiện", title: "Mùa lũ mang phù sa", text: "Mỗi lần lũ sông để lại lớp phù sa: ruộng trên các ô ven sông bị lũ cho thêm 20% lương thực trong hai lượt sau lũ.", reason: "Thế giới thật hơn cho mọi nước" }] } });
+  const p = w.petitions.at(-1)!;
+  assert.equal(p.category, "sáng kiến");
+  p.status = "accepted"; p.delivered = false;
+  const rep = a.reputation;
+  turn(w);
+  assert.equal(a.initiatives, 1);
+  assert.ok(a.reputation >= Math.min(100, rep + INITIATIVE.accepted.reputation) - 1, `${rep} → ${a.reputation}`);
+  assert.ok((a.research?.progress ?? 0) > 0 || a.inventions.includes("P2"), "inspiration for the research");
+  // decided again: no second reward
+  p.status = "accepted"; p.delivered = false;
+  turn(w);
+  assert.equal(a.initiatives, 1);
+});
+
+test("an initiative must be concrete; one built into the world is honoured once and counts in the ranking", async () => {
+  const { INITIATIVE } = await import("../src/rules.ts");
+  const { ranking } = await import("../src/ranking.ts");
+  const w = founded("initiative-built"), [a] = w.nations;
+  a.met = [];
+  turn(w, { 0: { actions: [{ type: "petition", category: "sáng kiến", title: "Ý hay", text: "ngắn quá", reason: "x" }] } });
+  assert.ok(a.lastRejected.some(r => /kind/.test(r.reason)), JSON.stringify(a.lastRejected));
+  turn(w, { 0: { actions: [{ type: "petition", category: "sáng kiến", kind: "cơ chế", title: "Ý hay", text: "ngắn quá", reason: "x" }] } });
+  assert.ok(a.lastRejected.some(r => /cụ thể/.test(r.reason)));
+  turn(w, { 0: { actions: [{ type: "petition", category: "sáng kiến", kind: "công trình", title: "Cối xay nước", text: "Công trình bên sông dùng sức nước xay hạt: mỗi cối giúp 4 nông dân làm ra thêm 30% lương thực, cần 20 gỗ 10 đá.", reason: "Mọi nước có sông đều dùng được" }] } });
+  const p = w.petitions.at(-1)!;
+  assert.equal(p.kind, "công trình");
+  p.status = "accepted"; p.delivered = false;
+  turn(w);
+  const before = ranking(w).find(r => r.nation === a.id)!.parts.ideas;
+  assert.equal(before, INITIATIVE.rankTaken);
+  p.implemented = w.tick;
+  const rep = a.reputation;
+  turn(w);
+  assert.ok(p.honoured && a.reputation > rep);
+  assert.equal(ranking(w).find(r => r.nation === a.id)!.parts.ideas, INITIATIVE.rank);
+  turn(w);
+  assert.ok(a.reputation >= rep, "honoured once");
+});

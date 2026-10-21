@@ -535,6 +535,19 @@ export class Runner {
     return null;
   }
 
+  /** §10.5 The Watcher marks an idea as built into the world (or takes the mark back while it is not yet honoured). */
+  markImplemented(id: number, done: boolean, note: string): string | null {
+    const p = this.world.petitions.find(x => x.id === id);
+    if (!p) return "Không có thỉnh nguyện này";
+    if (done && !["accepted", "partial"].includes(p.status)) return "Chỉ đánh dấu được thỉnh nguyện đã chấp thuận";
+    if (!done && p.honoured) return "Nước này đã được vinh danh cho sáng kiến này";
+    p.implemented = done ? this.world.tick : null; p.implementedNote = note.trim().slice(0, 200);
+    this.store.logWatcher(this.world.tick, "implemented", { id, done, note });
+    this.store.saveState(this.world);
+    this.emit({ type: "status" });
+    return null;
+  }
+
   /** §4.5 Let a faction go and give its nation a mind (a Claude model and effort, or a bot), or refuse it. */
   decideSchism(id: number, status: string, model: string, effort: string, verdict: string): string | null {
     const x = (this.world.schisms ?? []).find(s => s.id === id);

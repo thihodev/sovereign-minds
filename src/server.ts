@@ -111,7 +111,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         relations: Object.fromEntries(w.nations.filter(o => o.id !== n.id).map(o => [o.id, relation(w, n.id, o.id)])),
         thought: n.lastThought, memory: n.memory, events: n.lastEvents, rejected: n.lastRejected,
         met: n.met, intel: n.intel, stats: n.stats,
-        formerNames: n.formerNames,
+        formerNames: n.formerNames, initiatives: n.initiatives ?? 0,
         threats: nationThreats(w, n), resources: n.alive ? nationResources(w, n) : null,
         nextEra: n.alive ? nextEraNeeds(w, n) : null, courtSlots: n.alive ? maxOfficials(w, n) : 0,
         officials: (n.officials ?? []).map(o => ({ ...o, title: OFFICIAL_DOMAINS[o.domain]?.title ?? o.domain })), work: n.alive && n.founded ? workSites(w, n) : [],
@@ -290,6 +290,13 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (modelM && method === "POST") {
         const b = await readBody(req);
         const err = runner.setNationModel(Number(modelM[1]), String(b.model ?? ""), String(b.effort ?? ""));
+        return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
+      }
+      // §10.5 the Watcher marks an idea as built into the world
+      const impM = path.match(/^\/api\/petitions\/(\d+)\/implemented$/);
+      if (impM && method === "POST") {
+        const b = await readBody(req);
+        const err = runner.markImplemented(Number(impM[1]), b.done !== false, String(b.note ?? ""));
         return err ? send(res, 400, { error: err }) : send(res, 200, { ok: true });
       }
       const petM = path.match(/^\/api\/petitions\/(\d+)$/);
