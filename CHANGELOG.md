@@ -9,6 +9,10 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - ruộng ven sông +50%, ruộng châu thổ +100%; mỗi ô sông thêm 2 gia đình;
   - hai nước láng giềng cùng giữ một con sông thì biên giới căng thêm mỗi lượt (tranh chấp nguồn nước);
   - AI thấy `rivers_contested` và được cố vấn; bot nhắm vào đất ven sông của nước yếu.
+- **0.25.2, tổng kết chiến tranh:** Ngoại giao → Chiến sự có thêm mục "Tổng kết các cuộc chiến", gồm cả cuộc **đã kết thúc**.
+  - Mỗi cuộc chiến: thời gian, số trận, kết cục (đang diễn ra, kết thúc bằng hòa ước, nước nào diệt vong).
+  - Bảng so sánh hai bên: trận thắng, người chết, ô chiếm được, trung tâm chiếm được, đột kích thành công, ô bị mất. Bên chịu thiệt hơn tô đỏ.
+  - Nút tới nơi giao tranh gần nhất.
 - **0.25.1, vùng chiến sự:**
   - mặt trận (biên giới giữa hai nước đang chiến tranh) vẽ vạch vàng đen nhấp nháy, tâm mặt trận có huy hiệu ⚔;
   - chip "⚔ N cuộc chiến" trên thanh trên bấm được: một cuộc chiến thì bay tới mặt trận và phát lại các trận gần nhất, nhiều cuộc thì mở danh sách;

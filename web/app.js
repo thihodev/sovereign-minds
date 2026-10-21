@@ -2110,6 +2110,19 @@
     setCount("diplomacy", "hordes", (S.hordes || []).filter(h => h.alive).length); setCount("diplomacy", "trade", cars.length);
     $("#wars").innerHTML = (S.wars || []).map(w => { const bs = (S.battles || []).filter(b => (b.attacker === w.a && b.defender === w.b) || (b.attacker === w.b && b.defender === w.a)); return `<div class="card2 war-card"><div class="row"><b>${esc(w.aName)} ⚔ ${esc(w.bName)}</b><span style="flex:1"></span><button type="button" class="primary" data-war="${w.id}">⚔ Xem mặt trận</button></div><span class="meta">tuyên chiến lượt ${w.declared}, giao tranh từ lượt ${w.start}${w.reason ? ` · ${esc(w.reason)}` : ""}${bs.length ? ` · ${bs.length} trận gần đây, trận cuối lượt ${bs.at(-1).tick}` : " · chưa giao tranh"}</span></div>`; }).join("") || `<p class="note">Thế giới đang yên bình.</p>`;
     for (const b of document.querySelectorAll("#wars [data-war]")) b.onclick = () => { const w = (S.wars || []).find(x => x.id === +b.dataset.war); if (w) goToWar(w); };
+    // §7.4 each war's tally, side by side: battles won, the dead, land and centres taken, raids
+    $("#war-history").innerHTML = (S.warHistory || []).map(h => {
+      const row = (label, k, bad) => `<tr><td>${label}</td><td class="${bad && h.a[k] > h.b[k] ? "bad" : ""}">${h.a[k]}</td><td class="${bad && h.b[k] > h.a[k] ? "bad" : ""}">${h.b[k]}</td></tr>`;
+      const lostA = h.b.tiles, lostB = h.a.tiles;
+      return `<div class="card2 war-tally${h.end === null ? " live" : ""}"><div class="row"><b>${esc(h.a.name)} ⚔ ${esc(h.b.name)}</b><span style="flex:1"></span><span class="pill ${h.end === null ? "bad" : ""}">${esc(h.outcome)}</span></div>
+        <div class="meta">lượt ${h.start}${h.end !== null ? `–${h.end}` : " tới nay"} · ${h.battles} trận${h.reason ? ` · ${esc(h.reason)}` : ""}</div>
+        <table class="res tally"><thead><tr><th></th><th>${esc(h.a.name)}</th><th>${esc(h.b.name)}</th></tr></thead><tbody>
+          ${row("Trận thắng", "won")}${row("Người chết", "dead", true)}${row("Ô chiếm được", "tiles")}${row("Trung tâm chiếm được", "centres")}${row("Đột kích thành công", "raids")}
+          <tr><td>Ô bị mất</td><td class="${lostA > lostB ? "bad" : ""}">${lostA}</td><td class="${lostB > lostA ? "bad" : ""}">${lostB}</td></tr>
+        </tbody></table>
+        ${h.lastTile !== null ? `<button type="button" class="link" data-tally-tile="${h.lastTile}">📍 Tới nơi giao tranh gần nhất</button>` : ""}</div>`;
+    }).join("") || `<p class="note">Chưa có cuộc chiến nào.</p>`;
+    for (const b of document.querySelectorAll("#war-history [data-tally-tile]")) b.onclick = () => centerOn(+b.dataset.tallyTile, Math.max(view.z, 26 / geo.s));
     const TN = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
     $("#treaties").innerHTML = (S.treaties || []).map(t => `<div class="card2"><b>#${t.id} ${esc(TN[t.type] || t.type)}: ${esc(t.aName)} — ${esc(t.bName)}</b><span class="meta">từ lượt ${t.start}${t.end ? ` đến ${t.end}` : ", vĩnh viễn"}${Object.keys(t.tribute || {}).length ? ` · ${esc(t.aName)} nộp ${esc(Object.entries(t.tribute).map(([k, q]) => `${q} ${RES[k] ?? k}`).join(", "))}/lượt` : ""}</span></div>`).join("") || `<p class="note">Chưa có hiệp ước.</p>`;
     $("#battles").innerHTML = (S.battles || []).slice().reverse().map((b, k) => `<li class="clickable" data-battle="${(S.battles || []).length - 1 - k}" title="Bấm để bay tới và xem lại trận"><span class="t">${b.tick}</span><span>${esc(nm(b.attacker))} ${b.kind === "raid" ? "đột kích" : "tấn công"} ${esc(nm(b.defender))}: ${b.won ? "thắng" : "thua"} (${b.a} vs ${b.d}), thương vong ${b.lossA}/${b.lossD}${b.note ? ` · ${esc(b.note)}` : ""} <span class="link">📍</span></span></li>`).join("") || `<li class="note">Chưa có trận đánh.</li>`;

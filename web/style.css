@@ -601,3 +601,7 @@ table.prod td { font-size: 12.5px; }
 #battles li.clickable { cursor: pointer; border-radius: 6px; }
 #battles li.clickable:hover { background: color-mix(in srgb, var(--bad) 10%, transparent); }
 @media (prefers-reduced-motion: reduce) { .summary .war-chip.hot { animation: none; } }
+/* §7.4 a war's tally */
+.war-tally.live { border-left: 3px solid var(--bad); }
+table.tally td:not(:first-child), table.tally th:not(:first-child) { text-align: right; font-family: var(--f-mono); }
+table.tally td.bad { color: var(--bad); font-weight: 600; }

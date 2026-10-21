@@ -164,6 +164,27 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       treaties: w.treaties.filter(t => t.active).map(t => ({ ...t, aName: w.nations[t.a]?.name, bName: w.nations[t.b]?.name })),
       wars: w.wars.filter(x => x.end === null).map(x => ({ ...x, aName: w.nations[x.a]?.name, bName: w.nations[x.b]?.name })),
       battles: w.battles.slice(-20),
+      // §7.4 every war's tally, from the battles kept (the last 300): who won what, who buried whom, who lost land
+      warHistory: w.wars.slice(-20).reverse().map(x => {
+        const pair = (b: { attacker: number; defender: number }) => (b.attacker === x.a && b.defender === x.b) || (b.attacker === x.b && b.defender === x.a);
+        const bs = w.battles.filter(b => pair(b) && b.tick >= x.start - 1 && (x.end === null || b.tick <= x.end));
+        const side = (id: number) => {
+          const atk = bs.filter(b => b.attacker === id), def = bs.filter(b => b.defender === id);
+          return {
+            id, name: w.nations[id]?.name ?? "?", alive: !!w.nations[id]?.alive,
+            won: atk.filter(b => b.won).length + def.filter(b => !b.won).length,
+            dead: atk.reduce((s, b) => s + b.lossA, 0) + def.reduce((s, b) => s + b.lossD, 0),
+            tiles: atk.filter(b => b.won && b.kind === "attack" && /chiếm được/.test(b.note)).length,
+            centres: atk.filter(b => b.won && /trung tâm/.test(b.note) && !/chưa bị vây/.test(b.note)).length,
+            raids: atk.filter(b => b.won && b.kind === "raid").length,
+          };
+        };
+        const A = side(x.a), B = side(x.b);
+        const outcome = x.end === null ? "đang diễn ra"
+          : !A.alive && B.alive ? `${A.name} diệt vong` : !B.alive && A.alive ? `${B.name} diệt vong`
+          : w.treaties.some(t => t.type === "peace" && ((t.a === x.a && t.b === x.b) || (t.a === x.b && t.b === x.a)) && Math.abs(t.start - x.end!) <= 1) ? "kết thúc bằng hòa ước" : "đã dừng";
+        return { id: x.id, declared: x.declared, start: x.start, end: x.end, reason: x.reason, outcome, battles: bs.length, a: A, b: B, lastTile: bs.at(-1)?.tile ?? null };
+      }),
       caravans: w.caravans,
       borders: w.borders ?? {},
       eraGates: w.eraGates,
