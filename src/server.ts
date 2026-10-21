@@ -102,7 +102,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         discontent: Math.round(n.discontent ?? 0), advice: n.alive && n.founded ? advice(w, n) : [], idleStreak: n.idleStreak ?? 0, origin: n.origin ? { ...n.origin, fromName: w.nations[n.origin.from]?.name } : null,
         population: n.population, workers: workers(n),
         demo: n.alive ? (() => { const d = demo(n); return { m: d.m, f: d.f, born: d.born ?? 0, infants: d.infants ?? 0, aged: d.aged ?? 0, households: households(n), fighters: fighters(n), mouths: mouths(n) }; })() : null,
-        family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: DEMO.births[n.family?.births ?? "neutral"]?.name, fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
+        family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: "tự nhiên (theo đời sống)", fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
         roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n, w), works: (n.roadWorks ?? []).length } : null,

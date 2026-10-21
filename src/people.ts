@@ -101,7 +101,7 @@ export const count = (who: Demography) => total(who);
 
 /** Workers: each group's share of a full day's work (§4.2); mothers work less when births are encouraged. */
 export function workForce(n: Nation): number {
-  const d = demo(n), w = DEMO.births[n.family?.births ?? "neutral"]?.womenWork ?? 1;
+  const d = demo(n), w = DEMO.womenWork;
   let x = 0;
   for (let a = 0; a < 4; a++) x += d.m[a] * DEMO.work[a] + d.f[a] * DEMO.work[a] * (a === 2 ? w : 1);
   return Math.floor(x);
@@ -144,9 +144,9 @@ export function breeding(n: Nation): number {
   const pair = d.f[2] ? Math.min(1, d.m[2] / (d.f[2] * DEMO.pairing)) : 0;
   return Math.min(1, women * pair);
 }
-/** How fertile the people is now for growth: breeding × the birth custom × marriage. */
+/** How fertile the people is now for growth: breeding × marriage × blessing (how well it lives is THRIVE, apart). */
 export function fertility(n: Nation, marriage: boolean, blessing = 1): number {
-  return breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.fert ?? 1) * (marriage ? DEMO.marriage : 1) * blessing;
+  return breeding(n) * (marriage ? DEMO.marriage : 1) * blessing;
 }
 /** Newborns: half boys, half girls; the odd one by the seed. */
 export function babies(n: Nation, k: number, rand: () => number): void {

@@ -13,7 +13,7 @@
 
 import { vietPlace } from "../names.ts";
 import { localPrice, price, veinsNear } from "../market.ts";
-import { FESTIVAL, MISSION, HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { ERA_TABLE, FESTIVAL, MISSION, HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
@@ -21,7 +21,7 @@ import { borderOf } from "../border.ts";
 import { immune, plagueNearby, quarantined } from "../contagion.ts";
 import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
-import { allInventions, buildingOf, invName, recipeOf } from "../catalog.ts";
+import { allInventions, buildingOf, eraIndex, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween, warLead, warSide } from "../diplomacy.ts";
@@ -81,6 +81,8 @@ const xy = (i: number) => [col(i), row(i)];
 
 interface View {
   world: World; n: Nation; m: Mods; owned: Tile[]; mine: Set<number>; centres: number[];
+  /** §5.6 the land resource the next era asks for, if the nation lacks it */
+  want?: string;
   pop: number; workers: number; need: number; food: number; house: number; limit: number;
   /** §2.6 land governed against the limit: water weighs a third */
   held: number;
@@ -116,7 +118,8 @@ function tileWorth(v: View, t: Tile): number {
   let food = (t.cap.game || 0) * (REGEN.game || 0) + (t.cap.plants || 0) * (REGEN.plants || 0) + (t.cap.fish || 0) * (REGEN.fish || 0);
   if (!t.land) food *= 0.7;
   return food + Math.min(5, (R.wood || 0) / 40) + Math.min(3, (R.stone || 0) / 100) + Math.min(4, (R.flint || 0) / 10) + Math.min(3, (R.clay || 0) / 50)
-    + (see("copper") && R.copper ? 6 : 0) + (t.river ? 4 : 0) + (t.terrain === "grass" || t.terrain === "coast" ? 2 : 0)
+    + (see("copper") && R.copper ? 6 : 0) + (v.want && see(v.want as ResKey) && (R[v.want as ResKey] || 0) > 0 ? 25 : 0) // §5.6 the resource the next era asks for: worth reaching out for
+    + (t.river ? 4 : 0) + (t.terrain === "grass" || t.terrain === "coast" ? 2 : 0)
     + (t.land && v.house - v.pop <= 3 ? (HAMLET.people[t.terrain] || 0) * 1.5 : 0) // §4.2 room for hamlets when the people is out of housing
     + (t.vein && (!HIDDEN.has(t.vein) || see(t.vein)) ? 3 + price(v.world, t.vein) : 0); // §2.10 a rich vein
 }
@@ -145,7 +148,10 @@ function look(world: World, n: Nation): View {
     }
     ring = next;
   }
+  // §5.6 the land resource the next era's gate asks for, while the nation holds none of it and has too little in store
+  const gate = ERA_TABLE[eraIndex(n) + 1], wantRes = gate?.res && !owned.some(t => (t.res[gate.res as ResKey] || 0) > 0) && (n.stock[gate.res] || 0) < 20 ? gate.res : undefined;
   return {
+    want: wantRes,
     world, n, m, owned, mine: new Set(owned.map(t => t.i)), centres: [n.capital, ...n.settlements.map(s => s.tile)],
     pop: n.population, workers: workers(n), need: mouths(n) * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
     has: id => n.inventions.includes(id), stock: k => n.stock[k] || 0,

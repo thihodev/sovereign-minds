@@ -52,7 +52,7 @@ test("housing: three tents per centre; only that many count", () => {
 
 test("growth is logistic toward housing; the tile limit grows with √population", () => {
   assert.equal(growthFor(20, 25), 1, "at least one");
-  assert.equal(growthFor(100, 200), 4, "8% × 100 × (1 − 100/200)");
+  assert.equal(growthFor(100, 200), 3, "7.5% × 100 × (1 − 100/200)");
   assert.equal(growthFor(199, 200), 1);
   assert.equal(growthFor(200, 200), 0, "never past the roof");
   const w = founded();

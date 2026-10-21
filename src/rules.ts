@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.39";
+export const RULES_VERSION = "0.40";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -61,7 +61,13 @@ export const WORKER_SHARE = 0.7;
 export const FOOD_PER_PERSON = 1;
 /** §4.2 Growth is logistic toward housing: +floor(pop × rate × (1 − pop/housing)), at least `min`,
  *  when the food left after eating is ≥ `surplus` of need. Mutable so tools/simulate.ts --variant can tune it. */
-export const GROWTH = { rate: 0.08, surplus: 0.2, min: 1 };
+export const GROWTH = { rate: 0.075, surplus: 0.2, min: 1 };
+/** §4.2 A people grows as well as it lives (v0.40): growth × a factor from food, the standard of living, order and health,
+ *  between `min` and `max` (festivals and missions add their blessing on top). */
+export const THRIVE = { min: 0.6, max: 1.1, foodRich: 2, foodRichBonus: 0.1, living: 0.6, stableAt: 60, stableBonus: 0.1, unstableAt: 30, unstableCut: 0.3, sickCut: 0.25, herbsBonus: 0.1 };
+/** §4.2 Housing is a soft roof (v0.40): a people that lives well (thrive ≥ 1) still grows past it, at `slow` × the
+ *  growth rate, up to `over` × its housing; crowding then shows in the standard of living and the restless provinces. */
+export const CROWD = { over: 1.1, slow: 0.1 };
 /** §4.2 People by age and sex. A turn is ten years, so the groups move up one step a turn:
  *  children (0–9), youths (10–19), adults (20–49, a 30-year group: a third grows old each turn), elders (50+). */
 export const DEMO = {
@@ -81,13 +87,9 @@ export const DEMO = {
   herbsPerBirth: 0.2, herbSave: 0.3,
   /** Elders keep the old knowledge (§5.5 lost knowledge needs fewer than `keepers`) and teach: +research up to `rpMax`. */
   keepers: 3, rpPerShare: 0.5, rpMax: 0.1,
-  /** The family customs a nation's AI chooses (action family_policy): `fert` scales the growth,
-   *  `keep` the births that replace the dead (below 1 the people slowly shrinks). */
-  births: {
-    encourage: { name: "khuyến khích sinh", fert: 1.3, keep: 1, womenWork: 0.85 },
-    neutral: { name: "tự nhiên", fert: 1, keep: 1, womenWork: 0.95 },
-    limit: { name: "hạn chế sinh", fert: 0.4, keep: 0.9, womenWork: 1 },
-  } as Record<string, { name: string; fert: number; keep: number; womenWork: number }>,
+  /** v0.40: births are not the ruler's to order; a people has as many children as its life allows (THRIVE).
+   *  Only the natural custom is left: adult women work this share of a full day. */
+  womenWork: 0.95,
   fighters: { men: "chỉ đàn ông ra trận", all: "mọi người lớn ra trận" } as Record<string, string>,
   /** Capability of a marriage custom: births ×marriage, stability +marriageStability a turn. */
   marriageCap: "hôn-nhân", marriage: 1.1, marriageStability: 0.5,

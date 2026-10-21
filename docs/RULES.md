@@ -395,15 +395,21 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
   Dân mới lập quốc có cơ cấu 19% / 19% / 44% / 18%, nam nữ ngang nhau.
 - **Sinh:** số trẻ sinh ra gồm hai phần, đều nhân với **mức sinh**:
   - phần bù đủ số người vừa qua đời (tối đa một đổi một)
-  - khi lương thực còn ≥ 20% nhu cầu, thêm phần tăng logistic floor(dân × 8% × (1 − dân / chỗ ở))
+  - khi lương thực còn ≥ 20% nhu cầu, thêm phần tăng logistic floor(dân × 7,5% × (1 − dân / chỗ ở)) × **hệ số đời sống**
 
-  Không bao giờ vượt chỗ ở; tối thiểu 1 trẻ khi còn chỗ.
+  **Hệ số đời sống** (×0,6 tới ×1,1): dân tăng theo cách họ sống, không theo lệnh triều đình. Hệ số gồm:
+  - lương thực dồi dào (≥ 2 lượt ăn): +10%;
+  - mức sống: +/−0,6 × (mức sống − 50)/100;
+  - xã hội yên ổn (ổn định ≥ 60): +10%; bất ổn (< 30): −30%;
+  - đang có dịch: −25%; có thuốc men (y thuật hay đủ thảo dược): +10%.
+
+  **Chỗ ở là trần mềm:** đã đủ chỗ mà dân sống tốt (hệ số ≥ 1) thì vẫn tăng chậm, bằng 10% tốc độ thường, tới tối đa quá chỗ ở 10%. Khi đó thiếu chỗ ở làm mức sống giảm, tỉnh chật thì bất ổn. Dân đông là thêm người làm nên lương thực theo kịp; thứ một dân tộc đang lớn thiếu là **đất và chỗ ở**, nên vua phải mở rộng lãnh thổ: khai hoang, lập điểm định cư, giành đất có tài nguyên mà kỷ nguyên sau cần.
 
   **Mức sinh** được tính từ:
   - tỷ lệ phụ nữ trưởng thành so với một dân tộc bình thường
   - có đủ bạn đời hay không (đủ khi số đàn ông trưởng thành ≥ 0,5 × phụ nữ trưởng thành)
-  - phong tục sinh
   - phong tục hôn nhân
+  - lễ hội và truyền giáo trong nước (mùa cưới)
 
   Mất phụ nữ trẻ thì sinh ít đi; có nhiều phụ nữ hơn bình thường thì không sinh nhiều hơn.
 - **Trẻ sơ sinh:** 30% trẻ sơ sinh không sống được, và mức này đã tính sẵn trong tỷ lệ sinh. Các yếu tố làm thay đổi mức này:
@@ -417,11 +423,7 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
   - trận đánh: chiến binh, theo phong tục ra trận
   - man di và thiên tai: mọi lứa tuổi
   - dân bỏ đi vì bất ổn: cả gia đình, chủ yếu người trẻ, và họ sang nước nhận họ như cũ
-- **Phong tục (hành động `family_policy`, 1 AP):**
-  - **Sinh:**
-    - "khuyến khích": sinh ×1,3, phụ nữ trưởng thành làm việc ×0,85
-    - "tự nhiên": ×1 và ×0,95
-    - "hạn chế": sinh ×0,6, phụ nữ làm việc đủ
+- **Phong tục (hành động `family_policy`, 1 AP):** từ v0.40 triều đình không ra lệnh sinh đẻ được nữa; phụ nữ trưởng thành làm việc ×0,95.
   - **Ra trận:**
     - "chỉ đàn ông": quân chỉ bằng một nửa, nhưng các bà mẹ an toàn nên sinh không bị ảnh hưởng khi thua trận
     - "mọi người lớn": quân gấp đôi, nhưng tổn thất trận mạc làm giảm số sinh

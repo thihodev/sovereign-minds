@@ -66,15 +66,17 @@ test("customs: who goes to war, and only they fall", () => {
   const n = w.nations[0];
   n.population = 100;
   const all = fighters(n);
-  turn(w, { actions: [{ type: "family_policy", fighters: "men", births: "encourage" }] });
-  assert.deepEqual(n.family, { births: "encourage", fighters: "men" });
+  turn(w, { actions: [{ type: "family_policy", births: "encourage" }] });
+  assert.ok(n.lastRejected.some(r => /không ra lệnh cho dân sinh/.test(r.reason)), "births are not the ruler's to order");
+  turn(w, { actions: [{ type: "family_policy", fighters: "men" }] });
+  assert.deepEqual(n.family, { births: "neutral", fighters: "men" });
   assert.ok(fighters(n) < all * 0.6, "half the army");
   const women = sum(n.demo!.f);
   const fallen = take(n, 10, "war");
   assert.equal(sum(fallen.f), 0, "the women stay home");
   assert.equal(sum(n.demo!.f), women);
-  turn(w, { actions: [{ type: "family_policy", births: "sometimes" }] });
-  assert.match(n.lastRejected[0].reason, /births phải là/);
+  turn(w, { actions: [{ type: "family_policy", fighters: "sometimes" }] });
+  assert.match(n.lastRejected[0].reason, /fighters phải là/);
   // the warriors cannot outnumber those who may fight
   const pool = fighters(n);
   turn(w, { labor: { gather: 0, hunt: 0, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: 0, research: 0, warrior: pool + 5 } });

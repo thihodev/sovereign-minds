@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN,
+  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -257,6 +257,21 @@ export function settlementPayment(n: Nation): Record<string, number> | null {
   return pay;
 }
 /** §4.2 Logistic growth: rate × pop × (1 − pop/housing), at least GROWTH.min, never past the roof. */
+/** §4.2 How well the people lives, as a factor on its growth (v0.40): food in store, the standard of living, order, health.
+ *  Not the ruler's to order: a people that lives well has more children. */
+export function thrive(world: World, n: Nation): { factor: number; why: string[] } {
+  const m = mods(world, n), need = Math.max(1, mouths(n) * m.foodPerPerson), turns = (n.stock.food || 0) / need, why: string[] = [];
+  let f = 1;
+  const add = (d: number, w: string) => { f += d; why.push(`${d > 0 ? "+" : "−"}${Math.round(Math.abs(d) * 100)}% ${w}`); };
+  if (turns >= THRIVE.foodRich) add(THRIVE.foodRichBonus, "lương thực dồi dào"); // a thin store already stops growth (GROWTH.surplus)
+  const living = n.living ?? 50;
+  if (living !== 50) add((living - 50) / 100 * THRIVE.living, `mức sống ${living}/100`);
+  if (n.stability >= THRIVE.stableAt) add(THRIVE.stableBonus, "xã hội yên ổn");
+  else if (n.stability < THRIVE.unstableAt) add(-THRIVE.unstableCut, "xã hội bất ổn");
+  if ((n.outbreakUntil ?? -1) >= world.tick) add(-THRIVE.sickCut, "dịch bệnh");
+  else if (m.medicine > 0 || (n.stock.herbs || 0) >= n.population / 20) add(THRIVE.herbsBonus, "có thuốc men");
+  return { factor: Math.round(Math.max(THRIVE.min, Math.min(THRIVE.max, f)) * 100) / 100, why };
+}
 export function growthFor(pop: number, roof: number): number {
   if (pop >= roof) return 0;
   return Math.min(roof - pop, Math.max(GROWTH.min, Math.floor(pop * GROWTH.rate * (1 - pop / roof))));
@@ -1132,8 +1147,11 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const before = n.population;
   d.aged = grow(n, prand);
   const bless = blessing(n, world.tick); // §4.10 a mission at home, a festival
-  const fert = fertility(n, m.caps.has(DEMO.marriageCap), bless), keep = breeding(n) * (DEMO.births[n.family?.births ?? "neutral"]?.keep ?? 1) * (shortage > 1e-9 ? fed * fed : 1) * bless;
-  const replace = n.population >= roof ? 0 : d.aged * keep, grow2 = n.population >= roof || surplus < GROWTH.surplus ? 0 : growthFor(before, roof) * (1 + m.growth) * fert;
+  // v0.40: a soft roof (the people still grows, slower, past its housing) and growth as good as its life (thrive)
+  const room = Math.floor(roof * CROWD.over), well = thrive(world, n).factor;
+  const fert = fertility(n, m.caps.has(DEMO.marriageCap), bless), keep = breeding(n) * (shortage > 1e-9 ? fed * fed : 1) * bless;
+  const crowdGrow = before >= roof && well >= 1 ? Math.max(GROWTH.min, Math.floor(before * GROWTH.rate * CROWD.slow * well)) : 0;
+  const replace = n.population >= room ? 0 : d.aged * keep, grow2 = n.population >= room || surplus < GROWTH.surplus ? 0 : (before < roof ? growthFor(before, roof) * well : crowdGrow) * (1 + m.growth) * fert;
   const want = replace + grow2;
   if (want > 0) {
     // Infants who do not live: the base rate is in the births already; medicine and herbs save more,
@@ -1141,12 +1159,13 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     let rate = DEMO.infant * (dry ? DEMO.dryInfant : 1) * (1 - m.medicine);
     const herbsWant = want * DEMO.herbsPerBirth, herbs = Math.min(n.stock.herbs || 0, herbsWant);
     if (herbs > 0) { L.stock(n, "herbs", -herbs, "births"); rate *= 1 - DEMO.herbSave * herbs / herbsWant; }
-    const born = Math.max(0, Math.min(roof - n.population, Math.max(shortage > 1e-9 ? 0 : GROWTH.min, Math.floor(replace + grow2 * (1 - rate) / (1 - DEMO.infant) + prand()))));
+    const born = Math.max(0, Math.min(room - n.population, Math.max(shortage > 1e-9 ? 0 : GROWTH.min, Math.floor(replace + grow2 * (1 - rate) / (1 - DEMO.infant) + prand()))));
     d.infants = Math.max(0, Math.round(want / (1 - DEMO.infant) * rate));
     babies(n, born, prand); d.born = born;
     if (born > 0) fx({ kind: "birth", tile: n.capital, nation: n.id, n: born });
   }
   if (m.caps.has(DEMO.marriageCap)) n.stability += DEMO.marriageStability;
+
   const lux = luxuries(world, n); // §2.11
   if (lux.kinds.length) { for (const g of lux.kinds) L.stock(n, g, -lux.need, "luxury"); n.stability += lux.stability; }
   let spoil = m.spoilage - m.spoilageCut - Math.min(0.1, doneEffect(world, n, "spoilage"));
@@ -1711,15 +1730,16 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       return null;
     }
     case "family_policy": {
-      // §4.2 the people's customs: how many children, who goes to war
+      // §4.2 the people's customs: who goes to war. How many children is not the ruler's to order (v0.40): a people
+      // has as many as its life allows (thrive)
       const fam = (n.family ??= { births: "neutral", fighters: "all" });
-      const births = a.births === undefined ? fam.births : String(a.births), fight = a.fighters === undefined ? fam.fighters : String(a.fighters);
-      if (!DEMO.births[births]) return `births phải là một trong: ${Object.keys(DEMO.births).join(", ")}`;
+      if (a.births !== undefined && a.fighters === undefined) return "Triều đình không ra lệnh cho dân sinh bao nhiêu con: dân số tăng theo đời sống (đủ ăn, mức sống, yên ổn, thuốc men, chỗ ở). Lệnh này chỉ còn chọn ai ra trận (fighters)";
+      const fight = a.fighters === undefined ? fam.fighters : String(a.fighters);
       if (!DEMO.fighters[fight]) return `fighters phải là một trong: ${Object.keys(DEMO.fighters).join(", ")}`;
-      if (births === fam.births && fight === fam.fighters) return "Phong tục không đổi";
-      fam.births = births; fam.fighters = fight;
-      n.lastEvents.push(`Phong tục mới: ${DEMO.births[births].name}, ${DEMO.fighters[fight]}.`);
-      say(n.id, "family", `${n.name} đổi phong tục: ${DEMO.births[births].name}, ${DEMO.fighters[fight]}.`);
+      if (fight === fam.fighters) return "Phong tục không đổi";
+      fam.fighters = fight; fam.births = "neutral";
+      n.lastEvents.push(`Phong tục mới: ${DEMO.fighters[fight]}.`);
+      say(n.id, "family", `${n.name} đổi phong tục: ${DEMO.fighters[fight]}.`);
       return null;
     }
     case "build_road": {

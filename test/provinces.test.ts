@@ -59,6 +59,7 @@ test("every tile in the province of its nearest centre; the people shared by hou
   const obs = buildObservation(w, n) as { provinces: Array<Record<string, unknown>> };
   assert.equal(obs.provinces.length, 2);
   assert.equal(obs.provinces[1].way_to_capital, "CUT OFF");
+  n.population = Math.min(n.population, Math.floor(housing(w, n)) - 10); // room to live: the far province is the matter here
   turn(w);
   assert.ok(advice(w, n).some(a => /Tỉnh Xa Xôi/.test(a.text) && /bá tước/.test(a.text)), JSON.stringify(advice(w, n)));
 });
@@ -78,7 +79,7 @@ test("a cut-off, ungoverned province grows restless; a loyal governor calms it a
   const before = yieldShares(w, n)(land);
   n.officials = [{ id: 900, name: "Bá", domain: "governor", seat: st, skill: 5, loyalty: 90, since: w.tick - 60, lastAct: "" }];
   assert.ok(Math.abs(yieldShares(w, n)(land) - before * (1 + PROVINCE.yield * 5)) < 1e-9, "more from the governed land");
-  assert.deepEqual(provinces(w, n).find(p => p.centre === st)!.causes, ["cut_off"], "no longer ungoverned");
+  assert.ok(!provinces(w, n).find(p => p.centre === st)!.causes.includes("ungoverned"), "no longer ungoverned");
   turn(w);
   assert.equal(unrest(), Math.round((high + PROVINCE.cutOff - PROVINCE.fade - PROVINCE.calm * 5) * 10) / 10, "calmer every turn");
   assert.ok(unrest() < high);

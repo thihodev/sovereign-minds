@@ -3,10 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, CROWD, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
-import { roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
+import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, neighbours } from "../border.ts";
@@ -100,7 +100,7 @@ export function advice(world: World, n: Nation): Advice[] {
       const best = [...free.entries()].filter(([, k]) => k >= 2).sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 3);
       if (best.length) ways.push(`chiếm thêm đất cho thôn xóm (còn ${hp.hamletMax - hp.hamlets} chỗ): ${best.map(([i, k]) => `${xy(i)} +${k}`).join(", ")}`);
     }
-    say(2, `Dân ${n.population}/${roof} chỗ ở: hết chỗ thì dân không tăng. Cách mở thêm: ${ways.join("; ") || "lập điểm định cư"}.`);
+    say(2, `Dân ${n.population}/${roof} chỗ ở: hết chỗ thì dân chỉ tăng rất chậm (tối đa quá ${Math.round((CROWD.over - 1) * 100)}%) và mức sống giảm. Cách mở thêm: ${ways.join("; ") || "lập điểm định cư"}.`);
   }
 
   // Settlement: what is still missing
@@ -215,7 +215,10 @@ export function advice(world: World, n: Nation): Advice[] {
   }
 
   // Customs
-  if ((n.family?.births ?? "neutral") === "limit" && n.population < 40) say(2, `Bạn đang hạn chế sinh khi chỉ có ${n.population} dân: dân sẽ co dần. Đổi về "neutral" (family_policy) trừ khi đang đói.`);
+  { // §4.2 v0.40 a people grows as well as it lives
+    const t = thrive(world, n);
+    if (t.factor < 1 && n.population > 0) say(1, `Dân sinh nở chậm (×${t.factor}): ${t.why.filter(w => w.startsWith("−")).join(", ")}. Triều đình không ra lệnh sinh đẻ được; dân tăng khi đủ ăn, mức sống cao, xã hội yên ổn, có thuốc men và đủ chỗ ở.`);
+  }
 
   // Research
   if (!n.research) {

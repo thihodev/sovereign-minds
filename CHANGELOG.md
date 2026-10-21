@@ -2,6 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.40
+
+- **Dân số tăng theo đời sống, không theo lệnh vua (§4.2):**
+  - **Bỏ quyền ra lệnh sinh đẻ:** `family_policy` chỉ còn chọn ai ra trận. Lệnh "khuyến khích / hạn chế sinh" bị từ chối, có giải thích.
+  - **Hệ số đời sống ×0,6–×1,1** nhân vào tốc độ tăng: lương thực dồi dào, mức sống, xã hội yên ổn, dịch bệnh, thuốc men. AI thấy hệ số này (`population.thriving`) và lý do.
+  - **Chỗ ở là trần mềm:** dân sống tốt vẫn tăng chậm khi đã đủ chỗ, tới tối đa quá chỗ ở 10%.
+  - **Cân lại:** tốc độ gốc 8% → 7,5%. Dân số trung vị lượt 300 khoảng 155–190 (trước 150–170): tăng đều, không bùng nổ.
+- **Mở rộng lãnh thổ:**
+  - luật cho AI nhấn mạnh: dân đông thì thêm người làm, thứ thiếu là đất và chỗ ở;
+  - bot ưu tiên mạnh vùng đất có tài nguyên mà kỷ nguyên sau đòi hỏi (ví dụ quặng đồng cho Đồ Đồng), nên không còn kẹt ở cổng kỷ nguyên vì may rủi.
+
 ## v0.39
 
 - **Đường sắt (§2.5):** cấp đường thứ 4.
