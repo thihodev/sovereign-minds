@@ -90,15 +90,15 @@ export function create(container, hooks) {
       const t = ST.terrain[i];
       if (WATER.has(t)) { H[i] = 0; continue; }
       const e = clamp(((ST.elev?.[i] ?? 40) / 100 - 0.22) / 0.6, 0, 1);
-      let h = 0.14 + e * 1.5;
-      if (t === "coast") h = 0.1 + e * 0.25;
-      else if (t === "swamp") h = Math.min(h, 0.16);
-      else if (t === "hill") h += 0.4;
-      else if (t === "mountain") h += 1.0;
-      else if (t === "glacier") h += 0.2;
-      else if (t === "icewall") h = 3.2;
-      if (ST.river?.[i]) h -= 0.05;
-      H[i] = Math.max(0.08, Math.round(h * 12) / 12);
+      let h = 0.12 + e * 0.6;
+      if (t === "coast") h = 0.1;
+      else if (t === "swamp") h = Math.min(h, 0.14);
+      else if (t === "hill") h += 0.3;
+      else if (t === "mountain") h += 0.7;
+      else if (t === "glacier") h += 0.15;
+      else if (t === "icewall") h = 1.8;
+      // few broad steps: a lowland reads as one plain, not a staircase of hexes
+      H[i] = Math.max(0.08, Math.round(h * 4) / 4);
     }
   }
 
@@ -140,6 +140,7 @@ export function create(container, hooks) {
 
   // ------------------------------------------------------------------ colours: owners, the picked nation, overlays
   let selected = -1, pinned = -1, layer = null;
+  const GREY = new THREE.Color("#7a8088");
   function paint() {
     if (!groups.land || !S) return;
     const owners = S.owners, nc = new Map();
@@ -147,9 +148,9 @@ export function create(container, hooks) {
     for (let i = 0; i < N * N; i++) {
       tmpC.copy(baseColor[i]);
       const o = owners[i];
-      if (o >= 0) tmpC.lerp(natCol(o), isWater(i) ? 0.16 : 0.26);
+      if (o >= 0) tmpC.lerp(natCol(o), isWater(i) ? 0.2 : 0.38);
       if (layer && layer.values[i] > 0) { const a = clamp(layer.values[i] / layer.max, 0, 1); tmpC.lerp(new THREE.Color(layer.threat ? "#e12d1e" : "#ffd400"), 0.15 + a * 0.6); }
-      if (selected >= 0 && o !== selected) tmpC.multiplyScalar(0.42);
+      if (selected >= 0 && o !== selected) tmpC.lerp(GREY, 0.45).multiplyScalar(0.8);
       if (i === pinned) tmpC.lerp(new THREE.Color("#ffd84a"), 0.45);
       (isWater(i) ? groups.water : groups.land).setColorAt(slotOf[i], tmpC);
     }
@@ -162,24 +163,23 @@ export function create(container, hooks) {
   function buildDecor() {
     if (decor) { scene.remove(decor); disposeTree(decor); }
     decor = new THREE.Group(); scene.add(decor);
-    const P = parts();
+    const P = parts(), PT = parts();
     for (let i = 0; i < N * N; i++) {
       const t = ST.terrain[i], [x, z] = pos(i), h = H[i];
       if (TREES[t]) {
-        const k = t === "jungle" ? 4 : 3, dark = t === "jungle" ? "#1f5a2c" : t === "taiga" ? "#2f5a43" : "#3f7a3a";
+        const k = t === "jungle" ? 3 : 2, dark = t === "jungle" ? "#2a6338" : t === "taiga" ? "#3a6650" : "#4a8045";
         for (let j = 0; j < k; j++) {
-          const a = hash(i, j, 3) * 6.283, d = 0.25 + hash(j, i, 9) * 0.45, s = 0.32 + hash(i, j, 13) * 0.18;
-          P.add(TREES[t], x + Math.cos(a) * d, h, z + Math.sin(a) * d, t === "taiga" ? s * 0.9 : s * 1.2, t === "taiga" ? s * 2.4 : s * 1.3, t === "taiga" ? s * 0.9 : s * 1.2, 0, dark);
+          const a = hash(i, j, 3) * 6.283, d = 0.2 + hash(j, i, 9) * 0.45, s = 0.24 + hash(i, j, 13) * 0.12;
+          PT.add(TREES[t], x + Math.cos(a) * d, h, z + Math.sin(a) * d, t === "taiga" ? s * 0.9 : s * 1.2, t === "taiga" ? s * 2.4 : s * 1.3, t === "taiga" ? s * 0.9 : s * 1.2, 0, dark);
         }
-      } else if (t === "mountain") P.add("peak", x, h, z, 0.82, 0.9 + hash(i, 1) * 0.6, 0.82, hash(i, 2) * 1, h > 2.3 ? "#e9eef2" : h > 1.9 ? "#9a948e" : "#7d746c");
-      else if (t === "hill") P.add("blob", x + 0.15, h - 0.12, z - 0.1, 0.9, 0.42, 0.75, 0, "#a68d58");
-      else if (t === "icewall") { P.add("peak", x, h, z, 0.95, 0.9 + hash(i, 4) * 0.8, 0.95, hash(i, 5), "#f4fbff"); }
-      else if (t === "desert" && hash(i, 7) < 0.25) P.add("blob", x + 0.3, h - 0.05, z + 0.2, 0.3, 0.18, 0.3, 0, "#c9a86a");
-      else if (t === "swamp" && hash(i, 8) < 0.6) for (let j = 0; j < 3; j++) P.add("cyl", x + (hash(i, j, 21) - 0.5), h, z + (hash(j, i, 22) - 0.5), 0.04, 0.3, 0.04, 0, "#6a7a3a");
+      } else if (t === "mountain") P.add("peak", x, h, z, 0.55, 0.35 + hash(i, 1) * 0.3, 0.55, hash(i, 2) * 1, h >= 1.4 ? "#c9cdd0" : "#8b8179");
+      else if (t === "icewall") { if (hash(i, 6) < 0.5) P.add("peak", x, h, z, 0.6, 0.4 + hash(i, 4) * 0.4, 0.6, hash(i, 5), "#f4fbff"); }
+      else if (t === "swamp" && hash(i, 8) < 0.4) for (let j = 0; j < 2; j++) P.add("cyl", x + (hash(i, j, 21) - 0.5) * 0.8, h, z + (hash(j, i, 22) - 0.5) * 0.8, 0.04, 0.22, 0.04, 0, "#6a7a3a");
     }
     for (const w of ST.wonders || []) { const [x, z] = pos(w.i); P.add("gem", x, top(w.i) + 0.35, z, 0.45, 0.7, 0.45, 0, "#ffd84a", true); }
     for (const v of ST.veins || []) { const [x, z] = pos(v.i); P.add("gem", x - 0.45, top(v.i) + 0.05, z + 0.35, 0.22, 0.3, 0.22, 0, hooks.veinColor[v.good] || "#d9822b"); }
     decor.add(P.build());
+    decor.userData.trees = PT.build(); decor.add(decor.userData.trees);
     // rivers: a band of water down their course
     const T = new Tris(), blue = new THREE.Color("#5fb4e6");
     for (const path of ST.rivers || []) for (let k = 1; k < path.length; k++) {
@@ -243,29 +243,28 @@ export function create(container, hooks) {
         const j = nb[k], oj = j >= 0 ? owners[j] : -1;
         if (oj === o) continue;
         const [c1, c2] = EDGE[k], a = corner(i, c1, 0.05), b = corner(i, c2, 0.05);
-        const front = oj >= 0 && atWar.has(`${o}:${oj}`), hgt = front ? 0.42 : 0.16;
+        const front = oj >= 0 && atWar.has(`${o}:${oj}`), hgt = front ? 0.42 : 0.2;
+        if (!front) { const a2 = corner(i, c1, 0.26), b2 = corner(i, c2, 0.26), yb = y0 + 0.012; T.quad([a[0], yb, a[1]], [b[0], yb, b[1]], [b2[0], yb, b2[1]], [a2[0], yb, a2[1]], colOf(o)); }
         if (front) { const steps = 3; for (let s = 0; s < steps; s++) { const t0 = s / steps, t1 = (s + 1) / steps, p0 = [a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0], p1 = [a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1]; F.quad([p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y0 + hgt, p1[1]], [p0[0], y0 + hgt, p0[1]], (s + k) % 2 ? yellow : black); } }
         else T.quad([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y0 + hgt, b[1]], [a[0], y0 + hgt, a[1]], colOf(o));
       }
     }
-    const wallMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.88 });
+    const wallMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
     dyn.add(new THREE.Mesh(T.geometry(), wallMat));
     if (F.p.length) dyn.add(new THREE.Mesh(F.geometry(), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
     // roads: a band from each road tile to each road neighbour; sea lanes pale on the water
-    const R = new Tris(), lane = new THREE.Color("#e8f4ff");
-    for (let i = 0; i < N * N; i++) {
-      const lv = roads[i] || 0; if (!lv) continue;
-      const [x, z] = pos(i), w = isWater(i);
-      let linked = false;
-      for (const j of NB(i)) {
-        if (j < 0 || !(roads[j] > 0)) continue;
-        linked = true; if (j < i) continue;
-        const [x2, z2] = pos(j), lv2 = Math.min(lv, roads[j]), wl = w && isWater(j);
-        const c = wl ? lane : new THREE.Color(ROAD_COLOR[lv2] || ROAD_COLOR[1]).multiplyScalar(owners[i] < 0 && owners[j] < 0 ? 0.55 : 1);
-        R.band([x, top(i) + 0.045, z], [x2, top(j) + 0.045, z2], wl ? 0.08 : 0.12 + lv2 * 0.04, c);
-      }
-      if (!linked) R.band([x - 0.25, top(i) + 0.045, z], [x + 0.25, top(i) + 0.045, z], 0.16, new THREE.Color(ROAD_COLOR[lv] || ROAD_COLOR[1]));
-    }
+    // roads: branches from the centres, as on the 2D map (a mesh of every touching pair reads as a web of triangles)
+    const R = new Tris(), lane = new THREE.Color("#e8f4ff"), hubs = new Set();
+    for (const n of S.nations) if (n.alive && n.founded) { hubs.add(n.capital); for (const st of n.settlements || []) hubs.add(st.tile); }
+    const { parent, links, loose } = hooks.roadTree(hubs);
+    const seg = (i, j, lv) => {
+      const w = isWater(i) && isWater(j), wild = loose.has(i) && owners[i] < 0 && owners[j] < 0;
+      if (wild) return; // roads gone wild are left off the 3D map: they only clutter it
+      const [x, z] = pos(i), [x2, z2] = pos(j);
+      R.band([x, top(i) + 0.05, z], [x2, top(j) + 0.05, z2], w ? 0.07 : 0.1 + lv * 0.03, w ? lane : new THREE.Color(ROAD_COLOR[lv] || ROAD_COLOR[1]));
+    };
+    for (let i = 0; i < N * N; i++) { const lv = roads[i] || 0, j = parent.get(i); if (lv && j !== undefined && j >= 0) seg(i, j, Math.min(lv, roads[j] || lv)); }
+    for (const [i, h] of links) seg(i, h, roads[i] || 1);
     if (R.p.length) { const rm = new THREE.Mesh(R.geometry(), new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })); rm.receiveShadow = true; dyn.add(rm); }
 
     // towns and works
@@ -277,7 +276,8 @@ export function create(container, hooks) {
       for (const c of centres) {
         if (c < 0) continue;
         const [x, z] = pos(c), h = top(c), tier = tierOf.get(c) ?? 0, cap = c === n.capital;
-        const houses = [3, 7, 13][tier] + (cap ? 2 : 0), small = tier === 2 ? 0.75 : 1;
+        const houses = [3, 6, 11][tier] + (cap ? 2 : 0), small = tier === 2 ? 0.85 : 1.15;
+        P.add("cyl", x, h - 0.03, z, cap ? 1.5 : 1.25, 0.05, cap ? 1.5 : 1.25, 0, new THREE.Color(color).lerp(new THREE.Color("#e8dcc2"), 0.55).getStyle());
         for (let k = 0; k < houses; k++) {
           const a = k * 2.399 + hash(c, k) * 0.5, d = 0.22 + Math.sqrt(k / houses) * 0.58, hx = x + Math.cos(a) * d, hz = z + Math.sin(a) * d;
           const w = (0.24 + hash(k, c) * 0.08) * small, ht = (0.18 + hash(c, k, 5) * 0.08) * small * (tier === 2 && k % 4 === 0 ? 2.2 : 1);
@@ -355,9 +355,10 @@ export function create(container, hooks) {
     const o = new CSS2DObject(el); o.position.copy(at(i, dy)); o.userData.kind = kind; parent.add(o); allLabels.push(o);
     return o;
   }
-  const SHOW_AT = { capital: 400, town: 95, wonder: 70, horde: 80, fx: 1e9 };
+  const SHOW_AT = { capital: 400, town: 120, wonder: 70, horde: 80, fx: 1e9 };
   function cullLabels() {
     const d = camera.position.distanceTo(controls.target);
+    if (decor?.userData.trees) decor.userData.trees.visible = d < 110;
     for (const o of allLabels) if (o.parent) o.visible = d < (SHOW_AT[o.userData.kind] ?? 100);
   }
 
@@ -528,7 +529,7 @@ export function create(container, hooks) {
     if (i < 0 || !H) return;
     const p = at(i), d = close ? 18 : Math.min(camera.position.distanceTo(controls.target), 45);
     const dir = camera.position.clone().sub(controls.target).normalize();
-    if (close || dir.y > 0.8) { const flat = Math.hypot(dir.x, dir.z) || 1; dir.set(dir.x / flat * 0.72, 0.69, dir.z / flat * 0.72); if (!Number.isFinite(dir.x) || (dir.x === 0 && dir.z === 0)) dir.set(0, 0.69, 0.72); dir.normalize(); }
+    if (close || dir.y > 0.9) { const flat = Math.hypot(dir.x, dir.z) || 1; dir.set(dir.x / flat * 0.55, 0.83, dir.z / flat * 0.55); if (!Number.isFinite(dir.x) || (dir.x === 0 && dir.z === 0)) dir.set(0, 0.69, 0.72); dir.normalize(); }
     fly = { t0: performance.now(), dur: 700, fromT: controls.target.clone(), toT: p, fromC: camera.position.clone(), toC: p.clone().add(dir.multiplyScalar(d)) };
   }
   function zoom(f) {
@@ -539,7 +540,7 @@ export function create(container, hooks) {
   function home() {
     const half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), w = X0 + 4, d = Z0 + 6;
     const dist = Math.max(w / (half * camera.aspect), d / half * 0.95) * 1.02;
-    return new THREE.Vector3(0, dist * 0.72, dist * 0.69);
+    return new THREE.Vector3(0, dist * 0.86, dist * 0.5);
   }
   function fit() { fly = { t0: performance.now(), dur: 700, fromT: controls.target.clone(), toT: new THREE.Vector3(0, 0, 0), fromC: camera.position.clone(), toC: home() }; }
 

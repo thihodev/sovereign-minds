@@ -2547,6 +2547,7 @@
 
   // ---------------------------------------------------------------- the 3D map (Three.js, loaded on demand)
   const btn3d = $("#view-3d");
+  let M3loading = null;
   async function set3D(on) {
     if (on && !window.WebGLRenderingContext) { btn3d.title = "Trình duyệt này không hỗ trợ WebGL để xem 3D"; return; }
     is3D = on;
@@ -2555,15 +2556,16 @@
     if (on && !M3) {
       btn3d.disabled = true;
       try {
-        const mod = await import("/map3d.js");
-        M3 = mod.create($("#map3d"), {
-          terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor,
+        // one 3D map only, however many times it is asked for while it loads
+        M3loading ??= import("/map3d.js").then(mod => mod.create($("#map3d"), {
+          terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor, roadTree,
           onPick: i => pinTile(i), onHover: (i, ev) => hoverCard(i, ev),
           fxWord: f => FX_WORD[f.kind]?.(f) ?? f.kind, fxTone, fxDur: f => FX_DUR[f.kind] || FX_DEFAULT,
           isDark: () => effectiveTheme() === "dark", anim: () => ANIM.on,
-        });
-        M3.setStatic(ST);
-      } catch (e) { is3D = false; btn3d.classList.remove("on"); btn3d.setAttribute("aria-pressed", "false"); btn3d.title = `Không mở được bản đồ 3D: ${e.message}`; console.error("[3D]", e); try { localStorage.setItem("sm-3d", "0"); } catch { } return; }
+        }));
+        const m = await M3loading;
+        if (!M3) { M3 = m; M3.setStatic(ST); }
+      } catch (e) { is3D = false; M3loading = null; btn3d.classList.remove("on"); btn3d.setAttribute("aria-pressed", "false"); btn3d.title = `Không mở được bản đồ 3D: ${e.message}`; console.error("[3D]", e); try { localStorage.setItem("sm-3d", "0"); } catch { } return; }
       finally { btn3d.disabled = false; }
     }
     cv.hidden = on;

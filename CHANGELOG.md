@@ -4,6 +4,14 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.34
 
+- **0.34.2, bản đồ 3D dễ nhìn hơn:**
+  - **Đường:** vẽ theo cây nhánh từ các trung tâm như bản 2D, không còn mạng tam giác chồng chéo. Đường bỏ hoang trên đất vô chủ không vẽ ở 3D.
+  - **Địa hình:** phẳng hơn, ít bậc hơn nên đồng bằng liền một mảng. Núi nhỏ và dịu màu; bỏ các khối trên đồi và sa mạc. Rừng thưa hơn, cây chỉ hiện khi nhìn gần.
+  - **Lãnh thổ:** tô màu cờ đậm hơn, thêm dải màu cờ chạy dọc biên giới trên mặt đất, viền cao hơn. Chọn một nước thì các nước khác chỉ xám nhẹ, không tối cả bản đồ.
+  - **Thị trấn và nhãn:** mỗi điểm định cư có một mảng sân màu cờ, nhà to hơn. Tên các nước, thủ đô, điểm định cư to hơn, có nền tối.
+  - **Camera:** góc nhìn mặc định cao hơn.
+  - **Sửa lỗi:** bật 3D hai lần cùng lúc (trang tự khôi phục và bấm nút) từng tạo hai bản đồ chồng lên nhau, khiến tên các nước hiện đôi.
+
 - **0.34.1, bản đồ 3D (Three.js):** nút **3D** cạnh nút phóng to chuyển giữa bản đồ 2D và 3D (trình duyệt nhớ lựa chọn).
   - **Địa hình:** mỗi ô là một khối lục giác cao theo độ cao thật. Đồi nhô lên, núi có đỉnh (tuyết trên đỉnh cao), Tường Băng là vách trắng. Biển nông và sâu có sóng; sông chảy theo thung lũng. Rừng, rừng lá kim, rừng rậm có cây.
   - **Lãnh thổ:** đất tô màu cờ, viền thấp theo biên giới. Mặt trận giữa hai nước đang đánh nhau là dải sọc vàng đen, có khói ở chỗ vừa giao tranh. Bấm một nước thì các nước khác tối đi.
