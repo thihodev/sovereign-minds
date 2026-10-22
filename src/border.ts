@@ -159,9 +159,11 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       if (tick % 5 === 0) say(a.id, "border", `Biên giới ${a.name} – ${b.name} căng thẳng (${Math.round(st.tension)}/100): hai bên đều có chính nghĩa để tuyên chiến.`);
       // A long dispute tears up the treaties that kept the peace (alliances and vassalage hold)
       if (st.dispute >= BORDER.treatyBreakAfter) {
-        for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "peace", "passage"])) {
-          tr.active = false; tr.end = tick; tr.endedBy = `tan vỡ sau ${st.dispute} lượt tranh chấp biên giới`;
-          for (const x of [a, b]) x.lastEvents.push(`Hiệp ước ${tr.type === "peace" ? "hòa bình" : tr.type === "passage" ? "thông hành" : "bất tương xâm"} #${tr.id} với ${(x === a ? b : a).name} tan vỡ sau ${st.dispute} lượt tranh chấp biên giới. Hai bên có chính nghĩa: tuyên chiến không mất uy tín.`);
+        // a treaty falls only to a dispute it has itself lived through: the turns of dispute since it was signed
+        for (const tr of treatiesBetween(world, a.id, b.id, ["non_aggression", "peace", "passage"]).filter(x => Math.min(st.dispute!, tick - x.start) >= BORDER.treatyBreakAfter)) {
+          const turns = Math.min(st.dispute, tick - tr.start);
+          tr.active = false; tr.end = tick; tr.endedBy = `tan vỡ sau ${turns} lượt tranh chấp biên giới`;
+          for (const x of [a, b]) x.lastEvents.push(`Hiệp ước ${tr.type === "peace" ? "hòa bình" : tr.type === "passage" ? "thông hành" : "bất tương xâm"} #${tr.id} với ${(x === a ? b : a).name} tan vỡ sau ${turns} lượt tranh chấp biên giới. Hai bên có chính nghĩa: tuyên chiến không mất uy tín.`);
           say(a.id, "treaty", `Tranh chấp biên giới kéo dài: hiệp ước giữa ${a.name} và ${b.name} tan vỡ.`);
         }
       }

@@ -336,6 +336,8 @@ export interface Treaty {
   paid?: number; missed?: number;
   /** why it ended before its term, when nobody tore it up */
   endedBy?: string;
+  /** the turns it was agreed for (null: for ever), kept when it ends early */
+  term?: number | null;
 }
 export interface TreatyOffer { id: number; from: number; to: number; type: TreatyType; duration: number | null; tribute: Record<string, number>; cede: number[]; payer: number; tick: number }
 export interface TradeOffer { id: number; from: number; to: number; give: Record<string, number>; get: Record<string, number>; tick: number; status: "open" | "done" | "expired" | "failed" }

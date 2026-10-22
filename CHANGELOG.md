@@ -2,6 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.42
+
+- **Sửa lỗi hòa ước tan vỡ ngay khi ký (§7.9):**
+  - **Lỗi cũ:** biên giới đã tranh chấp lâu (ví dụ 189 lượt) thì hòa ước vừa ký bị xé ngay trong lượt đó, cống nạp chưa nộp lượt nào.
+  - **Sau chiến tranh:** hòa ước mở lại biên giới từ đầu, căng thẳng tối đa 45 và bộ đếm tranh chấp về 0.
+  - **Hiệp ước nói chung:** chỉ tan vỡ khi chính nó đã trải qua 5 lượt tranh chấp kể từ khi ký.
+- **Tổng kết chiến tranh** hiện rõ:
+  - thời hạn đã thỏa thuận ("10 lượt, lượt 935–945");
+  - chuyện gì đã xảy ra (đang hiệu lực, hết hạn, bị ai xé ở lượt nào, tan vỡ vì sao ở lượt nào);
+  - cống nạp đã nộp trên tổng số lượt.
+
 ## v0.41
 
 - **Muối mỏ (§6.5b), sáng kiến của một quốc gia, chấp thuận một phần:**

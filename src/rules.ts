@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.41";
+export const RULES_VERSION = "0.42";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -148,6 +148,8 @@ export const BORDER = {
   /** At `dispute` both sides have a just cause for war and lose `disputeStability` a turn; after
    *  `treatyBreakAfter` turns of dispute in a row their non-aggression, peace and passage treaties fall apart. */
   dispute: 70, disputeStability: 1, treatyBreakAfter: 5,
+  /** a peace that ends a war starts the border afresh: tension down to at most this, the dispute count at 0 */
+  afterPeace: 45,
   /** The border market: while tension < marketBelow, up to `marketValue` worth of goods a side, from a good one has
    *  beyond what it keeps (food: two turns of eating; others: marketKeep) to a nation holding less than marketLack of it. */
   marketBelow: 60, marketValue: 12, marketKeep: 20, marketLack: 5,

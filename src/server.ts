@@ -222,7 +222,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const nm = (id: number | null | undefined) => (id === null || id === undefined ? null : w.nations[id]?.name ?? "?");
         const treaty = tr ? {
           id: tr.id, by: nm(tr.by), payer: Object.keys(tr.tribute).length || tr.cede.length ? nm(tr.a) : null, receiver: Object.keys(tr.tribute).length || tr.cede.length ? nm(tr.b) : null,
-          tribute: Object.keys(tr.tribute).length ? fmtGoods(w, tr.tribute) : null, cede: tr.cede.length, start: tr.start, end: tr.end, active: tr.active, brokenBy: nm(tr.brokenBy), endedBy: tr.endedBy ?? null,
+          tribute: Object.keys(tr.tribute).length ? fmtGoods(w, tr.tribute) : null, cede: tr.cede.length, start: tr.start, end: tr.end, active: tr.active, term: tr.term !== undefined ? tr.term : tr.end !== null && tr.active ? tr.end - tr.start : null, brokenBy: nm(tr.brokenBy), endedBy: tr.endedBy ?? null,
           paid: tr.paid ?? 0, missed: tr.missed ?? 0, due: Object.keys(tr.tribute).length ? Math.max(0, Math.min(w.tick, tr.end ?? w.tick) - tr.start - (tr.active ? 0 : 0)) : 0,
         } : null;
         const talks = (x.talks ?? []).map(t => ({ ...t, fromName: nm(t.from) }));

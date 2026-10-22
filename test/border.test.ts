@@ -140,3 +140,26 @@ test("a border gate market: on our land at the neighbour's edge, joined by road;
   assert.equal(st.market, market + 1, "open beyond the usual 60");
   assert.ok(GATE.below > 0);
 });
+
+test("a peace after a long dispute is not torn up by the dispute before it; the border starts afresh", () => {
+  const w = touching("peace-afresh"), [a, b] = w.nations;
+  a.met.push(b.id); b.met.push(a.id);
+  for (const n of w.nations) n.stock.coin = 200;
+  turn(w, { 0: { actions: [{ type: "declare_war", target: "Nuoc Bình" }] } });
+  const st = borderOf(w, a.id, b.id);
+  st.dispute = 189; st.tension = 100;
+  turn(w, { 1: { actions: [{ type: "treaty", to: "Nuoc A", kind: "peace", tribute: { coin: 6 }, duration: 10, payer: "me" }] } });
+  const offer = w.treatyOffers.at(-1)!;
+  turn(w, { 0: { actions: [{ type: "accept_treaty", offer: offer.id }] } });
+  const t = w.treaties.find(x => x.id === offer.id)!;
+  assert.ok(t.active, `the new peace holds (${t.endedBy ?? ""})`);
+  assert.equal(t.term, 10);
+  assert.ok(st.tension <= BORDER.afterPeace + 10 && (st.dispute ?? 0) < BORDER.treatyBreakAfter, `${st.tension} / ${st.dispute}`);
+  turn(w); turn(w);
+  assert.ok(t.active && (t.paid ?? 0) >= 1, `paid ${t.paid}`);
+  // a treaty falls only to a dispute it has lived through itself
+  st.tension = 100; st.dispute = 0;
+  for (let k = 0; k < BORDER.treatyBreakAfter + 1 && t.active; k++) { st.tension = 100; turn(w); }
+  assert.equal(t.active, false);
+  assert.match(t.endedBy ?? "", /tranh chấp biên giới/);
+});

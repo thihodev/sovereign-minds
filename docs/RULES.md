@@ -1241,7 +1241,8 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
   - Hiệp ước hòa bình, liên minh hoặc chư hầu ngăn được điều này.
   - Lời cố vấn báo khẩn khi đã có 2 vụ.
   - Trên bản đồ, một vụ xô xát hiện là "🤜 xô xát biên giới", không phải trận đánh, và người chết vì xô xát có nguyên nhân riêng.
-- **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt. Tranh chấp liên tục 5 lượt thì hiệp ước bất tương xâm, hòa bình và thông hành giữa hai nước tan vỡ (liên minh và chư hầu vẫn giữ). Có chính nghĩa thì tự xé hiệp ước (`break_treaty`) không mất uy tín.
+- **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt. Một hiệp ước bất tương xâm, hòa bình hay thông hành tan vỡ khi **chính nó** đã trải qua 5 lượt tranh chấp liên tục (chỉ tính từ khi ký; liên minh và chư hầu vẫn giữ). Có chính nghĩa thì tự xé hiệp ước (`break_treaty`) không mất uy tín.
+- **Sau chiến tranh:** hòa ước kết thúc một cuộc chiến mở lại biên giới từ đầu: căng thẳng hạ xuống tối đa 45, bộ đếm tranh chấp về 0. Chiến tranh đã trút hết giận, nên hòa ước mới không bị xé ngay vì những tranh chấp trước đó.
 - **Chợ biên giới:** khi căng thẳng dưới 60 và không bên nào đang cách ly (mục 9.5), mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
 - **Chợ cửa khẩu** (`border_gate`, sáng kiến của một quốc gia, chấp thuận một phần):
   - **Xây:** cần Ký hiệu (P12); 6 gỗ, 4 đá, 10 công.

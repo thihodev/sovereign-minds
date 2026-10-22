@@ -2301,8 +2301,12 @@
       const rows = [];
       if (t) {
         rows.push(["Hòa ước", `#${t.id}${t.by ? `, do ${esc(t.by)} đề nghị` : ""}`]);
-        rows.push(["Thời hạn", `từ lượt ${t.start}${t.end !== null ? ` tới lượt ${t.end} (${t.end - t.start} lượt)` : ", vĩnh viễn"} · ${t.active ? "đang hiệu lực" : t.brokenBy ? `<span class="bad">bị ${esc(t.brokenBy)} xé bỏ</span>` : t.endedBy ? `<span class="bad">${esc(t.endedBy)}</span>` : "đã hết hạn"}`]);
-        if (t.tribute) rows.push(["Cống nạp", `${esc(t.payer)} nộp ${esc(t.receiver)} ${esc(t.tribute)} mỗi lượt · đã nộp đủ ${t.paid} lượt${t.missed ? `, <span class="bad">thiếu ${t.missed} lượt</span>` : ""}`]);
+        // what was agreed, then what happened: in force, ended on time, torn up, or fallen early (and when)
+        const agreed = t.term ? `${t.term} lượt (lượt ${t.start}–${t.start + t.term})` : t.term === null ? "vĩnh viễn" : `từ lượt ${t.start}`;
+        const early = !t.active && t.end !== null && (!t.term || t.end < t.start + t.term);
+        const fate = t.active ? "đang hiệu lực" : t.brokenBy ? `<span class="bad">bị ${esc(t.brokenBy)} xé bỏ ở lượt ${t.end}</span>` : t.endedBy ? `<span class="bad">${esc(t.endedBy)} (lượt ${t.end})</span>` : early ? `<span class="bad">kết thúc sớm ở lượt ${t.end}</span>` : "đã hết hạn";
+        rows.push(["Thời hạn", `${agreed} · ${fate}`]);
+        if (t.tribute) rows.push(["Cống nạp", `${esc(t.payer)} nộp ${esc(t.receiver)} ${esc(t.tribute)} mỗi lượt · đã nộp ${t.paid}${t.term ? `/${t.term}` : ""} lượt${t.missed ? `, <span class="bad">thiếu ${t.missed} lượt</span>` : ""}${!t.active && t.term && t.paid < t.term ? " (hòa ước chấm dứt trước khi nộp đủ)" : ""}`]);
         if (t.cede) rows.push(["Nhượng đất", `${esc(t.payer)} nhượng ${t.cede} ô cho ${esc(t.receiver)}`]);
         if (!t.tribute && !t.cede) rows.push(["Điều khoản", "không có: hòa trắng"]);
       }

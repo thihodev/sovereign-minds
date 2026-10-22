@@ -6,10 +6,12 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
+  BORDER,
   GESTURES, HAMLET, INJECTION, KIN, LAND, ROADS, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
+import { borderOf } from "./border.ts";
 import { quarantined } from "./contagion.ts";
 import { add, part, take, add as addPeople, take as takePeople } from "./people.ts";
 import { noteExodus } from "./exodus.ts";
@@ -322,7 +324,7 @@ export function resolveRelations(ctx: DiploCtx): void {
     const receiver = payer === off.from ? off.to : off.from;
     if (!from.alive) continue;
     const cede = off.cede.filter(i => world.tiles[i].owner === payer);
-    const t: Treaty = { id: off.id, type: off.type, a: payer, b: receiver, tribute: off.tribute, cede, start: tick, end: off.duration ? tick + off.duration : null, active: true, brokenBy: null, by: off.from };
+    const t: Treaty = { id: off.id, type: off.type, a: payer, b: receiver, tribute: off.tribute, cede, start: tick, end: off.duration ? tick + off.duration : null, active: true, brokenBy: null, by: off.from, term: off.duration ?? null };
     if (off.type !== "tribute" && off.type !== "vassal" && !Object.keys(off.tribute).length) { t.a = off.from; t.b = off.to; }
     world.treaties.push(t);
     world.treatyOffers = world.treatyOffers.filter(x => x.id !== offer);
@@ -332,6 +334,8 @@ export function resolveRelations(ctx: DiploCtx): void {
       talk(world, n.id, off.from, "signed", `Chấp nhận đề nghị hòa #${off.id} của ${from.name}${cede.length ? ` (nhượng ${cede.length} ô)` : ""}.`);
       for (const w of world.wars) if (w.end === null && ((w.a === off.from && w.b === off.to) || (w.a === off.to && w.b === off.from))) w.treaty = t.id;
       settlePeace(world, t, payer, L, say); endWar(world, off.from, off.to, tick);
+      // the war vented the anger: the border starts afresh, so the new peace is not torn up by the dispute before it
+      const st = borderOf(world, off.from, off.to); st.tension = Math.min(st.tension, BORDER.afterPeace); st.dispute = 0;
     }
   }
   world.treatyOffers = world.treatyOffers.filter(x => tick - x.tick <= TREATY.offerTicks);
