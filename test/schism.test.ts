@@ -5,6 +5,10 @@ import { createWorld, ownedTiles, step, type NationSpec } from "../src/engine.ts
 import { PROSPERITY, SCHISM } from "../src/rules.ts";
 import type { AIResponse, TurnInput, World } from "../src/types.ts";
 
+// these tests follow factions that leave; a faction that rises for the throne (§4.5b) is test/civil.test.ts
+import { CIVIL } from "../src/rules.ts";
+Object.assign(CIVIL, { chance: 0, noLand: 0, weak: 0 });
+
 const bots = (n: number): NationSpec[] => Array.from({ length: n }, () => ({ controller: "bot", provider: "bot", model: "bot" }));
 function founded(seed: string): World {
   const w = createWorld(seed, bots(1));

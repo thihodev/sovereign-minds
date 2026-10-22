@@ -123,6 +123,8 @@ export interface Nation {
   air?: import("./air.ts").AirState;
   /** §4.14 the royal house: its name and its princes and princesses (those married in carry `from`) */
   house?: string; royals?: import("./royals.ts").Royal[];
+  /** §4.5b the ruler's name when one took the throne in a civil war, the houses that ruled, and the turn the last one did */
+  ruler?: string; dynasties?: Array<{ tick: number; house: string; leader: string; trait: string; from?: string }>; dynastyTick?: number;
   /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */
   urban?: Record<string, import("./urban.ts").Urban>;
   /** §4.15 each order of society's mood, 0–100 */
@@ -282,7 +284,7 @@ export interface Schism {
   leader: string;
   grievance: string;
   /** pending → approved → done (a new nation); or refused/expired → asking another nation → emigrated, or returned home */
-  status: "pending" | "approved" | "refused" | "expired" | "done" | "asking" | "emigrated" | "returned";
+  status: "pending" | "approved" | "refused" | "expired" | "done" | "asking" | "emigrated" | "returned" | "fighting" | "won" | "crushed";
   /** The nation they ask to take them in, and until when. */
   to?: number;
   askUntil?: number;
@@ -295,6 +297,12 @@ export interface Schism {
   decidedTick?: number;
   /** The nation it became. */
   nation?: number;
+  /** §4.5b a faction that rose for the throne instead of leaving: the turns each side won, the rebels' odds last turn,
+   *  and whether the Watcher has chosen the new ruler's mind */
+  kind?: "civil";
+  score?: { rebels: number; crown: number };
+  odds?: number;
+  mind?: boolean;
 }
 
 export interface Demography {

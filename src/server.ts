@@ -138,6 +138,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         living: n.alive && n.founded ? livingStandard(w, n) : null, // §4.11
         treasury: n.alive && n.founded && n.treasury ? (() => { const t = n.treasury!; return { coin: Math.round((n.stock.coin || 0) * 10) / 10, tax: t.tax, tariff: t.tariff, last: t.last ?? null, lines: LINE_VI, fair: TREASURY.fair, safe: TREASURY.safe }; })() : null,
         power: n.alive && n.founded ? (v => v && { ...v, centres: n.power?.centres ?? [] })(powerView(w, n)) ?? null : null, // §6.8 (+ the lit centres' tiles, for the 3D map)
+        ruler: n.ruler ?? null, dynasties: n.dynasties ?? [], // §4.5b
         air: n.alive && n.founded ? (v => v && { ...v, tiles: n.buildings.filter(b => b.type === "airport").map(b => b.tile), open_tiles: n.air?.open ?? [] })(airView(w, n)) ?? null : null, // §7.3b (+ tiles, for the 3D map)
         royals: n.alive && n.founded ? royalsView(w, n) : null,
         classes: n.alive && n.founded ? classView(w, n) : [],

@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.53";
+export const RULES_VERSION = "0.54";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -126,6 +126,17 @@ export const SCHISM = {
   /** The old nation once they are gone: stability +calmAfter; the new one starts at `startStability`. */
   calmAfter: 15, startStability: 70,
 };
+/** §4.5b Civil war: a faction at 100 discontent (with no restless province of its own) rises for the throne instead of
+ *  leaving with chance `chance` (+`noLand` when there is no free land to go to, +`weak` while stability is under
+ *  `weakBelow`; at most `max`). Each turn the rebels (their people × WORKER_SHARE × `rise` × the nation's arms) fight the
+ *  crown (its home defence, less the rebels' share): the side that wins a turn scores; `win` turns decide it. Each turn
+ *  the winning side loses `dead` and the losing side `loserDead` of its people, and the nation `stability`.
+ *  The crown wins: the leader is put to death, discontent falls to `crushedDiscontent`, stability +`crushedStability`.
+ *  The rebels win: the ruler is killed and the leader takes the throne — a new house, a new character (another trait),
+ *  a new mind if the Watcher gives one, stability at least `wonStability`, discontent 0, and RENAME.windowTicks turns to
+ *  rename the nation, change its flag and write a new manifesto. From `warn` discontent the ruler is told the danger. */
+export const CIVIL = { chance: 0.5, noLand: 0.3, weak: 0.2, weakBelow: 15, max: 0.9, rise: 0.6, win: 2, dead: 0.03, loserDead: 0.06, stability: 3,
+  crushedDiscontent: 40, crushedStability: 5, wonStability: 65, warn: 60 };
 /** §2.7 A connected realm: goods reach the stores along a way (a walk of at most `walk` tiles over one's own land,
  *  a road, or water between piers). A centre cut off from the capital yields `isolatedYield` and adds
  *  `isolatedDiscontent` a turn, once `grace` turns have passed since it was founded (time to build its road);

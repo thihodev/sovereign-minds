@@ -8,7 +8,7 @@ import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
-  YIELD, apFor, depthCostMult,
+  YIELD, apFor, depthCostMult, CIVIL, TRAITS,
   TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
@@ -522,6 +522,8 @@ function validateFlag(world: World, n: Nation, raw: unknown): string | null {
 export function renameDecreed(world: World): boolean { const d = world.renameDecree; return !!d && !d.done && world.tick >= d.from && world.tick <= d.until; }
 export function renameOpen(world: World, n: Nation): boolean {
   if (renameDecreed(world)) return true;
+  // §4.5b a new house may rename the nation once
+  if (n.dynastyTick !== undefined && world.tick - n.dynastyTick <= RENAME.windowTicks && (n.renameTick === null || n.renameTick < n.dynastyTick)) return true;
   if (n.eraTick === null || world.tick - n.eraTick > RENAME.windowTicks) return false;
   return n.renameTick === null || n.renameTick <= n.eraTick;
 }
@@ -1324,14 +1326,16 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
   for (const n of world.nations) {
     if (!n.alive || !n.founded) continue;
     const mine = list.filter(x => x.from === n.id);
-    const open = mine.find(x => x.status === "pending" || x.status === "approved");
+    const open = mine.find(x => x.status === "pending" || x.status === "approved" || x.status === "fighting");
     // A faction forms
     if (!open && (n.discontent ?? 0) >= 100 && n.population >= SCHISM.minPop && !mine.some(x => tick - x.tick < SCHISM.cooldown)) {
-      // §2.8 the unhappiest province (cut off, or far and ungoverned) is the faction; else they seek new land
+      // §2.8 the unhappiest province (cut off, or far and ungoverned) is the faction; else they seek new land,
+      // or (§4.5b) rise to kill the ruler and take the throne
       const prov = restlessProvince(world, n);
       const site = prov ? prov.centre : schismSite(world, n);
-      if (site < 0) continue;
       const r = rngFor(world.seed, tick, "schism", n.id);
+      if (!prov && rngFor(world.seed, tick, "civil-rise", n.id)() < civilChance(n, site)) { riseForThrone(world, n, list, r, say); continue; }
+      if (site < 0) continue;
       const leader = vietPerson(r);
       const share = prov ? prov.people / n.population : SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
       const why = prov ? `tỉnh ${prov.name} ${prov.causes.filter(c => c !== "crowded").map(c => CAUSE_VI[c]).join(" và ")}; ${grievance(world, n)}` : grievance(world, n);
@@ -1354,7 +1358,65 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
       else if (x.status === "asking" && tick >= (x.askUntil ?? tick)) goHome(n, x, `${world.nations[x.to!]?.name ?? "nước kia"} không nhận họ`);
     }
     if (open?.status === "approved") secede(world, n, open, L, say);
+    if (open?.status === "fighting" && open.tick < tick) civilBattle(world, n, open, say);
   }
+}
+
+/** §4.5b How likely a faction at 100 discontent rises for the throne rather than leaving. */
+export function civilChance(n: Nation, site: number): number {
+  return Math.min(CIVIL.max, CIVIL.chance + (site < 0 ? CIVIL.noLand : 0) + (n.stability < CIVIL.weakBelow ? CIVIL.weak : 0));
+}
+/** §4.5b The strength of the two sides of a civil war this turn. */
+export function civilStrength(world: World, n: Nation, x: Schism): { rebels: number; crown: number; odds: number } {
+  const m = mods(world, n), share = Math.min(0.9, x.people / Math.max(1, n.population));
+  const crown = homeDefence(world, n) * (1 - share), rebels = x.people * WORKER_SHARE * CIVIL.rise * (1 + (m.role.warrior || 0) + m.combat);
+  return { rebels, crown, odds: Math.round(rebels / Math.max(1e-9, rebels + crown) * 100) / 100 };
+}
+/** §4.5b A faction rises to kill the ruler and take the throne. */
+function riseForThrone(world: World, n: Nation, list: Schism[], r: () => number, say: Say): void {
+  const tick = world.tick, leader = vietPerson(r);
+  const share = SCHISM.share[0] + (SCHISM.share[1] - SCHISM.share[0]) * Math.min(1, Math.max(0, (SCHISM.threshold - n.stability) / SCHISM.threshold));
+  const x: Schism = { id: (list.at(-1)?.id ?? 0) + 1, from: n.id, tick, share: Math.round(share * 100) / 100, people: Math.round(n.population * share), site: n.capital, leader, grievance: grievance(world, n), status: "fighting", kind: "civil", score: { rebels: 0, crown: 0 } };
+  x.odds = civilStrength(world, n, x).odds;
+  list.push(x);
+  n.lastEvents.push(`NỘI CHIẾN: ${x.people} người theo ${leader} nổi dậy đòi giết người trị vì và chiếm ngai vàng vì ${x.grievance}. Mỗi lượt quân triều đình (chiến binh, dân quân, tường thành, ổn định) đánh với phe nổi dậy; bên nào thắng ${CIVIL.win} lượt trước thì thắng. Phe nổi dậy thắng thì người trị vì bị giết và bị thay. Khả năng họ thắng mỗi lượt lúc này: ${Math.round(x.odds! * 100)}%.`);
+  say(n.id, "civil", `Nội chiến ở ${n.name}: ${x.people} người theo ${leader} nổi dậy đòi lật đổ người trị vì, vì ${x.grievance}.`);
+  fx({ kind: "riot", tile: n.capital, nation: n.id, text: `nội chiến: ${leader}` });
+}
+/** §4.5b One turn of civil war: the two sides fight; two turns won decide it. */
+function civilBattle(world: World, n: Nation, x: Schism, say: Say): void {
+  const tick = world.tick, s = civilStrength(world, n, x), r = rngFor(world.seed, tick, "civil", n.id), rebelsWin = r() < s.odds;
+  const score = (x.score ??= { rebels: 0, crown: 0 });
+  if (rebelsWin) score.rebels++; else score.crown++;
+  x.odds = s.odds;
+  const rebelsDead = Math.min(x.people, Math.ceil(x.people * (rebelsWin ? CIVIL.dead : CIVIL.loserDead)));
+  const crownDead = Math.ceil(Math.max(0, n.population - x.people) * (rebelsWin ? CIVIL.loserDead : CIVIL.dead) * 0.5);
+  takePeople(n, Math.min(n.population - 1, rebelsDead + crownDead), "war"); x.people = Math.max(0, x.people - rebelsDead);
+  fxDeath(n.capital, n.id, rebelsDead + crownDead, "war");
+  n.stability = Math.max(0, n.stability - CIVIL.stability);
+  n.lastEvents.push(`Nội chiến, lượt ${score.rebels + score.crown}: ${rebelsWin ? `phe ${x.leader} thắng` : "quân triều đình thắng"} (${rebelsDead} người nổi dậy, ${crownDead} người phía triều đình chết). Tỉ số: nổi dậy ${score.rebels} – triều đình ${score.crown}.`);
+  if (score.crown >= CIVIL.win || x.people <= 0) {
+    x.status = "crushed"; x.decidedTick = tick;
+    n.discontent = Math.min(n.discontent ?? 0, CIVIL.crushedDiscontent); n.stability = Math.min(100, n.stability + CIVIL.crushedStability);
+    n.lastEvents.push(`Quân triều đình dẹp tan cuộc nổi dậy; ${x.leader} bị xử tử. Ngai vàng còn đó, nhưng bất mãn còn ${n.discontent}: cai trị cho tốt, kẻo lần sau không may như vậy.`);
+    say(n.id, "civil", `${n.name} dẹp tan cuộc nổi dậy của ${x.leader}.`);
+  } else if (score.rebels >= CIVIL.win) newRuler(world, n, x, say);
+}
+/** §4.5b The rebels win: the ruler is killed and the leader takes the throne with a new house and a new character. */
+function newRuler(world: World, n: Nation, x: Schism, say: Say): void {
+  const tick = world.tick, r = rngFor(world.seed, tick, "dynasty", n.id);
+  const others = TRAITS.filter(t => t.id !== n.trait), trait = others[Math.floor(r() * others.length)] ?? TRAITS[0];
+  const fallen = n.ruler ?? (n.house ? `vua nhà ${n.house}` : "người trị vì cũ"), house = x.leader.split(" ")[0], from = n.house;
+  (n.dynasties ??= []).push({ tick, house, leader: x.leader, trait: trait.id, from });
+  n.trait = trait.id; n.house = house; n.ruler = x.leader; n.royals = []; n.dynastyTick = tick;
+  if (x.mind && x.model) { n.controller = x.controller ?? n.controller; n.provider = x.provider ?? n.provider; n.model = x.model; n.effort = x.effort; }
+  n.memory = `Ta là ${x.leader}, nhà ${house}. Ở lượt ${tick} phe ta nổi dậy vì ${x.grievance}, giết ${fallen} và lên ngôi. Ta không mang ký ức của triều cũ; dân theo ta vì tin ta sẽ cai trị khác. Tính cách của ta: ${trait.name}. Trong ${RENAME.windowTicks} lượt ta có thể đổi tên nước, cờ và viết tuyên ngôn mới (rename_nation, kèm manifesto). Nếu ta cũng cai trị tệ, dân sẽ lật đổ ta như vậy.`;
+  n.lastThought = "";
+  n.discontent = 0; n.stability = Math.max(n.stability, CIVIL.wonStability);
+  x.status = "won"; x.decidedTick = tick; x.nation = n.id;
+  n.lastEvents.push(`Phe nổi dậy thắng: ${fallen} bị giết. ${x.leader} lên ngôi, lập nhà ${house}, với tính cách mới (${trait.name}).`);
+  say(n.id, "civil", `Nội chiến ở ${n.name} kết thúc: ${fallen} bị giết, ${x.leader} lên ngôi, lập nhà ${house}.`);
+  fx({ kind: "riot", tile: n.capital, nation: n.id, text: `${x.leader} lên ngôi` });
 }
 
 /** A faction that may not found its own nation asks the calmest, roomiest nation its people knows to take it in. */
@@ -2084,7 +2146,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       const name = a.name == null ? null : String(a.name).trim(), flag = a.flag ?? null, decreed = renameDecreed(world);
       const capital = decreed && a.capital != null ? String(a.capital).trim() : null, people = decreed && a.people != null ? String(a.people).trim() : null;
-      if (name === null && flag === null && capital === null && people === null) return "Cần name, flag (hoặc capital, people khi có sắc lệnh đổi tên)";
+      const newHouse = n.dynastyTick !== undefined && world.tick - n.dynastyTick <= RENAME.windowTicks, manifesto = newHouse && a.manifesto != null ? String(a.manifesto).trim().slice(0, 280) : null; // §4.5b a new house's manifesto
+      if (name === null && flag === null && capital === null && people === null && manifesto === null) return "Cần name, flag (hoặc capital, people khi có sắc lệnh đổi tên; manifesto khi vừa lên ngôi)";
       for (const [label, v] of [["Tên thủ đô", capital], ["Tên dân tộc", people]] as const) if (v !== null) { const err = validateName(label, v); if (err) return err; }
       for (const o of world.nations) if (o.id !== n.id && o.founded && ((capital !== null && normName(o.capitalName) === normName(capital)) || (people !== null && normName(o.people) === normName(people)))) return "Tên thủ đô hoặc dân tộc này đã có nước khác dùng";
       if (name !== null && !(decreed && normName(name) === normName(n.name))) {
@@ -2096,6 +2159,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (!decreed) { n.stability = Math.max(0, n.stability - RENAME.stability); n.renameTick = world.tick; } // §10.6 free under the gods' decree
       if (name !== null && normName(name) !== normName(n.name)) { n.formerNames.push(old); n.name = name; }
       if (flag !== null) n.flag = toFlag(flag);
+      if (manifesto !== null) n.manifesto = manifesto;
       if (capital !== null) n.capitalName = capital;
       if (people !== null) n.people = people;
       const also = [capital !== null ? `thủ đô ${capital}` : "", people !== null ? `dân tộc ${people}` : "", flag !== null ? "cờ mới" : ""].filter(Boolean).join(", ");

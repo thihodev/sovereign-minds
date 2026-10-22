@@ -573,6 +573,23 @@ export class Runner {
   decideSchism(id: number, status: string, model: string, effort: string, verdict: string): string | null {
     const x = (this.world.schisms ?? []).find(s => s.id === id);
     if (!x) return "Không có phái ly khai này";
+    // §4.5b a civil war: the Watcher gives the mind the new ruler will have if the rebels win (or keeps the old one)
+    if (x.kind === "civil") {
+      if (x.status !== "fighting") return "Cuộc nội chiến này đã kết thúc";
+      if (status === "approved") {
+        if (model === "bot") { x.controller = "bot"; x.provider = "bot"; x.model = "bot"; x.effort = undefined; }
+        else {
+          if (!CLAUDE_MODELS.some(m => m.id === model)) return "Model không hợp lệ";
+          if (!CLAUDE_EFFORTS.includes(effort)) return "Effort không hợp lệ";
+          x.controller = "ai"; x.provider = "claude"; x.model = model; x.effort = effort;
+        }
+      } else if (status !== "refused") return "Kết quả không hợp lệ";
+      x.mind = true; x.verdict = verdict.slice(0, 500);
+      this.store.logWatcher(this.world.tick, "civil", { id, status, model, effort, verdict });
+      this.store.saveState(this.world);
+      this.emit({ type: "status" });
+      return null;
+    }
     if (x.status !== "pending") return "Phái này đã được quyết định";
     if (status === "approved") {
       if (model === "bot") { x.controller = "bot"; x.provider = "bot"; x.model = "bot"; x.effort = undefined; }

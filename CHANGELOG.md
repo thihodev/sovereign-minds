@@ -2,6 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.54
+
+- **Nội chiến (§4.5b):** bất mãn lên 100 giờ có hai lối ra: ly khai như cũ, hoặc nổi dậy giết người trị vì để cướp ngôi.
+  - Khả năng nổi dậy: 50%; cao hơn khi không còn đất trống để đi hay khi triều đình yếu; tối đa 90%. Tỉnh bất an thì vẫn ly khai.
+  - Mỗi lượt, quân triều đình (chiến binh, dân quân, tường thành, ổn định) đánh với phe nổi dậy; bên nào thắng 2 lượt trước thì thắng.
+  - Triều đình thắng: thủ lĩnh bị xử tử, bất mãn giảm.
+  - Phe nổi dậy thắng: người trị vì bị giết; nhà mới, tính cách mới (một nét dân tộc khác), bộ não mới do Watcher chọn, ký ức triều cũ bị xóa; được đổi tên nước, cờ và tuyên ngôn.
+  - Watcher chọn bộ não cho người trị vì mới trong mục Thỉnh nguyện.
+- **Cảnh báo cho người trị vì:** luật chơi nói rõ cai trị tệ thì có thể bị giết. Từ bất mãn 60, AI thấy `nation.throne` với mức nguy; trong nội chiến thấy tỉ số và khả năng bị lật đổ. Cố vấn cảnh báo mức cao.
+- Giao diện: thẻ nội chiến trong mục Thỉnh nguyện; tên người trị vì mới (🗡) trên khung quốc gia.
+
 ## v0.53
 
 - **Dân số như thế giới thật (§4.2b):** trước đây chỗ ở là trần cứng và gần như không lớn theo thời đại. Vì vậy ở lượt 1099, thời Hiện Đại, các nước chỉ có vài trăm tới hơn một nghìn người.

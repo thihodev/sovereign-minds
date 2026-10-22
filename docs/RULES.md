@@ -548,6 +548,36 @@ Phát minh chỉ có thể nhân các con số này theo Bảng hiệu ứng chu
 - **Áp dụng cho mọi cặp nước gốc và nước tách ra,** kể cả những nước đã tách trước v0.19. Mỗi lượt Engine giữ đúng luật này: cho hai nước biết nhau, hủy hiệp ước bằng hữu, hủy đề nghị trao đổi.
 - **AI được báo:** `known_nations[].split` ghi TRAITORS hay traitors, và lời cố vấn nhắc cả hai bên.
 
+### 4.5b Nội chiến: dân giết người trị vì
+
+Bất mãn lên 100 có hai lối ra: ly khai (4.5) hoặc **nội chiến**. Người trị vì cai trị tệ có thể bị giết và bị thay.
+
+- **Ai nổi dậy:** khi một phái hình thành ở mức bất mãn 100 mà không phải một tỉnh bất an (tỉnh bất an thì vẫn ly khai cùng đất của tỉnh), phái đó nổi dậy đòi ngai thay vì bỏ đi:
+  - khả năng cơ bản 50%;
+  - +30% khi không còn đất trống để đi;
+  - +20% khi ổn định dưới 15;
+  - tối đa 90%.
+- **Phe nổi dậy:** 20–35% dân, càng đông khi ổn định càng thấp, có một thủ lĩnh.
+- **Mỗi lượt nội chiến:**
+  - Sức của triều đình = sức thủ tại nhà (chiến binh, vũ khí, dân quân, tường thành, nhân ổn định; xem 9.4) × (1 − phần dân nổi dậy).
+  - Sức của phe nổi dậy = số người nổi dậy × 0,7 × 0,6 × (1 + thưởng chiến binh và chiến đấu của nước).
+  - Bên thắng lượt được chọn theo tỉ lệ sức (RNG có seed). Bên thua lượt mất 6% người của mình, bên thắng mất 3%. Cả nước mất 3 ổn định.
+  - Bên nào thắng 2 lượt trước thì thắng cả cuộc.
+- **Triều đình thắng:** thủ lĩnh bị xử tử; bất mãn giảm còn tối đa 40; ổn định +5.
+- **Phe nổi dậy thắng:** người trị vì bị giết. Thủ lĩnh lên ngôi:
+  - lập nhà mới (họ của thủ lĩnh), hoàng tộc cũ không còn;
+  - mang **tính cách mới**: một nét dân tộc khác (2.4), có đạo lý và hiệu ứng riêng;
+  - mang **bộ não mới** nếu Watcher đã chọn model; nếu không, nước dùng model cũ;
+  - **không mang ký ức của triều cũ**: bộ nhớ AI được viết lại thành câu chuyện lên ngôi;
+  - ổn định ít nhất 65, bất mãn về 0;
+  - trong 10 lượt được đổi tên nước, cờ và viết tuyên ngôn mới (`rename_nation`, kèm `manifesto`).
+- **Watcher:** mỗi cuộc nội chiến hiện trong mục Thỉnh nguyện, kèm tỉ số và khả năng phe nổi dậy thắng mỗi lượt. Watcher chọn model và effort cho người trị vì mới nếu phe nổi dậy thắng, hoặc giữ bộ não cũ. Watcher không chặn được nội chiến.
+- **Cảnh báo cho người trị vì:**
+  - Luật chơi nói rõ: cai trị tệ thì có thể bị giết và bị thay.
+  - Từ mức bất mãn 60, gói trạng thái có `nation.throne`: mức nguy (RISING, HIGH, EXTREME) và điều xảy ra ở mức 100.
+  - Trong nội chiến, `nation.throne` có tỉ số, khả năng phe nổi dậy thắng lượt này và cách giữ ngai.
+  - Cố vấn cảnh báo mức 2–3 khi bất mãn từ 40 ("nổi dậy GIẾT BẠN để cướp ngôi"), và mức 3 mỗi lượt nội chiến.
+
 ### 4.6 Triều đình: phân quyền cho quan chức
 
 Một quốc gia giao một lĩnh vực cho một người. Người đó **tự làm việc mỗi lượt, không tốn AP của nhà vua**:

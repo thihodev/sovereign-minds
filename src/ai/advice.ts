@@ -3,10 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, CIVIL, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, inv, invName } from "../catalog.ts";
-import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
+import { civilChance, civilStrength, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
@@ -67,7 +67,7 @@ export function advice(world: World, n: Nation): Advice[] {
   // §4.10 discontent climbing: faith and feasts calm a people before it splits
   if ((n.discontent ?? 0) >= 60 && !ex.recent) {
     const faithful = m.caps.has(MISSION.cap);
-    say((n.discontent ?? 0) >= 85 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 thì một phái đòi ly khai. ${faithful ? `Truyền giáo trong nước (mission home, −${MISSION.calm}/lượt trong ${MISSION.turns} lượt) và lễ hội (festival, −${FESTIVAL.calm}, +${FESTIVAL.stability} ổn định)` : "Nghiên cứu Nghi lễ (P5) để truyền giáo"}; bổ nhiệm bá tước và làm đường cho tỉnh xa.`);
+    say((n.discontent ?? 0) >= 85 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 thì một phái đòi ly khai, hoặc nổi dậy giết người trị vì để cướp ngôi. ${faithful ? `Truyền giáo trong nước (mission home, −${MISSION.calm}/lượt trong ${MISSION.turns} lượt) và lễ hội (festival, −${FESTIVAL.calm}, +${FESTIVAL.stability} ổn định)` : "Nghiên cứu Nghi lễ (P5) để truyền giáo"}; bổ nhiệm bá tước và làm đường cho tỉnh xa.`);
   }
 
   // Food
@@ -137,7 +137,15 @@ export function advice(world: World, n: Nation): Advice[] {
   if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) tự thành đất hoang. Muốn giữ đất: nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1), lập điểm định cư hoặc tăng dân; hoặc tự chọn ô bỏ (abandon_tile) để giữ ô tốt.`);
 
   // Discontent
-  if ((n.discontent ?? 0) >= 40) say((n.discontent ?? 0) >= 75 ? 3 : 2, `Bất mãn ${Math.round(n.discontent ?? 0)}/100: tới 100 một phái sẽ đòi bỏ đi lập quốc riêng. Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, có chỗ ở, có nghi lễ/công trình ổn định) để nó nguội đi.`);
+  // §4.5b the throne in danger: a people badly governed kills its ruler
+  const civil = (world.schisms ?? []).find(x => x.from === n.id && x.kind === "civil" && x.status === "fighting");
+  if (civil) {
+    const st = civilStrength(world, n, civil);
+    say(3, `NỘI CHIẾN: ${civil.people} người theo ${civil.leader} đang đánh để GIẾT BẠN và chiếm ngai. Tỉ số: nổi dậy ${civil.score?.rebels ?? 0} – triều đình ${civil.score?.crown ?? 0} (ai thắng ${CIVIL.win} lượt trước thì thắng); khả năng họ thắng lượt này ${Math.round(st.odds * 100)}%. Thêm chiến binh (labor.warrior), giữ ổn định, tường thành tăng sức của triều đình. Thua là bạn bị giết và bị thay bằng một người trị vì khác.`);
+  } else if ((n.discontent ?? 0) >= 40) {
+    const d = n.discontent ?? 0;
+    say(d >= 75 ? 3 : 2, `Bất mãn ${Math.round(d)}/100: tới 100 một phái sẽ bỏ đi lập quốc riêng, hoặc nổi dậy GIẾT BẠN để cướp ngôi (nội chiến, khả năng ${Math.round(civilChance(n, 0) * 100)}%, cao hơn nếu không còn đất trống để họ đi). Giữ ổn định ≥ ${SCHISM.calm} (đủ ăn, có chỗ ở, có nghi lễ/công trình ổn định) để nó nguội đi; ban ơn (grant), lễ hội (festival), truyền giáo (mission) làm dịu nhanh hơn.`);
+  }
 
   // §2.5 transport is the lifeblood: land with no road beside it sends home less
   {

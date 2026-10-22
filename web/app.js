@@ -1473,6 +1473,7 @@
     if (n.air) g.push(`<span title="${esc(n.air.airports.map(x => `${x.at}: ${x.state === "open" ? "mở" : x.state === "shut" ? "đóng (thiếu dầu hay tiền)" : "đang xây"}`).join(" · ") + (n.air.can_fly_to ? ` · bay được tới: ${n.air.can_fly_to.join(", ")}` : ""))}">✈ Sân bay <b class="${n.air.airports.some(x => x.state === "shut") ? "bad" : ""}">${n.air.airports.filter(x => x.state === "open").length}/${n.air.airports.length}</b></span>`);
     if (n.power) g.push(`<span title="${esc(`${n.power.plants} nhà máy điện${n.power.idle_plants ? ` (${n.power.idle_plants} đang đứng: thiếu nhiên liệu hay tiền)` : ""} · làm ${n.power.made}, cần ${n.power.need} · có điện: ${n.power.on_grid.join(", ") || "chưa nơi nào"}${n.power.off_grid.length ? ` · chưa có: ${n.power.off_grid.join(", ")}` : ""}`)}">⚡ Điện <b class="${n.power.people_reached >= 0.5 ? "good" : n.power.idle_plants ? "bad" : "warn"}">${Math.round(n.power.people_reached * 100)}%</b></span>`);
     g.push(`<span title="${esc(n.nextEra ? `Để sang ${n.nextEra.era} còn cần: ${n.nextEra.missing.join(", ") || "đã đủ"}` : "Kỷ nguyên")}">🏺 <b>${esc(n.era)}</b></span>`);
+    if (n.ruler) g.push(`<span title="${esc(`Lên ngôi sau nội chiến${(n.dynasties || []).length ? ` · các triều: ${n.dynasties.map(d => `nhà ${d.house} (${d.leader}, L${d.tick})`).join(", ")}` : ""}`)}">🗡 <b>${esc(n.ruler)}</b></span>`);
     if (n.royals?.house) g.push(`<span title="${esc(`${(n.royals.unwed || []).length} hoàng thân chưa thành hôn${(n.royals.in_laws || []).length ? ` · thông gia: ${n.royals.in_laws.map(x => x.nation).join(", ")}` : ""}`)}">👑 <b>${esc(n.royals.house)}</b></span>`);
     return `<div class="gauges">${g.join("")}</div>`;
   }
@@ -2030,7 +2031,7 @@
   // ---------------------------------------------------------------- petitions & decrees
   const PSTATUS = { pending: ["Đang chờ", "warn"], accepted: ["Chấp thuận", "ok"], partial: ["Một phần", "ok"], rejected: ["Bác bỏ", "bad"], merged: ["Đã gộp", ""] };
   // §4.5 factions that want to leave: the Watcher lets them go and gives the new nation a mind
-  const SSTATUS = { pending: ["Xin ra đi", "warn"], approved: ["Đã cho phép, đi ở lượt sau", "ok"], done: ["Đã lập quốc", "ok"], refused: ["Không cho đi", "bad"], expired: ["Hết hạn", ""], asking: ["Đang xin định cư nước khác", "warn"], emigrated: ["Đã sang nước khác", ""], returned: ["Quay về nước cũ", "bad"] };
+  const SSTATUS = { fighting: ["Đang nội chiến", "bad"], won: ["Phe nổi dậy thắng, đổi người trị vì", "warn"], crushed: ["Bị dẹp tan", "ok"], pending: ["Xin ra đi", "warn"], approved: ["Đã cho phép, đi ở lượt sau", "ok"], done: ["Đã lập quốc", "ok"], refused: ["Không cho đi", "bad"], expired: ["Hết hạn", ""], asking: ["Đang xin định cư nước khác", "warn"], emigrated: ["Đã sang nước khác", ""], returned: ["Quay về nước cũ", "bad"] };
   /** Waiting items stay on top as cards; decided ones fold away under one header. */
   function splitDecided(box, key, title, waiting, decided) {
     box.replaceChildren(...waiting);
@@ -2044,10 +2045,32 @@
   const mindOptions = () => [...(S.claudeModels || []).map(m => `<option value="${esc(m.id)}">Claude ${esc(m.label)}</option>`), `<option value="bot">Bot (không tốn lượt Claude)</option>`].join("");
   const effortOptions = () => (S.claudeEfforts || []).map(e => `<option value="${esc(e)}"${e === "low" ? " selected" : ""}>${esc(e)}</option>`).join("");
   const nationTag = id => { const n = S.nations[id]; return n ? `<i class="sw" style="background:${esc(nationColor(id))}"></i>${esc(nationName(n))}` : "?"; };
+  /** §4.5b a civil war: the score, the rebels' odds, and the mind the new ruler gets if the rebels win */
+  function civilCard(x, st, cls) {
+    const open = x.status === "fighting", ask = open && !x.mind;
+    const el = document.createElement("article"); el.className = "petition schism";
+    el.innerHTML = `<div class="row"><h3></h3><span class="grow"></span><span class="pill ${cls}">${st}</span></div>
+      <div class="meta">⚔️ #${x.id} · ${nationTag(x.from)} · từ L${x.tick} · <b>${x.people}</b> người nổi dậy · tỉ số nổi dậy <b>${x.score?.rebels ?? 0}</b> – triều đình <b>${x.score?.crown ?? 0}</b>${open && x.odds !== undefined ? ` · khả năng nổi dậy thắng mỗi lượt ~${Math.round(x.odds * 100)}%` : ""}</div>
+      <div class="body"></div>
+      ${ask ? `<div class="row"><label class="sr-only" for="civ-model-${x.id}">Model</label><select id="civ-model-${x.id}">${mindOptions()}</select><label class="sr-only" for="civ-effort-${x.id}">Effort</label><select id="civ-effort-${x.id}">${effortOptions()}</select>${tip("Nếu phe nổi dậy thắng, người trị vì bị giết; thủ lĩnh lên ngôi với nhà mới, tính cách mới (một nét dân tộc khác) và không mang ký ức của triều cũ. Chọn bộ não cho người trị vì mới; \"Giữ bộ não cũ\" thì nước vẫn dùng model hiện tại.")}</div>
+        <textarea rows="1" placeholder="Lời phán (tùy chọn)"></textarea>
+        <div class="actions"><button data-s="approved" class="primary sm">Ban bộ não này nếu họ thắng</button><button data-s="refused" class="sm">Giữ bộ não cũ</button></div>`
+      : `<div class="meta">${x.mind ? (x.model ? `Bộ não cho người trị vì mới: ${esc(x.model === "bot" ? "bot" : `Claude ${x.model} · ${x.effort}`)}` : "Giữ bộ não cũ") : ""}${x.verdict ? ` · ⚖️ ${esc(x.verdict)}` : ""}</div>`}`;
+    el.querySelector("h3").textContent = x.status === "won" ? `${x.leader} giết người trị vì, lên ngôi` : x.status === "crushed" ? `Cuộc nổi dậy của ${x.leader} bị dẹp` : `Nội chiến: ${x.leader} đòi lật đổ người trị vì`;
+    el.querySelector(".body").textContent = `Bất mãn vì ${x.grievance}.`;
+    const model = el.querySelector("select[id^=civ-model]"), effort = el.querySelector("select[id^=civ-effort]");
+    if (model) model.onchange = () => { effort.disabled = model.value === "bot"; };
+    for (const b of el.querySelectorAll("button[data-s]")) b.onclick = async () => {
+      await api(`/api/schisms/${x.id}`, { method: "POST", body: { status: b.dataset.s, model: model.value, effort: effort.value, verdict: el.querySelector("textarea").value } }).catch(e => alertMsg(e.message));
+      refresh();
+    };
+    return [ask, el];
+  }
   function renderSchisms() {
     const box = $("#schisms"), list = (S.schisms || []).slice().sort((a, b) => b.id - a.id);
     const cards = list.map(x => {
       const [st, cls] = SSTATUS[x.status] || [x.status, ""], pending = x.status === "pending";
+      if (x.kind === "civil") return civilCard(x, st, cls);
       const el = document.createElement("article"); el.className = "petition schism";
       el.innerHTML = `<div class="row"><h3></h3><span class="grow"></span><span class="pill ${cls}">${st}</span></div>
         <div class="meta">✊ #${x.id} · từ ${nationTag(x.from)} · L${x.tick} · <b>${x.people}</b> người (~${Math.round(x.share * 100)}%) · ${x.province !== undefined ? `tỉnh ${esc(x.provinceName || "?")}` : "đất mới"} <button class="link" data-act="site" title="Xem trên bản đồ">(${x.site % 128}, ${(x.site / 128) | 0}) ↗</button>${pending ? ` · <span class="warn">còn ${x.waitLeft} lượt</span>` : ""}</div>
@@ -2067,7 +2090,7 @@
       };
       return [pending, el];
     });
-    splitDecided(box, "pet-schisms", "Ly khai đã quyết", cards.filter(c => c[0]).map(c => c[1]), cards.filter(c => !c[0]).map(c => c[1]));
+    splitDecided(box, "pet-schisms", "Ly khai, nội chiến đã xong", cards.filter(c => c[0]).map(c => c[1]), cards.filter(c => !c[0]).map(c => c[1]));
   }
   // §4.9 a nation asks for an AI minister: the Watcher grants it a mind (Claude model and effort, or the bot), or refuses
   const MSTATUS = { pending: ["Xin bộ trưởng", "warn"], approved: ["Đã ban, nhậm chức lượt sau", "ok"], done: ["Đang tại chức", "ok"], refused: ["Không ban", "bad"], expired: ["Hết hạn", ""], ended: ["Đã thôi chức", ""] };
@@ -2145,7 +2168,7 @@
     renderMinisterRequests();
     const list = S.petitions.slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id);
     const pending = list.filter(p => p.status === "pending" && p.category !== "sáng kiến").length + // the Judge of Ideas rules on initiatives
-      (S.schisms || []).filter(x => x.status === "pending").length + (S.ministerRequests || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
+      (S.schisms || []).filter(x => x.status === "pending" || (x.kind === "civil" && x.status === "fighting" && !x.mind)).length + (S.ministerRequests || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
     badge.hidden = !pending; badge.textContent = pending;
     const box = $("#petitions");
     const cards = list.map(p => {
