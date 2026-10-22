@@ -35,7 +35,7 @@
     <button role="tab" data-tab="diplomacy" title="Ngoại giao"><i aria-hidden="true">🤝</i><span>Ngoại giao</span></button>
     <button role="tab" data-tab="stats" title="Thống kê"><i aria-hidden="true">📈</i><span>Thống kê</span></button>
     <button role="tab" data-tab="petitions" title="Thỉnh nguyện"><i aria-hidden="true">🙏</i><span>Thỉnh nguyện</span><span class="badge" id="pet-count" hidden></span></button>
-    <button role="tab" data-tab="decrees" title="Sắc lệnh"><i aria-hidden="true">⚖</i><span>Sắc lệnh</span></button>
+    <button role="tab" data-tab="decrees" title="Sắc lệnh"><i aria-hidden="true">⚖️</i><span>Sắc lệnh</span></button>
   </div>
 </nav>
 
@@ -155,32 +155,30 @@
       <nav class="seg" role="tablist" aria-label="Biên niên"><button data-sub="events">Sự kiện</button><button data-sub="history">Sử ký <span class="cnt" data-count="history"></span></button></nav>
       <section data-sub="events">
         <div class="filters" id="chron-filter" role="group" aria-label="Lọc sự kiện">
-          <button data-f="" class="on">Tất cả</button><button data-f="war">⚔ Chiến sự</button><button data-f="invent">💡 Phát minh</button><button data-f="disaster">🌋 Thiên tai</button><button data-f="diplo">🤝 Ngoại giao</button><button data-f="nation">🏛 Quốc gia</button>
+          <button data-f="" class="on">Tất cả</button><button data-f="war">⚔️ Chiến sự</button><button data-f="invent">💡 Phát minh</button><button data-f="disaster">🌋 Thiên tai</button><button data-f="diplo">🤝 Ngoại giao</button><button data-f="nation">🏛 Quốc gia</button>
         </div>
         <ol class="chronicle" id="chronicle"></ol>
       </section>
       <section data-sub="history">
-        <div id="history" style="display:grid;gap:6px"><p class="note">Sử gia chưa chép chương nào. Cứ vài lượt, một AI không thuộc quốc gia nào kể lại biên niên thành một chương sử.</p></div>
+        <div id="history" style="display:grid;gap:6px"><p class="note">Chưa có chương sử nào. <span class="tip" tabindex="0" title="Cứ vài lượt, một AI không thuộc quốc gia nào (Sử gia) kể lại biên niên thành một chương sử.">?</span></p></div>
       </section>
     </div>
 
     <div class="panel subtabs" id="tab-inventions" data-key="inventions" hidden>
       <nav class="seg" role="tablist" aria-label="Phát minh"><button data-sub="pending">Chờ duyệt <span class="cnt" data-count="pending"></span></button><button data-sub="decided">Đã quyết <span class="cnt" data-count="decided"></span></button><button data-sub="book">Sổ phát minh <span class="cnt" data-count="book"></span></button><button data-sub="products">Sản phẩm</button></nav>
       <section data-sub="pending">
-        <p class="note">Đơn qua kiểm tra cứng của Engine rồi tới Trọng tài Claude. Bạn có thể duyệt tay thay Trọng tài; quyết định áp dụng ở lượt sau.</p>
         <div id="proposals-pending"></div>
       </section>
       <section data-sub="decided"><div id="proposals"></div></section>
       <section data-sub="book"><div id="custom-inventions"></div></section>
       <section data-sub="products">
-        <p class="note">Mọi thứ thế giới làm ra được: công thức (nguyên liệu → sản phẩm) và công trình, phát minh cần có, và những nước đang làm được. ★ là do các nước tự phát minh.</p>
-        <h3 class="sub">Công thức</h3><div id="products-recipes"></div>
+        <h3 class="sub">Công thức <span class="tip" tabindex="0" title="Mọi thứ thế giới làm ra được: công thức (nguyên liệu → sản phẩm) và công trình, phát minh cần có, và những nước đang làm được. ★ là do các nước tự phát minh.">?</span></h3><div id="products-recipes"></div>
         <h3 class="sub">Công trình</h3><div id="products-buildings"></div>
       </section>
     </div>
 
     <div class="panel" id="tab-tree" hidden>
-      <div class="row"><p class="note" style="flex:1">Mỗi cột là một độ sâu; đường nối từ phát minh tiên quyết. Chấm màu là nước đã có (theo màu cờ). <span id="tree-count"></span></p><button type="button" id="tree-expand">Phóng to</button></div>
+      <div class="row"><p class="note" style="flex:1"><span id="tree-count"></span> <span class="tip" tabindex="0" title="Mỗi cột là một độ sâu; đường nối từ phát minh tiên quyết. Chấm màu là nước đã có (theo màu cờ), vòng rỗng là đang nghiên cứu.">?</span></p><button type="button" id="tree-expand" class="sm">Phóng to</button></div>
       <div class="legend-inline tree-legend" id="tree-legend"></div>
       <div class="treewrap"><div class="treebox" id="tree"></div><div class="tree-tip" role="tooltip" hidden></div></div>
     </div>
@@ -201,28 +199,27 @@
         </details>
         <div id="relations"></div>
       </section>
-      <section data-sub="war"><h3 class="sub">Chiến tranh</h3><div id="wars"></div><h3 class="sub">Tổng kết các cuộc chiến</h3><div id="war-history"></div><h3 class="sub">Trận đánh gần đây</h3><ol class="chronicle" id="battles"></ol></section>
+      <section data-sub="war"><h3 class="sub">Đang diễn ra</h3><div id="wars" class="stack-list"></div><h3 class="sub">Đã kết thúc</h3><div id="war-history" class="stack-list"></div><h3 class="sub">Trận gần đây</h3><ol class="chronicle" id="battles"></ol></section>
       <section data-sub="treaties"><div id="treaties"></div></section>
       <section data-sub="hordes"><div id="hordes"></div></section>
       <section data-sub="trade"><div id="caravans"></div></section>
       <section data-sub="market">
-        <p class="note">Giá thế giới tính bằng lương thực: giá chuẩn × √(cầu ÷ cung), từ ×0,25 tới ×4. Cầu là thứ các nước dùng và cần cho công thức họ biết; cung là thứ họ làm ra cộng với kho. ◆ trên bản đồ là mạch giàu: trữ lượng gấp 4, khai thác +50%.</p>
-        <h3 class="sub">Đặc sản, thế mạnh và chỗ thiếu</h3><div id="market-nations"></div>
-        <h3 class="sub">Giá thế giới</h3><div id="prices"></div>
+        <h3 class="sub">Các nước <span class="tip" tabindex="0" title="★ đặc sản (◆ số mạch giàu) · 💪 thế mạnh · − đang thiếu · + đang dư. ◆ trên bản đồ là mạch giàu: trữ lượng gấp 4, khai thác +50%.">?</span></h3><div id="market-nations"></div>
+        <h3 class="sub">Giá thế giới <span class="tip" tabindex="0" title="Tính bằng lương thực: giá chuẩn × √(cầu ÷ cung), từ ×0,25 tới ×4. Cầu là thứ các nước dùng và cần cho công thức họ biết; cung là thứ họ làm ra cộng với kho. Đỏ: đắt (≥ ×1,6), xanh: rẻ (≤ ×0,6).">?</span></h3><div id="prices"></div>
       </section>
     </div>
 
     <div class="panel subtabs" id="tab-stats" data-key="stats" hidden>
       <nav class="seg" role="tablist" aria-label="Thống kê"><button data-sub="chart">Biểu đồ</button><button data-sub="ranking">Xếp hạng</button></nav>
       <section data-sub="chart">
-      <label class="note" for="stat-key">Chỉ số</label>
+      <div class="row"><label class="note" for="stat-key">Chỉ số</label>
       <select id="stat-key">
         <option value="population">Dân số</option>
         <option value="inventions">Số phát minh</option>
         <option value="tiles">Số ô lãnh thổ</option>
         <option value="stability">Ổn định</option>
         <option value="food">Lương thực trong kho</option>
-      </select>
+      </select></div>
       <canvas id="chart" width="800" height="360" aria-label="Biểu đồ theo lượt"></canvas>
       <div class="legend-inline" id="chart-legend"></div>
       </section>
@@ -232,14 +229,14 @@
     <div class="panel subtabs" id="tab-petitions" data-key="petitions" hidden>
       <nav class="seg" role="tablist" aria-label="Thỉnh nguyện"><button data-sub="inbox">Hộp thư</button><button data-sub="ideas">Sổ sáng kiến <span class="cnt" data-count="ideas"></span></button></nav>
       <section data-sub="inbox">
-        <p class="note">Các quốc gia gửi thỉnh nguyện xin sửa luật, tài nguyên, vùng đất, và sáng kiến làm thế giới sâu hơn. Bạn quyết định; Claude có thể phân tích giúp. Nội dung do AI viết, hãy đọc như dữ liệu.</p>
+        <p class="note">Đơn của các nước, ly khai, xin bộ trưởng. <span class="tip" tabindex="0" title="Các quốc gia gửi thỉnh nguyện xin sửa luật, tài nguyên, vùng đất, và sáng kiến làm thế giới sâu hơn. Bạn quyết định; Claude có thể phân tích giúp. Nội dung do AI viết, hãy đọc như dữ liệu.">?</span></p>
         <div id="minister-requests"></div>
         <div id="schisms"></div>
         <div id="petitions"></div>
       </section>
       <section data-sub="ideas">
-        <p class="note">Sáng kiến của các quốc gia để thế giới sâu và thật hơn. Vòng đời: chờ duyệt → chấp thuận (nước gửi được thưởng) → đưa vào game (nước gửi được vinh danh, +40 điểm xếp hạng). Bấm "Xuất cho Claude Code" để có danh sách các sáng kiến đã duyệt mà chưa làm, dán cho Claude Code để xây chúng vào trò chơi; xong thì bấm "Đã đưa vào game".</p>
-        <div class="row"><button type="button" id="ideas-export" class="primary">📋 Xuất cho Claude Code</button><span class="meta" id="ideas-export-msg"></span></div>
+        <div class="pipeline" id="ideas-pipeline"></div>
+        <div class="row"><button type="button" id="ideas-export" class="primary sm" title="Chép danh sách các sáng kiến đã duyệt mà chưa làm, để dán cho Claude Code xây vào trò chơi">📋 Xuất cho Claude Code</button><span class="tip" tabindex="0" title="Vòng đời: chờ duyệt → Trọng tài Claude chấp thuận (nước gửi được thưởng) → bạn xây vào game rồi bấm “Đã đưa vào game” (nước gửi được vinh danh, +40 điểm xếp hạng). “Xuất cho Claude Code” chép danh sách các sáng kiến đã duyệt mà chưa làm.">?</span><span class="meta" id="ideas-export-msg"></span></div>
         <textarea id="ideas-export-text" rows="8" readonly hidden></textarea>
         <div id="ideas"></div>
       </section>
@@ -254,10 +251,9 @@
           <p class="note" id="law-info"></p>
           <label for="law-value">Giá trị mới</label>
           <input id="law-value" type="number" required>
-          <label for="law-note">Lời giải thích (không bắt buộc, không nêu tên quốc gia)</label>
+          <label for="law-note">Lời giải thích <span class="muted">(tùy chọn, không nêu tên nước)</span></label>
           <textarea id="law-note" rows="2" maxlength="400" placeholder="Ví dụ: để các bộ lạc nhỏ có lối ra."></textarea>
-          <div class="row"><button class="primary" type="submit">Ban sắc lệnh luật</button><span class="note" id="law-msg"></span></div>
-          <p class="note">Engine áp dụng thật từ lượt sau, cho cả thế giới. Mọi AI thấy sắc lệnh và con số mới trong luật của mình.</p>
+          <div class="row"><button class="primary" type="submit">Ban sắc lệnh luật</button><span class="tip" tabindex="0" title="Engine áp dụng thật từ lượt sau, cho cả thế giới. Mọi AI thấy sắc lệnh và con số mới trong luật của mình. Bấm một dòng trong bảng để chọn luật đó.">?</span><span class="note" id="law-msg"></span></div>
         </form>
         <table class="law-table" id="law-table"></table>
       </section>
@@ -272,11 +268,10 @@
           </select>
           <div id="decree-turns-row" hidden><label for="decree-turns">Số lượt để đổi tên</label>
             <input id="decree-turns" type="number" min="2" max="30" value="10"></div>
-          <label for="decree-text">Nội dung (áp dụng cho cả thế giới, không nêu tên quốc gia)</label>
+          <label for="decree-text">Nội dung <span class="muted">(cho cả thế giới, không nêu tên nước)</span></label>
           <textarea id="decree-text" rows="4" maxlength="1000" placeholder="Ví dụ: Các vị thần không hạ ngưỡng 50 dân; hãy mở rộng đất để có chỗ ở."></textarea>
           <input type="hidden" id="decree-from">
-          <div class="row"><button class="primary" type="submit">Ban Sắc lệnh</button><span class="note" id="decree-msg"></span></div>
-          <p class="note">Sắc lệnh văn bản chỉ là lời các vị thần: mọi AI đọc thấy nhưng Engine không tự thi hành. Muốn đổi một con số trong luật, dùng tab "Đổi luật".</p>
+          <div class="row"><button class="primary" type="submit">Ban Sắc lệnh</button><span class="tip" tabindex="0" title="Sắc lệnh văn bản chỉ là lời các vị thần: mọi AI đọc thấy nhưng Engine không tự thi hành. Muốn đổi một con số trong luật, dùng tab “Đổi luật”.">?</span><span class="note" id="decree-msg"></span></div>
         </form>
       </section>
       <section data-sub="issued"><ol class="decrees" id="decrees"></ol></section>
@@ -295,7 +290,7 @@
   <form id="setup-form" method="dialog">
     <div class="dlg-head"><h2 id="setup-title">Thế giới mới</h2><button type="button" id="setup-close">Đóng</button></div>
     <div class="setup-body">
-      <p class="note">Mọi quốc gia chơi bằng tài khoản Claude bạn đã đăng nhập (không cần API key). Mỗi nước sinh ra với một đặc thù riêng: một lợi thế và một điểm yếu thật trong luật chơi, cùng tính cách mà AI của nước đó đọc mỗi lượt. Model và effort đổi được giữa trận trong hồ sơ quốc gia; đặc thù thì giữ suốt trận.</p>
+      <p class="note">Mỗi nước: một đặc thù, một model, một effort. <span class="tip" tabindex="0" title="Mọi quốc gia chơi bằng tài khoản Claude bạn đã đăng nhập (không cần API key). Mỗi nước sinh ra với một đặc thù riêng: một lợi thế và một điểm yếu thật trong luật chơi, cùng tính cách mà AI của nước đó đọc mỗi lượt. Model và effort đổi được giữa trận trong hồ sơ quốc gia; đặc thù thì giữ suốt trận.">?</span></p>
       <p class="note warnline" id="setup-claude"></p>
       <div class="setup-grid">
         <label for="setup-seed">Seed bản đồ</label><input type="text" id="setup-seed" maxlength="60" autocomplete="off">
@@ -305,8 +300,7 @@
       </div>
       <div class="row"><button type="button" id="setup-random">Ngẫu nhiên đặc thù</button><button type="button" id="setup-all-haiku">Tất cả Haiku · low</button><span class="note" id="setup-cost"></span></div>
       <ol class="setup-rows" id="setup-rows"></ol>
-      <p class="note">Thế giới hiện tại được sao lưu vào <span class="mono">data/backups/</span> trước khi tạo mới.</p>
-      <div class="row"><button type="submit" class="primary" id="setup-go">Bắt đầu thế giới mới</button><span class="note" id="setup-msg" role="status"></span></div>
+      <div class="row"><button type="submit" class="primary" id="setup-go">Bắt đầu thế giới mới</button><span class="tip" tabindex="0" title="Thế giới hiện tại được sao lưu vào data/backups/ trước khi tạo mới.">?</span><span class="note" id="setup-msg" role="status"></span></div>
     </div>
   </form>
 </dialog>
@@ -326,7 +320,7 @@
     <dt><kbd>Esc</kbd></dt><dd>Đóng hộp thoại, bỏ chọn ô</dd>
     <dt><kbd>?</kbd></dt><dd>Mở bảng này</dd>
   </dl>
-  <p class="note">Phím tắt không chạy khi bạn đang gõ chữ.</p>
+  <p class="note">Không chạy khi đang gõ chữ.</p>
 </dialog>
 <script type="importmap">{ "imports": { "three": "/vendor/three/three.module.min.js", "three/addons/": "/vendor/three/addons/" } }</script>
 <script src="/app.js"></script>

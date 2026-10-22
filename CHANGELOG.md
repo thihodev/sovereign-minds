@@ -4,6 +4,15 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.44
 
+- **0.44.3, giao diện dễ nhìn, ít chữ:**
+  - Khung Chi tiết của một nước thành bảng điều khiển: cờ, tên, 6 ô số chính (dân, lương thực, ổn định, ngân khố, lãnh thổ, phát minh, kèm tăng giảm), dải cảnh báo (bấm chiến tranh để bay tới mặt trận), thanh nghiên cứu, rồi các mục gập lại được (đe dọa, công trình, điểm định cư, tài nguyên) và nhớ mục nào đang mở.
+  - Hồ sơ quốc gia: Tổng quan là các thẻ số hai cột (kỷ nguyên, ngân khố thu/chi, mức sống với nhu cầu còn thiếu, thịnh vượng, tầng lớp, dân cư, bất mãn); cố vấn, lượt trước và các lượt gần đây gập lại. Đe dọa mỗi dòng một mối, bấm để đọc. Tỉnh, công trình, kinh tế, đối ngoại, nhật ký AI gọn hơn.
+  - Lời giải thích dài chuyển vào nút "?" (rê chuột để đọc). Danh sách dài chỉ hiện vài mục đầu với "+ N nữa".
+  - Chiến sự: điểm số to ở đầu thẻ (A 6,3 : 2,3 B), bảng tổng kết, hòa ước và thương lượng gập trong "Chi tiết"; chiến tranh đang diễn ra và đã kết thúc tách riêng.
+  - Sổ sáng kiến: thanh tiến trình (chờ trọng tài → chờ làm → trong game), sáng kiến chia theo giai đoạn; thỉnh nguyện, ly khai và đơn bộ trưởng đã quyết gập lại.
+  - Bảng quốc gia, bản tin (tối đa 4 tin mỗi nước, "+N" để xem thêm), thẻ quốc gia, hiệp ước, man di, đoàn buôn, thị trường, sắc lệnh: mỗi mục một dòng.
+  - Một thang khoảng cách và cỡ chữ, thẻ nền mềm không viền, màu chỉ để báo tốt / cần để ý / xấu. Bãi nhiệm bộ trưởng hỏi lại ngay trên nút thay vì hộp thoại trình duyệt. Vừa màn hình 1280×720 và điện thoại.
+
 - **0.44.2, trọng tài sáng kiến:**
   - Claude của Watcher tự chấm các sáng kiến mỗi lượt (tối đa 4), đối chiếu với toàn bộ luật hiện có và các sáng kiến đã quyết.
   - Kết quả là chấp thuận, một phần hoặc bác bỏ, kèm lời phán tiếng Việt có con số. Watcher chỉ còn bấm "Đã đưa vào game".
