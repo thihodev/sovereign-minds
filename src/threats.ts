@@ -104,7 +104,6 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   }
   // Governance
   const limit = tileLimit(world, n), held = governed(world, n);
-  if (held > limit) add("overreach", 1, "Quá nhiều đất", `${held}/${limit} ô (ô biển tính 1/3): không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) thành đất hoang. Dân số, điểm định cư và đường nối các trung tâm nâng giới hạn.`);
   // §4.5 a faction may leave
   const faction = (world.schisms ?? []).find(x => x.from === n.id && (x.status === "pending" || x.status === "approved" || x.status === "asking"));
   if (faction) add("schism", 3, "Ly khai", faction.province !== undefined

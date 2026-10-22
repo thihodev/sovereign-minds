@@ -51,11 +51,10 @@ test("a hunting ground is a treaty between neighbours; hunters hunt the other's 
   // A's own land holds no game: its hunters take it from B's land, lawfully
   for (const t of w.tiles) if (t.owner === a.id) t.res.game = 0;
   for (const t of zone) t.res.game = 20;
-  const before = zone.reduce((s, t) => s + (t.res.game || 0), 0), food = a.stock.food!;
+  const before = zone.reduce((s, t) => s + (t.res.game || 0), 0); a.stock.hide = 0;
   turn(w, { 0: { labor: { gather: 20, hunt: 20, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: 0, research: 0, warrior: 0 }, actions: idle.actions } });
-  const after = huntZone(w, a).reduce((s, t) => s + (t.res.game || 0), 0);
-  assert.ok(after < before, `game taken from the grounds: ${before} → ${after}`);
-  assert.ok(a.stock.hide! > 0 || a.stock.food! !== food);
+  // A's own land holds no game, so every hide it brought home came from B's land
+  assert.ok((a.stock.hide ?? 0) > 0, `hides from the grounds (game there ${before})`);
   const obs = buildObservation(w, a) as { neighbours: Array<{ hunting_grounds?: { your_hunters_may_hunt_tiles: number } }> };
   assert.ok(obs.neighbours.some(x => (x.hunting_grounds?.your_hunters_may_hunt_tiles ?? 0) > 0));
 });

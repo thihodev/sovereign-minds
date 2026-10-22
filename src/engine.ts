@@ -838,19 +838,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   updateMeetings(world, say);
   updateIntel(world, tick, say);
 
-  // 8. Tiles cut off from every centre go wild after 5 ticks (§2.3)
-  for (const n of alive) {
-    if (!n.alive) continue;
-    const reach = new Set<number>(), stack = centres(n).filter(i => world.tiles[i].owner === n.id);
-    for (const s of stack) reach.add(s);
-    while (stack.length) { const k = stack.pop()!; for (const j of NEIGHBORS[k]) if (!reach.has(j) && world.tiles[j].owner === n.id) { reach.add(j); stack.push(j); } }
-    for (const t of ownedTiles(world, n.id)) {
-      const key = String(t.i);
-      if (reach.has(t.i)) { delete world.cutoff[key]; continue; }
-      world.cutoff[key] = (world.cutoff[key] || 0) + 1;
-      if (world.cutoff[key] >= SETTLEMENT.cutoffTicks) { t.owner = -1; delete world.cutoff[key]; n.stability = Math.max(0, n.stability - LAND.wildStability); fx({ kind: "lost_tile", tile: t.i, nation: n.id }); n.lastEvents.push(`Ô (${col(t.i)}, ${row(t.i)}) bị cắt rời quá lâu nên thành đất hoang (−${LAND.wildStability} ổn định).`); }
-    }
-  }
+  // 8. (until v0.57 tiles cut off from every centre went wild; land a nation holds now stays its own, §2.3)
 
   // 8b. §2.5 roads on land no one holds and joined to no one's centre go untended and fall apart, a level every
   // ROADS.decayTicks turns (a road through the wilds that still joins a nation's centres is kept up)
@@ -1257,8 +1245,6 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Stability (§4.4)
   n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
   if (ownsWonder(world, n, "spring")) n.stability += 2;
-  const over = Math.ceil(governed(world, n) - tileLimit(world, n) - 1e-9);
-  if (over > 0) releaseOver(world, n, over); // §2.3 too few hands: the land beyond the limit goes wild, no one leaves over it
   if (n.silentStreak >= 3) n.stability -= 5;
   // Too many centres to govern from one hearth (§4.4)
   const sprawl = n.settlements.length - roadNet(world, n).linked.length - SETTLEMENT.freeCentres; // §2.5 a road to the capital holds a settlement close
@@ -1717,20 +1703,6 @@ const ENGINE_ACTIONS = new Set([
 /** §2.3: the penalty for land beyond the tile limit is capped so a shrinking people can recover. */
 const CAUSE_WORD: Record<string, string> = { famine: "chết đói", winter: "chết rét", plague: "chết dịch", disaster: "chết vì thiên tai", beasts: "bị thú dữ giết", raid: "bị man di giết", war: "tử trận", brawl: "chết vì xô xát", migrate: "bỏ đi", any: "qua đời" };
 /** §2.3 Land beyond the limit: the poorest, farthest empty tiles go wild, a few a turn. */
-function releaseOver(world: World, n: Nation, over: number): void {
-  const centres = [n.capital, ...n.settlements.map(s => s.tile)];
-  const busyTiles = new Set(n.buildings.map(b => b.tile));
-  const far = (i: number) => Math.min(...centres.map(c => dist(c, i)));
-  const loose = ownedTiles(world, n.id).filter(t => !centres.includes(t.i) && !busyTiles.has(t.i))
-    .sort((a, b) => (HAMLET.people[a.terrain] || 0) - (HAMLET.people[b.terrain] || 0) || far(b.i) - far(a.i) || tileValue(a) - tileValue(b) || a.i - b.i);
-  const gone: string[] = [];
-  for (const t of loose.slice(0, Math.min(over, LAND.overRelease))) {
-    t.owner = -1; delete world.cutoff[String(t.i)];
-    fx({ kind: "lost_tile", tile: t.i, nation: n.id });
-    gone.push(`(${col(t.i)}, ${row(t.i)})`);
-  }
-  if (gone.length) n.lastEvents.push(`Giữ ${over} ô quá giới hạn quản lý: không đủ người làm, ô ${gone.join(", ")} trở thành đất hoang (không mất ổn định). Nâng giới hạn bằng dân số, điểm định cư hoặc đường sá.`);
-}
 /** §7.6: an expedition walks up to 16 tiles out and back within one turn (10 years). */
 const EXPLORE_RANGE = 16;
 
@@ -1837,6 +1809,10 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         return `Vùng biển không giáp bờ của bạn phải nằm trong ${SEA.pierReach} ô quanh một Bến thuyền của bạn (Cảng: thêm 3 ô)`;
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
+      // §2.3 v0.57 the limit is on what the people can newly settle: land already held stays the nation's
+      const weight = (i: number) => (world.tiles[i].land ? 1 : SEA.limitWeight), limit = tileLimit(world, n);
+      if (governed(world, n) + claims.filter(c => c.n === n).reduce((s2, c) => s2 + weight(c.tile), 0) + weight(tile) > limit + 1e-9)
+        return `Đã tới giới hạn khai hoang ${limit} ô (đang giữ ${governed(world, n)}): đất đang giữ vẫn là của bạn, nhưng muốn khai hoang thêm phải nâng giới hạn (dân số, điểm định cư, đường nối các trung tâm)`;
       claims.push({ n, tile });
       return null;
     }

@@ -80,11 +80,11 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
 - **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó.
-- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. **Vượt giới hạn** (ví dụ khi dân giảm): không đủ người làm, nên mỗi lượt 1 ô thừa tự thành đất hoang. Engine chọn ô trống, không công trình, ít người ở, xa trung tâm và nghèo nhất trước. Việc này **không làm mất ổn định và không làm dân bất mãn**: đất rộng không phải lý do để dân bỏ đi, vì phái ra đi lập quốc cũng sẽ giữ chừng ấy đất. Muốn giữ ô tốt thì tự chọn ô bỏ (`abandon_tile`) hoặc nâng giới hạn.
+- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. **Từ v0.57, giới hạn chỉ chặn việc khai hoang thêm** (`claim_tile`): đất đã giữ (khai hoang, chiếm được, được nhượng, hay bị cắt rời khỏi trung tâm) **luôn là của nước đó**, không bao giờ tự thành đất hoang, kể cả khi dân giảm. Nước có thể đưa dân tới sống trên đất đó bất cứ lúc nào. Giữ nhiều đất hơn giới hạn không làm mất ổn định, cũng không làm dân bất mãn.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
-- **Mất ô:** ô bị chiếm trong chiến tranh, nhượng qua hiệp ước, bị bỏ (`abandon_tile`), hoặc bị cắt rời: một ô không liền với thủ đô hay điểm định cư nào trong 5 lượt liên tiếp sẽ thành vô chủ.
+- **Mất ô:** ô bị chiếm trong chiến tranh, nhượng qua hiệp ước, hoặc bị bỏ (`abandon_tile`). Từ v0.57, ô bị cắt rời khỏi mọi trung tâm vẫn là của nước đó (chỉ cho sản lượng ít hơn, mục 2.7).
 
 **Dời đô (v0.24):** lệnh `move_capital` (3 AP) dời thủ đô về một điểm định cư của mình, tới vùng giàu tài nguyên, bên sông, ven biển hay chỗ thuận đường giao thương.
 - **Cái giá:** 30 gỗ và/hoặc đá, −8 ổn định, và 30 lượt mới dời lại được một lần.
@@ -215,7 +215,6 @@ Lãnh thổ chia thành các tỉnh, mỗi trung tâm một tỉnh: tỉnh thủ
   - các gia đình thôn xóm trên ô (1–3 người tùy địa hình) ở lại dưới quyền bên chiếm, và được ghi vào số người mất (§4.8)
   - bên mất đất −2 ổn định, bất mãn +3
   - bên mất đất có chính nghĩa đòi lại đất trong 10 lượt
-- **Ô bị cắt rời quá lâu mà thành đất hoang:** −1 ổn định.
 - **Dân giữ nhà:** khi phòng thủ một ô có người ở (thôn xóm từ 2 người, hoặc có công trình), bên phòng thủ mạnh hơn 25%.
 
 ### 2.10 Mạch giàu

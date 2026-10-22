@@ -54,18 +54,24 @@ test("a split nation: no pact with its old nation, a just war for the old one, a
   assert.ok(a.population > popA - 10, "and its people");
 });
 
-test("land beyond the limit goes wild a tile a turn, and no one is unhappy about it", () => {
+test("land beyond the limit stays the nation's; the limit only stops new claims (v0.57)", () => {
   const w = createWorld("over-limit", [{ controller: "bot", provider: "bot", model: "bot" }]);
   step(w, { 0: { kind: "ok", response: { actions: [{ type: "found_nation", name: "Nuoc Rong", capital: "Do Rong", people: "Dan Rong", flag: { layout: "h2", colors: ["#c0392b", "#ffffff"], symbol: "sun" } }] } } });
   const n = w.nations[0];
   n.stock.food = 500; n.stability = 60; n.discontent = 0;
-  // far more land than the people can hold
+  // far more land than the limit
   const extra = w.tiles.filter(t => t.owner === -1 && t.land && t.terrain !== "icewall" && t.terrain !== "mountain" && NEIGHBORS[t.i].some(j => w.tiles[j].owner === n.id)).slice(0, 8);
   for (const t of extra) t.owner = n.id;
   const before = w.tiles.filter(t => t.owner === n.id).length;
-  const out = step(w, { 0: { kind: "ok", response: { actions: [{ type: "research", invention: "P2" }] } } });
+  const free = w.tiles.find(t => t.owner === -1 && t.land && t.terrain !== "icewall" && t.terrain !== "mountain" && NEIGHBORS[t.i].some(j => w.tiles[j].owner === n.id))!;
+  const out = step(w, { 0: { kind: "ok", response: { actions: [{ type: "claim_tile", tile: [free.i % 128, Math.floor(free.i / 128)] }] } } });
   assert.deepEqual(out.audit, []);
-  assert.equal(w.tiles.filter(t => t.owner === n.id).length, before - LAND.overRelease, "one tile went wild");
-  assert.ok(n.lastEvents.some(e => /trở thành đất hoang \(không mất ổn định\)/.test(e)), JSON.stringify(n.lastEvents));
+  assert.equal(w.tiles.filter(t => t.owner === n.id).length, before, "no land goes wild, and no new claim beyond the limit");
+  assert.ok(n.lastRejected.some(r => /giới hạn khai hoang/.test(r.reason)), JSON.stringify(n.lastRejected));
   assert.equal(n.discontent ?? 0, 0, "land is no grievance");
+  // land cut off from every centre stays the nation's too
+  const island = extra.at(-1)!;
+  for (const j of NEIGHBORS[island.i]) if (w.tiles[j].owner === n.id && j !== n.capital) w.tiles[j].owner = -1;
+  for (let k = 0; k < 6; k++) step(w, { 0: { kind: "ok", response: {} } });
+  assert.equal(island.owner, n.id, "cut-off land stays");
 });

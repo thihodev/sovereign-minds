@@ -138,7 +138,7 @@ export function advice(world: World, n: Nation): Advice[] {
 
   // Land over the limit
   const held = governed(world, n), limit = tileLimit(world, n);
-  if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) tự thành đất hoang. Muốn giữ đất: nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1), lập điểm định cư hoặc tăng dân; hoặc tự chọn ô bỏ (abandon_tile) để giữ ô tốt.`);
+  if (held >= limit) say(1, `Đang giữ ${held}/${limit} ô: đất đang giữ vẫn là của bạn, nhưng muốn khai hoang thêm phải nâng giới hạn (đường nối các trung tâm: mỗi ${ROADS.tilesPerLimit} ô đường +1; điểm định cư; dân số).`);
 
   // Discontent
   // §4.5b a neighbour's civil war: a chance to make a friend of the winner, or to strike while it is weak

@@ -217,17 +217,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   const wet = (o: Nation) => weak.length > 1 ? world.tiles.filter(t => t.owner === o.id && t.river && t.land && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id)).length : 0;
   const prey = weak.sort((a, b) => (covet.filter(x => x.owner === b.id).length + wet(b)) - (covet.filter(x => x.owner === a.id).length + wet(a)) || a.id - b.id)[0];
 
-  // 0. Too much land: give up the poorest, far from any centre — §2.9 an empty one first: giving up a lived-in tile shakes the people
-  const extra = Math.ceil(Math.max(v.held - v.limit, settleNow ? v.held + ring - (v.limit + 3) : 0));
-  if (n.founded && extra > 0) {
-    const centreSet = new Set(v.centres);
-    const far = (t: Tile) => Math.min(...v.centres.map(c => dist(c, t.i)));
-    // Never give up ground that faces an enemy we fight, or the one we mean to fight
-    const foes = new Set([...v.wars.map(w => w.a === n.id ? w.b : w.a), ...(prey ? [prey.id] : [])]);
-    const poor = v.owned.filter(t => !centreSet.has(t.i) && !n.buildings.some(b => b.tile === t.i) && !NEIGHBORS[t.i].some(j => foes.has(world.tiles[j].owner)) && (!foes.size || !atWarFront(v, t.i, foes)))
-      .sort((a, b) => (HAMLET.people[a.terrain] || 0) - (HAMLET.people[b.terrain] || 0) || tileWorth(v, a) - far(a) * 2 - (tileWorth(v, b) - far(b) * 2) || a.i - b.i).slice(0, extra);
-    for (const t of poor) spend("abandon_tile", { tile: xy(t.i) });
-  }
+  // 0. (until v0.57 a bot gave up its poorest land over the limit; land held now stays the nation's, §2.3)
 
   // 0b. §9.5 A plague next door or on the trade road and little medicine: shut the borders while it lasts (two turns at most)
   let shut = quarantined(n, tick);
@@ -299,7 +289,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       } else if (white) spend("treaty", { to: enemy.name, kind: "peace", duration: 40 });
     }
     for (const s of war.strikes) spend("attack", { tile: xy(s.tile), warriors: s.warriors });
-    if (war.bridge !== undefined && v.food >= CLAIM_FOOD) spend("claim_tile", { tile: xy(war.bridge) });
+    if (war.bridge !== undefined && v.food >= CLAIM_FOOD && v.held + 1 <= v.limit) spend("claim_tile", { tile: xy(war.bridge) }); // §2.3 claims stay under the limit
   }
 
   // 3. Rarely, a war of conquest against that neighbour: first build a front at least 3 tiles wide
@@ -309,7 +299,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     const border = ownedTiles(world, prey.id).filter(t => NEIGHBORS[t.i].some(j => v.mine.has(j))).length;
     if (border < 3) {
       const step = frontStep(v, prey.id);
-      if (step !== undefined && v.food >= CLAIM_FOOD + v.need * 0.4) preparing = spend("claim_tile", { tile: xy(step) });
+      if (step !== undefined && v.food >= CLAIM_FOOD + v.need * 0.4 && v.held + 1 <= v.limit) preparing = spend("claim_tile", { tile: xy(step) });
     } else if (rand() < 0.1) spend("declare_war", { target: prey.name });
   }
 
@@ -380,7 +370,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
 
 
   // 6. Land: claim the best free tile next to ours while under the limit
-  if (n.founded && !settling && !preparing && war?.bridge === undefined && sett === null && extra <= 0 && v.food >= CLAIM_FOOD + v.need * 0.4) {
+  if (n.founded && !settling && !preparing && war?.bridge === undefined && sett === null && v.food >= CLAIM_FOOD + v.need * 0.4) {
     const best = claimTile(v);
     if (best.tile >= 0 && v.held + (world.tiles[best.tile].land ? 1 : SEA.limitWeight) <= v.limit) spend("claim_tile", { tile: xy(best.tile) });
     else if (best.tile >= 0 && best.fills && ap >= (AP_COST.claim_tile ?? 2)) {

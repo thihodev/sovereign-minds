@@ -2,6 +2,11 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.57
+
+- **Đất đã giữ là của mình mãi (§2.3):** bỏ luật "đất vượt giới hạn quản lý tự thành đất hoang" và luật "ô bị cắt rời 5 lượt thành vô chủ". Đất khai hoang, chiếm được hay được nhượng luôn là của nước đó; nước có thể đưa dân tới sống bất cứ lúc nào, không cần đợi quá tải mới đi chiếm đất mới.
+- Giới hạn quản lý giờ chỉ chặn việc khai hoang thêm (`claim_tile`). Bot thôi bỏ đất thừa.
+
 ## v0.56
 
 - **Đồng ruộng và đô thị (§4.2b):** dân không còn sống dày đặc trên đất ruộng.

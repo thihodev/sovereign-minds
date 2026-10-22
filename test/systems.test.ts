@@ -191,7 +191,7 @@ test("war: declare, wait a tick, attack and take a tile; allies join; peace ends
   assert.ok(activeWar(w, a.id, c.id) || w.wars.some(x => x.end === null && x.a === c.id), "the ally's war goes on until its own peace");
 });
 
-test("settlements: found one, tiles cut off go wild", () => {
+test("settlements: found one; tiles cut off stay the nation's (v0.57)", () => {
   const w = founded(1, "settle");
   const n = w.nations[0];
   n.inventions.push("P4");
@@ -218,11 +218,11 @@ test("settlements: found one, tiles cut off go wild", () => {
   assert.ok(track > 0, "the road home is ordered");
   assert.ok((n.stock.wood || 0) + (n.stock.stone || 0) <= 70 + 9 - 25 - track, "the settlement and a wood a tile of track are paid");
   assert.ok(n.lastEvents.some(e => /ổn định −5/.test(e)), "the move unsettles the people");
-  // an isolated tile far away is lost after 5 ticks
+  // an isolated tile far away stays the nation's
   const lonely = w.tiles.find(t => t.land && t.owner === -1 && dist(t.i, n.capital) > 15)!;
   lonely.owner = n.id;
   for (let k = 0; k < 6; k++) turn(w, {});
-  assert.equal(w.tiles[lonely.i].owner, -1);
+  assert.equal(w.tiles[lonely.i].owner, n.id);
 });
 
 test("material conditions gate research; equal proposals merge; eras never fall back", () => {
