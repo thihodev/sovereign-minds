@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT,
+  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT, FLOUR,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -1122,7 +1122,14 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     L.stock(n, "food_reserve", -out, "granary"); L.stock(n, "food", out, "granary");
     n.lastEvents.push(`Kho làng mở cứu đói: ${fmt(out)} lương thực dự trữ (còn ${fmt(n.stock.food_reserve || 0)}).`);
   }
+  // §6.7 flour is eaten like food when the food runs short
+  if ((n.stock.food || 0) < need && (n.stock.flour || 0) > 0) { const f = Math.min(n.stock.flour!, need - (n.stock.food || 0)); L.stock(n, "flour", -f, "eat"); L.stock(n, "food", f, "eat"); }
   const eaten = Math.min(n.stock.food || 0, need); L.stock(n, "food", -eaten, "eat");
+  { // §6.7 the grinding stones turn spare food into flour, while the store keeps FLOUR.keep turns of eating
+    const stones = n.buildings.reduce((s2, b) => s2 + (buildingWorks(world, b) ? buildingOf(world, b.type)?.effect.grind || 0 : 0), 0);
+    const spare = (n.stock.food || 0) - need * FLOUR.keep, batches = Math.min(Math.floor(stones / FLOUR.food), Math.floor(Math.max(0, spare) / FLOUR.food));
+    if (batches > 0) { L.stock(n, "food", -batches * FLOUR.food, "craft"); L.stock(n, "flour", batches * FLOUR.flour, "craft"); }
+  }
   { // and set aside a share of what is left over, up to their room
     const room = n.buildings.reduce((s2, b) => s2 + (buildingWorks(world, b) ? buildingOf(world, b.type)?.effect.reserve || 0 : 0), 0) - (n.stock.food_reserve || 0);
     const spare = (n.stock.food || 0) - need, put = Math.min(room, spare * GRANARY.share);
@@ -1176,6 +1183,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   spoil = Math.max(SPOILAGE.min, spoil);
   L.stock(n, "food", -(n.stock.food || 0) * spoil, "spoil");
   L.stock(n, "hide", -(n.stock.hide || 0) * SPOILAGE.hide, "spoil");
+  L.stock(n, "flour", -(n.stock.flour || 0) * FLOUR.spoil, "spoil"); // §6.7 flour keeps far better than fresh food
 
   // Research (§5.5)
   const teach = n.population ? Math.min(DEMO.rpMax, elders(n) / n.population * DEMO.rpPerShare) : 0; // §4.2 elders teach

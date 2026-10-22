@@ -241,6 +241,7 @@ export function buildingEffectText(e: BuildingDef["effect"]): string {
   if (e.reserve) p.push(`dự trữ tới ${e.reserve} lương thực chống đói`);
   if (e.gate) p.push("chợ cửa khẩu: chợ biên giới họp lâu hơn, làm dịu biên giới");
   if (e.tower) p.push("trạm canh: biên giới bớt căng, ít sự cố");
+  if (e.grind) p.push(`xay ${e.grind} lương thực dư thành bột mỗi lượt`);
   return p.join(", ");
 }
 export function describeEffects(world: World, e: Invention["effects"]): string {

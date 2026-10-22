@@ -1029,6 +1029,13 @@ Ngoài muối ven biển, một số ô có mỏ muối đá:
 
 Muối giữ thực phẩm lâu hơn và đáp ứng nhu cầu "Muối, gia vị" của mức sống từ thời Đồ Đá Mới. Nhờ vậy dân sâu trong lục địa cũng có muối.
 
+### 6.5c Cối đá (sáng kiến của Sơn Thạch Quốc, chấp thuận một phần)
+
+**Cối đá** (`grinder`) là công trình biến lương thực thành bột, không phải thêm một lớp chống hư:
+- **Xây:** cần Đá mài (P10); 10 đá, 4 gỗ, 6 công. Xây ngay trên thủ đô hoặc một điểm định cư, mỗi trung tâm một cối.
+- **Xay:** mỗi lượt mỗi cối biến 4 lương thực thành 3 bột (`flour`). Cối chỉ xay khi kho còn đủ ít nhất 1,5 lượt ăn.
+- **Bột:** hư 8% mỗi lượt (lương thực 30%); ăn được như lương thực khi thiếu ăn; là một loại hàng (giá 1,5), buôn bán được và tính cho sự đa dạng hàng hóa.
+
 ### 6.6 Thảo dược đồng và Vườn thảo dược (hai sáng kiến của các quốc gia)
 
 **Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt (chậm hơn thảo dược rừng, 8%).

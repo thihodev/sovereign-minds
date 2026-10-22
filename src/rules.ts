@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.44";
+export const RULES_VERSION = "0.45";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -44,7 +44,7 @@ export const RES_NAME: Record<string, string> = {
   dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
-  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền", food_reserve: "lương dự trữ (kho làng)",
+  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền", flour: "bột", food_reserve: "lương dự trữ (kho làng)",
 };
 
 // §4 Population and production
@@ -545,7 +545,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §7.9 a border gate market: it keeps the border market of its neighbours open and calming */
   gate?: number;
   /** §7.9 a watchtower: guards on the border calm it and stop poachers and brawls */
-  tower?: number }
+  tower?: number;
+  /** §6.7 a grinding stone: food it turns into flour each turn */
+  grind?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -569,6 +571,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
   { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "grinder", name: "Cối đá", needs: "P10", cost: { stone: 10, wood: 4 }, work: 6, perCentre: true, desc: "Mỗi trung tâm một cối, xây ngay trên trung tâm: mỗi lượt xay 4 lương thực dư thành 3 bột. Bột chỉ hư 8% mỗi lượt (lương thực 30%), ăn được như lương thực khi thiếu ăn, và bán được.", effect: { grind: 4 } },
   { type: "watchtower", name: "Trạm canh", needs: "P10", cost: { wood: 8, stone: 4 }, work: 8, desc: "Trên ô của ta giáp đất láng giềng, có đường nối về một trung tâm; mỗi láng giềng một trạm. Phòng thủ quanh trạm +15%; biên giới với nước ấy bớt căng 1 mỗi lượt (mỗi bên có trạm), sự cố biên giới ít đi 25%.", effect: { tower: 1, defense: 0.15 } },
   { type: "border_gate", name: "Chợ cửa khẩu", needs: "P12", cost: { wood: 6, stone: 4 }, work: 10, desc: "Trên ô của ta giáp đất láng giềng, có đường nối về một trung tâm; mỗi láng giềng một chợ. Không thu tiền riêng: chợ biên giới với nước ấy còn họp tới căng thẳng 70 (thay vì 60), mỗi phiên làm dịu gấp đôi (gấp ba nếu cả hai bên cùng dựng) và đổi nhiều hàng hơn 25%.", effect: { gate: 1 } },
   { type: "herb_garden", name: "Vườn thảo dược", needs: "P14", cost: { fiber: 5 }, work: 6, perTile: true, terrains: ["grass", "hill", "forest", "jungle", "swamp", "coast"], desc: "Trồng cây thuốc trên đất ấm (ôn đới, nhiệt đới) cách thủ đô hay điểm định cư tối đa 2 ô, tối đa 2 vườn mỗi trung tâm: tự cho 0,5 thảo dược mỗi lượt, không cần người làm.", effect: { herbs: 0.5 } },
@@ -602,7 +605,7 @@ export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
   copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6,
   dog: 4, goat: 4, cattle: 8, pig: 4, fowl: 1,
-  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5, coin: 1,
+  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5, coin: 1, flour: 1.5,
 };
 export const TOOL_LIFE = 10; // ticks
 /** §6.4 Animals. `wild`: the wild kind on the map that hunters bring home alive (with the capability `cap`); `breed`: growth
@@ -1065,3 +1068,7 @@ export const TRUCE = { max: 5, window: 10 };
 // §7.9 Watchtowers (a nation's idea, taken up in part): each side's tower calms the border `calm` a turn; any tower cuts
 // the chance of an incident (poaching, brawls) by `incidents`
 export const TOWER = { calm: 1, incidents: 0.25 };
+
+// §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`
+// of flour a turn while the store holds `keep` turns of eating; flour spoils `spoil` a turn and is eaten as food in need
+export const FLOUR = { food: 4, flour: 3, keep: 1.5, spoil: 0.08 };

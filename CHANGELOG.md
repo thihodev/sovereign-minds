@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.45
+
+- **Cối đá (§6.5c), sáng kiến #16 của Sơn Thạch Quốc, trọng tài chấp thuận một phần:**
+  - mỗi trung tâm một cối (10 đá, 4 gỗ, 6 công, cần Đá mài);
+  - mỗi lượt xay 4 lương thực dư thành 3 bột; bột hư 8% thay vì 30%, ăn được khi thiếu, buôn bán được;
+  - AI biết luật; bản đồ 3D có cối đá.
+- Lời phán của trọng tài sáng kiến dài tối đa 1.200 ký tự (trước bị cắt ở 500).
+
 ## v0.44
 
 - **0.44.3, giao diện dễ nhìn, ít chữ:**

@@ -45,3 +45,26 @@ test("a granary goes on a centre, one each; it sets spare food aside and opens i
   assert.ok(!n.lastEvents.some(e => /chết đói/.test(e)) || n.population >= before - 2, "no one (or almost no one) starved");
   assert.ok(GRANARY.share > 0);
 });
+
+test("a grinding stone (Sơn Thạch Quốc's idea): on a centre, one each; spare food becomes flour that keeps, and is eaten in need", async () => {
+  const { FLOUR, SPOILAGE } = await import("../src/rules.ts");
+  const w = founded("grinder"), [n] = w.nations;
+  n.inventions.push("P10"); n.stock.stone = 50; n.stock.wood = 50; n.stock.food = 800;
+  turn(w, { 0: { actions: [{ type: "build", building: "grinder" }, { type: "build", building: "grinder" }] } });
+  assert.equal(n.buildings.filter(b => b.type === "grinder").length, 1, "one on the capital");
+  assert.ok(n.lastRejected.some(r => /đã có Cối đá/.test(r.reason)));
+  const g = n.buildings.find(b => b.type === "grinder")!; g.done = true; g.progress = 6;
+  n.stock.food = 800; n.stock.flour = 0;
+  turn(w);
+  assert.ok((n.stock.flour || 0) >= FLOUR.flour * (1 - FLOUR.spoil) - 1e-9, `flour ${n.stock.flour}`);
+  // with too little food in store, the stone stands idle
+  n.stock.food = 1; const flour = n.stock.flour || 0;
+  turn(w);
+  assert.ok((n.stock.flour || 0) <= flour, "no grinding when the store is thin");
+  // flour keeps better than food, and the people eat it when the food runs out
+  assert.ok(FLOUR.spoil < SPOILAGE.food);
+  n.stock.food = 0; n.stock.flour = 500; n.population = 60;
+  turn(w);
+  assert.ok((n.stock.flour || 0) < 500, "flour eaten");
+  assert.ok(!n.lastEvents.some(e => /chết đói/.test(e)), JSON.stringify(n.lastEvents));
+});

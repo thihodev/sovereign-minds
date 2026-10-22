@@ -14,7 +14,7 @@ You are given the rules every nation plays by now (the world as it is), the idea
 - "rejected": it duplicates what already exists (say what), only takes something away (e.g. a rule that only cuts food), favours one nation, is vague, or would need a huge change for little gain.
 Check carefully against the rules: many ideas re-invent something the world already does (salt already keeps food, wild plants are already wild grain, herbs do not spoil, trade already calms borders…). Prefer reusing existing goods and systems over new near-duplicates. Ideas the same as one already taken up are "rejected".
 
-Write the verdict in VIETNAMESE, 2–4 sentences, plain words, addressed to the nation: what is taken up and how it will work (with numbers), or why not. It is shown to the nation and to the developer, who builds exactly what the verdict says.
+Write the verdict in VIETNAMESE, 2–4 sentences (at most 900 characters), plain words, addressed to the nation: what is taken up and how it will work (with numbers), or why not. It is shown to the nation and to the developer, who builds exactly what the verdict says.
 
 Reply with ONLY this JSON: {"rulings":[{"id":<petition id>,"status":"accepted"|"partial"|"rejected","verdict":"…"}]}`;
 
@@ -44,7 +44,7 @@ export interface IdeaRuling { id: number; status: "accepted" | "partial" | "reje
 export function parseIdeaRulings(j: Record<string, unknown>, asked: Petition[]): IdeaRuling[] {
   const ids = new Set(asked.map(p => p.id)), out: IdeaRuling[] = [];
   for (const x of Array.isArray(j.rulings) ? j.rulings as Array<Record<string, unknown>> : []) {
-    const id = Number(x.id), status = String(x.status), verdict = String(x.verdict ?? "").trim().slice(0, 500);
+    const id = Number(x.id), status = String(x.status), verdict = String(x.verdict ?? "").trim().slice(0, 1200);
     if (!ids.has(id) || !["accepted", "partial", "rejected"].includes(status) || !verdict) continue;
     out.push({ id, status: status as IdeaRuling["status"], verdict });
   }

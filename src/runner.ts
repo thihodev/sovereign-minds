@@ -548,7 +548,7 @@ export class Runner {
     const p = this.world.petitions.find(x => x.id === id);
     if (!p) return "Không có thỉnh nguyện này";
     if (!["accepted", "partial", "rejected", "merged", "pending"].includes(status)) return "Kết quả không hợp lệ";
-    p.status = status as typeof p.status; p.verdict = verdict.slice(0, 500); p.decidedTick = this.world.tick; delete p.judge;
+    p.status = status as typeof p.status; p.verdict = verdict.slice(0, 1200); p.decidedTick = this.world.tick; delete p.judge;
     p.mergedInto = status === "merged" ? mergedInto : null; p.delivered = false;
     this.store.logWatcher(this.world.tick, "petition", { id, status, verdict, mergedInto });
     this.store.saveState(this.world);
