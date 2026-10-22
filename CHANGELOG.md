@@ -2,6 +2,10 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.58
+
+- **Báo luật mới cho các vua (§10.8):** khi luật đổi, trong 5 lượt đầu mỗi vua thấy mục `new_rules` kể những gì mới (lấy từ nhật ký thay đổi), và được dặn bỏ những gì trong ghi nhớ mà luật mới làm sai. Trước đây luật mới có hiệu lực ngay, nhưng không ai báo cho vua biết điều gì đã đổi.
+
 ## v0.57
 
 - **0.57.1, Chat Claude trả lời chắc chắn và gọn:**

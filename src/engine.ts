@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
+  RULES_VERSION, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -636,6 +636,11 @@ export interface StepResult { chronicle: ChronicleEntry[]; audit: string[]; fx: 
 
 export function step(world: World, inputs: Record<number, TurnInput>, rulings: Record<number, Ruling> = {}): StepResult {
   applyLaws(world); // §10.3 the Watcher's law decrees in force this turn
+  // §10.8 new rules: the rulers are told what changed for a few turns (a new world simply starts under them)
+  if (world.rulesVersion !== RULES_VERSION) {
+    if (world.tick > 0) world.rulesChange = { from: world.rulesVersion ?? null, to: RULES_VERSION, tick: world.tick };
+    world.rulesVersion = RULES_VERSION;
+  }
   const tick = world.tick, L = new Ledger(world), chronicle: ChronicleEntry[] = [];
   fxBegin();
   const say = (nation: number | null, kind: string, text: string) => chronicle.push({ tick, nation, kind, text });

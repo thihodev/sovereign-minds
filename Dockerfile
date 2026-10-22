@@ -10,6 +10,7 @@ COPY package.json ./
 COPY src ./src
 COPY web ./web
 COPY tools ./tools
+COPY CHANGELOG.md ./
 RUN mkdir -p /app/data
 EXPOSE 3000
 # The supervisor restarts the engine on new code after the current turn ends.

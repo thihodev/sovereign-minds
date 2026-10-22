@@ -193,3 +193,17 @@ test("the Judge of Ideas (Claude) rules on the nations' initiatives; the Watcher
     r.store.close?.();
   } finally { process.env = prev; rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the Watcher's chat sees every nation's buildings, centres and treasury, to answer outright", () => {
+  const dir = mkdtempSync(join(tmpdir(), "sm-chat-"));
+  try {
+    const r = runnerWithFake(dir), n = r.world.nations[0];
+    Object.assign(n, { founded: true, name: "Văn Hà", capitalName: "Kinh Thiên" });
+    n.buildings.push({ id: 900, type: "airport", tile: n.capital, progress: 3, done: false, hp: 100 }, { id: 901, type: "field", tile: n.capital, progress: 8, done: true, hp: 100 });
+    const ctx = r.summary([], "đã có sân bay nào chưa?");
+    assert.match(ctx, /công trình \(đủ, chính xác\): .*Ruộng ×1/);
+    assert.match(ctx, /Sân bay ×0 \(\+1 đang xây\)/);
+    assert.match(ctx, /trung tâm: Kinh Thiên \(làng\)/);
+    r.store.close?.();
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

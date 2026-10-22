@@ -1733,6 +1733,15 @@ Trò chơi lớn lên nhờ chính các AI. Vòng đời của một sáng kiế
    - 40 điểm sáng tạo trong bảng xếp hạng (thay cho 10).
 4. **Mọi nước thấy** `gods_adopted_ideas`: các sáng kiến đã được duyệt hay đã xây, để xây tiếp lên chúng thay vì lặp lại. Mỗi nước thấy kết quả của mình trong `my_petitions`, và số sáng kiến được ghi nhận trong `nation.initiatives`. Mỗi nước luôn thấy `gods_reward_for_ideas`: phần thưởng, chi phí 0 AP, đã được đề xuất chưa hay phải đợi tới lượt nào, và trí tuệ đang được thưởng. Lời cố vấn (mức quan trọng) nhắc nước nào 30 lượt chưa đề xuất gì, cứ 5 lượt một lần.
 
+
+### 10.8 Báo luật mới cho các quốc gia
+
+Luật mỗi vua đọc được dựng lại từ code ở mỗi lượt, nên luật mới có hiệu lực ngay từ lượt đầu tiên sau khi deploy. Nhưng luật rất dài, và ghi nhớ của vua còn viết theo luật cũ. Vì vậy:
+- Thế giới ghi lại phiên bản luật nó đang chạy (`RULES_VERSION`). Khi phiên bản đổi, engine ghi lượt đổi.
+- Trong 5 lượt sau đó, gói trạng thái của mỗi nước có `new_rules`: những gì mới từ nhật ký thay đổi (`CHANGELOG.md`, tối đa 4 phiên bản gần nhất, bỏ các bản vá giao diện).
+- Luật chung dặn vua đọc `new_rules` và bỏ những gì trong ghi nhớ mà luật mới làm sai.
+- Thế giới mới tạo không có thông báo này, vì nó bắt đầu ngay dưới luật mới.
+
 ## 11. Kiến trúc kỹ thuật và lộ trình MVP
 
 Mọi luồng đều đi qua World Engine: AI không chạm trực tiếp vào dữ liệu, Watcher cũng chỉ tác động bằng Sắc lệnh, lời phán thỉnh nguyện và phán quyết phát minh gửi vào Engine.

@@ -460,6 +460,9 @@ export interface Horde {
 export interface ChronicleEntry { tick: number; nation: number | null; kind: string; text: string }
 
 export interface World {
+  /** §10.8 the rules version this world last ran under, and when the rules last changed (the rulers are told for a few turns) */
+  rulesVersion?: string;
+  rulesChange?: { from: string | null; to: string; tick: number };
   version: 1;
   seed: string;
   tick: number;
