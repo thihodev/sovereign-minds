@@ -4,6 +4,8 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.54
 
+- **0.54.1, sửa lỗi tỉnh "chật người" giả:** từ v0.53, khi chia chỗ ở cho từng tỉnh, chỗ ở của điểm định cư chưa nhân hệ số thời đại. Tổng chỗ ở các tỉnh vì vậy thấp hơn của cả nước, mọi tỉnh bị tính là chật người, và bất mãn tăng dù ổn định cao (ví dụ Văn Hà: ổn định 100 mà bất mãn 79). Giờ chỗ ở các tỉnh cộng lại đúng bằng của cả nước; bất an do chật người sẽ tự nguội dần.
+
 - **Nội chiến (§4.5b):** bất mãn lên 100 giờ có hai lối ra: ly khai như cũ, hoặc nổi dậy giết người trị vì để cướp ngôi.
   - Khả năng nổi dậy: 50%; cao hơn khi không còn đất trống để đi hay khi triều đình yếu; tối đa 90%. Tỉnh bất an thì vẫn ly khai.
   - Mỗi lượt, quân triều đình (chiến binh, dân quân, tường thành, ổn định) đánh với phe nổi dậy; bên nào thắng 2 lượt trước thì thắng.

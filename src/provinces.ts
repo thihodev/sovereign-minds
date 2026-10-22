@@ -67,7 +67,9 @@ export function provinces(world: World, n: Nation, ls: Map<number, Link> = links
   });
   const sum = (k: "roofs" | "ham") => raw.reduce((s, r) => s + r[k], 0);
   const fb = sum("roofs") ? parts.buildings / sum("roofs") : 0, fh = sum("ham") ? parts.hamlets / sum("ham") : 0;
-  const housing = cs.map((c, k) => (c === n.capital ? parts.natural : SETTLEMENT.housing) + raw[k].roofs * fb + raw[k].ham * fh + raw[k].cave);
+  // §4.2b a settlement houses SETTLEMENT.housing × the era's factor, as the nation's own count has it
+  const town = n.settlements.length ? parts.settlements / n.settlements.length : SETTLEMENT.housing;
+  const housing = cs.map((c, k) => (c === n.capital ? parts.natural : town) + raw[k].roofs * fb + raw[k].ham * fh + raw[k].cave);
   const people = apportion(Math.max(0, Math.floor(n.population)), housing);
   const young = new Set(n.settlements.filter(s => world.tick - s.tick < CONNECT.grace).map(s => s.tile));
   return cs.map((c, k) => {

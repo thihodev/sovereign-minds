@@ -43,3 +43,16 @@ test("a modern people grows by at most a fifth a turn, and only as its food allo
   step(w2, { 0: { kind: "ok", response: { ...idle, labor: { gather: 0, hunt: 0, fish: 0, farm: 0, wood: 0, stone: 0, flint: 0, clay: 0, mine: 0, craft: 0, build: 0, research: 600, warrior: 0 } } } });
   assert.ok((m.demo!.born ?? 0) - (m.demo!.aged ?? 0) < born - aged, `less food, fewer children: ${m.demo!.born}-${m.demo!.aged} vs ${born}-${aged}, food ${m.stock.food}, pop ${m.population}`);
 });
+
+test("the provinces' housing sums to the nation's in every era (no province crowded by the era's factor)", async () => {
+  const { provinces } = await import("../src/provinces.ts");
+  const w = founded("demo-prov"), [n] = w.nations;
+  const far = w.tiles.find(t => t.land && t.owner === -1 && Math.abs((t.i % 128) - (n.capital % 128)) > 8)!;
+  far.owner = n.id; n.settlements.push({ tile: far.i, name: "Xóm Mới", tick: -50 });
+  for (const era of ["Đồ Đá Cũ", "Công Nghiệp", "Hiện Đại"]) {
+    n.era = era; n.population = housing(w, n);
+    const ps = provinces(w, n), sum = ps.reduce((s, p) => s + p.housing, 0);
+    assert.ok(Math.abs(sum - housing(w, n)) <= ps.length, `${era}: ${sum} vs ${housing(w, n)}`);
+    assert.ok(!ps.some(p => p.causes.includes("crowded")), `${era}: no province crowded at the roof`);
+  }
+});
