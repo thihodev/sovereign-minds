@@ -138,6 +138,18 @@ test("economy labour applies only when the ruler sends none; the ruler's researc
   assert.ok(orders(n).includes("[chiến tranh] warriors 20 ✓"));
 });
 
+test("with an enemy at war only the ruler speaks; a bot minister sends no letters at all", async () => {
+  const { startWar } = await import("../src/diplomacy.ts");
+  const { botMinister } = await import("../src/ai/minister.ts");
+  const { rngFor } = await import("../src/rng.ts");
+  const w = founded("min-war-words", 6000), n = w.nations[0], o = w.nations[1];
+  const dip = seat(w, n, "diplomacy");
+  startWar(w, n, o, w.tick, "", () => {});
+  turn(w, {}, { 0: [{ minister: dip.id, domain: "diplomacy", response: { actions: [{ type: "message", to: o.name, gesture: "muốn hòa bình" }] } }] });
+  assert.match(orders(n).join(" | "), /\[ngoại giao\] message .*✗ Đang chiến tranh với/);
+  for (let k = 0; k < 20; k++) assert.ok(!(botMinister(w, n, dip, rngFor(w.seed, k, "x")).actions ?? []).some(a => a.type === "message"));
+});
+
 test("a minister's prompt holds only its field's rules; its observation carries the ruler's directives", () => {
   const w = founded("min-prompt", 1200), n = w.nations[0];
   n.lastThought = "Mở rộng về phía sông."; n.memory = "Kế hoạch: khai hoang ven sông, làm đường.";

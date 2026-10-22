@@ -12,7 +12,7 @@ import {
   TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT, FLOUR,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
-import { activeWar, betrayalPhase, findTarget, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
+import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
 import { generateWorld, tileValue } from "./worldgen.ts";
 import { fx, fxBegin, fxDeath, fxEnd, type MapFx } from "./fx.ts";
 import { busy, piers } from "./routes.ts";
@@ -1730,7 +1730,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     }
     case "accept_migrants": {
       // §4.5 take in a faction that left its nation
-      const x = (world.schisms ?? []).find(s => s.id === Math.floor(num(a.faction)));
+      const x = (world.schisms ?? []).find(s => s.id === idOf(a.faction));
       if (!x || x.status !== "asking" || x.to !== n.id) return "Không có nhóm nào đang xin sang nước bạn với số này";
       const from = world.nations[x.from];
       const k = Math.min(x.people, Math.max(0, from.population - 10));

@@ -169,3 +169,18 @@ test("the beaten cannot dictate terms; a peace offer shows what signing it bring
   assert.match(String(off.if_signed?.reparations_at_once), /Văn Lang gives \d+% of every good/);
   assert.equal(off.if_signed?.you_pay, undefined);
 });
+
+test("an offer number written as \"#3216\" is understood; the ruler is told of a peace offer waiting", () => {
+  const w = neighbours("peace-id");
+  const [a, b] = w.nations;
+  const war = atWar(w);
+  war.tally![String(a.id)] = { score: 20, dead: 4, clashes: 2, battles: 1, tiles: 1, centres: 0, raids: 0 };
+  war.tally![String(b.id)] = { score: 3, dead: 16, clashes: 0, battles: 0, tiles: 0, centres: 0, raids: 0 };
+  while (w.tick < war.start + WAR.peaceAfter) turn(w, { 0: { labor: army(a, 0), actions: idle.actions }, 1: { labor: army(b, 0), actions: idle.actions } });
+  turn(w, { 0: { actions: [{ type: "treaty", to: b.name, kind: "peace" }] } });
+  const off = w.treatyOffers.find(o => o.from === a.id)!;
+  assert.ok(advice(w, b).some(x => x.text.includes(`đề nghị hòa #${off.id}`) && /accept_treaty/.test(x.text)), "the advice names the offer");
+  turn(w, { 1: { actions: [{ type: "accept_treaty", offer: `#${off.id}` }] } });
+  assert.deepEqual(b.lastRejected, []);
+  assert.equal(activeWar(w, a.id, b.id), undefined, "peace signed");
+});

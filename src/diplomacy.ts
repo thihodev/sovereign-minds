@@ -54,6 +54,8 @@ export function relation(world: World, a: number, b: number): string {
   if (t.some(x => x.type === "non_aggression")) return "bất tương xâm";
   return world.nations[a].met.includes(b) ? "đã gặp" : "chưa biết";
 }
+/** An offer, treaty or faction number as the AI wrote it: 3216, "3216", "#3216", "đề nghị #3216". */
+export function idOf(v: unknown): number { const m = String(v ?? "").match(/\d+/); return m ? Number(m[0]) : NaN; }
 export function sharedLanguage(world: World, a: Nation, b: Nation): boolean {
   if (kin(a, b)) return true; // §4.5 they were one people: they speak one tongue
   return (mods(world, a).caps.has("ghi-chép") && mods(world, b).caps.has("ghi-chép")) || (a.trades[String(b.id)] || 0) >= SHARED_LANGUAGE_TRADES;
@@ -150,7 +152,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       return null;
     }
     case "accept_trade": {
-      const id = Math.floor(Number(a.offer ?? a.id));
+      const id = idOf(a.offer ?? a.id);
       const off = world.tradeOffers.find(x => x.id === id);
       if (!off || off.to !== n.id) return `Không có đề nghị trao đổi #${id} gửi cho bạn`;
       if (off.status !== "open" || tick - off.tick > TRADE.offerTicks) return "Đề nghị đã hết hạn";
@@ -190,7 +192,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       return null;
     }
     case "accept_treaty": {
-      const id = Math.floor(Number(a.offer ?? a.id));
+      const id = idOf(a.offer ?? a.id);
       const off = world.treatyOffers.find(x => x.id === id);
       if (!off || off.to !== n.id) return `Không có đề nghị hiệp ước #${id} gửi cho bạn`;
       if (tick - off.tick > TREATY.offerTicks) return "Đề nghị đã hết hạn";
@@ -198,7 +200,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       return null;
     }
     case "break_treaty": {
-      const id = Math.floor(Number(a.treaty ?? a.id));
+      const id = idOf(a.treaty ?? a.id);
       const t = world.treaties.find(x => x.id === id && x.active && (x.a === n.id || x.b === n.id));
       if (!t) return `Không có hiệp ước #${id} của bạn`;
       if (t.type === "vassal" && t.a === n.id) return "Chư hầu không phá ước được; dùng declare_independence";

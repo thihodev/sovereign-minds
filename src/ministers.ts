@@ -8,6 +8,7 @@ import { AP_COST, INITIATIVE, INJECTION, MINISTERS, MINISTER_DOMAINS } from "./r
 import { rngFor, pickOne } from "./rng.ts";
 import { recipeOf } from "./catalog.ts";
 import { fx } from "./fx.ts";
+import { idOf, pendingOrActiveWar } from "./diplomacy.ts";
 import { fighters, workForce } from "./people.ts";
 import { ROLES, type AIResponse, type Minister, type MinisterRequest, type Nation, type Role, type TurnInput, type World } from "./types.ts";
 
@@ -149,13 +150,18 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const num = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
 
 /** Why a minister may not give this order (null: it may). Beyond its field, the ruler's word comes first. */
-function forbidden(world: World, m: Minister, type: string, a: Record<string, unknown>, rulerTypes: Set<string>): string | null {
+function forbidden(world: World, n: Nation, m: Minister, type: string, a: Record<string, unknown>, rulerTypes: Set<string>): string | null {
   const def = MINISTER_DOMAINS[m.domain];
   if (type === "request_minister") return "Chỉ người trị vì mới xin được bộ trưởng";
   if (!def.actions.includes(type)) return `Ngoài lĩnh vực của ${def.title}: chỉ được ${def.actions.join(", ")}`;
   if (MINISTERS.rulerFirst.includes(type) && rulerTypes.has(type)) return `Người trị vì đã ra lệnh ${type} lượt này; bộ trưởng không làm trái`;
   if (type === "treaty" && String(a.kind ?? a.type_ ?? "") === "peace") return "Giảng hòa là việc của người trị vì";
-  if (type === "accept_treaty" && world.treatyOffers.find(o => o.id === num(a.offer))?.type === "peace") return "Giảng hòa là việc của người trị vì";
+  // §7.4b with an enemy at war, only the ruler speaks: no letters, gestures, offers or treaties from a minister
+  if (["message", "trade_offer", "treaty"].includes(type)) {
+    const o = world.nations.find(x => x.alive && (x.name === String(a.to ?? "") || x.id === Number(a.to)));
+    if (o && pendingOrActiveWar(world, n.id, o.id)) return `Đang chiến tranh với ${o.name}: mọi lời qua lại với họ là việc của người trị vì`;
+  }
+  if (type === "accept_treaty" && world.treatyOffers.find(o => o.id === idOf(a.offer))?.type === "peace") return "Giảng hòa là việc của người trị vì";
   return null;
 }
 
@@ -194,7 +200,7 @@ export function ministersAct(world: World, n: Nation, inp: TurnInput | undefined
       if (!isObj(a)) continue;
       const type = String(a.type ?? "");
       const reject = (reason: string) => { n.lastRejected.push({ action: `[${def.short}] ${type || "?"}`, reason }); orders.push(`${h.label(a)} ✗ ${reason.slice(0, 90)}`); };
-      const no = forbidden(world, m, type, a, rulerTypes);
+      const no = forbidden(world, n, m, type, a, rulerTypes);
       if (no) { reject(no); continue; }
       const cost = AP_COST[type] ?? 1;
       if (cost > ap) { reject(`Không đủ AP của bộ trưởng (cần ${cost}, còn ${ap})`); continue; }

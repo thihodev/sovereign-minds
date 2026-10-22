@@ -3,6 +3,7 @@
 // nations for a generation: their border calms, they pay no duties to each other, and the side that makes war on
 // its in-laws is shamed before the world.
 
+import { idOf } from "./diplomacy.ts";
 import { ROYALS } from "./rules.ts";
 import { pickOne, rngFor } from "./rng.ts";
 import { borderOf } from "./border.ts";
@@ -86,7 +87,7 @@ export function offerMarriage(world: World, n: Nation, a: Record<string, unknown
 
 /** The order "accept_marriage": take the prince or princess in; the two courts become in-laws. */
 export function acceptMarriage(world: World, n: Nation, a: Record<string, unknown>, L: Ledger, atWar: (x: number, y: number) => boolean, say: Say): string | null {
-  const id = Math.floor(Number(a.offer ?? a.id));
+  const id = idOf(a.offer ?? a.id);
   const off = (world.marriageOffers ?? []).find(x => x.id === id);
   if (!off || off.to !== n.id) return `Không có lời cầu hôn #${id} gửi cho bạn`;
   if (off.status !== "open" || world.tick - off.tick > ROYALS.offerTicks) return "Lời cầu hôn đã hết hạn";

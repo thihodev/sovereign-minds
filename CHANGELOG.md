@@ -2,6 +2,13 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.50
+
+- **Chiến tranh là chuyện giữa hai người trị vì (§4.9, §7.4b):** bộ trưởng không còn gửi thư, cử chỉ, đề nghị hay hiệp ước tới nước đang đánh nhau với mình. Bộ trưởng chạy bằng bot không gửi thư hay cử chỉ nào nữa (trước đây cử chỉ "muốn hòa bình" của nó khiến hai bên tưởng đang nói chuyện).
+- Cố vấn nhắc người trị vì mỗi đề nghị hòa đang chờ: điều khoản, điểm chiến tranh, hậu quả nếu ký và lệnh để ký. Bên đã gửi nhiều đề nghị hòa mà không được trả lời cũng được nhắc.
+- Số đề nghị viết kiểu "#3216" giờ được hiểu (trước đây lệnh `accept_treaty` với số dạng này bị từ chối).
+- Bot trả lời đề nghị hòa trước mọi việc khác trong lượt, để không hết điểm hành động trước khi kịp ký.
+
 ## v0.49
 
 - **Bên thua không đặt điều kiện (§7.4b):** bên đang bị dẫn từ 8 điểm chiến tranh không còn đề nghị được hòa bắt bên thắng nộp cống hay nhượng đất (trước đây có thể, ví dụ bên thua 2,5 – 11 đòi bên thắng nộp 6 tiền mỗi lượt). Mỗi đề nghị hòa gửi tới AI kèm "nếu ký": điểm, ai thắng, bồi thường ngay bao nhiêu, mình phải nộp gì.

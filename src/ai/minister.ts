@@ -97,7 +97,8 @@ export function ministerObservation(world: World, n: Nation, m: Minister): Recor
 /** A minister with the bot's mind: the bot's plan for the nation, only the orders of the minister's field. */
 export function botMinister(world: World, n: Nation, m: Minister, rand: Rand): AIResponse {
   const plan = botTurn(world, n, rand), def = MINISTER_DOMAINS[m.domain];
-  const out: AIResponse & Record<string, unknown> = { thought: `Theo lệ thường của bot cho ${def.title}.`, actions: (plan.actions ?? []).filter(a => def.actions.includes(String(a?.type ?? ""))) };
+  // a bot minister keeps to deeds: it sends no letters or gestures in the nation's name (words are for minds)
+  const out: AIResponse & Record<string, unknown> = { thought: `Theo lệ thường của bot cho ${def.title}.`, actions: (plan.actions ?? []).filter(a => def.actions.includes(String(a?.type ?? "")) && a?.type !== "message") };
   if (m.domain === "economy") { out.labor = plan.labor; out.crafts = plan.crafts; }
   if (m.domain === "war" && plan.labor?.warrior !== undefined) out.warriors = plan.labor.warrior;
   return out;

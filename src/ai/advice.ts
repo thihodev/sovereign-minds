@@ -14,7 +14,7 @@ import { isolated } from "../connect.ts";
 import { WAY_NAME, contagious, cureDiscount, diseaseOf, plagueNearby, quarantined, shield, spreadOf, vaccinated } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
-import { activeWar, hostile, peaceOutlook, touching, treatiesBetween, warSide } from "../diplomacy.ts";
+import { activeWar, hostile, peaceOutlook, pendingOrActiveWar, touching, treatiesBetween, warSide } from "../diplomacy.ts";
 import { ministerAdvice } from "../ministers.ts";
 import { goodVi, landReserves, shortages, specialtiesOf, surpluses, veinsNear } from "../market.ts";
 import { seaAdvice } from "../sea.ts";
@@ -185,6 +185,21 @@ export function advice(world: World, n: Nation): Advice[] {
     else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}${!hasTower(world, n, o.id) && n.inventions.includes("P10") ? ` Dựng Trạm canh (build watchtower, tile: ô của ta giáp ${o.name}, có đường nối về trung tâm): biên giới bớt căng ${TOWER.calm} mỗi lượt, sự cố ít đi ${TOWER.incidents * 100}%.` : ""}${!hasGate(world, n, o.id) && n.inventions.includes("P12") ? ` Dựng Chợ cửa khẩu (build border_gate, tile: ô của ta giáp ${o.name}, có đường nối về trung tâm): chợ biên giới còn họp tới căng thẳng ${BORDER.marketBelow + GATE.below}, mỗi phiên làm dịu gấp đôi.` : ""}`);
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
+  }
+
+  // §7.4b peace offers waiting for the ruler's answer, and its own that go unanswered
+  for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace")) {
+    const w = pendingOrActiveWar(world, n.id, off.from), foe = world.nations[off.from];
+    if (!w || !foe) continue;
+    const out = peaceOutlook(w, n.id), r1 = (x: number) => Math.round(x * 10) / 10, terms = Object.keys(off.tribute).length || off.cede.length;
+    const who = out.winner === null ? "không bên nào thắng rõ" : out.winner === n.id ? `ta thắng, ${foe.name} bồi thường ngay ${Math.round(out.share * 100)}% kho${out.tiles ? ` và ${out.tiles} ô` : ""}` : `ta thua, phải bồi thường ngay ${Math.round(out.share * 100)}% kho${out.tiles ? ` và ${out.tiles} ô` : ""}`;
+    say(2, `${foe.name} đề nghị hòa #${off.id}${terms ? ` (${off.payer === n.id ? "ta" : foe.name} nộp ${Object.entries(off.tribute).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}${off.cede.length ? ` và nhượng ${off.cede.length} ô` : ""}${off.duration ? ` trong ${off.duration} lượt` : ""})` : " (hòa trắng)"}. Điểm ${r1(warSide(w, n.id).score)} – ${r1(warSide(w, foe.id).score)}: nếu ký thì ${who}. Ký: {"type":"accept_treaty","offer":${off.id}}; không ký thì chiến tranh tiếp tục.`);
+  }
+  for (const w of world.wars.filter(x => x.end === null && (x.a === n.id || x.b === n.id))) {
+    const foe = world.nations[w.a === n.id ? w.b : w.a];
+    const mine = (w.talks ?? []).filter(t => t.from === n.id && t.kind === "offer" && world.tick - t.tick <= 6).length;
+    const theirs = (w.talks ?? []).filter(t => t.from === foe.id && world.tick - t.tick <= 6).length;
+    if (mine >= 3) say(1, `Đã gửi ${foe.name} ${mine} đề nghị hòa trong 6 lượt mà chưa được ký${theirs ? "" : ", họ cũng chưa nói gì"}: gửi thư nói rõ điều khoản, đổi điều khoản, hoặc giữ phòng tuyến chờ họ.`);
   }
 
   // Plague next door, or at home (§9.5)

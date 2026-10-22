@@ -239,6 +239,22 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 0c. §10.6 a renaming decree of the gods: obey it with a new name for the capital
   if (n.founded && renameDecreed(world) && !unrenamed(world, n).changed) spend("rename", { what: "capital", name: `Tân ${n.capitalName}`.slice(0, 30) });
 
+  // 0d. §7.4b Answer peace offers first, so the action points are never spent before it. The score decides who pays;
+  // a white peace waits a few turns of fighting. One offer from each enemy is enough.
+  if (n.founded && v.wars.length) {
+    const signed = new Set<number>();
+    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && tick - o.tick <= 2).sort((a, b) => b.id - a.id)) {
+      const w = v.wars.find(x => x.a === off.from || x.b === off.from);
+      if (!w || signed.has(off.from)) continue;
+      const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ"), age = tick - w.start, lead = warLead(w, n.id);
+      const iPay = off.payer === n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
+      const theyPay = off.payer !== n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
+      // terms in our favour: take them; we pay only when losing or worn out; a white peace once our war has paid or tired us
+      const ok = theyPay || (iPay ? lead <= -WAR.losingBy || age >= 12 : !aggressor || age >= 8 || Math.abs(lead) >= WAR.decisive);
+      if (ok && spend("accept_treaty", { offer: off.id })) signed.add(off.from);
+    }
+  }
+
   // 1. Research
   if (n.founded && !n.research) {
     const opts = researchOptions(world, n);
@@ -253,17 +269,6 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // 2. War: fight, then make peace (§7.4)
   const war = n.founded ? warPlan(v) : null;
   if (war) {
-    // §7.4b Peace has a price: the score decides who pays, a white peace waits a few turns of fighting
-    for (const off of world.treatyOffers.filter(o => o.to === n.id && o.type === "peace" && tick - o.tick <= 2)) {
-      const w = v.wars.find(x => x.a === off.from || x.b === off.from);
-      if (!w) continue;
-      const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ"), age = tick - w.start, lead = warLead(w, n.id);
-      const iPay = off.payer === n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
-      const theyPay = off.payer !== n.id && (Object.keys(off.tribute).length > 0 || off.cede.length > 0);
-      // terms in our favour: take them; we pay only when losing or worn out; a white peace once our war has paid or tired us
-      const ok = theyPay || (iPay ? lead <= -WAR.losingBy || age >= 12 : !aggressor || age >= 8 || Math.abs(lead) >= WAR.decisive);
-      if (ok) spend("accept_treaty", { offer: off.id });
-    }
     for (const w of v.wars) {
       const enemy = world.nations[w.a === n.id ? w.b : w.a];
       const aggressor = w.a === n.id && !w.reason.startsWith("bảo vệ");
