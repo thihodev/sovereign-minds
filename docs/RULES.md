@@ -1244,6 +1244,13 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
 - **Tranh chấp:** căng thẳng từ 70 trở lên thì cả hai bên có chính nghĩa với nhau và mỗi bên −1 ổn định mỗi lượt. Một hiệp ước bất tương xâm, hòa bình hay thông hành tan vỡ khi **chính nó** đã trải qua 5 lượt tranh chấp liên tục (chỉ tính từ khi ký; liên minh và chư hầu vẫn giữ). Có chính nghĩa thì tự xé hiệp ước (`break_treaty`) không mất uy tín.
 - **Sau chiến tranh:** hòa ước kết thúc một cuộc chiến mở lại biên giới từ đầu: căng thẳng hạ xuống tối đa 45, bộ đếm tranh chấp về 0. Chiến tranh đã trút hết giận, nên hòa ước mới không bị xé ngay vì những tranh chấp trước đó.
 - **Chợ biên giới:** khi căng thẳng dưới 60 và không bên nào đang cách ly (mục 9.5), mỗi lượt hai bên tự đổi một món mình dư lấy một món bên kia thiếu, mỗi bên tối đa 12 đơn vị giá trị. Món dư là lương thực vượt 2 lượt ăn, hoặc hàng khác vượt 20 đơn vị; món thiếu là món bên kia có dưới 5. Mỗi phiên chợ tính là một lần buôn (tiến tới chung ngôn ngữ, học phát minh của nhau rẻ hơn).
+- **Trạm canh** (`watchtower`, sáng kiến của một quốc gia, chấp thuận một phần):
+  - **Xây:** cần Hàng rào gỗ (P10); 8 gỗ, 4 đá, 8 công.
+  - **Đặt ở đâu:** trên ô của mình giáp đất láng giềng, có đường của mình nối về một trung tâm. Mỗi láng giềng một trạm.
+  - **Tác dụng:**
+    - ô có trạm và các ô quanh nó được thủ thêm 15%;
+    - căng thẳng với nước ấy giảm 1 mỗi lượt cho mỗi bên có trạm;
+    - sự cố biên giới (săn trộm, xô xát) ít đi 25%.
 - **Phiên chợ đình chiến** (sáng kiến của một quốc gia, chấp thuận một phần):
   - Mỗi cuộc trao đổi hoàn thành (`trade_offer` rồi `accept_trade`) vẫn làm dịu biên giới 3 điểm ở mọi mức căng thẳng, không cần hòa ước.
   - Trên biên giới đang tranh chấp (căng thẳng từ 70), mỗi cuộc trao đổi còn **xóa vụ xô xát gần nhất** khỏi sổ "máu đòi máu", nên chiến tranh tự phát chậm lại.

@@ -7,7 +7,7 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GATE, GOOD_VALUE, KIN, ROADS, WAR } from "./rules.ts";
+import { BORDER, GATE, GOOD_VALUE, KIN, ROADS, TOWER, WAR } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { buildingOf, goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
@@ -74,10 +74,12 @@ export function sharedRivers(world: World, a: number, b: number): number {
   }
   return k;
 }
-/** §7.9 Does nation `n` keep a working border gate market on a tile touching the land of `other`? */
-export function hasGate(world: World, n: Nation, other: number): boolean {
-  return n.buildings.some(b => buildingWorks(world, b) && world.tiles[b.tile].owner === n.id && buildingOf(world, b.type)?.effect.gate && NEIGHBORS[b.tile].some(j => world.tiles[j].owner === other));
+/** §7.9 Does nation `n` keep a working building with this border effect (gate, tower) on a tile touching the land of `other`? */
+function atBorder(world: World, n: Nation, other: number, key: "gate" | "tower"): boolean {
+  return n.buildings.some(b => buildingWorks(world, b) && world.tiles[b.tile].owner === n.id && buildingOf(world, b.type)?.effect[key] && NEIGHBORS[b.tile].some(j => world.tiles[j].owner === other));
 }
+export const hasGate = (world: World, n: Nation, other: number) => atBorder(world, n, other, "gate");
+export const hasTower = (world: World, n: Nation, other: number) => atBorder(world, n, other, "tower");
 /** §2.5 Does a road of either side reach the border between them? */
 export function roadAtBorder(world: World, a: number, b: number): boolean {
   for (const t of world.tiles) {
@@ -107,8 +109,11 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
     if (foes) t = Math.max(t, KIN.tensionFloor);
     if (sharedLanguage(world, a, b)) t -= BORDER.languageCalm;
     const r = rngFor(world.seed, tick, "border", a.id, b.id);
-    // §7.9 a border gate market of either side keeps the market open longer, trading more and calming more
+    // §7.9 a border gate market of either side keeps the market open longer, trading more and calming more;
+    // a watchtower's guards calm the border and keep poachers and brawlers off it
     const ga = hasGate(world, a, b.id), gb = hasGate(world, b, a.id), gate = ga || gb;
+    const ta = hasTower(world, a, b.id), tb = hasTower(world, b, a.id);
+    t -= (ta ? TOWER.calm : 0) + (tb ? TOWER.calm : 0);
     // A small market at the border, while the peoples are not too wary of each other (and neither is in quarantine, §9.5)
     if (t < BORDER.marketBelow + (gate ? GATE.below : 0) && !foes && !quarantined(a, tick) && !quarantined(b, tick)) {
       const sa = spare(world, a).find(([g]) => lacks(b, g)), sb = spare(world, b).find(([g]) => lacks(a, g));
@@ -132,7 +137,7 @@ export function borderPhase(world: World, L: Ledger, say: (nation: number | null
       }
     }
     // Incidents: the more tension, the more often
-    if (r() < Math.min(BORDER.incidentMax, t / BORDER.incidentDiv)) t += incident(world, a, b, st, r, L, say);
+    if (r() < Math.min(BORDER.incidentMax, t / BORDER.incidentDiv) * (ta || tb ? 1 - TOWER.incidents : 1)) t += incident(world, a, b, st, r, L, say);
     st.tension = Math.max(0, Math.min(100, Math.round(t * 10) / 10));
     // Blood for blood: brawl after brawl and the border goes to war
     const recent = (st.brawls ?? []).filter(x => tick - x.tick < BORDER.brawlWindow);

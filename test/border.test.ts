@@ -168,3 +168,27 @@ test("a peace after a long dispute is not torn up by the dispute before it; the 
   assert.equal(t.active, false);
   assert.match(t.endedBy ?? "", /tranh chấp biên giới/);
 });
+
+test("a watchtower: on our land at the neighbour's edge, joined by road; it calms the border and guards the tiles around it", async () => {
+  const { hasTower } = await import("../src/border.ts");
+  const { TOWER } = await import("../src/rules.ts");
+  const w = touching("tower"), [a, b] = w.nations;
+  a.inventions.push("P10"); a.stock.wood = 50; a.stock.stone = 50;
+  const xy = (i: number) => [i % 128, Math.floor(i / 128)];
+  const spot = w.tiles.find(t => t.owner === a.id && NEIGHBORS[t.i].some(k => w.tiles[k].owner === b.id) && NEIGHBORS[t.i].includes(a.capital))!.i;
+  w.tiles[spot].road = 1;
+  turn(w, { 0: { actions: [{ type: "build", building: "watchtower", tile: xy(spot) }] } });
+  assert.deepEqual(a.lastRejected, []);
+  const g = a.buildings.find(x => x.type === "watchtower")!; g.done = true; g.progress = 8;
+  assert.ok(hasTower(w, a, b.id));
+  turn(w, { 0: { actions: [{ type: "build", building: "watchtower", tile: xy(spot) }] } });
+  assert.ok(a.lastRejected.some(r => /Đã có Trạm canh/.test(r.reason)));
+  // the same border, with and without the tower: it calms by TOWER.calm a turn
+  const st = borderOf(w, a.id, b.id), market = BORDER.marketBelow;
+  BORDER.marketBelow = 0;
+  try {
+    st.tension = 50; turn(w); const withTower = st.tension;
+    g.done = false; st.tension = 50; turn(w); const without = st.tension;
+    assert.ok(without - withTower >= TOWER.calm - 0.5, `${withTower} vs ${without}`);
+  } finally { BORDER.marketBelow = market; }
+});

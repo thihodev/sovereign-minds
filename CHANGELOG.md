@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.44
+
+- **Trạm canh (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**
+  - Đặt trên ô giáp láng giềng, có đường nối về trung tâm; mỗi láng giềng một trạm; 8 gỗ, 4 đá, 8 công.
+  - Phòng thủ quanh trạm +15%. Biên giới bớt căng 1 mỗi lượt cho mỗi bên có trạm. Sự cố biên giới ít đi 25%.
+  - AI thấy trạm canh của mỗi bên trong `neighbours`; lời cố vấn gợi ý dựng ở biên giới đang căng.
+- **Không làm:** Kho muối (muối trong kho đã giữ thực phẩm, kho hàng không giới hạn chứa) và Ruộng nghỉ (ruộng không bạc màu nên ruộng nghỉ chỉ làm mất lương thực).
+
 ## v0.43
 
 - **Phiên chợ đình chiến (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**

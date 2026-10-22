@@ -18,7 +18,7 @@ import { urbanView } from "../urban.ts";
 import { classView } from "../classes.ts";
 import { greatsView } from "../greats.ts";
 import { livingStandard } from "../living.ts";
-import { CLASSES, CROWD, ROCK_SALT, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
+import { CLASSES, CROWD, ROCK_SALT, TOWER, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
 import { seaView } from "../sea.ts";
 import { landReserves, localPrice, price, shortages, specialtiesOf, surpluses, techEdge, trend, veinsNear, worth } from "../market.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
@@ -26,7 +26,7 @@ import { housingParts } from "../engine.ts";
 import { advice } from "./advice.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { annalsLines } from "../annals.ts";
-import { borderOf, hasGate, neighbours } from "../border.ts";
+import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
 import { contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
 import { links } from "../connect.ts";
 import { sharedRivers } from "../border.ts";
@@ -105,6 +105,8 @@ GREAT PEOPLE: now and then a great one is born to a nation — ${Object.entries(
 ROCK SALT (an idea a nation proposed, taken up in part): besides the coasts, some hills (${ROCK_SALT.chance.hill * 100}%) and deserts (${ROCK_SALT.chance.desert * 100}%) hold a seam of salt (${ROCK_SALT.min}–${ROCK_SALT.max}), regrowing ${ROCK_SALT.regen * 100}% a turn; your miners dig it like any salt, with no special knowledge. Salt keeps food longer and meets the people's need for salt and spices.
 
 HEALING HERBS (two ideas nations proposed and the gods built in): herbs grow wild in forests, jungles and swamps, and now a few (${MEADOW_HERBS.min}–${MEADOW_HERBS.max}) on every grass and hill tile too, regrowing ${MEADOW_HERBS.regen * 100}% a turn there; your gatherers bring them home. With Trồng trọt (P14) you can plant "herb_garden" (${Object.entries(BUILDING_BY_TYPE.herb_garden.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.herb_garden.work} work): on your own warm land (temperate or tropical; grass, hill, forest, jungle, swamp or coast) within ${HERB_GARDEN.near} tiles of a centre, at most ${HERB_GARDEN.perCentre} for each centre; each gives ${BUILDING_BY_TYPE.herb_garden.effect.herbs} herbs a turn with no hands. One herb per ${HERBS.perPeople} people halves the deaths of a plague; herbs save newborns and meet the people's need for medicine.
+
+WATCHTOWERS (an idea a nation proposed, taken up in part): build "watchtower" (${Object.entries(BUILDING_BY_TYPE.watchtower.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.watchtower.work} work; needs Hàng rào gỗ P10) on a tile of yours touching a neighbour's land, joined by your own road to one of your centres; one for each neighbour. Its guards hold the tile and those around it ${Math.round(BUILDING_BY_TYPE.watchtower.effect.defense! * 100)}% harder, calm that border ${TOWER.calm} a turn (each side that has one), and cut border incidents (poaching, deadly brawls) by ${TOWER.incidents * 100}%. Guard a tense border instead of bleeding on it ("neighbours[].watchtower").
 
 TRUCE MARKETS (an idea a nation proposed, taken up in part): trading calms a border at any tension (−${BORDER.tradeCalm} the turn a trade completes, no treaty needed). On a disputed border (tension ${BORDER.dispute}+) every trade you complete with that neighbour also clears the latest deadly brawl from the blood-for-blood count, so it takes longer to boil over into war. An old nation and the traitors who split from it, hostile otherwise, may still complete ${TRUCE.max} trades in ${TRUCE.window} turns with each other ("neighbours[].truce_markets_left") — a way out short of war.
 
@@ -312,6 +314,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
         const st = borderOf(world, n.id, o.id), cause = n.casusBelli[String(o.id)] ?? -1;
         return { name: o.name, border_tiles: border || undefined, gap: border ? undefined : gap, relation: relation(world, n.id, o.id), tension: Math.round(st.tension), border_market_trades: st.market || undefined,
           border_gate: border ? { mine: hasGate(world, n, o.id), theirs: hasGate(world, o, n.id) } : undefined,
+          watchtower: border ? { mine: hasTower(world, n, o.id), theirs: hasTower(world, o, n.id) } : undefined,
           truce_markets_left: hostile(world, n, o) ? truceLeft(world, n.id, o.id) : undefined,
           incidents: st.incidents.length ? st.incidents.slice(-3).map(x => `L${x.tick}: ${x.text}`) : undefined, just_cause_until: cause >= world.tick ? cause : undefined };
       });

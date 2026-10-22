@@ -240,6 +240,7 @@ export function buildingEffectText(e: BuildingDef["effect"]): string {
   if (e.income) p.push(`thu ${e.income} tiền/lượt${e.market ? " + theo dân và bạn hàng" : ""}`);
   if (e.reserve) p.push(`dự trữ tới ${e.reserve} lương thực chống đói`);
   if (e.gate) p.push("chợ cửa khẩu: chợ biên giới họp lâu hơn, làm dịu biên giới");
+  if (e.tower) p.push("trạm canh: biên giới bớt căng, ít sự cố");
   return p.join(", ");
 }
 export function describeEffects(world: World, e: Invention["effects"]): string {

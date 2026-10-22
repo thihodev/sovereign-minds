@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.43";
+export const RULES_VERSION = "0.44";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -543,7 +543,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §6.6 herbs a garden grows each turn, with no hands */
   herbs?: number;
   /** §7.9 a border gate market: it keeps the border market of its neighbours open and calming */
-  gate?: number }
+  gate?: number;
+  /** §7.9 a watchtower: guards on the border calm it and stop poachers and brawls */
+  tower?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -567,6 +569,7 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "salt_pan", name: "Ruộng muối", needs: "P13", cost: { clay: 6, stone: 4 }, work: 6, perTile: true, max: 3, terrains: ["coast"], desc: "Phơi nước biển lấy muối: +3 muối mỗi lượt.", effect: { seaSalt: 3 } },
   { type: "harbor", name: "Cảng", needs: "P18", cost: { wood: 30, stone: 20, rope: 6 }, work: 14, perTile: true, max: 2, terrains: ["coast"], desc: "Cảng biển: như bến thuyền, chiếm lãnh hải xa thêm 3 ô, đánh cá +10%. Thu 4 tiền/lượt.", effect: { port: 1, harbor: 3, fish: 0.1, income: 4 } },
   // §2.11 marble
+  { type: "watchtower", name: "Trạm canh", needs: "P10", cost: { wood: 8, stone: 4 }, work: 8, desc: "Trên ô của ta giáp đất láng giềng, có đường nối về một trung tâm; mỗi láng giềng một trạm. Phòng thủ quanh trạm +15%; biên giới với nước ấy bớt căng 1 mỗi lượt (mỗi bên có trạm), sự cố biên giới ít đi 25%.", effect: { tower: 1, defense: 0.15 } },
   { type: "border_gate", name: "Chợ cửa khẩu", needs: "P12", cost: { wood: 6, stone: 4 }, work: 10, desc: "Trên ô của ta giáp đất láng giềng, có đường nối về một trung tâm; mỗi láng giềng một chợ. Không thu tiền riêng: chợ biên giới với nước ấy còn họp tới căng thẳng 70 (thay vì 60), mỗi phiên làm dịu gấp đôi (gấp ba nếu cả hai bên cùng dựng) và đổi nhiều hàng hơn 25%.", effect: { gate: 1 } },
   { type: "herb_garden", name: "Vườn thảo dược", needs: "P14", cost: { fiber: 5 }, work: 6, perTile: true, terrains: ["grass", "hill", "forest", "jungle", "swamp", "coast"], desc: "Trồng cây thuốc trên đất ấm (ôn đới, nhiệt đới) cách thủ đô hay điểm định cư tối đa 2 ô, tối đa 2 vườn mỗi trung tâm: tự cho 0,5 thảo dược mỗi lượt, không cần người làm.", effect: { herbs: 0.5 } },
   { type: "granary", name: "Kho làng", needs: "stone_tools", cost: { wood: 10, stone: 6 }, work: 5, perCentre: true, desc: "Mỗi trung tâm một kho: mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư; tự mở cứu đói khi cả nước thiếu ăn. Điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa.", effect: { reserve: 100 } },
@@ -1058,3 +1061,7 @@ export const ROCK_SALT = { chance: { hill: 0.15, desert: 0.3 } as Record<string,
 // §7.9 Truce markets (a nation's idea, taken up in part): on a disputed border every completed trade also clears a
 // brawl from the blood-for-blood count; the old nation and its seceders may trade `max` times in `window` turns without peace
 export const TRUCE = { max: 5, window: 10 };
+
+// §7.9 Watchtowers (a nation's idea, taken up in part): each side's tower calms the border `calm` a turn; any tower cuts
+// the chance of an incident (poaching, brawls) by `incidents`
+export const TOWER = { calm: 1, incidents: 0.25 };
