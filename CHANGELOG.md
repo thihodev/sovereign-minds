@@ -9,6 +9,13 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Các trung tâm có sân bay nối với nhau bằng đường bay: điểm định cư cách biển, cách núi không còn bị cô lập.
   - Hai nước cùng có sân bay và không đánh nhau: hàng bay tới trong 1 lượt (tối đa 40 hàng mỗi sân bay), không phí qua đất, không cướp, không bão.
 - AI thấy mục `airports`, cố vấn nhắc xây; giao diện có chỉ số "✈ Sân bay", đoàn buôn bay có biểu tượng ✈.
+- **0.48.1, bản đồ 3D dùng mô hình low-poly thật** (bộ Kenney, CC0):
+  - Rừng: sồi, cây tán tròn, cây dương, thông, cọ, mỗi loại vài kiểu, vẫn đung đưa trong gió; đá, bụi cây, lau sậy, xương rồng. Từ xa (cây chỉ còn vài điểm ảnh) và ở các vùng xa điểm nhìn thì vẫn vẽ hình đơn giản, nên không chậm hơn trước.
+  - Nhà, dinh thự, thành lũy đá có tháp tròn, tường thành, tháp canh, cối xay gió (nhà xay), lều man di, hàng rào chuồng, thuyền buồm; mái và cờ theo màu quốc gia (dịu lại). Mô hình tải ngầm: khung hình đầu vẫn là hình đơn giản, tải xong thì thay; mô hình nào lỗi thì giữ hình cũ.
+  - Điện: nhà máy nhiệt điện bằng gạch với hai ống khói nhả khói khi chạy, đập thủy điện bê tông chắn ngang sông với nhà máy bên bờ; đường dây điện (cột thép, dây võng) chạy dọc đường sá từ nhà máy tới các trung tâm có điện; trung tâm có điện sáng đèn cửa sổ và tỏa ánh vàng ấm nhìn thấy từ xa.
+  - Sân bay: đường băng có vạch bên cạnh thị trấn, nhà ga, tháp điều khiển, máy bay đậu khi sân bay mở; các sân bay mở của một nước nối nhau bằng vòng cung nét đứt; đoàn buôn bay là máy bay bay theo vòng cung.
+  - Phóng to nhanh hơn: một nấc con lăn ≈ 1,75×, nút +/− 2×, nhấp đúp phóng 2× về điểm đó (Shift: thu nhỏ); từ toàn cảnh tới một thành phố chỉ 4–6 nấc. Thu nhỏ tối đa là vừa cả thế giới.
+  - Nhanh dùng ít kiểu cây và ít cây hơn.
 
 ## v0.47
 

@@ -11,6 +11,7 @@ import { MapControls } from "three/addons/MapControls.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/CSS2DRenderer.js";
 import { mergeGeometries } from "three/addons/BufferGeometryUtils.js";
 import { createPost } from "./map3d-post.js";
+import { loadModels, modelMaterial } from "./map3d-models.js";
 
 const SQ3 = Math.sqrt(3);
 const WATER = new Set(["ocean", "shallow"]);
@@ -109,6 +110,16 @@ const SHAPES = {
   broad, conifer, palm, reeds,
   hull: () => { const g = new THREE.CylinderGeometry(0.5, 0.32, 1, 6, 1, false, 0, Math.PI); g.rotateZ(Math.PI / 2); g.rotateX(Math.PI); return g.translate(0, 0.25, 0); },
   sail: () => new THREE.ConeGeometry(0.5, 1, 3).translate(0, 0.5, 0),
+  // a steel pylon: a tapering lattice mast (four open sides) and a cross-arm for the wires
+  pylon: () => {
+    const parts = [new THREE.BoxGeometry(1.6, 0.04, 0.07).translate(0, 0.9, 0), new THREE.BoxGeometry(1.1, 0.04, 0.07).translate(0, 0.68, 0), new THREE.ConeGeometry(0.12, 0.14, 4).translate(0, 1.04, 0)];
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) parts.push(new THREE.BoxGeometry(0.06, 1.0, 0.06).rotateZ(0.36 * sx).rotateX(-0.36 * sz).translate(sx * 0.29, 0.48, sz * 0.29));
+    for (const y of [0.3, 0.6]) { const w = 0.62 - y * 0.42; for (const [ox, oz, lx, lz] of [[0, w / 2, w, 0.03], [0, -w / 2, w, 0.03], [w / 2, 0, 0.03, w], [-w / 2, 0, 0.03, w]]) parts.push(new THREE.BoxGeometry(lx, 0.03, lz).translate(ox, y, oz)); }
+    return mergeGeometries(parts.map(ni));
+  },
+  // an aeroplane, nose along +x: fuselage, wings, tailplane and fin
+  plane: () => mergeGeometries([new THREE.CylinderGeometry(0.06, 0.1, 1, 6).rotateZ(Math.PI / 2).translate(0, 0.1, 0), new THREE.ConeGeometry(0.06, 0.14, 6).rotateZ(-Math.PI / 2).translate(0.57, 0.1, 0),
+    new THREE.BoxGeometry(0.24, 0.025, 1.1).translate(0.06, 0.09, 0), new THREE.BoxGeometry(0.13, 0.02, 0.38).translate(-0.43, 0.12, 0), new THREE.BoxGeometry(0.16, 0.2, 0.025).translate(-0.43, 0.2, 0)].map(ni)),
   person: () => { const b = new THREE.ConeGeometry(0.32, 0.8, 6).translate(0, 0.4, 0), h = new THREE.SphereGeometry(0.2, 8, 6).translate(0, 0.95, 0); return mergeGeometries([ni(b), ni(h)]); },
 };
 const GEO = {};
@@ -232,7 +243,7 @@ export function create(container, hooks) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.3, 2000);
   const controls = new MapControls(camera, renderer.domElement);
-  Object.assign(controls, { enableDamping: true, dampingFactor: 0.12, screenSpacePanning: false, maxPolarAngle: 1.32, minDistance: 4, maxDistance: 420, zoomSpeed: 1.2 });
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.12, screenSpacePanning: false, maxPolarAngle: 1.32, minDistance: 3.5, maxDistance: 420, zoomSpeed: 1.2 });
   // a warm low sun from the south-west, a cool sky above and a faint blue fill from the other side
   const hemi = new THREE.HemisphereLight(0xc4d8ff, 0x4a3a28, 1.25); scene.add(hemi);
   const SUN_DIR = new THREE.Vector3(-0.55, 0.62, 0.56).normalize();
@@ -402,6 +413,7 @@ export function create(container, hooks) {
     uTiles: { value: tileTex }, uPal: { value: palTex }, uN: { value: 128 }, uOrigin: { value: new THREE.Vector2() },
     uHover: { value: -1 }, uPin: { value: -1 }, uSel: { value: -1 }, uBand: { value: 0.1 }, uTime: { value: 0 }, uDetail: { value: 1 },
     uSkyRefl: { value: new THREE.Color("#3a5366").multiplyScalar(0.55) },
+    uLod: { value: new THREE.Vector3(0, 0, -1) }, // the woods: models within uLod.z of (x, z), their plain stand-ins beyond
   };
   let selected = -1, pinned = -1, layer = null;
   function paintTiles() {
@@ -663,49 +675,114 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     return b;
   }
 
+  // ------------------------------------------------------------------ the models (web/map3d-models.js), loaded in the background:
+  // until they are in, and for any that fails to load, the shapes above stand in
+  const MMAT = {};
+  /** The models' shared materials: "plain", "lit" (lit windows), "sway" (trees), "soft" (plants seen from both sides). */
+  function modelMat(kind) {
+    if (!MMAT[kind]) {
+      const k = kind.replace("L", ""), lod = kind.endsWith("L"); // "…L": a wood's model, drawn near only
+      const m = MMAT[kind] = modelMaterial(U, { sway: k === "sway" || k === "soft", lit: k === "lit", side: k === "soft" ? THREE.DoubleSide : THREE.FrontSide, extra: lod ? sh => lodShader(sh, true) : null, key: lod ? "L" : "" });
+      m.userData.keep = true;
+    }
+    return MMAT[kind];
+  }
+  const hasModel = k => !!GEO["m:" + k];
+  const MODEL_NEAR = 60; // nearer than this the woods and rocks are models (round the point looked at); farther, a tree is a few pixels and the plain shapes do
+  // the woods' kinds: their models (Nhanh: fewer), their height and breadth for a size `s`
+  const WOODS = {
+    broad: { hi: ["oak", "broad", "fat"], lo: ["fat", "small"], h: 1.32, w: 1.1 },
+    poplar: { hi: ["poplar"], lo: ["poplar"], h: 1.4, w: 1.0 },
+    conifer: { hi: ["pine", "pineSmall", "pineTall"], lo: ["pineTall"], h: 1.75, w: 1.1 },
+    palm: { hi: ["palm", "palmBend"], lo: ["palm"], h: 1.45, w: 0.95 },
+  };
+
+  /** The woods' level of detail, per copy: `near` (a model) is drawn only within uLod.z of the point looked at,
+   *  its stand-in (a plain shape) only beyond, so the two meet without a gap or a double. A copy left out is
+   *  folded to a point (no area, no pixels). Used by the materials and by the shadows' depth materials. */
+  function lodShader(sh, near) {
+    sh.uniforms.uLod = U.uLod;
+    sh.vertexShader = "uniform vec3 uLod;\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+  #ifdef USE_INSTANCING
+  { float dl = distance(instanceMatrix[3].xz, uLod.xy); if (${near ? "dl > uLod.z" : "dl < uLod.z"}) transformed *= 0.0; }
+  #endif`);
+  }
+  const LODMAT = {};
+  /** The shadow caster of a LOD'd copy (cached: "near" or "far"). */
+  function lodDepth(near) {
+    const k = near ? "near" : "far";
+    if (!LODMAT[k]) { const m = LODMAT[k] = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); m.onBeforeCompile = sh => lodShader(sh, near); m.customProgramCacheKey = () => "lodd" + k; m.userData.keep = true; }
+    return LODMAT[k];
+  }
+
   // ------------------------------------------------------------------ the static decor: woods, reeds, scrub, rocks, wonders, veins
   let decor = null;
   const woods = []; // per instanced mesh: the tile of each copy, its distance from the tile's centre and its matrix, so towns can clear them
   function buildDecor() {
     if (decor) { scene.remove(decor); disposeTree(decor); }
     decor = new THREE.Group(); scene.add(decor); woods.length = 0;
-    const W = {}, add = (shape, i, x, z, sx, sy, sz, ry, color, sink = 0.03) => { if (riverAt(x, z) > 0.07) return; const [cx, cz] = pos(i), ch = Math.min(CHUNKS - 1, Math.max(0, Math.floor((x + X0 + 1) / (2 * X0 + 2) * CHUNKS))) + CHUNKS * Math.min(CHUNKS - 1, Math.max(0, Math.floor((z + Z0 + 1) / (2 * Z0 + 2) * CHUNKS))); (W[shape + "@" + ch] ??= []).push([i, Math.hypot(x - cx, z - cz), x, surf(x, z) - sink, z, sx, sy, sz, ry, color]); };
+    const lite = quality === "lo";
+    // the models are drawn up close, one mesh per kind holding only the copies near the point looked at (refill());
+    // elsewhere, and from afar (where a tree is a few pixels), the plain shapes stand in for them ("^")
+    const W = {}, add = (shape, i, x, z, sx, sy, sz, ry, color, sink = 0.03) => { if (riverAt(x, z) > 0.07) return; const [cx, cz] = pos(i), ch = shape.startsWith("m:") ? 0 : Math.min(CHUNKS - 1, Math.max(0, Math.floor((x + X0 + 1) / (2 * X0 + 2) * CHUNKS))) + CHUNKS * Math.min(CHUNKS - 1, Math.max(0, Math.floor((z + Z0 + 1) / (2 * Z0 + 2) * CHUNKS))); (W[shape + "@" + ch] ??= []).push([i, Math.hypot(x - cx, z - cz), x, surf(x, z) - sink, z, sx, sy, sz, ry, color]); };
     const tint = (hex, i, j, amt = 0.14) => { const c = new THREE.Color(hex), f = 1 + (hash(i, j, 41) - 0.5) * amt * 2; c.offsetHSL((hash(j, i, 43) - 0.5) * 0.03, 0, 0); return c.multiplyScalar(f); };
     const spot = (i, j, rmax = 0.82) => { const [x, z] = pos(i), a = hash(i, j, 3) * 6.283, d = Math.sqrt(hash(j, i, 9)) * rmax; return [x + Math.cos(a) * d, z + Math.sin(a) * d]; };
+    /** A tree: a model of its kind (one of several, picked by the spot) or the old trunk and crown; `dense`: the thick of the woods. */
+    const tree = (kind, i, j, x, z, s, color, dense) => {
+      const V = WOODS[kind], list = (lite ? V.lo : V.hi).filter(hasModel);
+      let d = dense ? "+" : "";
+      if (list.length) { const h = s * V.h; add("m:" + list[Math.floor(hash(i, j, 29) * list.length)] + d, i, x, z, h * V.w, h, h * V.w, hash(j, i, 5) * 6.283, color, 0.02); d += "^"; }
+      if (kind === "conifer") { add("trunk" + d, i, x, z, s * 0.15, s * 0.5, s * 0.15, 0, "#4e3a2a"); add("conifer" + d, i, x, z, s * 0.85, s * 2.3, s * 0.85, hash(j, i, 5) * 6, color, -s * 0.3); }
+      else if (kind === "palm") { add("trunk" + d, i, x, z, s * 0.14, s * 1.3, s * 0.14, 0, "#6b5236"); add("palm" + d, i, x, z, s, s * 1.7, s, hash(j, i, 5) * 6, color, 0); }
+      else { add("trunk" + d, i, x, z, s * 0.18, s * 0.7, s * 0.18, 0, "#5e4330"); add("broad" + d, i, x, z, s, s * 1.1, s, hash(j, i, 5) * 6, color, -s * 0.45); }
+    };
+    /** A rock, a bush, a reed bed, a cactus: one of the models `names` (`w` across, `h` high), else the shape. */
+    const thing = (names, shape, i, j, x, z, w, h, color) => {
+      const list = names.filter(hasModel), ry = hash(i, j, 5) * 6.283;
+      if (list.length) { const name = list[Math.floor(hash(j, i, 27) * list.length)], sz = GEO["m:" + name].userData.size, k = w / Math.max(sz.x, sz.z); add("m:" + name, i, x, z, k, h, k, ry, color, 0.02); shape += "^"; }
+      add(shape, i, x, z, w, h, w, ry, color);
+    };
+    const nTree = lite ? 5 : 7;
     for (let i = 0; i < N * N; i++) {
       const t = ST.terrain[i];
-      if (t === "forest") for (let j = 0; j < 7; j++) {
+      if (t === "forest") for (let j = 0; j < nTree; j++) {
         const [x, z] = spot(i, j), s = 0.21 + hash(i, j, 13) * 0.1, autumn = hash(i, j, 17) < 0.06;
-        add(j < 3 ? "trunk" : "trunk+", i, x, z, s * 0.18, s * 0.7, s * 0.18, 0, "#5e4330");
-        add(j < 3 ? "broad" : "broad+", i, x, z - 0, s, s * 1.1, s, hash(j, i, 5) * 6, tint(autumn ? "#9a8a2c" : hash(i, j, 19) < 0.5 ? "#4b7f33" : "#5a8a35", i, j), -s * 0.45);
-      } else if (t === "taiga") for (let j = 0; j < 7; j++) {
+        tree(hash(i, j, 21) < 0.15 ? "poplar" : "broad", i, j, x, z, s, tint(autumn ? "#9a8a2c" : hash(i, j, 19) < 0.5 ? "#4b7f33" : "#5a8a35", i, j), j >= 3);
+      } else if (t === "taiga") for (let j = 0; j < nTree; j++) {
         const [x, z] = spot(i, j), s = 0.2 + hash(i, j, 13) * 0.09;
-        add(j < 3 ? "trunk" : "trunk+", i, x, z, s * 0.15, s * 0.5, s * 0.15, 0, "#4e3a2a");
-        add(j < 3 ? "conifer" : "conifer+", i, x, z, s * 0.85, s * 2.3, s * 0.85, hash(j, i, 5) * 6, tint(hash(i, j, 19) < 0.5 ? "#2f5a3e" : "#3b6a48", i, j), -s * 0.3);
-      } else if (t === "jungle") for (let j = 0; j < 8; j++) {
+        tree("conifer", i, j, x, z, s, tint(hash(i, j, 19) < 0.5 ? "#2f5a3e" : "#3b6a48", i, j), j >= 3);
+      } else if (t === "jungle") for (let j = 0; j < nTree + 1; j++) {
         const [x, z] = spot(i, j), s = 0.23 + hash(i, j, 13) * 0.11, tall = hash(i, j, 23) < 0.35;
-        add(j < 3 ? "trunk" : "trunk+", i, x, z, s * 0.14, s * (tall ? 1.3 : 0.8), s * 0.14, 0, "#6b5236");
-        add((tall ? "palm" : "broad") + (j < 3 ? "" : "+"), i, x, z, s * (tall ? 1.0 : 1.15), s * (tall ? 1.7 : 1.0), s * (tall ? 1.0 : 1.15), hash(j, i, 5) * 6, tint(hash(i, j, 19) < 0.5 ? "#2c6a2c" : "#3f7f30", i, j), tall ? 0 : -s * 0.4);
+        tree(tall ? "palm" : "broad", i, j, x, z, tall ? s : s * 1.1, tint(hash(i, j, 19) < 0.5 ? "#2c6a2c" : "#3f7f30", i, j), j >= 3);
       } else if (t === "swamp") {
-        for (let j = 0; j < 5; j++) { const [x, z] = spot(i, j); add("reeds", i, x, z, 0.3, 0.3 + hash(i, j, 7) * 0.12, 0.3, hash(i, j, 5) * 6, tint("#7d8a3e", i, j)); }
-        for (let j = 5; j < 7; j++) { const [x, z] = spot(i, j); add("blob", i, x, z, 0.22, 0.18, 0.22, 0, tint("#40583a", i, j)); }
-      } else if (t === "desert") { for (let j = 0; j < 2; j++) if (hash(i, j, 31) < 0.45) { const [x, z] = spot(i, j); add("blob", i, x, z, 0.13, 0.09, 0.13, 0, tint("#8a8a4a", i, j)); } }
-      else if (t === "grass") { if (hash(i, 31) < 0.18) { const [x, z] = spot(i, 1), s = 0.3; add("trunk", i, x, z, s * 0.18, s * 0.7, s * 0.18, 0, "#5e4330"); add("broad", i, x, z, s, s * 1.1, s, 0, tint("#5f8f38", i, 1), -s * 0.45); } if (hash(i, 37) < 0.3) { const [x, z] = spot(i, 2); add("blob", i, x, z, 0.16, 0.12, 0.16, 0, tint("#6a8e3a", i, 2)); } }
-      else if (t === "hill") for (let j = 0; j < 2; j++) { const [x, z] = spot(i, j), s = 0.1 + hash(i, j, 7) * 0.12; add("rock", i, x, z, s * 1.3, s, s, hash(i, j, 5) * 6, tint("#9a8d7c", i, j, 0.1)); if (j === 0 && hash(i, 39) < 0.4) { const [x2, z2] = spot(i, 7), s2 = 0.26; add("trunk", i, x2, z2, s2 * 0.18, s2 * 0.7, s2 * 0.18, 0, "#5e4330"); add("broad", i, x2, z2, s2, s2 * 1.1, s2, 0, tint("#62853a", i, 7), -s2 * 0.45); } }
-      else if (t === "mountain" && hash(i, 35) < 0.5) { const [x, z] = spot(i, 0), s = 0.14 + hash(i, 0, 7) * 0.14; add("rock", i, x, z, s * 1.3, s, s, hash(i, 0, 5) * 6, tint("#958a7c", i, 0, 0.1)); }
-      else if (t === "tundra" && hash(i, 33) < 0.5) { const [x, z] = spot(i, 1); add("rock", i, x, z, 0.12, 0.09, 0.1, 0, "#9aa29a"); }
+        for (let j = 0; j < 5; j++) { const [x, z] = spot(i, j); thing(["reed"], "reeds", i, j, x, z, 0.3, 0.3 + hash(i, j, 7) * 0.12, tint("#7d8a3e", i, j)); }
+        for (let j = 5; j < 7; j++) { const [x, z] = spot(i, j); thing(["bush"], "blob", i, j, x, z, 0.24, 0.16, tint("#40583a", i, j)); }
+      } else if (t === "desert") { for (let j = 0; j < 2; j++) if (hash(i, j, 31) < 0.45) { const [x, z] = spot(i, j); if (hash(i, j, 33) < 0.5) thing(["cactus", "cactusS"], "blob", i, j, x, z, 0.1, 0.16, tint("#6f8a46", i, j)); else thing(["bush"], "blob", i, j, x, z, 0.15, 0.09, tint("#8a8a4a", i, j)); } }
+      else if (t === "grass") { if (hash(i, 31) < 0.18) { const [x, z] = spot(i, 1); tree("broad", i, 1, x, z, 0.3, tint("#5f8f38", i, 1), false); } if (hash(i, 37) < 0.3) { const [x, z] = spot(i, 2); thing(["bush"], "blob", i, 2, x, z, 0.2, 0.13, tint("#6a8e3a", i, 2)); } }
+      else if (t === "hill") for (let j = 0; j < 2; j++) { const [x, z] = spot(i, j), s = 0.1 + hash(i, j, 7) * 0.12; thing(["rockA", "rockB", "rockS"], "rock", i, j, x, z, s * 1.4, s * 0.8, tint("#9a8d7c", i, j, 0.1)); if (j === 0 && hash(i, 39) < 0.4) { const [x2, z2] = spot(i, 7); tree("broad", i, 7, x2, z2, 0.26, tint("#62853a", i, 7), false); } }
+      else if (t === "mountain" && hash(i, 35) < 0.5) { const [x, z] = spot(i, 0), s = 0.14 + hash(i, 0, 7) * 0.14; thing(["rockT", "rockT2", "rockB"], "rock", i, 0, x, z, s * 1.4, s * 1.1, tint("#958a7c", i, 0, 0.1)); }
+      else if (t === "tundra" && hash(i, 33) < 0.5) { const [x, z] = spot(i, 1); thing(["rockS"], "rock", i, 1, x, z, 0.14, 0.07, "#9aa29a"); }
     }
-    const SMALL = new Set(["trunk", "rock", "reeds", "blob"]), STILL = new Set(["rock", "blob"]), woodMat = swayMaterial(), stoneMat = new THREE.MeshLambertMaterial({ flatShading: true });
+    const SMALL = new Set(["trunk", "rock", "reeds", "blob", "m:rockS", "m:bush", "m:reed", "m:cactus", "m:cactusS"]), STILL = new Set(["rock", "blob"]), SOFT = new Set(["m:bush", "m:reed"]);
+    const woodMat = swayMaterial(), stoneMat = new THREE.MeshLambertMaterial({ flatShading: true }), woodFar = swayMaterial(true), stoneFar = new THREE.MeshLambertMaterial({ flatShading: true });
+    stoneFar.onBeforeCompile = sh => lodShader(sh, false); stoneFar.customProgramCacheKey = () => "stonefar";
     for (const [key, items] of Object.entries(W)) {
-      const kind = key.split("@")[0], shape = kind.replace("+", ""), m = new THREE.InstancedMesh(geo(shape), STILL.has(shape) ? stoneMat : woodMat, items.length);
-      m.userData.dense = kind.endsWith("+"); // the thick of the woods, drawn only nearer in
+      const kind = key.split("@")[0], shape = kind.replace("+", "").replace("^", ""), still = STILL.has(shape) || shape.startsWith("m:rock") || shape.startsWith("m:cactus");
+      const far = kind.includes("^"), mat = shape.startsWith("m:") ? modelMat(SOFT.has(shape) ? "softL" : still ? "plainL" : "swayL") : still ? (far ? stoneFar : stoneMat) : far ? woodFar : woodMat;
+      const m = new THREE.InstancedMesh(geo(shape), mat, items.length);
+      m.userData.dense = kind.includes("+"); // the thick of the woods, drawn only nearer in
+      m.userData.lod = shape.startsWith("m:") ? 1 : kind.includes("^") ? 2 : 0; // 1: the model, near; 2: its stand-in, far
+      if (m.userData.lod) m.customDepthMaterial = lodDepth(m.userData.lod === 1);
       m.castShadow = true; m.receiveShadow = true;
       const tiles = new Int32Array(items.length), off = new Float32Array(items.length);
       items.forEach(([i, d, x, y, z, sx, sy, sz, ry, c], k) => { tiles[k] = i; off[k] = d; tmpQ.setFromAxisAngle(Y_AXIS, ry); tmpM.compose(tmpP.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz)); m.setMatrixAt(k, tmpM); m.setColorAt(k, typeof c === "string" ? tmpC.set(c) : c); });
       m.userData.small = SMALL.has(shape); m.computeBoundingSphere();
-      woods.push({ m, tiles, off, base: m.instanceMatrix.array.slice() });
+      const w = { m, tiles, off, base: m.instanceMatrix.array.slice() };
+      if (m.userData.lod === 1) { w.colors = m.instanceColor.array.slice(); w.cleared = new Uint8Array(items.length); w.n = items.length; m.count = 0; m.frustumCulled = false; }
+      woods.push(w);
       decor.add(m);
     }
+    for (const w of woods) if (w.cleared) refill(w);
     // wonders shine; rich seams show as small crystals in their colour
     const P = parts();
     for (const w of ST.wonders || []) { const [x, z] = pos(w.i); P.add("gem", x, top(w.i) + 0.4, z, 0.45, 0.7, 0.45, 0, "#ffd84a", true); }
@@ -716,9 +793,10 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     need = true; reshadow();
   }
   /** Trees in the wind: each sways on its own beat, more at the crown than at the foot (the vertex shader; no cost on the CPU). */
-  function swayMaterial() {
+  function swayMaterial(far = false) {
     const m = new THREE.MeshLambertMaterial({ flatShading: true });
     m.onBeforeCompile = sh => {
+      if (far) lodShader(sh, false);
       sh.uniforms.uTime = U.uTime;
       sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
   #ifdef USE_INSTANCING
@@ -726,12 +804,26 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     float k = transformed.y * transformed.y; transformed.x += sw * 0.05 * k; transformed.z += sw * 0.03 * k; }
   #endif`);
     };
-    m.customProgramCacheKey = () => "sway";
+    m.customProgramCacheKey = () => (far ? "swayfar" : "sway");
     return m;
+  }
+  /** A kind of model tree (or rock) takes the copies within the LOD circle, the cleared ones left out. */
+  function refill(w) {
+    const L = U.uLod.value, R2 = L.z * L.z, a = w.m.instanceMatrix.array, c = w.m.instanceColor.array, B = w.base, C = w.colors;
+    let j = 0;
+    if (L.z > 0) for (let k = 0; k < w.n; k++) {
+      if (w.cleared[k]) continue;
+      const dx = B[k * 16 + 12] - L.x, dz = B[k * 16 + 14] - L.y;
+      if (dx * dx + dz * dz >= R2) continue;
+      for (let q = 0; q < 16; q++) a[j * 16 + q] = B[k * 16 + q];
+      c[j * 3] = C[k * 3]; c[j * 3 + 1] = C[k * 3 + 1]; c[j * 3 + 2] = C[k * 3 + 2]; j++;
+    }
+    w.m.count = j; w.m.instanceMatrix.needsUpdate = true; w.m.instanceColor.needsUpdate = true;
   }
   /** Woods give way to towns, works and roads. */
   function clearWoods(cleared) {
     for (const w of woods) {
+      if (w.cleared) { for (let k = 0; k < w.n; k++) { const r = cleared.get(w.tiles[k]); w.cleared[k] = r !== undefined && w.off[k] < r ? 1 : 0; } refill(w); continue; }
       const a = w.m.instanceMatrix.array; a.set(w.base);
       for (let k = 0; k < w.tiles.length; k++) { const r = cleared.get(w.tiles[k]); if (r !== undefined && w.off[k] < r) a.fill(0, k * 16, k * 16 + 16); }
       w.m.instanceMatrix.needsUpdate = true;
@@ -744,11 +836,17 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     const list = {};
     return {
       add(shape, x, y, z, sx, sy, sz, ry, color, glow = false) { (list[shape + (glow ? "*" : "")] ??= []).push([x, y, z, sx, sy, sz, ry, color]); },
+      /** A model (when the models are in) sized to w × h × d, or else `fallback()`; `lit`: its windows lit. */
+      model(name, x, y, z, w, h, d, ry, color, lit = false, fallback = null) {
+        const k = "m:" + name, sz = GEO[k]?.userData.size;
+        if (!sz) { fallback?.(); return false; }
+        (list[k + (lit ? "~" : "")] ??= []).push([x, y, z, w / sz.x, h, d / sz.z, ry, color]); return true;
+      },
       build() {
         const g = new THREE.Group();
         for (const [key, items] of Object.entries(list)) {
-          const glow = key.endsWith("*"), shape = glow ? key.slice(0, -1) : key;
-          const mat = glow ? new THREE.MeshStandardMaterial({ emissive: 0x8a5a00, emissiveIntensity: 2.4, roughness: 0.35, metalness: 0.4 }) : new THREE.MeshLambertMaterial({ flatShading: true });
+          const glow = key.endsWith("*"), lit = key.endsWith("~"), shape = glow || lit ? key.slice(0, -1) : key;
+          const mat = shape.startsWith("m:") ? modelMat(lit ? "lit" : "plain") : glow ? new THREE.MeshStandardMaterial({ emissive: 0x8a5a00, emissiveIntensity: 2.4, roughness: 0.35, metalness: 0.4 }) : new THREE.MeshLambertMaterial({ flatShading: true });
           const m = new THREE.InstancedMesh(geo(shape), mat, items.length);
           m.castShadow = !glow; m.receiveShadow = true;
           items.forEach(([x, y, z, sx, sy, sz, ry, c], k) => { tmpQ.setFromAxisAngle(Y_AXIS, ry); tmpM.compose(tmpP.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz)); m.setMatrixAt(k, tmpM); m.setColorAt(k, tmpC.set(c)); });
@@ -795,7 +893,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
   function buildDynamic() {
     if (dyn) { scene.remove(dyn); disposeTree(dyn, true); }
     dyn = new THREE.Group(); scene.add(dyn); flags.length = 0;
-    const chimneys = [];
+    const chimneys = [], plantSmoke = [], AR = new Tris();
     const owners = S.owners, roads = S.roads || [], cleared = new Map(), clear = (i, r) => cleared.set(i, Math.max(cleared.get(i) ?? 0, r));
     // roads: branches from the centres, as on the 2D map; railways with ballast, sleepers and two rails
     const R = new Tris(), lane = new THREE.Color("#dcecf6"), steam = new THREE.Color("#ffe8a8"), hubs = new Set(), joints = new Map();
@@ -837,11 +935,11 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
       // roofs in the nation's colour, muted and weathered towards terracotta so they sit in the scene
       const roofBase = new THREE.Color(color), hsl = {}; roofBase.getHSL(hsl);
       roofBase.setHSL(hsl.h, hsl.s * 0.55, clamp(hsl.l, 0.34, 0.52)).lerp(TERRA, 0.3);
-      const roofCss = roofBase.getStyle();
+      const roofCss = roofBase.getStyle(), litC = new Set(n.power?.centres ?? []); // §6.8 the centres the grid lights
       // the works on each centre stand around its edge; houses keep clear of them
       const spots = new Map(), onCentre = new Map();
       for (const b of n.buildings || []) {
-        if (b.kind === "housing" || !centres.includes(b.tile)) continue;
+        if (b.kind === "housing" || b.type === "airport" || !centres.includes(b.tile)) continue;
         const key = b.tile + ":" + b.type; if (onCentre.has(key)) { spots.set(b.id, null); continue; } onCentre.set(key, 1); // one of each kind is enough to see
         const k = onCentre.get(b.tile) ?? 0; onCentre.set(b.tile, k + 1);
         const a = k * 2.2 + 0.5, dd = 0.66 + (k % 2) * 0.1, [x, z] = pos(b.tile);
@@ -861,8 +959,11 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
           const w = (0.13 + hash(k, c) * 0.05) * (tier === 2 ? 0.95 : 1), L = w * (1.3 + hash(c, k, 7) * 0.4), floors = tier === 2 && k % 3 === 0 ? 2 : tier === 1 && k % 5 === 0 ? 1.5 : 1;
           const ht = (0.11 + hash(c, k, 5) * 0.04) * floors, y = surf(hx, hz) - 0.05, ry = -a + (hash(c, k, 9) < 0.5 ? 0 : Math.PI / 2);
           const roof = roofBase.clone().offsetHSL((hash(c, k, 11) - 0.5) * 0.04, 0, (hash(c, k, 13) - 0.5) * 0.1);
-          P.add("box", hx, y, hz, w, ht + 0.05, L, ry, WALLS[(c + k) % WALLS.length]);
-          P.add("gable", hx, y + ht + 0.05, hz, w * 1.18, w * 0.62, L * 1.1, ry, roof.getStyle());
+          const big = floors > 1 || (tier >= 1 && hash(c, k, 19) < 0.3);
+          if (!P.model(big ? "mansion" : "house", hx, y + 0.03, hz, w * 1.15, ht + w * 0.75, big ? L * 1.2 : L, ry, roof.getStyle(), litC.has(c))) {
+            P.add("box", hx, y, hz, w, ht + 0.05, L, ry, WALLS[(c + k) % WALLS.length]);
+            P.add("gable", hx, y + ht + 0.05, hz, w * 1.18, w * 0.62, L * 1.1, ry, roof.getStyle());
+          }
           if (hash(c, k, 15) < 0.55) {
             const [ox, oz] = turnXZ(w * 0.22, L * 0.28, ry), cy = y + ht + 0.05 + w * 0.2;
             P.add("box", hx + ox, cy, hz + oz, 0.035, w * 0.42, 0.035, ry, "#5a4a40");
@@ -871,6 +972,11 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
         }
         if (cap) { // the keep, its banners and the flag on top
           const y = surf(x, z) - 0.05;
+          if (P.model("keep", x, y, z, 0.32, 0.62, 0.32, 0.3, roofCss, litC.has(c))) { // a stone keep, round towers with roofs in the nation's colour, a hall
+            for (const [tx0, tz0] of [[0.27, 0.27], [-0.27, 0.27], [0.27, -0.27], [-0.27, -0.27]]) { const [ox, oz] = turnXZ(tx0, tz0, 0.3), tx = x + ox, tz = z + oz, ty = surf(tx, tz) - 0.05; P.model("hexTower", tx, ty, tz, 0.15, 0.36, 0.15, 0.3, roofCss); P.model("hexRoof", tx, ty + 0.36, tz, 0.19, 0.17, 0.19, 0.3, roofCss); }
+            { const [ox, oz] = turnXZ(0.06, -0.32, 0.3); P.model("mansion", x + ox, y + 0.02, z + oz, 0.34, 0.3, 0.2, 0.3 + Math.PI / 2, roofCss, litC.has(c)); }
+            flags.push(makeFlag(n, x, y + 0.6, z));
+          } else {
           P.add("box", x, y, z, 0.3, 0.12, 0.3, 0.3, "#b9ad96"); // a plinth
           P.add("box", x, y, z, 0.26, 0.6, 0.26, 0.3, "#cfc3aa");
           P.add("box", x, y + 0.56, z, 0.3, 0.04, 0.3, 0.3, "#bfb39c"); // a string course under the battlements
@@ -878,9 +984,10 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
           for (const [tx0, tz0] of [[0.27, 0.27], [-0.27, 0.27], [0.27, -0.27], [-0.27, -0.27]]) { const [ox, oz] = turnXZ(tx0, tz0, 0.3), tx = x + ox, tz = z + oz, ty = surf(tx, tz) - 0.05; P.add("cyl", tx, ty, tz, 0.1, 0.34, 0.1, 0, "#c9bda4"); P.add("cyl", tx, ty + 0.32, tz, 0.125, 0.04, 0.125, 0, "#bcae95"); P.add("cone", tx, ty + 0.36, tz, 0.15, 0.17, 0.15, 0, roofCss); }
           { const [ox, oz] = turnXZ(0.06, -0.3, 0.3); P.add("box", x + ox, y, z + oz, 0.3, 0.2, 0.16, 0.3, "#d8ccb2"); P.add("gable", x + ox, y + 0.2, z + oz, 0.34, 0.12, 0.18, 0.3 + Math.PI / 2, roofCss); }
           flags.push(makeFlag(n, x, y + 0.6, z));
+          }
         } else if (tier >= 1) { // a town's bell tower on its square
           const y = surf(x, z) - 0.03;
-          P.add("box", x, y, z, 0.13, 0.36, 0.13, 0.4, "#d6cab0"); P.add("box", x, y + 0.36, z, 0.15, 0.03, 0.15, 0.4, "#bcae95"); P.add("roof", x, y + 0.39, z, 0.15, 0.16, 0.15, 0.4, roofCss);
+          if (!P.model("tower", x, y, z, 0.17, 0.56, 0.19, 0.4, roofCss, litC.has(c))) { P.add("box", x, y, z, 0.13, 0.36, 0.13, 0.4, "#d6cab0"); P.add("box", x, y + 0.36, z, 0.15, 0.03, 0.15, 0.4, "#bcae95"); P.add("roof", x, y + 0.39, z, 0.15, 0.16, 0.15, 0.4, roofCss); }
         }
         else { const y = surf(x, z) - 0.03; P.add("cyl", x, y, z, 0.1, 0.07, 0.1, 0, "#8e8a82"); }
         if (tier === 2) { // a city wall with towers
@@ -889,16 +996,19 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
             const a0 = k / K * Math.PI * 2, a1 = (k + 1) / K * Math.PI * 2, am = (a0 + a1) / 2, mx = x + Math.cos(am) * Rw, mz = z + Math.sin(am) * Rw;
             if (surf(mx, mz) < 0.04) continue;
             const seg = 2 * Rw * Math.sin(Math.PI / K) + 0.02, wy = surf(mx, mz) - 0.08;
-            P.add("box", mx, wy, mz, 0.07, 0.24, seg, -am, STONE);
-            P.add("box", mx - Math.cos(am) * 0.012, wy + 0.24, mz - Math.sin(am) * 0.012, 0.045, 0.02, seg, -am, "#a69b87"); // the wall walk
-            for (const f of [-0.3, 0, 0.3]) { const ux = -Math.sin(am), uz = Math.cos(am), px = mx + ux * f * seg + Math.cos(am) * 0.022, pz = mz + uz * f * seg + Math.sin(am) * 0.022; P.add("box", px, wy + 0.24, pz, 0.026, 0.05, 0.05, -am, STONE); }
-            if (k % 3 === 0) { const tx = x + Math.cos(a0) * Rw, tz = z + Math.sin(a0) * Rw, ty = surf(tx, tz) - 0.08; P.add("cyl", tx, ty, tz, 0.13, 0.34, 0.13, 0, "#c2b7a2"); P.add("cyl", tx, ty + 0.32, tz, 0.16, 0.05, 0.16, 0, "#b2a690"); P.add("cone", tx, ty + 0.37, tz, 0.19, 0.16, 0.19, 0, roofCss); }
+            if (!P.model("wall", mx, wy, mz, 0.09, 0.29, seg, -am, STONE)) {
+              P.add("box", mx, wy, mz, 0.07, 0.24, seg, -am, STONE);
+              P.add("box", mx - Math.cos(am) * 0.012, wy + 0.24, mz - Math.sin(am) * 0.012, 0.045, 0.02, seg, -am, "#a69b87"); // the wall walk
+              for (const f of [-0.3, 0, 0.3]) { const ux = -Math.sin(am), uz = Math.cos(am), px = mx + ux * f * seg + Math.cos(am) * 0.022, pz = mz + uz * f * seg + Math.sin(am) * 0.022; P.add("box", px, wy + 0.24, pz, 0.026, 0.05, 0.05, -am, STONE); }
+            }
+            if (k % 3 === 0) { const tx = x + Math.cos(a0) * Rw, tz = z + Math.sin(a0) * Rw, ty = surf(tx, tz) - 0.08; if (P.model("hexTower", tx, ty, tz, 0.2, 0.38, 0.2, -a0, roofCss)) P.model("hexRoof", tx, ty + 0.38, tz, 0.24, 0.19, 0.24, -a0, roofCss); else { P.add("cyl", tx, ty, tz, 0.13, 0.34, 0.13, 0, "#c2b7a2"); P.add("cyl", tx, ty + 0.32, tz, 0.16, 0.05, 0.16, 0, "#b2a690"); P.add("cone", tx, ty + 0.37, tz, 0.19, 0.16, 0.19, 0, roofCss); } }
           }
         }
       }
       // works on the land (homes are counted in the towns above)
       for (const b of n.buildings || []) {
         if (b.kind === "housing") continue;
+        if (b.type === "airport") { airport(n, b, P, AR, clear); continue; } // §7.3b beside the town
         if (spots.get(b.id) === null) continue;
         const [x, z] = pos(b.tile), r = hash(b.id, 7) * 6.28, at0 = spots.get(b.id), X = at0 ? at0[0] : x, Z = at0 ? at0[1] : z, h = surf(X, Z) - 0.03;
         if (!at0) clear(b.tile, b.type === "field" || b.type === "salt_pan" || b.type === "palisade" ? 2 : 0.55);
@@ -909,7 +1019,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
         }
         switch (b.type) {
           case "field": { const [ox, oz] = turnXZ(0.42, 0.2, r); const fy = surf(x + ox, z + oz); P.add("cone", x + ox, fy - 0.02, z + oz, 0.13, 0.13, 0.13, 0, "#d8b85a"); P.add("cone", x + ox + 0.12, fy - 0.02, z + oz + 0.05, 0.1, 0.1, 0.1, 0, "#cfae50"); break; }
-          case "pen": for (let s = 0; s < 6; s++) { const a = s * Math.PI / 3 + Math.PI / 6, px = X + Math.cos(a) * 0.3, pz = Z + Math.sin(a) * 0.3; P.add("box", px, surf(px, pz) - 0.02, pz, 0.31, 0.07, 0.02, -a + Math.PI / 2, WOOD); } P.add("blob", X - 0.08, h, Z, 0.14, 0.11, 0.2, r, "#f0ece0"); P.add("blob", X + 0.1, h, Z + 0.08, 0.13, 0.1, 0.18, r + 1, "#6b4b33"); break;
+          case "pen": for (let s = 0; s < 6; s++) { const a = s * Math.PI / 3 + Math.PI / 6, px = X + Math.cos(a) * 0.3, pz = Z + Math.sin(a) * 0.3; if (!P.model("fence", px, surf(px, pz) - 0.02, pz, 0.31, 0.09, 0.03, -a + Math.PI / 2, WOOD)) P.add("box", px, surf(px, pz) - 0.02, pz, 0.31, 0.07, 0.02, -a + Math.PI / 2, WOOD); } P.add("blob", X - 0.08, h, Z, 0.14, 0.11, 0.2, r, "#f0ece0"); P.add("blob", X + 0.1, h, Z + 0.08, 0.13, 0.1, 0.18, r + 1, "#6b4b33"); break;
           case "pier": case "harbor": case "fish_dock": {
             const sea = NBS[b.tile].find(j => j >= 0 && isWater(j));
             if (sea === undefined || sea < 0) { P.add("box", X, h, Z, 0.24, 0.1, 0.18, r, "#9a7448"); P.add("gable", X, h + 0.1, Z, 0.27, 0.08, 0.2, r, "#7a5a40"); break; } // a river landing: a boat shed
@@ -919,7 +1029,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
             for (let f = -0.43 * big; f <= 0.43 * big; f += 0.055) P.add("box", cx + ux * f, 0.06, cz + uz * f, 0.17 * big, 0.014, 0.045, ry, hash(b.id, Math.round(f * 100)) < 0.5 ? "#a07a4c" : "#8d6a40");
             P.add("cyl", cx + ux * 0.43 * big, 0.06, cz + uz * 0.43 * big, 0.035, 0.07, 0.035, 0, "#4a3a2c");
             for (const s of [-1, 1]) for (const f of [0.6, 1.35]) { const px = x + ux * f + uz * 0.07 * s * big, pz = z + uz * f - ux * 0.07 * s * big; P.add("cyl", px, -0.15, pz, 0.03, 0.23, 0.03, 0, "#5e4330"); }
-            if (b.type === "harbor") { const wx = x + ux * 0.45, wz = z + uz * 0.45, wy = surf(wx, wz) - 0.04; P.add("box", wx, wy, wz, 0.3, 0.22, 0.22, ry, "#b9a682"); P.add("gable", wx, wy + 0.22, wz, 0.34, 0.14, 0.26, ry + Math.PI / 2, "#7a5a40"); P.add("box", cx + ux * 0.3, 0.08, cz + uz * 0.3, 0.03, 0.4, 0.03, 0, "#5e4330"); P.add("box", cx + ux * 0.3, 0.46, cz + uz * 0.3, 0.03, 0.03, 0.3, ry, "#5e4330"); }
+            if (b.type === "harbor") { const wx = x + ux * 0.45, wz = z + uz * 0.45, wy = surf(wx, wz) - 0.04; if (!P.model("mansion", wx, wy + 0.02, wz, 0.26, 0.34, 0.36, ry, "#7a5a40")) { P.add("box", wx, wy, wz, 0.3, 0.22, 0.22, ry, "#b9a682"); P.add("gable", wx, wy + 0.22, wz, 0.34, 0.14, 0.26, ry + Math.PI / 2, "#7a5a40"); } P.add("box", cx + ux * 0.3, 0.08, cz + uz * 0.3, 0.03, 0.4, 0.03, 0, "#5e4330"); P.add("box", cx + ux * 0.3, 0.46, cz + uz * 0.3, 0.03, 0.03, 0.3, ry, "#5e4330"); }
             if (b.type === "fish_dock") { const fx = x + ux * 0.5 + uz * 0.2, fz = z + uz * 0.5 - ux * 0.2, fy = surf(fx, fz) - 0.02; P.add("box", fx, fy, fz, 0.22, 0.12, 0.04, ry, WOOD); P.add("box", fx, fy + 0.12, fz, 0.24, 0.02, 0.06, ry, "#c9c2b0"); }
             break;
           }
@@ -933,10 +1043,33 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
           case "workshop": P.add("box", X, h, Z, 0.26, 0.14, 0.2, r, "#b9a07a"); P.add("gable", X, h + 0.14, Z, 0.29, 0.1, 0.23, r, "#6e5a44"); { const [ox, oz] = turnXZ(0.07, 0.05, r); P.add("box", X + ox, h + 0.14, Z + oz, 0.04, 0.14, 0.04, r, "#4a3c32"); } break;
           case "pit": P.add("cyl", X, h - 0.02, Z, 0.24, 0.05, 0.24, 0, "#4a3c2c"); P.add("roof", X, h + 0.02, Z, 0.2, 0.08, 0.2, r, "#8a6d48"); break;
           case "granary": P.add("cyl", X, h, Z, 0.2, 0.18, 0.2, 0, "#c8b48a"); P.add("cone", X, h + 0.18, Z, 0.26, 0.14, 0.26, 0, "#9b7448"); break;
-          case "grinder": P.add("cyl", X, h, Z, 0.2, 0.06, 0.2, 0, "#8e8a82"); P.add("cyl", X, h + 0.06, Z, 0.16, 0.05, 0.16, 0, "#a29d94"); P.add("box", X, h + 0.11, Z, 0.26, 0.025, 0.025, r, WOOD); P.add("box", X + 0.24, h, Z + 0.1, 0.12, 0.08, 0.1, r, "#e8dcc2"); break; // a millstone, its handle, a sack of flour
+          case "grinder": if (P.model("windmill", X, h - 0.02, Z, 0.26, 0.62, 0.34, r, roofCss)) { P.add("box", X + 0.2, h, Z + 0.12, 0.1, 0.07, 0.08, r, "#e8dcc2"); break; } // a windmill grinding (and a sack of flour)
+            P.add("cyl", X, h, Z, 0.2, 0.06, 0.2, 0, "#8e8a82"); P.add("cyl", X, h + 0.06, Z, 0.16, 0.05, 0.16, 0, "#a29d94"); P.add("box", X, h + 0.11, Z, 0.26, 0.025, 0.025, r, WOOD); P.add("box", X + 0.24, h, Z + 0.1, 0.12, 0.08, 0.1, r, "#e8dcc2"); break; // a millstone, its handle, a sack of flour
           case "herb_garden": for (let q = 0; q < 3; q++) { const [ox, oz] = turnXZ((q - 1) * 0.1, 0, r); P.add("box", X + ox, h, Z + oz, 0.06, 0.05, 0.26, r, ["#4f9a4a", "#7db35a", "#9a6ab0"][q]); } break;
           case "border_gate": for (const s of [-1, 1]) { const [ox, oz] = turnXZ(s * 0.17, 0, r); P.add("box", X + ox, h, Z + oz, 0.09, 0.36, 0.09, r, "#b5aa96"); P.add("roof", X + ox, h + 0.36, Z + oz, 0.11, 0.1, 0.11, r, roofCss); } P.add("box", X, h + 0.26, Z, 0.36, 0.06, 0.08, r, "#a69a84"); { const [ox, oz] = turnXZ(0.1, 0.24, r); P.add("box", X + ox, h, Z + oz, 0.14, 0.08, 0.12, r, "#a07a4a"); P.add("gable", X + ox, h + 0.12, Z + oz, 0.17, 0.06, 0.14, r, "#e2b13c"); } break;
-          case "watchtower": for (let q = 0; q < 4; q++) { const [ox, oz] = turnXZ(q % 2 ? 0.07 : -0.07, q < 2 ? 0.07 : -0.07, r); P.add("box", X + ox, h, Z + oz, 0.025, 0.5, 0.025, r, WOOD); } P.add("box", X, h + 0.42, Z, 0.2, 0.05, 0.2, r, "#7a5a3a"); P.add("roof", X, h + 0.47, Z, 0.24, 0.16, 0.24, r, roofCss); break;
+          case "watchtower": if (P.model("tower", X, h, Z, 0.2, 0.62, 0.23, r, roofCss)) break;
+            for (let q = 0; q < 4; q++) { const [ox, oz] = turnXZ(q % 2 ? 0.07 : -0.07, q < 2 ? 0.07 : -0.07, r); P.add("box", X + ox, h, Z + oz, 0.025, 0.5, 0.025, r, WOOD); } P.add("box", X, h + 0.42, Z, 0.2, 0.05, 0.2, r, "#7a5a3a"); P.add("roof", X, h + 0.47, Z, 0.24, 0.16, 0.24, r, roofCss); break;
+          case "power_plant": { // §6.8 a thermal plant: a brick hall, its boiler house, two tall chimneys smoking while it runs, a coal heap
+            const on = (n.power?.made ?? 0) > 0, L2 = (ox, oz) => { const [a, c] = turnXZ(ox, oz, r); return [X0 + a, Z0 + c]; }, X0 = at0 ? X : X - 0.42, Z0 = at0 ? Z : Z + 0.3;
+            const h0 = surf(X0, Z0) - 0.03;
+            P.add("box", X0, h0, Z0, 0.46, 0.2, 0.28, r, "#8d4b37");
+            for (let q = 0; q < 3; q++) { const [sx, sz] = L2(-0.15 + q * 0.15, 0); P.add("gable", sx, h0 + 0.2, sz, 0.15, 0.08, 0.3, r + Math.PI / 2, "#57524d"); }
+            { const [bx, bz] = L2(-0.1, 0.22); P.add("box", bx, h0, bz, 0.22, 0.3, 0.18, r, "#7c4231"); P.add("box", bx, h0 + 0.3, bz, 0.24, 0.02, 0.2, r, "#4b4744"); }
+            for (const ox of [0.02, 0.26]) { const [cx2, cz2] = L2(ox, 0.22), cy = surf(cx2, cz2) - 0.03; P.add("cyl", cx2, cy, cz2, 0.07, 0.86, 0.07, 0, "#a35a43"); P.add("cyl", cx2, cy + 0.74, cz2, 0.08, 0.04, 0.08, 0, "#e2dcd0"); if (on) plantSmoke.push(cx2, cy + 0.86, cz2); }
+            { const [hx2, hz2] = L2(-0.34, -0.06); P.add("blob", hx2, surf(hx2, hz2) - 0.04, hz2, 0.24, 0.1, 0.2, r, "#262422"); }
+            break;
+          }
+          case "hydro_dam": { // §6.8 a concrete dam across the river, its spillway foaming, a powerhouse on the bank
+            const [fx, fz, px2, pz2] = riverAcross(b.tile), across = Math.atan2(px2, pz2);
+            const banks = Math.max(ground(fx + px2 * 0.5, fz + pz2 * 0.5), ground(fx - px2 * 0.5, fz - pz2 * 0.5)), y0 = ground(fx, fz) - 0.14, top = Math.max(banks + 0.06, y0 + 0.22);
+            P.add("box", fx, y0, fz, 0.16, top - y0, 1.05, across, "#c9c5bb");
+            P.add("box", fx, top, fz, 0.2, 0.025, 1.1, across, "#a9a49a");
+            for (const sd of [-1, 1]) P.add("box", fx + px2 * 0.55 * sd, y0, fz + pz2 * 0.55 * sd, 0.24, top - y0 + 0.06, 0.08, across, "#b8b3a8");
+            P.add("box", fx + pz2 * 0.14, ground(fx, fz) + 0.005, fz - px2 * 0.14, 0.12, 0.02, 0.5, across, "#e8f2f4"); // foam below the spillway
+            { const bx = fx + px2 * 0.7, bz = fz + pz2 * 0.7, by = surf(bx, bz) - 0.03; P.add("box", bx, by, bz, 0.22, 0.15, 0.18, across, "#b8b2a6"); P.add("gable", bx, by + 0.15, bz, 0.24, 0.07, 0.2, across + Math.PI / 2, "#6e6a64"); }
+            clear(b.tile, 0.9);
+            break;
+          }
           default: P.add("box", X, h, Z, 0.22, 0.14, 0.2, r, "#c4b08a"); P.add("gable", X, h + 0.14, Z, 0.25, 0.1, 0.23, r, hooks.kindColor?.[b.kind] || "#7b6a55");
         }
       }
@@ -944,13 +1077,16 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     // barbarian camps: dark tents round a fire
     for (const hd of S.hordes || []) {
       const [x, z] = pos(hd.tile);
-      for (let k = 0; k < 5; k++) { const a = k * 1.256 + 0.4, tx = x + Math.cos(a) * 0.36, tz = z + Math.sin(a) * 0.36; P.add("cone", tx, ground(tx, tz) - 0.02, tz, 0.24, 0.26, 0.24, a, "#5b1e1a"); }
+      for (let k = 0; k < 5; k++) { const a = k * 1.256 + 0.4, tx = x + Math.cos(a) * 0.36, tz = z + Math.sin(a) * 0.36; if (!P.model("tent", tx, ground(tx, tz) - 0.02, tz, 0.32, 0.22, 0.26, -a, "#6b231d")) P.add("cone", tx, ground(tx, tz) - 0.02, tz, 0.24, 0.26, 0.24, a, "#5b1e1a"); }
       P.add("cone", x, ground(x, z) - 0.02, z, 0.1, 0.18, 0.1, 0, "#ff7a2f", true);
       clear(hd.tile, 0.6);
       addLabel(dyn, hd.tile, `☠ ${hd.name} · ${hd.strength}`, "horde", 1.0);
     }
+    powerGrid(P); airLinks();
+    if (AR.p.length) { const am = new THREE.Mesh(AR.geometry(), new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })); am.receiveShadow = true; dyn.add(am); }
     dyn.add(P.build());
     if (chimneys.length) dyn.add(smokeWisps(chimneys));
+    if (plantSmoke.length) dyn.add(smokeWisps(plantSmoke, "0.6, 0.59, 0.57", 1.8, 0.55));
     for (const f of flags) dyn.add(f.group);
     clearWoods(cleared);
     // names: a banner over each capital and town, as in the strategy games: its people in a badge of the nation's
@@ -964,6 +1100,115 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     }
     need = true; reshadow();
   }
+  /** §7.3b An airport: a runway on the flattest dry side of the town, just outside it, a terminal and a control tower
+   *  by it, a plane on the apron while it is open (a dirt strip while it is being built). */
+  function airport(n, b, P, AR, clear) {
+    const c = b.tile, [x, z] = pos(c), hc = ground(x, z);
+    let best = null, bs = Infinity;
+    for (let k = 0; k < 6; k++) {
+      const j = NBS[c][k]; if (j < 0) continue;
+      const [jx, jz] = pos(j), ux = (jx - x) / SQ3, uz = (jz - z) / SQ3, tx = -uz, tz = ux, mx = x + ux * 1.32, mz = z + uz * 1.32;
+      let sc = (isWater(j) ? 50 : 0) + ((S.roads?.[j] || 0) > 0 ? 12 : 0) + (S.owners[j] !== n.id ? 6 : 0);
+      for (const f of [-0.55, 0, 0.55]) { const g = surf(mx + tx * f, mz + tz * f); sc += Math.abs(g - hc) * 4 + (g < 0.04 ? 20 : 0) + riverAt(mx + tx * f, mz + tz * f) * 30; }
+      if (S.nations.some(o => o.capital === j || (o.settlements || []).some(st => st.tile === j))) sc += 40;
+      if (sc < bs) { bs = sc; best = [j, ux, uz, tx, tz, mx, mz]; }
+    }
+    if (!best) return;
+    const [j, ux, uz, tx, tz, mx, mz] = best, open = (n.air?.open_tiles ?? []).includes(c), L = 0.68;
+    if (!b.done) { ribbon(AR, mx - tx * L, mz - tz * L, mx + tx * L, mz + tz * L, 0.16, new THREE.Color("#8a7458"), 0.035); clear(j, 1.2); return; }
+    ribbon(AR, mx - tx * L, mz - tz * L, mx + tx * L, mz + tz * L, 0.17, new THREE.Color("#3b3d40"), 0.035);
+    const dash = new THREE.Color("#e9e6dc");
+    for (let f = -L + 0.12; f < L - 0.1; f += 0.16) ribbon(AR, mx + tx * f, mz + tz * f, mx + tx * (f + 0.07), mz + tz * (f + 0.07), 0.016, dash, 0.04);
+    for (const e of [-1, 1]) for (const s of [-0.05, -0.025, 0.025, 0.05]) { const f = e * (L - 0.06); ribbon(AR, mx + tx * f + ux * s, mz + tz * f + uz * s, mx + tx * (f - e * 0.07) + ux * s, mz + tz * (f - e * 0.07) + uz * s, 0.012, dash, 0.04); }
+    // the apron, the terminal and the tower, between the strip and the town
+    const ax = x + ux * 1.02, az = z + uz * 1.02, ry = Math.atan2(tx, tz);
+    ribbon(AR, ax - tx * 0.3, az - tz * 0.3, ax + tx * 0.3, az + tz * 0.3, 0.2, new THREE.Color("#55575a"), 0.033);
+    { const px = ax + tx * 0.16 - ux * 0.02, pz = az + tz * 0.16 - uz * 0.02, py = surf(px, pz) - 0.02; P.add("box", px, py, pz, 0.08, 0.08, 0.26, ry, "#dcd8cf"); P.add("box", px, py + 0.08, pz, 0.09, 0.012, 0.27, ry, "#6c7a84"); }
+    { const px = ax - tx * 0.22, pz = az - tz * 0.22, py = surf(px, pz) - 0.02; P.add("cyl", px, py, pz, 0.045, 0.3, 0.045, 0, "#d5d1c8"); P.add("cyl", px, py + 0.3, pz, 0.08, 0.055, 0.08, 0, "#7fb6cf", open); P.add("cyl", px, py + 0.355, pz, 0.09, 0.015, 0.09, 0, "#4a4d52"); }
+    if (open) P.add("plane", ax - tx * 0.02 + ux * 0.04, ground(ax, az) + 0.02, az - tz * 0.02 + uz * 0.04, 0.26, 0.26, 0.26, Math.atan2(-tz, tx), hooks.nationColor(n.id));
+    clear(j, 1.3);
+  }
+  /** §7.3b A nation's open airports joined by faint dashed arcs (its centres are joined by air). */
+  function airLinks() {
+    for (const n of S.nations) {
+      const open = (n.alive && n.founded && n.air?.open_tiles) || [];
+      for (let k = 1; k < open.length; k++) {
+        const a = at(open[0]), b = at(open[k]), L = a.distanceTo(b), pts = [];
+        for (let q = 0; q <= 32; q++) { const t = q / 32; pts.push(new THREE.Vector3().lerpVectors(a, b, t).setY(a.y + (b.y - a.y) * t + 0.5 + Math.sin(Math.PI * t) * (1.2 + L * 0.12))); }
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: hooks.nationColor(n.id), dashSize: 0.45, gapSize: 0.35, transparent: true, opacity: 0.55 }));
+        line.computeLineDistances(); dyn.add(line);
+      }
+    }
+  }
+  /** §6.8 Where a river crosses a tile: the point of its course nearest the centre, and the unit vector across it. */
+  function riverAcross(i) {
+    const [x, z] = pos(i);
+    let best = null, bd = Infinity;
+    for (const pts of riverPaths) for (let k = 0; k < pts.length - 1; k++) {
+      const [ax, az] = pts[k], [bx, bz] = pts[k + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+      const px = ax + dx * t, pz = az + dz * t, d = Math.hypot(px - x, pz - z);
+      if (d < bd) { bd = d; const L = Math.sqrt(L2); best = [px, pz, -dz / L, dx / L]; }
+    }
+    return best && bd < 1.2 ? best : [x, z, 1, 0];
+  }
+  /** §6.8 The power lines: from each nation's plants along its roads to the centres they light, a pylon on each
+   *  tile beside the road and wires sagging between; and a warm glow over each lit town (windows lit in its homes). */
+  function powerGrid(P) {
+    const roads = S.roads || [], wire = [], glow = [], OFF = [0.36, -0.24], PH = 0.55;
+    for (const n of S.nations) {
+      if (!n.alive || !n.founded || !n.power?.centres?.length || !(n.power.made > 0)) continue;
+      const lit = new Set(n.power.centres), hubs = new Set([n.capital, ...(n.settlements || []).map(s => s.tile)]);
+      const plants = (n.buildings || []).filter(b => b.done && (b.type === "power_plant" || b.type === "hydro_dam")).map(b => b.tile);
+      // the shortest ways from the plants along roads (the grid follows the roads)
+      const prev = new Map(plants.map(t => [t, -1])), queue = [...plants];
+      for (let q = 0; q < queue.length; q++) for (const j of NBS[queue[q]]) if (j >= 0 && !prev.has(j) && !isWater(j) && (hubs.has(j) ? S.owners[j] === n.id : (roads[j] || 0) > 0)) { prev.set(j, queue[q]); queue.push(j); }
+      const edges = [], seen = new Set();
+      for (const c of lit) { if (!prev.has(c)) continue; for (let t = c; prev.get(t) >= 0; t = prev.get(t)) { const a = prev.get(t), key = Math.min(a, t) + ":" + Math.max(a, t); if (seen.has(key)) break; seen.add(key); edges.push([a, t]); } }
+      // a pylon on each tile of the lines, beside the road, its arm across their way; in a town, one at its edge towards each line
+      const way = new Map(), poles = new Map();
+      for (const [a, b] of edges) for (const [u, v] of [[a, b], [b, a]]) { const [ux, uz] = pos(u), [vx, vz] = pos(v), D = Math.hypot(vx - ux, vz - uz) || 1, e = way.get(u) ?? [0, 0]; e[0] += (vx - ux) / D; e[1] += (vz - uz) / D; way.set(u, e); }
+      const pole = (t, other) => {
+        const key = hubs.has(t) ? t + ">" + other : String(t);
+        if (poles.has(key)) return poles.get(key);
+        const [x0, z0] = pos(t);
+        let x, z, dx, dz;
+        if (hubs.has(t)) { const [ox, oz] = pos(other); dx = ox - x0; dz = oz - z0; const D = Math.hypot(dx, dz) || 1; x = x0 + dx / D * 0.98 + OFF[0] * 0.4; z = z0 + dz / D * 0.98 + OFF[1] * 0.4; }
+        else { [dx, dz] = way.get(t); x = x0 + OFF[0]; z = z0 + OFF[1]; }
+        const D = Math.hypot(dx, dz) || 1, ax = -dz / D, az = dx / D, y = ground(x, z) - 0.02;
+        P.add("pylon", x, y, z, 0.13, PH, 0.13, Math.atan2(-az, ax), "#6a6e73");
+        const p = [x, y + PH * 0.9, z, ax * 0.095, az * 0.095]; poles.set(key, p); return p;
+      };
+      for (const [a, b] of edges) {
+        const A = pole(a, b), B = pole(b, a);
+        const flip = A[3] * B[3] + A[4] * B[4] < 0 ? -1 : 1, L = Math.hypot(B[0] - A[0], B[2] - A[2]), sag = 0.04 + L * 0.03;
+        for (const sd of [-1, 1]) {
+          let px = A[0] + A[3] * sd, py = A[1], pz = A[2] + A[4] * sd;
+          for (let q = 1; q <= 8; q++) {
+            const t = q / 8, x = A[0] + A[3] * sd + (B[0] + B[3] * sd * flip - A[0] - A[3] * sd) * t, z = A[2] + A[4] * sd + (B[2] + B[4] * sd * flip - A[2] - A[4] * sd) * t, y = A[1] + (B[1] - A[1]) * t - sag * 4 * t * (1 - t);
+            wire.push(px, py, pz, x, y, z); px = x; py = y; pz = z;
+          }
+        }
+      }
+      for (const c of lit) if (S.owners[c] === n.id) { const [x, z] = pos(c); glow.push(x, top0(c) + 0.35, z); }
+    }
+    if (wire.length) {
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(wire, 3));
+      dyn.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x24272b, transparent: true, opacity: 0.9 })));
+    }
+    if (glow.length) dyn.add(townGlow(glow));
+  }
+  const top0 = i => top(i);
+  /** A warm light over each electrified town, seen from afar (added light, no shadow). */
+  function townGlow(src) {
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(src, 3));
+    const m = new THREE.Points(g, new THREE.ShaderMaterial({
+      uniforms: LIFE, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: "uniform float uScale;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = min(uScale * 2.6 / -mv.z, 512.0); }",
+      fragmentShader: "void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0; if (r >= 1.0) discard; float a = (1.0 - r) * (1.0 - r) * 0.22; gl_FragColor = vec4(vec3(1.0, 0.62, 0.28) * a, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
+    }));
+    m.frustumCulled = false; m.renderOrder = 3;
+    return m;
+  }
   // ------------------------------------------------------------------ life: chimney smoke and gulls, animated wholly on the GPU
   const LIFE = { uTime: U.uTime, uScale: { value: 400 }, uNear: { value: 1 } };
   function pointsMaterial(vs, fs) {
@@ -974,20 +1219,20 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     });
   }
   /** Wisps of smoke from the chimneys: a few puffs each, rising, drifting with the wind and fading; seen only up close. */
-  function smokeWisps(src) {
+  function smokeWisps(src, col = "0.8, 0.8, 0.78", big = 1, alpha = 0.32) {
     const K = 4, n = src.length / 3, P = new Float32Array(n * K * 3), PH = new Float32Array(n * K);
     for (let i = 0; i < n; i++) for (let k = 0; k < K; k++) { P.set([src[i * 3], src[i * 3 + 1], src[i * 3 + 2]], (i * K + k) * 3); PH[i * K + k] = k / K + hash(i, 5) * 0.37; }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(P, 3)); g.setAttribute("aPhase", new THREE.BufferAttribute(PH, 1));
     const m = new THREE.Points(g, pointsMaterial(`attribute float aPhase; varying float vA;
       void main() {
         float age = fract(uTime * 0.11 + aPhase);
-        vec3 p = position + vec3(age * 0.32 + sin(age * 5.0 + aPhase * 30.0) * 0.03, age * 0.75, age * 0.1);
+        vec3 p = position + vec3(age * 0.32 + sin(age * 5.0 + aPhase * 30.0) * 0.03, age * 0.75, age * 0.1) * ${big.toFixed(2)};
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
-        gl_PointSize = uScale * (0.07 + age * 0.24) / -mv.z;
-        vA = (1.0 - age) * smoothstep(0.0, 0.15, age) * 0.32 * uNear;
+        gl_PointSize = uScale * (0.07 + age * 0.24) * ${big.toFixed(2)} / -mv.z;
+        vA = (1.0 - age) * smoothstep(0.0, 0.15, age) * ${alpha.toFixed(2)} * uNear;
       }`, `varying float vA;
-      void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0, a = exp(-r * 3.0) * (1.0 - r) * vA; if (a <= 0.004) discard; gl_FragColor = vec4(vec3(0.8, 0.8, 0.78), a);
+      void main() { vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0, a = exp(-r * 3.0) * (1.0 - r) * vA; if (a <= 0.004) discard; gl_FragColor = vec4(vec3(${col}), a);
       #END
       }`));
     m.frustumCulled = false; m.renderOrder = 2; m.userData.life = true; life.push(m);
@@ -1059,7 +1304,10 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
   const RANK = { capital: 0, town: 1, horde: 2, wonder: 3 }, tmpV = new THREE.Vector3();
   function cullLabels() {
     const d = camera.position.distanceTo(controls.target);
-    for (const w of woods) w.m.visible = d < (w.m.userData.small ? 120 : w.m.userData.dense ? 170 : 1e9);
+    // the models only in the pieces of the map near the point looked at (their stand-ins elsewhere)
+    const L = U.uLod.value, R = d < MODEL_NEAR ? (quality === "lo" ? 4 + d * 0.45 : 5 + d * 0.48) : -1, t = controls.target;
+    if ((R > 0) !== (L.z > 0) || Math.hypot(t.x - L.x, t.z - L.y) > Math.max(1, R) * 0.2 || Math.abs(R - L.z) > Math.max(1, R) * 0.2) { L.set(t.x, t.z, R); for (const w of woods) if (w.cleared) refill(w); reshadow(); }
+    for (const w of woods) { const u = w.m.userData; w.m.visible = d < (u.small ? 120 : u.dense ? 170 : 1e9) && (u.lod !== 1 || w.m.count > 0); }
     for (const o of allLabels) if (o.parent) o.visible = d < (SHOW_AT[o.userData.kind] ?? 100);
     // a label that would cover one more important (or one placed before it) steps aside
     const W = container.clientWidth, H = container.clientHeight, placed = [];
@@ -1077,12 +1325,13 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
 
   // ------------------------------------------------------------------ what moves: caravans, boats, trains, people at work
   let movers = null, moveT0 = performance.now();
-  const SHAPES_OF = { walker: { person: 1 }, cart: { box: 1, blob: 3 }, train: { box: 4, cyl: 1 }, boat: { hull: 1, sail: 1, mast: 1 }, fishing: { hull: 1, sail: 1, mast: 1 }, moored: { hull: 1, mast: 1 } };
+  const SHAPES_OF = { plane: { plane: 1 }, walker: { person: 1 }, cart: { box: 1, blob: 3 }, train: { box: 4, cyl: 1 }, boat: { hull: 1, sail: 1, mast: 1 }, fishing: { hull: 1, sail: 1, mast: 1 }, moored: { hull: 1, mast: 1 } };
+  const SHIP_OF = { boat: { "m:shipL": 1 }, fishing: { "m:shipL": 1 }, moored: { "m:ship": 1 } }; // with the models: one ship each
   function buildMovers() {
     if (movers) { scene.remove(movers.group); disposeTree(movers.group); }
     const list = [];
     const rail = i => (S.roads?.[i] || 0) >= 4 && !isWater(i);
-    for (const c of S.caravans || []) if (c.path?.length > 1) list.push({ kind: c.mode === "water" ? "boat" : c.path.filter(rail).length * 2 >= c.path.length ? "train" : "cart", c, color: hooks.nationColor(c.from) });
+    for (const c of S.caravans || []) if (c.path?.length > 1) list.push({ kind: c.mode === "air" ? "plane" : c.mode === "water" ? "boat" : c.path.filter(rail).length * 2 >= c.path.length ? "train" : "cart", c, color: hooks.nationColor(c.from) });
     // §2.5 a train for each railway network: from the capital to the farthest centre the rails reach, and back
     for (const n of S.nations) {
       if (!n.alive || !n.founded || n.capital < 0) continue;
@@ -1112,13 +1361,14 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
       }
     }
     const counts = {};
-    for (const m of list) for (const [k, c] of Object.entries(SHAPES_OF[m.kind])) counts[k] = (counts[k] || 0) + c;
+    const ships = !!(GEO["m:ship"] && GEO["m:shipL"]);
+    for (const m of list) for (const [k, c] of Object.entries((ships && SHIP_OF[m.kind]) || SHAPES_OF[m.kind])) counts[k] = (counts[k] || 0) + c;
     const group = new THREE.Group(), meshes = {};
     for (const [k, c] of Object.entries(counts)) {
-      const m = new THREE.InstancedMesh(k === "mast" ? geo("cyl") : geo(k), new THREE.MeshLambertMaterial({ flatShading: true }), c);
+      const m = new THREE.InstancedMesh(k === "mast" ? geo("cyl") : geo(k), k.startsWith("m:") ? modelMat("plain") : new THREE.MeshLambertMaterial({ flatShading: true }), c);
       m.frustumCulled = false; m.castShadow = false; meshes[k] = m; group.add(m);
     }
-    movers = { list, group, meshes }; scene.add(group); moveT0 = performance.now();
+    movers = { list, group, meshes, ships }; scene.add(group); moveT0 = performance.now();
   }
   function dist(a, b) { const [ax, az] = pos(a), [bx, bz] = pos(b); return Math.hypot(ax - bx, az - bz); }
   function shoreOf(n, tile) {
@@ -1141,6 +1391,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     for (const k in M) idx[k] = 0;
     const put = (k, x, y, z, sx, sy, sz, ry, color) => { const m = M[k]; if (!m) return; tmpQ.setFromAxisAngle(Y_AXIS, ry); tmpM.compose(tmpP.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz)); m.setMatrixAt(idx[k], tmpM); m.setColorAt(idx[k]++, colorOf(color)); };
     const boat = (x, y, z, s, a, color, sail = true) => {
+      if (movers.ships) { const k = sail ? "m:shipL" : "m:ship", sz = GEO[k].userData.size; put(k, x, y - 0.02 * s, z, 0.55 * s / sz.x, (sail ? 0.42 : 0.13) * s, 0.55 * s / sz.x, a + Math.PI, color); return; }
       put("hull", x, y, z, 0.5 * s, 0.28 * s, 0.26 * s, a, color);
       put("mast", x, y + 0.05, z, 0.02, 0.5 * s, 0.02, 0, "#4b3a2a");
       if (sail) put("sail", x - Math.cos(a) * 0.03, y + 0.12 * s, z + Math.sin(a) * 0.03, 0.2 * s, 0.46 * s, 0.04, a, "#f4efe2");
@@ -1159,6 +1410,12 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
         put("cyl", p.x + fx * 0.12, p.y + 0.2, p.z + fz * 0.12, 0.07, 0.14, 0.07, 0, "#16161a");
         for (let k = 1; k <= 2; k++) { const [q, b] = pointOnPath(path, f - k * back * dir); put("box", q.x, q.y + 0.06, q.z, 0.36, 0.17, 0.17, b, m.color); }
         if (near && animOn && now - (m.smoke || 0) > 260) { m.smoke = now; smoke.push(puff(new THREE.Vector3(p.x + fx * 0.12, p.y + 0.34, p.z + fz * 0.12), Math.floor(now / 260) % 97, "#e6e6e6", 0, 0.06, 1400, 0.45)); }
+        continue;
+      }
+      if (m.kind === "plane") { // §7.3b flying from one airport to the other along an arc
+        const c = m.c, span = Math.max(1, c.arrive - (c.depart ?? c.arrive - 1)), f = clamp(((S.tick - (c.depart ?? S.tick)) + turnPhase) / span, 0, 1), A = at(c.path[0]), B = at(c.path.at(-1)), L = A.distanceTo(B);
+        const x = A.x + (B.x - A.x) * f, z = A.z + (B.z - A.z) * f, y = A.y + (B.y - A.y) * f + 0.5 + Math.sin(Math.PI * f) * (1.2 + L * 0.12);
+        if (f < 1) put("plane", x, y, z, 0.42, 0.42, 0.42, Math.atan2(-(B.z - A.z), B.x - A.x), m.color); // landed: parked at the far airport
         continue;
       }
       if (m.kind === "cart" || (m.kind === "boat" && m.c)) {
@@ -1296,7 +1553,8 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     if (k === "t") { ev.preventDefault(); faceNorth(true); return; }
     if (k === "enter") { ev.preventDefault(); const r = el.getBoundingClientRect(), R = view(); hooks.onPick(tileAt({ clientX: r.left + R.x + R.w / 2, clientY: r.top + R.y + R.h / 2 })); }
   });
-  el.addEventListener("dblclick", ev => { const i = tileAt(ev); if (i >= 0) focus(i, true); });
+  // a double click zooms in 2× towards the point (shift: out)
+  el.addEventListener("dblclick", ev => { ev.preventDefault(); fly = null; zoomToward(ev); zoomVel += Math.log(ev.shiftKey ? 2 : 0.5); need = true; });
   el.addEventListener("contextmenu", ev => ev.preventDefault());
   // the wheel zooms smoothly, gliding on after the last notch, towards the point under the pointer
   let zoomVel = 0, zoomAnchor = null, lastNow = 0;
@@ -1304,19 +1562,26 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
   el.addEventListener("wheel", ev => {
     ev.preventDefault(); ev.stopImmediatePropagation(); // MapControls' own (instant) wheel zoom is not used
     const dy = ev.deltaMode === 1 ? ev.deltaY * 32 : ev.deltaMode === 2 ? ev.deltaY * 400 : ev.deltaY;
-    zoomVel += clamp(dy, -240, 240) * 0.0019;
+    // one notch of a mouse wheel (deltaY ≈ 100) is about 1.75×: from the whole world to a city in five notches;
+    // a trackpad's small deltas add up smoothly
+    zoomVel += clamp(dy, -240, 240) * 0.0056;
+    zoomToward(ev);
+    fly = null; need = true;
+  }, { capture: true, passive: false });
+  /** The wheel and the double click zoom about the point under the pointer. */
+  function zoomToward(ev) {
     const r = el.getBoundingClientRect();
     ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera); zoomPlane.set(Y_AXIS, -controls.target.y);
     const d = camera.position.distanceTo(controls.target), hit = ray.ray.intersectPlane(zoomPlane, zoomHit);
     zoomAnchor = hit && hit.distanceTo(controls.target) < d * 2 ? hit.clone() : controls.target.clone();
-    fly = null; need = true;
-  }, { capture: true, passive: false });
+  }
   function glideZoom(now) {
     if (!zoomVel) return;
     const dt = clamp((now - (lastNow || now)) / 16.7, 0.25, 4), step = zoomVel * (1 - Math.pow(0.78, dt));
     zoomVel -= step; if (Math.abs(zoomVel) < 2e-4) zoomVel = 0;
-    const d = camera.position.distanceTo(controls.target), k = clamp(d * Math.exp(step), controls.minDistance, controls.maxDistance) / d;
+    const d = camera.position.distanceTo(controls.target), far = ST ? Math.max(d, home().length() * 1.3) : controls.maxDistance; // fully out: the whole world, with a little room
+    const k = clamp(d * Math.exp(step), controls.minDistance, far) / d;
     if (Math.abs(k - 1) < 1e-6) { zoomVel = 0; return; }
     const A = zoomTmp.copy(zoomAnchor ?? controls.target); // a homothety about the anchor: it stays where it is on the screen
     camera.position.sub(A).multiplyScalar(k).add(A); controls.target.sub(A).multiplyScalar(k).add(A);
@@ -1369,7 +1634,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     fly = { t0: performance.now(), dur: 500, fromT: controls.target.clone(), toT: controls.target.clone(), fromC: camera.position.clone(), toC: controls.target.clone().add(toC) };
   }
   /** The + and − buttons and keys: the same glide as the wheel, about the middle of the view. */
-  function zoom(f) { fly = null; zoomAnchor = null; zoomVel += Math.log(1 / f); need = true; }
+  function zoom(f) { fly = null; zoomAnchor = null; zoomVel += Math.log(1 / f) * 1.5; need = true; } // the buttons' 1.6 is 2× here
   /** The part of the screen the docks leave free (container pixels). */
   function view() {
     const W = container.clientWidth, H = container.clientHeight, R = hooks.visibleRect?.();
@@ -1412,11 +1677,12 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
   function setQuality(q, keep = true) {
     if (q !== "hi" && q !== "lo") return quality;
     if (q === "hi" && !canPost) q = "lo";
-    quality = q;
+    const was = quality; quality = q;
     if (keep) try { localStorage.setItem("sm-3d-q", q); } catch { }
     U.uDetail.value = q === "hi" ? 1 : 0;
     if (q === "hi" && !post) post = createPost(renderer);
     if (q === "lo" && post) { post.dispose(); post = null; }
+    if (q !== was && ST && GEO["m:oak"]) { buildDecor(); if (S) buildDynamic(); } // Nhanh: fewer trees, fewer kinds
     need = true;
     return quality;
   }
@@ -1489,7 +1755,7 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
       if (x.isCSS2DObject) { x.element.remove(); const k = allLabels.indexOf(x); if (k >= 0) allLabels.splice(k, 1); }
       if (x.userData.life) { const k = life.indexOf(x); if (k >= 0) life.splice(k, 1); }
       if (x.geometry && !Object.values(GEO).includes(x.geometry)) x.geometry.dispose();
-      if (x.material) { const ms = Array.isArray(x.material) ? x.material : [x.material]; for (const m of ms) { if (!keepShared || !m.map) m.dispose(); } }
+      if (x.material) { const ms = Array.isArray(x.material) ? x.material : [x.material]; for (const m of ms) { if (m.userData.keep) continue; if (!keepShared || !m.map) m.dispose(); } }
     });
   }
 
@@ -1521,6 +1787,12 @@ vec3 bumpNormal(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDirection) 
     quality: q => (q === undefined ? quality : setQuality(q)),
   };
   setQuality(quality, false);
+  loadModels(geos => {
+    for (const [k, g] of Object.entries(geos)) GEO["m:" + k] = g;
+    if (ST) buildDecor();
+    if (S && ST) { buildDynamic(); buildMovers(); }
+    need = true;
+  });
   if (/[?&#]m3debug/.test(location.search + location.hash)) window.__m3 = { api: api3, camera, controls, renderer, scene }; // for checks in the browser only
   raf = requestAnimationFrame(frame);
   return api3;

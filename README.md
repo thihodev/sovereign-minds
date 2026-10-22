@@ -141,4 +141,4 @@ docs/RULES.md      bộ luật đầy đủ
 
 ## License
 
-MIT
+MIT. Mô hình 3D low-poly trong `web/vendor/models/` là của [Kenney](https://www.kenney.nl) (Hexagon Kit, Castle Kit, Nature Kit), giấy phép CC0 (xem `License.txt` cạnh mỗi bộ); Three.js theo giấy phép MIT.

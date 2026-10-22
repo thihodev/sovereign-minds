@@ -45,7 +45,7 @@ import { knownProsperity, prosperityRank } from "./prosperity.ts";
 import type { Runner } from "./runner.ts";
 
 const WEB = resolve("web");
-const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" };
+const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".glb": "model/gltf-binary" };
 
 function send(res: ServerResponse, code: number, body: unknown): void {
   const data = typeof body === "string" ? body : JSON.stringify(body);
@@ -137,8 +137,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         herds: n.alive && n.founded ? herdView(w, n) ?? null : null, // §6.4
         living: n.alive && n.founded ? livingStandard(w, n) : null, // §4.11
         treasury: n.alive && n.founded && n.treasury ? (() => { const t = n.treasury!; return { coin: Math.round((n.stock.coin || 0) * 10) / 10, tax: t.tax, tariff: t.tariff, last: t.last ?? null, lines: LINE_VI, fair: TREASURY.fair, safe: TREASURY.safe }; })() : null,
-        power: n.alive && n.founded ? powerView(w, n) ?? null : null, // §6.8
-        air: n.alive && n.founded ? airView(w, n) ?? null : null, // §7.3b
+        power: n.alive && n.founded ? (v => v && { ...v, centres: n.power?.centres ?? [] })(powerView(w, n)) ?? null : null, // §6.8 (+ the lit centres' tiles, for the 3D map)
+        air: n.alive && n.founded ? (v => v && { ...v, tiles: n.buildings.filter(b => b.type === "airport").map(b => b.tile), open_tiles: n.air?.open ?? [] })(airView(w, n)) ?? null : null, // §7.3b (+ tiles, for the 3D map)
         royals: n.alive && n.founded ? royalsView(w, n) : null,
         classes: n.alive && n.founded ? classView(w, n) : [],
         greats: n.alive && n.founded ? (n.greats ?? []).filter(g => g.dies > w.tick).map(g => ({ ...g, title: GREATS.kinds[g.kind]?.name, gift: GREATS.kinds[g.kind]?.desc, fromName: g.from !== undefined ? w.nations[g.from]?.name : undefined })) : [], // §4.12
