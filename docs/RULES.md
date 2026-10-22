@@ -1183,6 +1183,7 @@ Chiến tranh không phải một cuộc cãi nhau. Đã có chiến tranh là c
 - **Giá của hòa bình:**
   - **Không hòa trắng sớm.** Hòa ước không có cống nạp, không nhượng ô chỉ đề nghị được từ lượt thứ 5 tính từ khi giao tranh bắt đầu. Trước đó, muốn dừng thì hòa ước phải có điều khoản: cống nạp đáng ≥ 5 (theo giá thế giới) mỗi lượt trong ≥ 10 lượt (hoặc vĩnh viễn), hoặc nhượng ít nhất 1 ô. Đó là xin hàng.
   - **Bên thua bồi thường.** Khi hòa ước được ký mà một bên dẫn ≥ 8 điểm, bên thua bồi thường ngay cho bên thắng 1,2% mọi thứ trong kho (lương thực, hàng, tiền) cho mỗi điểm dẫn, tối đa 35%. Bên thua còn nhượng 1 ô biên giới cho mỗi 12 điểm dẫn, tối đa 3 ô, không bao giờ là trung tâm. Ô đã nhượng trong chính hòa ước được trừ vào số này. Điều khoản của hòa ước (cống nạp, nhượng ô) vẫn áp dụng thêm.
+  - **Bên thua không đặt điều kiện.** Bên đang bị dẫn ≥ 8 điểm không được đề nghị hòa mà bên thắng nộp cống hay nhượng đất; chỉ được đề nghị hòa trắng hoặc hòa mà chính mình là bên trả. Mỗi đề nghị hòa gửi tới một nước kèm `if_signed`: điểm chiến tranh, ai thắng, bên thua bồi thường bao nhiêu ngay khi ký, và nước nhận sẽ phải nộp gì.
   - **Hòa trắng có giá.** Hòa ước không có điều khoản mà không bên nào dẫn đủ 8 điểm: bên tuyên chiến mất 4 ổn định, vì máu đã đổ mà không được gì.
 - **Mỏi mệt:** ngay từ lượt đầu, bên kém ≥ 4 điểm mất 1 ổn định và thêm 1 bất mãn mỗi lượt. Từ lượt thứ 5, cả hai bên mất thêm 1 ổn định mỗi lượt (mục 7.4).
 - **AI thấy:** mục `wars` trong gói trạng thái cho mỗi cuộc chiến:

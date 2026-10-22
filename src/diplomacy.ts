@@ -179,6 +179,10 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const from = payerIsMe ? n.id : o.id;
       if (cede.some(i => world.tiles[i].owner !== from)) return "Chỉ nhượng được ô thuộc bên trả";
       if (t === "peace") { const early = peaceTooEarly(world, n.id, o.id, tribute, dur, cede); if (early) return early; }
+      if (t === "peace" && from === o.id && (Object.keys(tribute).length || cede.length)) { // §7.4b the beaten cannot dictate terms
+        const w = pendingOrActiveWar(world, n.id, o.id), out = w ? peaceOutlook(w, n.id) : null;
+        if (w && out?.winner === o.id) return `Đang thua ${Math.round(warSide(w, n.id).score * 10) / 10} – ${Math.round(warSide(w, o.id).score * 10) / 10} (bị dẫn ${Math.round(-out.lead * 10) / 10} điểm, từ ${WAR.decisive} là thua rõ): không thể đòi ${o.name} nộp cống hay nhượng đất. Chỉ đề nghị được hòa trắng hoặc hòa mà mình là bên trả (payer "me")`;
+      }
       const id = world.nextId++;
       world.treatyOffers.push({ id, from: n.id, to: o.id, type: t, duration: dur, tribute, cede, payer: from, tick });
       if (t === "peace") talk(world, n.id, o.id, "offer", `Đề nghị hòa #${id}: ${Object.keys(tribute).length || cede.length ? `${world.nations[from].name}${Object.keys(tribute).length ? ` nộp ${fmtGoods(world, tribute)} mỗi lượt` : ""}${cede.length ? `${Object.keys(tribute).length ? "," : ""} nhượng ${cede.length} ô` : ""}` : "hòa trắng, không điều khoản"}${dur ? `, thời hạn ${dur} lượt` : ", vĩnh viễn"}.`);

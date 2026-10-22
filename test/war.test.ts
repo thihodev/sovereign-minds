@@ -148,3 +148,24 @@ test("an unprovoked war costs reputation (a number, not NaN); the observation sh
   assert.ok(s.score && s.dead && s.peace_if_signed_now && s.white_peace_from, "score, dead and the price of peace");
   assert.ok(advice(w, b).some(x => /Đang chiến tranh với Nuoc An/.test(x.text)));
 });
+
+test("the beaten cannot dictate terms; a peace offer shows what signing it brings", async () => {
+  const { buildObservation } = await import("../src/ai/prompt.ts");
+  const w = neighbours("beaten-terms");
+  const [a, b] = w.nations;
+  const war = atWar(w);
+  war.tally![String(a.id)] = { score: 11, dead: 10, clashes: 2, battles: 1, tiles: 1, centres: 0, raids: 0 };
+  war.tally![String(b.id)] = { score: 2.5, dead: 16, clashes: 0, battles: 0, tiles: 0, centres: 0, raids: 0 };
+  while (w.tick < war.start + WAR.peaceAfter) turn(w, { 0: { labor: army(a, 0), actions: idle.actions }, 1: { labor: army(b, 0), actions: idle.actions } });
+  // Văn Lang, beaten, asks the winner to pay: refused
+  turn(w, { 1: { actions: [{ type: "treaty", to: a.name, kind: "peace", duration: 10, tribute: { coin: 6 }, payer: "them" }] } });
+  assert.ok(b.lastRejected.some(r => /Đang thua/.test(r.reason) && /payer "me"/.test(r.reason)), JSON.stringify(b.lastRejected));
+  assert.ok(!w.treatyOffers.some(o => o.from === b.id));
+  // terms it pays itself are fine, and the winner sees what signing brings
+  turn(w, { 1: { actions: [{ type: "treaty", to: a.name, kind: "peace", duration: 10, tribute: { coin: 6 }, payer: "me" }] } });
+  assert.deepEqual(b.lastRejected, []);
+  const off = (buildObservation(w, a) as { treaty_offers_to_me: Array<{ if_signed?: Record<string, string> }> }).treaty_offers_to_me[0];
+  assert.equal(off.if_signed?.winner, a.name);
+  assert.match(String(off.if_signed?.reparations_at_once), /Văn Lang gives \d+% of every good/);
+  assert.equal(off.if_signed?.you_pay, undefined);
+});

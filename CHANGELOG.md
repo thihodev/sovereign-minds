@@ -2,6 +2,10 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.49
+
+- **Bên thua không đặt điều kiện (§7.4b):** bên đang bị dẫn từ 8 điểm chiến tranh không còn đề nghị được hòa bắt bên thắng nộp cống hay nhượng đất (trước đây có thể, ví dụ bên thua 2,5 – 11 đòi bên thắng nộp 6 tiền mỗi lượt). Mỗi đề nghị hòa gửi tới AI kèm "nếu ký": điểm, ai thắng, bồi thường ngay bao nhiêu, mình phải nộp gì.
+
 ## v0.48
 
 - **Sân bay (§7.3b):** Hàng không (K23) thôi cộng +10% vận chuyển chung cho cả nước; máy bay giờ cần sân bay.
