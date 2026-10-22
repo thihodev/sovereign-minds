@@ -9,6 +9,13 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Phòng thủ quanh trạm +15%. Biên giới bớt căng 1 mỗi lượt cho mỗi bên có trạm. Sự cố biên giới ít đi 25%.
   - AI thấy trạm canh của mỗi bên trong `neighbours`; lời cố vấn gợi ý dựng ở biên giới đang căng.
 - **Không làm:** Kho muối (muối trong kho đã giữ thực phẩm, kho hàng không giới hạn chứa) và Ruộng nghỉ (ruộng không bạc màu nên ruộng nghỉ chỉ làm mất lương thực).
+- **0.44.1, bản đồ 3D vẽ lại, có chiều cao và chiều sâu:**
+  - Đất liền là một mặt địa hình liền mạch (không còn cột lục giác bậc thang): đồng bằng gợn nhẹ, đồi lượn sóng, dãy núi nhô dần lên từ chân tới đỉnh, đỉnh cao phủ tuyết, sườn dốc lộ đá; sông khoét lòng thung lũng và chảy.
+  - Bờ biển thoải xuống nước, có dải cát và bọt sóng; biển càng sâu càng tối, mặt nước gợn và lấp lánh; quanh bản đồ là mép đất cắt như sa bàn.
+  - Ánh sáng: nắng ấm chiếu xiên, trời xanh mát, bóng đổ mềm, tô bóng sườn núi và hõm thung lũng, sương mù xa, tone màu ACES, viền tối nhẹ quanh khung.
+  - Lãnh thổ, biên giới, mặt trận (vằn vàng đen), ô đang chọn, ô ghim và lớp phủ được vẽ ngay trên mặt đất nên không còn nổi lơ lửng hay chìm vào sườn đồi; biên giới là dải màu phát sáng, đọc được ở mọi mức phóng; lưới lục giác mờ chỉ hiện khi đến gần.
+  - Chi tiết: rừng lá rộng, rừng thông, rừng rậm, sậy đầm lầy, bụi sa mạc, đá trên đồi; ruộng có luống, ô muối, quảng trường lát đá; nhà có tường, mái, ống khói; thành phố có tường thành và tháp, thủ đô có thành lũy cắm cờ; đền, chợ, bến, trạm canh, giàn giáo; thuyền có buồm, tàu hỏa có vệt khói. Rừng nhường chỗ cho làng, công trình và đường.
+  - Đường và đường sắt bám theo mặt đất. Nhãn thủ đô kiểu băng rôn mang màu quốc gia. Vật nhỏ ẩn khi nhìn xa; máy chậm tự giảm độ phân giải để giữ khung hình.
 
 ## v0.43
 
