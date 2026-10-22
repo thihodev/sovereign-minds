@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.52";
+export const RULES_VERSION = "0.53";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -68,6 +68,16 @@ export const THRIVE = { min: 0.6, max: 1.1, foodRich: 2, foodRichBonus: 0.1, liv
 /** §4.2 Housing is a soft roof (v0.40): a people that lives well (thrive ≥ 1) still grows past it, at `slow` × the
  *  growth rate, up to `over` × its housing; crowding then shows in the standard of living and the restless provinces. */
 export const CROWD = { over: 1.1, slow: 0.1 };
+/** §4.2b People as in the real world (v0.53): with each era the land feeds and houses more — ploughs and irrigation,
+ *  towns and cities, machines — so the room of the land (the capital's natural shelter, settlements, hamlets) and the
+ *  hands a farm can use grow × `land[era]`; a people grows `rate[era]` a turn at most (many births and many deaths in
+ *  the early ages; medicine and sanitation spare the young later: × (1 + `medicine` × the nation's medicine)), and
+ *  never more than `max` of its number in one turn, nor more children than the food in store beyond a turn of eating feeds. */
+export const DEMOGRAPHY = {
+  land: [1, 1.2, 1.4, 2, 3, 5, 9, 18, 40, 60],
+  rate: [0.075, 0.075, 0.075, 0.075, 0.08, 0.085, 0.1, 0.14, 0.18, 0.16],
+  medicine: 0.5, max: 0.2,
+};
 /** §4.2 People by age and sex. A turn is ten years, so the groups move up one step a turn:
  *  children (0–9), youths (10–19), adults (20–49, a 30-year group: a third grows old each turn), elders (50+). */
 export const DEMO = {

@@ -23,7 +23,7 @@ import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, eraIndex, invName, recipeOf } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
-import { actionPoints, canSeeRes, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
+import { actionPoints, canSeeRes, landRoom, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween, warLead, warSide } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
 import { ROLES, type AIResponse, type Nation, type ResKey, type Role, type Tile, type War, type World } from "../types.ts";
@@ -132,7 +132,8 @@ function look(world: World, n: Nation): View {
   for (const b of n.buildings) {
     const e = buildingOf(world, b.type)?.effect; if (!b.done || !e?.farmSlots) continue;
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
-    farmSlots += e.farmSlots; farmFood += e.farmSlots * (e.farmFood || 0) * fertile * (b.type === "field" ? drought : 1);
+    const slots = Math.round(e.farmSlots * landRoom(m.era)); // §4.2b more hands on a farm each era
+    farmSlots += slots; farmFood += slots * (e.farmFood || 0) * fertile * (b.type === "field" ? drought : 1);
   }
   const wars = world.wars.filter(w => w.end === null && (w.a === n.id || w.b === n.id));
   const near = new Map<number, number>(owned.map(t => [t.i, 0]));
@@ -444,14 +445,13 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       spend("propose_invention", { name: idea.name, description: idea.description, prereqs: idea.prereqs, effects: [{ kind: "role_bonus", role: idea.role, percent: 10 }] });
     }
   }
-  // 5a. Customs (§4.2), looked at every 5 turns: more children when there is food and room, fewer
-  // when hunger looms; men to war, everyone when a war needs more hands than the men
+  // 5a. Customs (§4.2), looked at every 5 turns: men to war, everyone when a war needs more hands than the men
+  // (births are not the ruler's to order since v0.40)
   if (n.founded && tick % 5 === n.id % 5) {
-    const room = v.house - v.pop, fam = n.family ?? { births: "neutral", fighters: "all" };
-    const births = v.pop >= 40 && (capFood < v.need * 1.05 || v.food < v.need * 0.3) ? "limit" : room >= v.house * 0.2 && capFood > v.need * 1.3 ? "encourage" : "neutral";
+    const fam = n.family ?? { births: "neutral", fighters: "all" };
     const menOnly = { ...n, family: { ...fam, fighters: "men" } } as Nation;
     const fight = atWar && fighters(menOnly) < Math.max(n.labor.warrior, 10) ? "all" : "men";
-    if (births !== fam.births || fight !== fam.fighters) spend("family_policy", { births, fighters: fight });
+    if (fight !== fam.fighters) spend("family_policy", { fighters: fight });
   }
 
   // 5b. §4.10 a restless people: priests at home, a feast when the mood is low and the stores are full

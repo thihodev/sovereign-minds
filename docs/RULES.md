@@ -457,6 +457,26 @@ Kho khởi đầu: 40 lương thực, 10 gỗ, 10 đá, 5 đá lửa, 10 công c
 - **Người không được phân vai** tự động đi hái lượm.
 - Phân công mặc định lúc khởi đầu: 7 săn, 4 hái, 2 nghiên cứu, 1 chế tác.
 
+### 4.2b Dân số như thế giới thật (từ v0.53)
+
+Ngoài đời, dân số tăng theo công nghệ: thời đồ đá rất chậm, nông nghiệp nhanh hơn, y học và vệ sinh làm bùng nổ dân số. Giới hạn thật là đất và lương thực nuôi được bao nhiêu người.
+
+**Đất chứa và nuôi nhiều người hơn qua mỗi thời đại** (cày, tưới tiêu, thị trấn, thành phố, máy móc):
+
+| Thời đại | Đồ Đá Cũ | Đồ Đá Mới | Đồ Đồng | Đồ Sắt | Cổ Đại | Trung Đại | Cận Đại | Công Nghiệp | Hiện Đại | Nguyên Tử |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hệ số đất | ×1 | ×1,2 | ×1,4 | ×2 | ×3 | ×5 | ×9 | ×18 | ×40 | ×60 |
+| Tăng dân tối đa mỗi lượt | 7,5% | 7,5% | 7,5% | 7,5% | 8% | 8,5% | 10% | 14% | 18% | 16% |
+
+- **Chỗ ở:** chỗ trú tự nhiên ở thủ đô, chỗ ở của điểm định cư và thôn xóm trên đất (cả trần thôn xóm) đều nhân hệ số đất. Lều và các công trình có chỗ ở giữ nguyên.
+- **Ruộng, chuồng:** số nông dân một ruộng hay chuồng dùng được nhân hệ số đất. Ruộng 6 chỗ ở thời đồ đá có 240 chỗ ở thời Hiện Đại.
+- **Tốc độ tăng:** bảng trên là tỉ lệ của thời đại, nhân (1 + 0,5 × y học của nước), rồi nhân như cũ với (1 − dân/chỗ ở), mức sống tốt và độ màu mỡ (4.2).
+- **Hai giới hạn mới:**
+  - Mỗi lượt dân không tăng quá 20%.
+  - Dân không sinh thêm quá số người mà lương thực trong kho, sau khi đã trừ một lượt ăn, nuôi được.
+- **Kết quả:** một nước Hiện Đại có đủ ruộng có thể lên tới hàng nghìn, hàng chục nghìn người, tăng dần qua vài chục lượt. Thời đồ đá vẫn như trước.
+- **Thế giới đang chạy:** dân số giữ nguyên ở lượt cập nhật, rồi tăng dần theo luật mới.
+
 ### 4.3 Năng suất cơ bản (thời đồ đá, mỗi người mỗi lượt)
 
 | Vai | Sản lượng | Điều kiện |

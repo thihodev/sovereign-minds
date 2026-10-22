@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.53
+
+- **Dân số như thế giới thật (§4.2b):** trước đây chỗ ở là trần cứng và gần như không lớn theo thời đại. Vì vậy ở lượt 1099, thời Hiện Đại, các nước chỉ có vài trăm tới hơn một nghìn người.
+  - Mỗi thời đại, đất chứa và nuôi được nhiều người hơn: từ ×1 thời đồ đá tới ×40 thời Hiện Đại. Hệ số này nhân vào chỗ trú ở thủ đô, điểm định cư, thôn xóm, và số nông dân mỗi ruộng, mỗi chuồng.
+  - Tốc độ tăng dân theo thời đại: 7,5% mỗi lượt thời đồ đá, 18% thời Hiện Đại. Y học làm dân tăng nhanh hơn.
+  - Mỗi lượt dân không tăng quá 20%, và không sinh thêm quá số người kho lương thực nuôi được.
+  - Thời đồ đá không đổi. Thế giới đang chạy giữ dân số hiện có rồi tăng dần.
+- Bot thôi gửi lệnh phong tục sinh đẻ (đã không còn là việc của triều đình từ v0.40).
+
 ## v0.52
 
 - **Khu săn chung (§7.9), sáng kiến #26 của Hắc Sơn Quốc, trọng tài chấp thuận một phần:**

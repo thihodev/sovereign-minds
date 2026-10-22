@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT, FLOUR, RECIPES, type Recipe,
+  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -286,9 +286,15 @@ export function thrive(world: World, n: Nation): { factor: number; why: string[]
   else if (m.medicine > 0 || (n.stock.herbs || 0) >= n.population / 20) add(THRIVE.herbsBonus, "có thuốc men");
   return { factor: Math.round(Math.max(THRIVE.min, Math.min(THRIVE.max, f)) * 100) / 100, why };
 }
-export function growthFor(pop: number, roof: number): number {
+export function growthFor(pop: number, roof: number, rate = GROWTH.rate): number {
   if (pop >= roof) return 0;
-  return Math.min(roof - pop, Math.max(GROWTH.min, Math.floor(pop * GROWTH.rate * (1 - pop / roof))));
+  return Math.min(roof - pop, Math.max(GROWTH.min, Math.floor(pop * rate * (1 - pop / roof))));
+}
+/** §4.2b How much more the land houses and feeds in this era than in the first. */
+export const landRoom = (era: number): number => DEMOGRAPHY.land[Math.max(0, Math.min(DEMOGRAPHY.land.length - 1, era))];
+/** §4.2b A people's growth rate a turn in this era, as its medicine spares the young. */
+export function growthRate(era: number, medicine: number): number {
+  return DEMOGRAPHY.rate[Math.max(0, Math.min(DEMOGRAPHY.rate.length - 1, era))] * (1 + DEMOGRAPHY.medicine * medicine);
 }
 /** §4.2: how many housing buildings a nation may have, HOUSING.perCentre for the capital and each settlement. */
 /** §4.2 housing buildings allowed: HOUSING.perCentre per centre, plus what eras and inventions add per centre. */
@@ -301,10 +307,11 @@ export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
   const buildings = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
     .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
-  const hubs = new Set(centres(n)), hamletMax = HAMLET.max + HAMLET.perEra * eraIndex(n);
+  const era = eraIndex(n), land = landRoom(era), hubs = new Set(centres(n)), hamletMax = Math.round((HAMLET.max + HAMLET.perEra * era) * land);
   let hamlets = 0;
   for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += hamletRoom(t);
-  return { natural: START.naturalHousing, settlements: n.settlements.length * SETTLEMENT.housing, buildings, hamlets: Math.min(hamletMax, hamlets), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0 };
+  // §4.2b each era the land houses more: villages become towns, towns cities
+  return { natural: Math.round(START.naturalHousing * land), settlements: Math.round(n.settlements.length * SETTLEMENT.housing * land), buildings, hamlets: Math.min(hamletMax, Math.round(hamlets * land)), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0 };
 }
 export function housing(world: World, n: Nation): number {
   const p = housingParts(world, n);
@@ -1021,7 +1028,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   const volcano = world.wonders.find(w => w.key === "volcano");
   for (const b of n.buildings) {
     const e = buildingOf(world, b.type)?.effect; if (!buildingWorks(world, b) || !e?.farmSlots || farmers <= 0) continue;
-    const k = Math.min(farmers, e.farmSlots); farmers -= k;
+    const k = Math.min(farmers, Math.round(e.farmSlots * landRoom(m.era))); farmers -= k; // §4.2b more hands on a farm each era
     const fertile = volcano && b.type === "field" && dist(volcano.i, b.tile) <= 1 ? 2 : 1;
     const silt = (n.eventTimers.fertile || 0) > 0 ? 1 + FLOOD.fertile : 1; // §9.4 a flood leaves rich mud
     const bed = world.tiles[b.tile], alluvium = bed.delta ? 1 + RIVER.deltaBonus : bed.river ? 1 + RIVER.fieldBonus : 1; // §2.1
@@ -1178,8 +1185,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // v0.40: a soft roof (the people still grows, slower, past its housing) and growth as good as its life (thrive)
   const room = Math.floor(roof * CROWD.over), well = thrive(world, n).factor;
   const fert = fertility(n, m.caps.has(DEMO.marriageCap), bless), keep = breeding(n) * (shortage > 1e-9 ? fed * fed : 1) * bless;
-  const crowdGrow = before >= roof && well >= 1 ? Math.max(GROWTH.min, Math.floor(before * GROWTH.rate * CROWD.slow * well)) : 0;
-  const replace = n.population >= room ? 0 : d.aged * keep, grow2 = n.population >= room || surplus < GROWTH.surplus ? 0 : (before < roof ? growthFor(before, roof) * well : crowdGrow) * (1 + m.growth) * fert;
+  const rate = growthRate(m.era, m.medicine); // §4.2b as in the real world: faster with each era and with medicine
+  const crowdGrow = before >= roof && well >= 1 ? Math.max(GROWTH.min, Math.floor(before * rate * CROWD.slow * well)) : 0;
+  const replace = n.population >= room ? 0 : d.aged * keep, grow2 = n.population >= room || surplus < GROWTH.surplus ? 0 : Math.min(before * DEMOGRAPHY.max, Math.max(GROWTH.min, ((n.stock.food || 0) - need) / Math.max(0.5, m.foodPerPerson)), (before < roof ? growthFor(before, roof, rate) * well : crowdGrow) * (1 + m.growth) * fert);
   const want = replace + grow2;
   if (want > 0) {
     // Infants who do not live: the base rate is in the births already; medicine and herbs save more,
