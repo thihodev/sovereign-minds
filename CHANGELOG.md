@@ -12,6 +12,9 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - thời hạn đã thỏa thuận ("10 lượt, lượt 935–945");
   - chuyện gì đã xảy ra (đang hiệu lực, hết hạn, bị ai xé ở lượt nào, tan vỡ vì sao ở lượt nào);
   - cống nạp đã nộp trên tổng số lượt.
+- **0.42.1, cống nạp thấy được:**
+  - mỗi lượt cống nạp được nộp, cả hai nước nhận một dòng sự kiện ("Nộp cống cho X theo hiệp ước #id: 6 tiền (lượt 3/10)");
+  - cống nạp bằng tiền được ghi vào sổ thu chi ngân khố của cả hai bên (dòng "cống nạp (theo hiệp ước)").
 
 ## v0.41
 

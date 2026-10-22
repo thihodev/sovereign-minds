@@ -1,7 +1,7 @@
 // §7 Relations between nations: messages, treaties, trade, war, vassals.
 // Called by engine.step(); everything here is deterministic.
 
-import { importDuty, tollInCoin, tollRate } from "./treasury.ts";
+import { book, importDuty, tollInCoin, tollRate } from "./treasury.ts";
 import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
@@ -351,7 +351,15 @@ export function resolveRelations(ctx: DiploCtx): void {
       continue;
     }
     if (Object.keys(t.tribute).length && tick > t.start) {
-      if (has(A, t.tribute)) { for (const [k, q] of Object.entries(t.tribute)) { L.stock(A, k, -q, "tribute"); L.stock(B, k, q, "tribute"); } t.paid = (t.paid ?? 0) + 1; }
+      if (has(A, t.tribute)) {
+        for (const [k, q] of Object.entries(t.tribute)) { L.stock(A, k, -q, "tribute"); L.stock(B, k, q, "tribute"); }
+        t.paid = (t.paid ?? 0) + 1;
+        // §4.13 coin in the books of both treasuries, and a line for each side every turn it is paid
+        if (t.tribute.coin) { book(A, "out", "tribute", t.tribute.coin); book(B, "in", "tribute", t.tribute.coin); }
+        const what = fmtGoods(world, t.tribute), of = t.term ? `/${t.term}` : "";
+        A.lastEvents.push(`Nộp cống cho ${B.name} theo hiệp ước #${t.id}: ${what} (lượt ${t.paid}${of}).`);
+        B.lastEvents.push(`${A.name} nộp cống theo hiệp ước #${t.id}: ${what} (lượt ${t.paid}${of}).`);
+      }
       else { t.missed = (t.missed ?? 0) + 1; A.reputation = Math.max(0, A.reputation - TREATY.violationPenalty); B.lastEvents.push(`${A.name} không nộp đủ cống phẩm.`); A.lastEvents.push(`Không đủ hàng để nộp cống cho ${B.name}: uy tín −${TREATY.violationPenalty}.`); }
     }
   }

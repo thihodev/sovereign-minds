@@ -155,8 +155,13 @@ test("a peace after a long dispute is not torn up by the dispute before it; the 
   assert.ok(t.active, `the new peace holds (${t.endedBy ?? ""})`);
   assert.equal(t.term, 10);
   assert.ok(st.tension <= BORDER.afterPeace + 10 && (st.dispute ?? 0) < BORDER.treatyBreakAfter, `${st.tension} / ${st.dispute}`);
+  const coinB = b.stock.coin || 0, coinA = a.stock.coin || 0;
   turn(w); turn(w);
   assert.ok(t.active && (t.paid ?? 0) >= 1, `paid ${t.paid}`);
+  // the coin really moved, and both treasuries' books and events say so
+  assert.ok((a.stock.coin || 0) >= coinA + 6 * (t.paid ?? 0) - 30 && (b.stock.coin || 0) < coinB, `${coinA}→${a.stock.coin}, ${coinB}→${b.stock.coin}`);
+  assert.equal(b.treasury?.last?.out.tribute, 6); assert.equal(a.treasury?.last?.in.tribute, 6);
+  assert.ok(b.lastEvents.some(e => /Nộp cống cho Nuoc A/.test(e)) && a.lastEvents.some(e => /nộp cống theo hiệp ước/.test(e)));
   // a treaty falls only to a dispute it has lived through itself
   st.tension = 100; st.dispute = 0;
   for (let k = 0; k < BORDER.treatyBreakAfter + 1 && t.active; k++) { st.tension = 100; turn(w); }

@@ -20,7 +20,7 @@ export interface Treasury { tax: number; tariff: number; now: { in: Book; out: B
 /** The words for each line of the treasury's books. */
 export const LINE_VI: Record<string, string> = {
   tax: "thuế sản xuất", market: "thuế chợ biên giới", tariff: "thuế quan hàng nhập", toll: "phí qua đất", works: "công trình công cộng", roads: "phí đường",
-  cities: "thuế thị trấn, thành phố", trade: "nhận qua buôn bán, quà", officials: "lương quan lại", buy: "mua vật liệu", hire: "thuê nhân công", study: "nuôi học giả", duty: "thuế quan nộp nước khác", grant: "ban ơn các tầng lớp", start: "vốn lập quốc", leak: "thất thoát (kho đầy, quan lại tham ô)",
+  cities: "thuế thị trấn, thành phố", trade: "nhận qua buôn bán, quà", officials: "lương quan lại", buy: "mua vật liệu", hire: "thuê nhân công", study: "nuôi học giả", duty: "thuế quan nộp nước khác", grant: "ban ơn các tầng lớp", tribute: "cống nạp (theo hiệp ước)", start: "vốn lập quốc", leak: "thất thoát (kho đầy, quan lại tham ô)",
 };
 
 export const coin = (n: Nation) => n.stock.coin || 0;
