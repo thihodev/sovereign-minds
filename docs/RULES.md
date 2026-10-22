@@ -296,6 +296,17 @@ Lời cố vấn nhắc về biển giàu cá chưa khai thác, ngư trường v
 - biển nông (lượng cá, lượng cá hồi), biển sâu (có cá voi không);
 - đất bên kia biển, đất của các nước khác, trại man di.
 
+
+### 2.11b Trang sức (sáng kiến #21 của Hà Dương, chấp thuận một phần)
+
+Vàng, bạc, ngọc trai, hổ phách và ngọc giờ có một công thức dùng tới:
+- **Công thức `jewelry` (Trang sức):** 2 vàng **hoặc** 2 bạc, cộng 1 ngọc trai **hoặc** hổ phách **hoặc** ngọc → 1 Trang sức; 2 công, làm tại Bãi chế tác.
+- **Ai làm được:** mọi nước có năng lực `nhiệt-cao`, dù năng lực đó đến từ phát minh khung K1 (Lò nung nhiệt cao) hay từ phát minh riêng của nước đó. Không có phát minh riêng "Chế tác kim hoàn".
+- **Nguyên liệu thay thế:** với mỗi ô nguyên liệu, thợ dùng thứ đang có nhiều nhất trong kho (vàng hay bạc; ngọc trai, hổ phách hay ngọc).
+- **Là xa xỉ phẩm:** Trang sức là một loại xa xỉ riêng. Giữ ít nhất 0,005 × số dân (tối thiểu 1) thì mỗi lượt dân dùng hết chừng ấy và được +0,3 ổn định, trong trần chung +1,5 của mọi xa xỉ phẩm (2.11). Xa xỉ phẩm vốn không hư hỏng.
+- **Buôn bán:** giá gốc 35 (vàng 12, bạc 8, ngọc trai 12); giá thật theo chợ thế giới (6.3).
+
+AI thấy công thức trong `recipes` (mục `or` ghi nguyên liệu thay thế). Cố vấn nhắc khi kho có vàng hay bạc và đá quý mà chưa chế Trang sức.
 ### 2.13 Làng, thị trấn, thành phố
 
 Mỗi trung tâm (thủ đô, điểm định cư) ban đầu là **làng**. Nó lớn lên theo tỉnh của nó (§2.8).

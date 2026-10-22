@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.51
+
+- **Trang sức (§2.11b), sáng kiến #21 của Hà Dương, trọng tài chấp thuận một phần:**
+  - Công thức mới tại Bãi chế tác: 2 vàng hoặc 2 bạc + 1 ngọc trai, hổ phách hoặc ngọc → 1 Trang sức, 2 công.
+  - Mở cho mọi nước có năng lực `nhiệt-cao`, không cần phát minh riêng.
+  - Trang sức là một loại xa xỉ phẩm riêng (+0,3 ổn định khi đủ trong kho) và bán được giá cao.
+- Công thức giờ có thể nhận nguyên liệu thay thế (dùng thứ nhiều nhất trong kho) và mở theo năng lực. AI và trang Sản phẩm hiện đủ các lựa chọn đó.
+
 ## v0.50
 
 - **Chiến tranh là chuyện giữa hai người trị vì (§4.9, §7.4b):** bộ trưởng không còn gửi thư, cử chỉ, đề nghị hay hiệp ước tới nước đang đánh nhau với mình. Bộ trưởng chạy bằng bot không gửi thư hay cử chỉ nào nữa (trước đây cử chỉ "muốn hòa bình" của nó khiến hai bên tưởng đang nói chuyện).

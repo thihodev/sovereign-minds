@@ -434,6 +434,11 @@ export function advice(world: World, n: Nation): Advice[] {
     const sellers = known.filter(o => LUXURY.goods.some(g => surpluses(world, o).some(x => x.good === g))).map(o => o.name);
     say(1, `Xa xỉ phẩm: dân đang dùng ${lux.kinds.length ? lux.kinds.map(g => goodVi(world, g)).join(", ") : "không thứ nào"} (+${lux.stability} ổn định/lượt). Mỗi loại có đủ ${lux.need} trong kho cho thêm +${LUXURY.stability}/lượt (tối đa +${LUXURY.max}).${onLand.length ? ` Trên đất bạn có: ${onLand.join(", ")} (hái lượm, săn, đánh cá hay đào mỏ để lấy).` : ""}${sellers.length ? ` Mua của ${sellers.slice(0, 3).join(", ")}.` : ""}`);
   }
+  // §2.11b jewellery: gold or silver idle in the stores, a gem beside it, and the furnace to work them
+  if (n.founded && m.unlocked.has("jewelry") && !(n.crafts.jewelry > 0)) {
+    const metal = Math.max(n.stock.gold || 0, n.stock.silver || 0), gem = Math.max(n.stock.pearl || 0, n.stock.amber || 0, n.stock.gems || 0);
+    if (metal >= 2 && gem >= 1) say(1, `Có ${Math.floor(metal)} vàng/bạc và ${Math.floor(gem)} ngọc trai/hổ phách/ngọc: chế Trang sức tại Bãi chế tác ("crafts": {"jewelry": n}; 2 vàng hay bạc + 1 ngọc → 1 trang sức, 2 công). Trang sức là một loại xa xỉ riêng (+${LUXURY.stability} ổn định khi đủ ${lux.need}) và bán được giá cao.`);
+  }
 
   // §10.5 an idea for the world, now and then: the gods reward the ones they take up
   {

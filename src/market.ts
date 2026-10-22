@@ -32,7 +32,7 @@ export function wants(world: World, n: Nation): Record<string, number> {
   const m = mods(world, n), out: Record<string, number> = {};
   for (const rec of allRecipes(world)) {
     if (!n.inventions.includes(rec.needs) && !m.unlocked.has(rec.id)) continue;
-    for (const [g, q] of Object.entries(rec.input)) out[g] = (out[g] || 0) + q * MARKET.recipeWant;
+    for (const [g, q] of Object.entries(rec.input)) for (const x of [g, ...(rec.alt?.[g] ?? [])]) out[x] = (out[x] || 0) + q * MARKET.recipeWant / (1 + (rec.alt?.[g]?.length ?? 0)); // §2.11b stand-ins share the want
   }
   for (const g of LUXURY.goods) out[g] = (out[g] || 0) + n.population * LUXURY.want; // §2.11 every people likes fine things
   return out;

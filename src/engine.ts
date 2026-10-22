@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult,
-  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT, FLOUR,
+  TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -106,6 +106,16 @@ export function seaReach(world: World, n: Nation, tile: number): boolean {
 export const OPEN_MINE: ResKey[] = ["salt", "reeds", "marble", "ochre"];
 
 /** §2.11 Luxuries in store: each kind the people can enjoy this turn is used up and calms them. */
+/** §2.11b The goods a recipe takes from these stores now: each input, or the stand-in most in store; null if short. */
+export function recipeInput(n: Nation, rec: Recipe): Record<string, number> | null {
+  const out: Record<string, number> = {};
+  for (const [key, q] of Object.entries(rec.input)) {
+    const pick = [key, ...(rec.alt?.[key] ?? [])].filter(g => (n.stock[g] || 0) >= q - 1e-9 && !(g in out)).sort((a, b) => (n.stock[b] || 0) - (n.stock[a] || 0))[0];
+    if (!pick) return null;
+    out[pick] = q;
+  }
+  return out;
+}
 export function luxuries(world: World, n: Nation): { kinds: string[]; stability: number; need: number } {
   const need = Math.max(1, n.population * LUXURY.use);
   const kinds = LUXURY.goods.filter(g => (n.stock[g] || 0) >= need);
@@ -218,6 +228,7 @@ export function mods(world: World, n: Nation): Mods {
   m.medicine = Math.min(0.8, m.medicine);
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
+  for (const r of RECIPES) if (r.cap && m.caps.has(r.cap)) m.unlocked.add(r.id); // §2.11b a recipe open to a capability
   if (ownsWonder(world, n, "falls")) m.rp += 0.2;
   return m;
 }
@@ -1027,8 +1038,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
     if (!doneTypes.has(rec.building)) continue;
     for (let k = 0; k < want; k++) {
       if (craftWork < rec.work) break;
-      if (!Object.entries(rec.input).every(([key, q]) => (n.stock[key] || 0) >= q)) break;
-      for (const [key, q] of Object.entries(rec.input)) L.stock(n, key, -q, "craft");
+      const input = recipeInput(n, rec); // §2.11b what stands in for an input
+      if (!input) break;
+      for (const [key, q] of Object.entries(input)) L.stock(n, key, -q, "craft");
       for (const [key, q] of Object.entries(rec.output)) L.stock(n, key, q, "craft");
       craftWork -= rec.work;
     }

@@ -174,7 +174,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const live = w.nations.filter(n => n.alive && n.founded), g = (x: Record<string, number>) => Object.entries(x).map(([k, q]) => `${q} ${goodName(w, k)}`).join(" + ");
         const knows = (n: typeof live[number], needs: string, id: string) => n.inventions.includes(needs) || mods(w, n).unlocked.has(id);
         return {
-          recipes: allRecipes(w).map(r => ({ id: r.id, name: r.name, input: g(r.input), output: g(r.output), work: r.work, at: buildingOf(w, r.building)?.name ?? r.building, needs: invName(w, r.needs), custom: !!w.custom.recipes[r.id],
+          recipes: allRecipes(w).map(r => ({ id: r.id, name: r.name, input: Object.entries(r.input).map(([k, q]) => `${q} ${[k, ...(r.alt?.[k] ?? [])].map(x => goodName(w, x)).join("/")}`).join(" + "), output: g(r.output), work: r.work, at: buildingOf(w, r.building)?.name ?? r.building, needs: r.cap ? `năng lực ${r.cap} (vd. ${invName(w, r.needs)})` : invName(w, r.needs), custom: !!w.custom.recipes[r.id],
             makers: live.filter(n => knows(n, r.needs, r.id) && n.buildings.some(b => b.type === r.building && b.done)).map(n => n.name),
             know: live.filter(n => knows(n, r.needs, r.id)).map(n => n.name), tool: r.use ? `${r.use.role} +${Math.round(r.use.bonus * 100)}%, mỗi món cho ${r.use.per} người` : undefined })),
           buildings: allBuildings(w).map(b => ({ type: b.type, name: b.name, cost: g(b.cost), work: b.work, effect: buildingEffectText(b.effect), desc: b.desc, needs: invName(w, b.needs), custom: !!w.custom.buildings[b.type],
