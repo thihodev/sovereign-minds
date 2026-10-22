@@ -2242,7 +2242,40 @@
 
   // ---------------------------------------------------------------- Claude chat
   const log = $("#chatlog");
-  function msg(role, text) { const d = document.createElement("div"); d.className = `msg ${role}`; d.textContent = text; log.append(d); log.scrollTop = log.scrollHeight; return d; }
+  /** Claude's answers are Markdown: a small, safe renderer (everything escaped first) for bold, italic, code, lists,
+   *  headings, tables and paragraphs. */
+  function md(text) {
+    const inline = x => esc(x).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>");
+    const out = [], lines = String(text).replace(/\r/g, "").split("\n");
+    for (let k = 0; k < lines.length; k++) {
+      const l = lines[k];
+      if (/^\s*\|.*\|\s*$/.test(l) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[k + 1] || "")) { // a table
+        const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+        const head = cells(l), rows = []; k += 2;
+        while (k < lines.length && /^\s*\|.*\|\s*$/.test(lines[k])) rows.push(cells(lines[k++]));
+        k--;
+        out.push(`<table class="mdt"><thead><tr>${head.map(c => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+        continue;
+      }
+      const li = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(l);
+      if (li) {
+        const tag = li[1] ? "ol" : "ul", items = [];
+        while (k < lines.length) { const m = /^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/.exec(lines[k]); if (!m || (m[1] ? "ol" : "ul") !== tag) break; items.push(`<li>${inline(m[2])}</li>`); k++; }
+        k--; out.push(`<${tag}>${items.join("")}</${tag}>`); continue;
+      }
+      const h = /^#{1,6}\s+(.*)$/.exec(l);
+      if (h) { out.push(`<p><b>${inline(h[1])}</b></p>`); continue; }
+      if (!l.trim()) continue;
+      const para = [l]; while (k + 1 < lines.length && lines[k + 1].trim() && !/^\s*(?:[-*•]|\d+[.)])\s+|^#{1,6}\s|^\s*\|/.test(lines[k + 1])) para.push(lines[++k]);
+      out.push(`<p>${para.map(inline).join("<br>")}</p>`);
+    }
+    return out.join("");
+  }
+  function msg(role, text) {
+    const d = document.createElement("div"); d.className = `msg ${role}`;
+    if (role === "claude") { d.classList.add("md"); d.dataset.raw = text; d.innerHTML = md(text); } else d.textContent = text;
+    log.append(d); log.scrollTop = log.scrollHeight; return d;
+  }
   async function renderLogin() {
     const box = $("#claude-login"), st = await api("/api/claude").catch(e => ({ available: false, error: e.message }));
     const form = $("#chatform");
@@ -2294,7 +2327,7 @@
         let k; while ((k = buf.indexOf("\n\n")) >= 0) {
           const chunk = buf.slice(0, k); buf = buf.slice(k + 2);
           const ev = /event: (\w+)/.exec(chunk)?.[1], data = JSON.parse(/data: (.*)/.exec(chunk)?.[1] || "{}");
-          if (ev === "delta") { if (first) { out.textContent = ""; first = false; } out.textContent += data.text; log.scrollTop = log.scrollHeight; }
+          if (ev === "delta") { if (first) { out.dataset.raw = ""; first = false; } out.dataset.raw += data.text; out.innerHTML = md(out.dataset.raw); log.scrollTop = log.scrollHeight; }
           if (ev === "error") { out.className = "msg err"; out.textContent = data.error; }
         }
       }

@@ -13,7 +13,7 @@ import { backfillAnnals } from "./annals.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
 import { JUDGE_SYSTEM, JUDGE_SYSTEM_BATCH, judgeBatchPrompt, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
 import { IDEA_JUDGE_SYSTEM, ideaJudgePrompt, parseIdeaRulings } from "./ai/ideas.ts";
-import { migrate, invName } from "./catalog.ts";
+import { buildingOf, migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
 import { DEMO, RENAME_DECREE, SCHISM, TRAITS, TRAIT_BY_ID } from "./rules.ts";
@@ -713,6 +713,11 @@ export class Runner {
         const d = demo(n), hp = housingParts(w, n);
         lines.push(`  dân theo tuổi (nam/nữ): trẻ em ${d.m[0]}/${d.f[0]}, thiếu niên ${d.m[1]}/${d.f[1]}, trưởng thành ${d.m[2]}/${d.f[2]}, già ${d.m[3]}/${d.f[3]} | phong tục: ${DEMO.fighters[n.family?.fighters ?? "all"]} | chỗ ở ${housing(w, n)} (thủ đô ${hp.natural}, định cư ${hp.settlements}, lều ${hp.buildings}, thôn xóm ${hp.hamlets}/${hp.hamletMax}) | lao động ${workers(n)} | ${n.settlements.length} điểm định cư`);
         lines.push(`  lượt vừa rồi: ${bookLine(n)}`);
+        // the full facts, so the Watcher's adviser can answer outright: every building (and its state), the centres, what it runs
+        const kinds = new Map<string, { done: number; building: number }>();
+        for (const b of n.buildings) { const k = kinds.get(b.type) ?? { done: 0, building: 0 }; if (b.done) k.done++; else k.building++; kinds.set(b.type, k); }
+        lines.push(`  công trình (đủ, chính xác): ${[...kinds.entries()].map(([t, k]) => `${buildingOf(w, t)?.name ?? t} ×${k.done}${k.building ? ` (+${k.building} đang xây)` : ""}`).join(", ") || "không có"}`);
+        lines.push(`  trung tâm: ${[n.capital, ...n.settlements.map(s => s.tile)].map(c => `${c === n.capital ? n.capitalName : n.settlements.find(s => s.tile === c)?.name} (${["làng", "thị trấn", "thành phố"][n.urban?.[String(c)]?.tier ?? 0]})`).join(", ")} | ngân khố ${Math.round(n.stock.coin || 0)} | phát minh gần nhất: ${n.inventions.slice(-5).map(id => invName(w, id)).join(", ")}${n.power ? ` | điện: ${Math.round(n.power.share * 100)}% dân` : ""}${n.air ? ` | sân bay mở ${n.air.open.length}` : ""}${(n.outbreakUntil ?? -1) >= w.tick ? ` | đang có dịch ${n.disease ?? "plague"}` : ""}${n.ruler ? ` | người trị vì ${n.ruler} (lên ngôi sau nội chiến)` : ""}`);
       }
       if (n.lastThought) lines.push(`  suy nghĩ gần nhất (dữ liệu): "${n.lastThought.slice(0, 200)}"`);
     }

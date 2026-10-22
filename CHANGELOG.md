@@ -4,6 +4,11 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.57
 
+- **0.57.1, Chat Claude trả lời chắc chắn và gọn:**
+  - Câu trả lời hiện đúng định dạng: chữ đậm, gạch đầu dòng, danh sách số, bảng.
+  - Claude nhận dữ liệu đầy đủ hơn: mọi công trình của từng nước (kể cả đang xây), các trung tâm và cấp đô thị, ngân khố, phát minh gần nhất, điện, sân bay, dịch bệnh, người trị vì.
+  - Lời dặn mới: câu đầu là câu trả lời thẳng, mặc định dưới 120 từ. Thứ không có trong dữ liệu là không tồn tại, không rào đón "có lẽ", "rất có thể".
+
 - **Đất đã giữ là của mình mãi (§2.3):** bỏ luật "đất vượt giới hạn quản lý tự thành đất hoang" và luật "ô bị cắt rời 5 lượt thành vô chủ". Đất khai hoang, chiếm được hay được nhượng luôn là của nước đó; nước có thể đưa dân tới sống bất cứ lúc nào, không cần đợi quá tải mới đi chiếm đất mới.
 - Giới hạn quản lý giờ chỉ chặn việc khai hoang thêm (`claim_tile`). Bot thôi bỏ đất thừa.
 
