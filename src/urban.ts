@@ -3,9 +3,9 @@
 // capital and the Bronze Age, into a city. Towns and cities pay the treasury, think and craft more; the ruler may
 // set each one a focus (trade, learning, craft, faith, garrison) that doubles what it gives in that field.
 
-import { URBAN } from "./rules.ts";
+import { DEMOGRAPHY, URBAN } from "./rules.ts";
 import { buildingOf, eraIndex } from "./catalog.ts";
-import { buildingWorks, type Mods } from "./engine.ts";
+import { buildingWorks, landRoom, type Mods } from "./engine.ts";
 import type { Province } from "./provinces.ts";
 import type { Nation, World } from "./types.ts";
 
@@ -25,14 +25,15 @@ export function urbanNeeds(world: World, n: Nation, p: Province): { tier: number
   const works = n.buildings.filter(b => tiles.has(b.tile) && buildingWorks(world, b));
   const market = works.some(b => !!buildingOf(world, b.type)?.effect.market);
   const cur = tierAt(n, p.centre), keep = (k: number) => (cur >= k ? URBAN.keep : 1); // a grown place holds its tier a little below the bar
-  const town = URBAN.town, city = URBAN.city;
+  const town = URBAN.town, city = URBAN.city, big = Math.max(1, landRoom(eraIndex(n)) * DEMOGRAPHY.tierScale); // v0.56 a town of the modern age is bigger
+  const people = (k: 1 | 2) => Math.ceil((k === 1 ? town : city).people * big * keep(k));
   const townMiss = [
-    p.people < town.people * keep(1) ? `${Math.ceil(town.people * keep(1))} dân (có ${p.people})` : "",
+    p.people < people(1) ? `${people(1)} dân (có ${p.people})` : "",
     works.length < town.buildings ? `${town.buildings} công trình đang hoạt động (có ${works.length})` : "",
     p.way === null ? "lối về thủ đô" : "",
   ].filter(Boolean);
   const cityMiss = [
-    p.people < city.people * keep(2) ? `${Math.ceil(city.people * keep(2))} dân (có ${p.people})` : "",
+    p.people < people(2) ? `${people(2)} dân (có ${p.people})` : "",
     works.length < city.buildings ? `${city.buildings} công trình đang hoạt động (có ${works.length})` : "",
     market ? "" : "một Chợ",
     p.capital || p.way === "road" ? "" : "đường bộ nối về thủ đô",

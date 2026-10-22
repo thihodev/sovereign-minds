@@ -477,6 +477,13 @@ Ngoài đời, dân số tăng theo công nghệ: thời đồ đá rất chậm
 - **Kết quả:** một nước Hiện Đại có đủ ruộng có thể lên tới hàng nghìn, hàng chục nghìn người, tăng dần qua vài chục lượt. Thời đồ đá vẫn như trước.
 - **Thế giới đang chạy:** dân số giữ nguyên ở lượt cập nhật, rồi tăng dần theo luật mới.
 
+**Đồng ruộng và đô thị** (từ v0.56): ngoài đời, đồng ruộng thưa người, còn dân dồn về thị trấn và thành phố.
+- **Đất làm ruộng chứa ít người:** ô đất có ruộng, chuồng hay công trình sản xuất khác (bến cá, ruộng muối, lò gốm, nhà máy…) chỉ chứa 50% thôn xóm của ô đó, tức gia đình nông dân.
+- **Nông thôn vơi dần:** trần thôn xóm nhân thêm hệ số nông thôn theo thời đại: 1 (tới Đồ Sắt), 0,95 (Cổ Đại), 0,9, 0,8, 0,65, 0,5 (Hiện Đại), 0,45.
+- **Đô thị chứa phần đông:** thị trấn cộng thêm 12 chỗ ở, thành phố cộng 36 chỗ ở, nhân hệ số đất và hệ số đô thị hóa của thời đại. Hệ số đô thị hóa: 0 (đồ đá), 0,1 (Đồ Đồng), 0,15, 0,25, 0,3, 0,4, 0,6, 1 (Hiện Đại), 1,1. Thời Hiện Đại một thị trấn +480, một thành phố +1.440 chỗ ở.
+- **Ngưỡng lên thị trấn, thành phố** (2.13) nhân max(1, hệ số đất × 0,5). Thời Hiện Đại một thị trấn cần 1.200 người, một thành phố 3.000.
+- **Kết quả:** thời Hiện Đại khoảng 60% dân sống ở thủ đô, các điểm định cư, thị trấn và thành phố. Muốn đông dân thì phải nuôi các điểm định cư thành thành phố, và đặt ruộng tách khỏi nơi ở.
+
 ### 4.3 Năng suất cơ bản (thời đồ đá, mỗi người mỗi lượt)
 
 | Vai | Sản lượng | Điều kiện |

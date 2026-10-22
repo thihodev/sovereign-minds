@@ -6,8 +6,8 @@
 // the faction, and it leaves with its land. Reads of the World, except provinceTurn() and cedeProvince().
 
 import { dist } from "./hex.ts";
-import { CONNECT, HOUSING, OFFICIALS, PROVINCE, SETTLEMENT } from "./rules.ts";
-import { buildingWorks, hamletRoom, housingParts, mods } from "./engine.ts";
+import { CONNECT, DEMOGRAPHY, HOUSING, OFFICIALS, PROVINCE, SETTLEMENT } from "./rules.ts";
+import { buildingWorks, farmland, hamletRoom, housingParts, mods, urbanRoom } from "./engine.ts";
 import { buildingOf } from "./catalog.ts";
 import { links, nearestCentre, type Link } from "./connect.ts";
 import { urbanCalm, urbanTurn } from "./urban.ts";
@@ -56,20 +56,20 @@ export function provinces(world: World, n: Nation, ls: Map<number, Link> = links
   // housing: the centre's own shelter, the best housing buildings on its land (HOUSING.perCentre and the era's
   // slots each), hamlets on its land, the cave; buildings and hamlets scaled so the provinces sum to the nation's
   const parts = housingParts(world, n, owned), slots = HOUSING.perCentre + mods(world, n).housingSlots;
-  const homes = new Map<number, number[]>();
+  const homes = new Map<number, number[]>(), worked = farmland(world, n);
   for (const b of n.buildings) { const h = buildingWorks(world, b) ? buildingOf(world, b.type)?.effect.housing || 0 : 0; if (h > 0) homes.set(b.tile, [...(homes.get(b.tile) ?? []), h]); }
   const cave = world.wonders.find(w => w.key === "cave")?.i;
   const raw = cs.map(c => {
     const tiles = at.get(c)!;
     const roofs = tiles.flatMap(i => homes.get(i) ?? []).sort((a, b) => b - a).slice(0, slots).reduce((a, b) => a + b, 0);
-    const ham = tiles.reduce((s, i) => s + (i !== c && world.tiles[i].land ? hamletRoom(world.tiles[i]) : 0), 0);
+    const ham = tiles.reduce((s, i) => s + (i !== c && world.tiles[i].land ? hamletRoom(world.tiles[i]) * (worked.has(i) ? DEMOGRAPHY.farmland : 1) : 0), 0);
     return { roofs, ham, cave: cave !== undefined && tiles.includes(cave) ? parts.wonder : 0 };
   });
   const sum = (k: "roofs" | "ham") => raw.reduce((s, r) => s + r[k], 0);
   const fb = sum("roofs") ? parts.buildings / sum("roofs") : 0, fh = sum("ham") ? parts.hamlets / sum("ham") : 0;
   // §4.2b a settlement houses SETTLEMENT.housing × the era's factor, as the nation's own count has it
   const town = n.settlements.length ? parts.settlements / n.settlements.length : SETTLEMENT.housing;
-  const housing = cs.map((c, k) => (c === n.capital ? parts.natural : town) + raw[k].roofs * fb + raw[k].ham * fh + raw[k].cave);
+  const housing = cs.map((c, k) => (c === n.capital ? parts.natural : town) + urbanRoom(n, c) + raw[k].roofs * fb + raw[k].ham * fh + raw[k].cave); // v0.56 towns and cities hold the crowds
   const people = apportion(Math.max(0, Math.floor(n.population)), housing);
   const young = new Set(n.settlements.filter(s => world.tick - s.tick < CONNECT.grace).map(s => s.tile));
   return cs.map((c, k) => {

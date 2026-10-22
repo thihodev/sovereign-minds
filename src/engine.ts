@@ -304,19 +304,31 @@ export function isHousing(world: World, type: string): boolean { return (buildin
 /** §4.2 The families a land tile (not a centre) houses: by terrain, one more on a river. */
 export function hamletRoom(t: Tile): number { return (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0); }
 /** §4.2 Where the people live: the capital's natural shelter, settlements, housing buildings, hamlets on the land, the cave. */
-export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number } {
+/** v0.56 The tiles a nation works with a field, a pen or another production building: farmland, not homes. */
+export function farmland(world: World, n: Nation): Set<number> {
+  return new Set(n.buildings.filter(b => buildingOf(world, b.type)?.perTile).map(b => b.tile));
+}
+/** v0.56 What a town or city adds to its centre's housing in this era. */
+export function urbanRoom(n: Nation, centre: number): number {
+  const tier = n.urban?.[String(centre)]?.tier ?? 0, era = eraIndex(n);
+  if (!tier) return 0;
+  return Math.round((tier === 2 ? DEMOGRAPHY.city : DEMOGRAPHY.town) * landRoom(era) * DEMOGRAPHY.urban[Math.min(era, DEMOGRAPHY.urban.length - 1)]);
+}
+export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number; urban: number } {
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
   const buildings = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
     .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
-  const era = eraIndex(n), land = landRoom(era), hubs = new Set(centres(n)), hamletMax = Math.round((HAMLET.max + HAMLET.perEra * era) * land);
+  const era = eraIndex(n), land = landRoom(era), hubs = new Set(centres(n)), hamletMax = Math.round((HAMLET.max + HAMLET.perEra * era) * land * DEMOGRAPHY.rural[Math.min(era, DEMOGRAPHY.rural.length - 1)]);
+  const worked = farmland(world, n);
   let hamlets = 0;
-  for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += hamletRoom(t);
-  // §4.2b each era the land houses more: villages become towns, towns cities
-  return { natural: Math.round(START.naturalHousing * land), settlements: Math.round(n.settlements.length * SETTLEMENT.housing * land), buildings, hamlets: Math.min(hamletMax, Math.round(hamlets * land)), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0 };
+  for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += hamletRoom(t) * (worked.has(t.i) ? DEMOGRAPHY.farmland : 1);
+  // §4.2b each era the land houses more: villages become towns, towns cities; v0.56 towns and cities hold the crowds
+  const urban = [...hubs].reduce((s2, c) => s2 + urbanRoom(n, c), 0);
+  return { natural: Math.round(START.naturalHousing * land), settlements: Math.round(n.settlements.length * SETTLEMENT.housing * land), buildings, hamlets: Math.min(hamletMax, Math.round(hamlets * land)), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0, urban };
 }
 export function housing(world: World, n: Nation): number {
   const p = housingParts(world, n);
-  return p.natural + p.settlements + p.buildings + p.hamlets + p.wonder;
+  return p.natural + p.settlements + p.buildings + p.hamlets + p.wonder + p.urban;
 }
 /** §2.1 Fresh water near the capital: a river, a swamp, the hot spring or a well within RIVER.waterReach tiles. */
 export function freshWater(world: World, n: Nation): boolean {

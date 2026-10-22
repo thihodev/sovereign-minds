@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.55";
+export const RULES_VERSION = "0.56";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -77,6 +77,15 @@ export const DEMOGRAPHY = {
   land: [1, 1.2, 1.4, 2, 3, 5, 9, 18, 40, 60],
   rate: [0.075, 0.075, 0.075, 0.075, 0.08, 0.085, 0.1, 0.14, 0.18, 0.16],
   medicine: 0.5, max: 0.2,
+  /** v0.56 fields and towns: a tile worked by a field, a pen or another production building houses only `farmland` of
+   *  its hamlet room (the farmers' families); the hamlets' cap is × `rural[era]` (the countryside empties as the towns
+   *  grow); a town houses +`town` and a city +`city` × the era's land factor × `urban[era]` more; the people a centre
+   *  needs to grow into a town or city is × max(1, land factor × `tierScale`). In the modern age about 60% of a people
+   *  lives in its towns and cities. */
+  farmland: 0.5,
+  rural: [1, 1, 1, 1, 0.95, 0.9, 0.8, 0.65, 0.5, 0.45],
+  urban: [0, 0, 0.1, 0.15, 0.25, 0.3, 0.4, 0.6, 1, 1.1],
+  town: 12, city: 36, tierScale: 0.5,
 };
 /** §4.2 People by age and sex. A turn is ten years, so the groups move up one step a turn:
  *  children (0–9), youths (10–19), adults (20–49, a 30-year group: a third grows old each turn), elders (50+). */

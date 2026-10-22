@@ -3,10 +3,10 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, CIVIL, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, CIVIL, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
-import { allBuildings, inv, invName } from "../catalog.ts";
-import { civilChance, civilStrength, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
+import { allBuildings, eraIndex, inv, invName } from "../catalog.ts";
+import { civilChance, civilStrength, landRoom, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
@@ -101,6 +101,9 @@ export function advice(world: World, n: Nation): Advice[] {
       const best = [...free.entries()].filter(([, k]) => k >= 2).sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 3);
       if (best.length) ways.push(`chiếm thêm đất cho thôn xóm (còn ${hp.hamletMax - hp.hamlets} chỗ): ${best.map(([i, k]) => `${xy(i)} +${k}`).join(", ")}`);
     }
+    // v0.56 the crowds live in the towns: a village that grows into a town or city houses many more
+    const era = eraIndex(n), townRoom = Math.round(DEMOGRAPHY.town * landRoom(era) * DEMOGRAPHY.urban[Math.min(era, DEMOGRAPHY.urban.length - 1)]);
+    if (townRoom > 0) ways.push(`cho làng lên thị trấn (+${townRoom} chỗ ở), thị trấn lên thành phố (+${Math.round(townRoom * DEMOGRAPHY.city / DEMOGRAPHY.town)}): đủ dân, đủ công trình, có đường về thủ đô, thành phố cần thêm Chợ`);
     say(2, `Dân ${n.population}/${roof} chỗ ở: hết chỗ thì dân chỉ tăng rất chậm (tối đa quá ${Math.round((CROWD.over - 1) * 100)}%) và mức sống giảm. Cách mở thêm: ${ways.join("; ") || "lập điểm định cư"}.`);
   }
 
@@ -419,7 +422,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const tv = urbanView(world, n, provinces(world, n));
     const idle = tv.find(x => x.tier !== "Làng" && !x.focus);
     if (idle) say(1, `${idle.tier} ${idle.centre} chưa có trọng tâm: đặt city_focus (trade: ×${URBAN.focus.trade.mult} tiền, learning: ×${URBAN.focus.learning.mult} nghiên cứu, craft, faith, garrison).`);
-    const near = tv.find(x => x.next && !x.next.startsWith("đủ") && x.people >= (x.tier === "Làng" ? URBAN.town.people : URBAN.city.people) * 0.7);
+    const near = tv.find(x => x.next && !x.next.startsWith("đủ") && x.people >= (x.tier === "Làng" ? URBAN.town.people : URBAN.city.people) * Math.max(1, landRoom(eraIndex(n)) * DEMOGRAPHY.tierScale) * 0.7);
     if (near) say(1, `${near.centre} sắp lớn lên: ${near.next}.`);
   }
 

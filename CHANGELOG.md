@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.56
+
+- **Đồng ruộng và đô thị (§4.2b):** dân không còn sống dày đặc trên đất ruộng.
+  - Ô đất có ruộng, chuồng hay công trình sản xuất chỉ chứa một nửa thôn xóm.
+  - Trần thôn xóm ở nông thôn giảm dần về sau (thời Hiện Đại còn một nửa).
+  - Thị trấn và thành phố chứa thêm nhiều người, nhiều hơn qua mỗi thời đại: thời Hiện Đại thị trấn +480, thành phố +1.440 chỗ ở.
+  - Ngưỡng lên thị trấn, thành phố tăng theo thời đại (thời Hiện Đại 1.200 và 3.000 người); không còn chuyện mọi trung tâm đều là thành phố.
+  - Thời Hiện Đại khoảng 60% dân sống ở đô thị. AI được biết luật mới; cố vấn chỉ cách nâng làng lên thị trấn, thành phố để có thêm chỗ ở.
+
 ## v0.55
 
 - **Nội chiến đẫm máu (§4.5b):**

@@ -56,3 +56,26 @@ test("the provinces' housing sums to the nation's in every era (no province crow
     assert.ok(!ps.some(p => p.causes.includes("crowded")), `${era}: no province crowded at the roof`);
   }
 });
+
+test("fields and towns: farmland houses fewer, towns and cities hold the crowds, a modern town needs more people", async () => {
+  const { housingParts, urbanRoom } = await import("../src/engine.ts");
+  const { urbanNeeds } = await import("../src/urban.ts");
+  const { provinces } = await import("../src/provinces.ts");
+  const w = founded("demo-urban"), [n] = w.nations;
+  n.era = "Hiện Đại";
+  for (const t of w.tiles) if (t.owner === n.id && t.i !== n.capital) t.terrain = "desert"; // room under the cap
+  const before = housingParts(w, n).hamlets;
+  const tile = w.tiles.find(t => t.owner === n.id && t.land && t.i !== n.capital)!;
+  n.buildings.push({ id: w.nextBuildingId++, type: "field", tile: tile.i, progress: 8, done: true, hp: 100 });
+  assert.ok(housingParts(w, n).hamlets < before, "a field takes half the tile's homes");
+  assert.equal(urbanRoom(n, n.capital), 0, "a village adds nothing");
+  n.urban = { [String(n.capital)]: { tier: 2, since: 0 } };
+  const city = urbanRoom(n, n.capital);
+  assert.equal(city, Math.round(DEMOGRAPHY.city * DEMOGRAPHY.land[8] * DEMOGRAPHY.urban[8]));
+  assert.ok(housing(w, n) >= before + city - 200);
+  const p = provinces(w, n)[0];
+  assert.ok(p.housing >= city, "the city's room is its province's");
+  n.urban = {};
+  const need = urbanNeeds(w, n, { ...p, people: 100 });
+  assert.ok(need.missing.some(m => /\d+ dân/.test(m) && Number(m.match(/(\d+) dân/)![1]) > 60), "a modern town needs more than 60 people");
+});
