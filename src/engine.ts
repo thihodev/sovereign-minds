@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  COMPACT, HOLD, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
+  COMPACT, HOLD, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, SURFACE_IRON, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -136,7 +136,7 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
     version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, hordes: newHordes(seed, gen.wild), registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
-    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 5,
+    treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 6,
   };
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
@@ -536,6 +536,9 @@ function validateFlag(world: World, n: Nation, raw: unknown): string | null {
 /** §2.2: a nation may rename once within RENAME.windowTicks ticks after it entered a new era. */
 /** §10.6 A renaming decree of the gods is in force. */
 export function renameDecreed(world: World): boolean { const d = world.renameDecree; return !!d && !d.done && world.tick >= d.from && world.tick <= d.until; }
+/** §5.6 Land that holds an era's resource for its gate: a real deposit (surface iron gravel does not count: it must be
+ *  mined into the store, §2.11a). */
+const gateDeposit = (t: Tile, res: string): boolean => (t.cap[res as ResKey] || 0) > 0 && !(res === "iron" && t.surfaceIron);
 export function renameOpen(world: World, n: Nation): boolean {
   if (renameDecreed(world)) return true;
   // §4.5b a new house may rename the nation once
@@ -868,7 +871,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   for (const t of world.tiles) {
     for (const k in t.cap) { // only the reserves this tile has
       // §2.11 meadow herbs and rock salt regrow slowly
-      const share = k === "herbs" && MEADOW_HERBS.terrains.includes(t.terrain) ? MEADOW_HERBS.regen : k === "salt" && ROCK_SALT.chance[t.terrain] ? ROCK_SALT.regen : REGEN[k as ResKey]; if (!share) continue;
+      const share = k === "herbs" && MEADOW_HERBS.terrains.includes(t.terrain) ? MEADOW_HERBS.regen : k === "salt" && ROCK_SALT.chance[t.terrain] ? ROCK_SALT.regen : k === "iron" && t.surfaceIron ? SURFACE_IRON.regen : REGEN[k as ResKey]; if (!share) continue;
       const cap = t.cap[k as ResKey] || 0, cur = t.res[k as ResKey] || 0;
       if (cap > 0 && cur < cap) L.tile(t, k as ResKey, Math.min(cap - cur, cap * share), "regen");
     }
@@ -1650,7 +1653,7 @@ export function eraReady(n: Nation, def: (typeof ERA_TABLE)[number], caps: Set<s
   if (!def.caps.every(c => caps.has(c))) return false;
   if (def.anyCap && !def.anyCap.some(c => caps.has(c))) return false;
   if (n.population < def.pop || n.settlements.length < (def.settlements ?? 0)) return false;
-  if (def.res && !owned.some(t => (t.cap[def.res as ResKey] || 0) > 0) && (n.stock[def.res] || 0) < ERA_RES_STOCK) return false;
+  if (def.res && !owned.some(t => gateDeposit(t, def.res!)) && (n.stock[def.res] || 0) < ERA_RES_STOCK) return false;
   return true;
 }
 /** What the next era still needs, in words (for the nation's observation and the Watcher). */
@@ -1661,7 +1664,7 @@ export function nextEraNeeds(world: World, n: Nation): { era: string; missing: s
   if (def.anyCap && !def.anyCap.some(c => caps.has(c))) missing.push(`một trong: ${def.anyCap.join(" / ")}`);
   if (n.population < def.pop) missing.push(`${def.pop} dân (có ${n.population})`);
   if (n.settlements.length < (def.settlements ?? 0)) missing.push(`${def.settlements} điểm định cư`);
-  if (def.res && !owned.some(t => (t.cap[def.res as ResKey] || 0) > 0) && (n.stock[def.res] || 0) < ERA_RES_STOCK) missing.push(`đất có ${goodName(world, def.res)} hoặc ${ERA_RES_STOCK} trong kho`);
+  if (def.res && !owned.some(t => gateDeposit(t, def.res!)) && (n.stock[def.res] || 0) < ERA_RES_STOCK) missing.push(`đất có ${goodName(world, def.res)} hoặc ${ERA_RES_STOCK} trong kho`);
   if ((n.living ?? 100) < eraLivingNeed(k)) missing.push(`mức sống ${eraLivingNeed(k)} (đang ${n.living})`); // §4.11
   return { era: def.name, missing };
 }

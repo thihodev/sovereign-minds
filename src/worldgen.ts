@@ -5,7 +5,7 @@
 
 import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
 import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
-import { MEADOW_HERBS, RIVER, ROCK_SALT, VEIN, WONDER_DEFS } from "./rules.ts";
+import { MEADOW_HERBS, RIVER, ROCK_SALT, SURFACE_IRON, VEIN, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
 const AX = Math.sqrt(3) / 1.5;
@@ -287,6 +287,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   seedMeadowHerbs(seedStr, tiles); // §2.11 a nation's idea
   seedRockSalt(seedStr, tiles); // §2.11 a nation's idea
   seedVeins(seedStr, tiles);
+  seedSurfaceIron(seedStr, tiles); // §2.11 a nation's idea (after the veins: surface iron is never a rich vein)
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
 }
 
@@ -387,6 +388,17 @@ export function seedRockSalt(seed: string, tiles: Tile[]): void {
     if (rand() >= p) continue;
     const x = ROCK_SALT.min + Math.floor(rand() * (ROCK_SALT.max - ROCK_SALT.min + 1));
     t.res.salt = (t.res.salt || 0) + x; t.cap.salt = (t.cap.salt || 0) + x;
+  }
+}
+
+/** §2.11 Surface iron (a nation's idea): iron gravel on some hills with no iron, so a people far from the iron
+ *  veins can still smelt some. */
+export function seedSurfaceIron(seed: string, tiles: Tile[]): void {
+  const rand = rngFor(seed, "surface-iron");
+  for (const t of tiles) {
+    if (t.terrain !== "hill" || (t.res.iron || 0) > 0 || (t.cap.iron || 0) > 0 || rand() >= SURFACE_IRON.chance) continue;
+    const x = SURFACE_IRON.min + Math.floor(rand() * (SURFACE_IRON.max - SURFACE_IRON.min + 1));
+    t.res.iron = x; t.cap.iron = x; t.surfaceIron = true;
   }
 }
 

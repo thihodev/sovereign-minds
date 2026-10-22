@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.60";
+export const RULES_VERSION = "0.61";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1137,6 +1137,10 @@ export const HERB_GARDEN = { near: 2, perCentre: 2, zones: ["temp", "trop"] as s
 export const GATE = { below: 10, value: 1.25, calm: 1 };
 
 // §2.11 Rock salt (a nation's idea, taken up in part): a seam of salt in some hills and deserts, regrowing very slowly
+// §2.11 Surface iron (Việt Phú's idea #30, taken up in part): iron gravel on `chance` of the hills with no iron
+// already, `min`–`max` of it, seen with the ore sense like any iron, mined like any iron (no rich-vein bonus), regrowing
+// `regen` of it a turn
+export const SURFACE_IRON = { chance: 0.1, min: 2, max: 6, regen: 0.01 };
 export const ROCK_SALT = { chance: { hill: 0.15, desert: 0.3 } as Record<string, number>, min: 20, max: 40, regen: 0.01 };
 
 // §7.9 Truce markets (a nation's idea, taken up in part): on a disputed border every completed trade also clears a

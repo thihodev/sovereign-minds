@@ -1553,7 +1553,7 @@
     const battles = (S.battles || []).filter(b => b.tile === i).slice().reverse();
     const tags = [t.river && "<span>Sông</span>", t.delta && "<span>Châu thổ</span>", !t.land && "<span>Biển</span>", t.road && `<span>🛤 ${esc(t.land ? S.roadLevels[t.road - 1].name : S.roadLevels[t.road - 1].lane)}</span>`,
       capOf && `<span>★ Thủ đô ${esc(capOf.capitalName || nationName(capOf))}</span>`, stl && `<span>🏕 ${esc(stl.name)}</span>`, inWild(i) && `<span class="warn">Vùng hoang</span>`, ST.herd?.includes(i) && "<span>🐂 Tuyến bò rừng</span>",
-      w && `<span class="good">⭐ ${esc(w.name)}</span>`, vein && `<span class="good">◆ Mạch ${esc(vein.name)}</span>`, !owner && `<span class="dim">Vô chủ</span>`].filter(Boolean);
+      w && `<span class="good">⭐ ${esc(w.name)}</span>`, vein && `<span class="good">◆ Mạch ${esc(vein.name)}</span>`, t.surfaceIron && `<span title="Sỏi sắt nằm trên mặt đồi: đào như mọi mỏ sắt, tái tạo chậm">⛏ Sắt nổi</span>`, !owner && `<span class="dim">Vô chủ</span>`].filter(Boolean);
     const el = document.createElement("div"); el.className = "insp-tile";
     el.innerHTML = `<div class="head"><span class="swatch" style="background:${TERRAIN[t.terrain][1]}"></span><div class="grow"><h3>${esc(TERRAIN[t.terrain][0])}</h3>
         <div class="meta">(${i % geo.N}, ${(i / geo.N) | 0}) · ${ZONE[t.zone]} · ${esc(REGION[t.region] || "ngoài khơi")}${typeof t.elev === "number" ? ` · cao ${t.elev.toFixed(2)}` : ""}</div></div>

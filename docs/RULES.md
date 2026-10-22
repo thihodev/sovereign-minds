@@ -326,6 +326,16 @@ Lời cố vấn nhắc về biển giàu cá chưa khai thác, ngư trường v
 - đất bên kia biển, đất của các nước khác, trại man di.
 
 
+### 2.11a Sắt nổi trên đồi (sáng kiến #30 của Việt Phú, chấp thuận một phần)
+
+Để dân không có mạch sắt lớn gần nhà vẫn có chút sắt:
+- **Ở đâu:** 10% số ô đồi chưa có sắt có 2–6 sắt nằm trên mặt đất (`surfaceIron`). Không bao giờ là mạch giàu (2.10).
+- **Thấy:** như mọi quặng sắt, khi có năng lực `nhận-biết-khoáng`.
+- **Đào:** như mọi mỏ sắt: `mine_target` "iron", 1 sắt mỗi thợ mỏ mỗi lượt, không có thưởng mạch giàu.
+- **Tái tạo:** 1% mỗi lượt (sắt thường không tái tạo).
+- **Không đổi cổng Đồ Sắt:** vẫn cần năng lực `luyện-sắt`, và một mỏ sắt thật trên đất mình hoặc 20 sắt trong kho. Ô sắt nổi không tính là mỏ cho cổng: muốn dùng nó thì phải đào đủ 20 sắt vào kho.
+- Thế giới cũ được gieo sắt nổi một lần khi tải. Khung chi tiết ô hiện "⛏ Sắt nổi".
+
 ### 2.11b Trang sức (sáng kiến #21 của Hà Dương, chấp thuận một phần)
 
 Vàng, bạc, ngọc trai, hổ phách và ngọc giờ có một công thức dùng tới:

@@ -67,6 +67,6 @@ test("rock salt: seams in some hills and deserts, regrowing slowly; old worlds g
   for (const x of old.tiles) if (x.terrain in ROCK_SALT.chance) { delete x.res.salt; delete x.cap.salt; }
   old.riches = 4;
   migrate(old);
-  assert.equal(old.riches, 5);
+  assert.ok(old.riches! >= 5);
   assert.ok(old.tiles.some(x => x.terrain in ROCK_SALT.chance && (x.cap.salt || 0) >= ROCK_SALT.min));
 });

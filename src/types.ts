@@ -38,6 +38,8 @@ export interface Tile {
   elev: number;
   river: boolean;
   delta: boolean;
+  /** §2.11 iron lying on the surface of a hill (a nation's idea): it regrows slowly */
+  surfaceIron?: true;
   /** Current reserves. */
   res: Partial<Record<ResKey, number>>;
   /** Starting reserves; renewable resources regrow up to this cap. */
