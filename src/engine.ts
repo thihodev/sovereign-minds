@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  COMPACT, RULES_VERSION, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
+  COMPACT, HOLD, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -38,6 +38,7 @@ import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
 import { aidLosses, aidStrength, civilShare, ravage } from "./civil.ts";
 import { fillsGap, territory } from "./compact.ts";
+import { unheld } from "./hold.ts";
 import { airPhase } from "./air.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
@@ -736,7 +737,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   }
 
   // 3. Labour, craft orders and actions
-  const claims: Array<{ n: Nation; tile: number }> = [];
+  const claims: Array<{ n: Nation; tile: number; from?: number }> = [];
   const explorers = new Map<number, number>();
   const ctx: DiploCtx = { world, tick, L, say, strikes: [], sent: new Set(), accepts: [], treatyAccepts: [] };
   const rioted = new Set<number>();
@@ -793,12 +794,15 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   const crand = rngFor(world.seed, tick, "claims");
   for (const [tile, ns] of [...byTile.entries()].sort((a, b) => a[0] - b[0])) {
     const winner = ns.length === 1 ? ns[0] : ns[Math.floor(crand() * ns.length)];
-    if (world.tiles[tile].owner !== -1) { winner.lastRejected.push({ action: "claim_tile", reason: "Ô đã có chủ trước khi khai hoang xong" }); continue; }
+    const from = claims.find(c => c.n === winner && c.tile === tile)?.from, owner = world.tiles[tile].owner;
+    // §2.3c an encroachment: the land must still be its owner's and still unheld
+    if (from !== undefined ? owner !== from || !unheld(world, world.nations[from], tile) : owner !== -1) { winner.lastRejected.push({ action: "claim_tile", reason: from !== undefined ? "Ô không còn bỏ trống khi tới nơi" : "Ô đã có chủ trước khi khai hoang xong" }); continue; }
     const cost = CLAIM_FOOD * (fillsGap(world, winner, tile) ? COMPACT.fillFood : 1); // §2.3b filling a gap in one's land is cheap
     if ((winner.stock.food || 0) < cost) { winner.lastRejected.push({ action: "claim_tile", reason: "Hết lương thực để khai hoang" }); continue; }
     L.stock(winner, "food", -cost, "claim");
     world.tiles[tile].owner = winner.id;
     fx({ kind: "claim", tile, nation: winner.id });
+    if (from !== undefined) encroached(world, winner, world.nations[from], tile, say);
     for (const o of ns) if (o !== winner) o.lastRejected.push({ action: "claim_tile", reason: `${winner.name} giành được ô này cùng lượt` });
     winner.lastEvents.push(`Khai hoang thêm ô (${col(tile)}, ${row(tile)}).`);
   }
@@ -1294,6 +1298,20 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
 
+/** §2.3c A neighbour took a tile its owner left unheld: an act of hostility. */
+function encroached(world: World, taker: Nation, loser: Nation, tile: number, say: Say): void {
+  const st = borderOf(world, taker.id, loser.id), at = `(${col(tile)}, ${row(tile)})`;
+  st.tension = Math.min(100, st.tension + HOLD.encroachRise);
+  st.incidents = [...st.incidents, { tick: world.tick, text: `${taker.name} lấn chiếm ô ${at} của ${loser.name} (bỏ trống, không người giữ)` }].slice(-5);
+  loser.casusBelli[String(taker.id)] = Math.max(loser.casusBelli[String(taker.id)] ?? -1, world.tick + HOLD.encroachCause);
+  taker.reputation = Math.max(0, taker.reputation - HOLD.encroachRep);
+  delete world.cutoff[String(tile)];
+  fx({ kind: "lost_tile", tile, nation: loser.id });
+  taker.lastEvents.push(`Lấn chiếm ô ${at} bỏ trống của ${loser.name}: uy tín −${HOLD.encroachRep}, biên giới căng thêm ${HOLD.encroachRise}, họ có chính nghĩa đánh ta ${HOLD.encroachCause} lượt.`);
+  loser.lastEvents.push(`${taker.name} lấn chiếm ô ${at} của ta: ô đó bỏ trống, không người ở, xa trung tâm và đường sá. Ta có chính nghĩa đánh họ ${HOLD.encroachCause} lượt. Giữ đất bằng dân ở, công trình, đường nối hay điểm định cư gần đó.`);
+  say(loser.id, "border", `${taker.name} lấn chiếm đất bỏ trống của ${loser.name} ở ${at}.`);
+}
+
 /** A nation whose proposal was a duplicate studies the invention in the book instead, when it can. Returns what happened, in words. */
 function studyInstead(world: World, n: Nation, id: string): string {
   const v = inv(world, id); if (!v) return "";
@@ -1548,7 +1566,7 @@ export function maxOfficials(world: World, n: Nation): number {
 }
 
 /** Each official ages in office, pays and is paid, grows or loses loyalty, and does their work. */
-function officialsAct(world: World, n: Nation, L: Ledger, claims: Array<{ n: Nation; tile: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): void {
+function officialsAct(world: World, n: Nation, L: Ledger, claims: Array<{ n: Nation; tile: number; from?: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): void {
   const court = n.officials ?? []; if (!court.length) return;
   const tick = world.tick, done: string[] = [];
   const act = (type: string, a: Record<string, unknown>) => doAction(world, n, type, a, L, claims, explorers, strikes, say);
@@ -1583,17 +1601,16 @@ function workFor(world: World, n: Nation, o: Official, act: (type: string, a: Re
     case "governor": {
       if (o.seat === null || world.tiles[o.seat].owner !== n.id) return "mất lãnh địa";
       const want = o.skill >= 3 ? 2 : 1, got: string[] = [];
-      const room = Math.floor(tileLimit(world, n) - governed(world, n));
       const need = mouths(n) * m.foodPerPerson;
       const options = within(o.seat, 3).map(i => world.tiles[i])
         .filter(t => t.owner === -1 && (t.land || (t.terrain === "shallow" && m.move.has("shallow"))) && t.terrain !== "icewall" && NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id))
         .sort((a, b) => tileValue(b) - tileValue(a) || a.i - b.i);
       for (const t of options) {
-        if (got.length >= Math.min(want, room)) break;
+        if (got.length >= want) break; // §2.3c no limit on claims (v0.60)
         if ((n.stock.food || 0) < CLAIM_FOOD * (got.length + 1) + need * 0.5) break;
         if (!act("claim_tile", { tile: [col(t.i), row(t.i)] })) got.push(`(${col(t.i)}, ${row(t.i)})`);
       }
-      return got.length ? `khai hoang ${got.join(", ")}` : room <= 0 ? "giữ đất (đã đủ giới hạn quản lý)" : "giữ đất (không đủ lương thực hay không còn ô tốt)";
+      return got.length ? `khai hoang ${got.join(", ")}` : "giữ đất (không đủ lương thực hay không còn ô tốt)";
     }
     case "agriculture": {
       const need = mouths(n) * m.foodPerPerson, pending = n.buildings.some(b => !b.done && (buildingOf(world, b.type)?.effect.farmSlots || 0) > 0);
@@ -1718,7 +1735,7 @@ const CAUSE_WORD: Record<string, string> = { famine: "chết đói", winter: "ch
 const EXPLORE_RANGE = 16;
 
 function doAction(world: World, n: Nation, type: string, a: Record<string, unknown>, L: Ledger,
-  claims: Array<{ n: Nation; tile: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): string | null {
+  claims: Array<{ n: Nation; tile: number; from?: number }>, explorers: Map<number, number>, strikes: Strike[], say: Say): string | null {
   const m = mods(world, n);
   switch (type) {
     case "quarantine": return orderQuarantine(world, n, a, say); // §9.5
@@ -1810,7 +1827,17 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const tile = parseTile(a.tile);
       if (tile < 0) return "Ô không hợp lệ; dùng [cột, hàng]";
       const t = world.tiles[tile];
-      if (t.owner !== -1) return "Ô đã có chủ";
+      // §2.3c land a neighbour leaves unheld may be taken, in peace, as an act of hostility
+      let from: number | undefined;
+      if (t.owner === n.id) return "Ô đã là của bạn";
+      if (t.owner !== -1) {
+        const o = world.nations[t.owner];
+        if (!unheld(world, o, tile)) return `Ô của ${o.name} có người giữ (dân ở đó hoặc quanh đó, công trình, hay gần trung tâm, đường nối của họ): chỉ chiếm được bằng chiến tranh`;
+        if (pendingOrActiveWar(world, n.id, o.id)) return `Đang chiến tranh với ${o.name}: chiếm đất bằng attack`;
+        const bound = treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace", "vassal"]);
+        if (bound.length) return `Đang có hiệp ước ${bound.map(x => TREATY_NAME[x.type]).join(", ")} với ${o.name}: không lấn đất của họ được`;
+        from = o.id;
+      }
       if (t.terrain === "icewall") return "Không ai khai hoang được Tường Băng";
       if (t.terrain === "ocean" && !m.move.has("ocean")) return "Cần tàu viễn dương (move ocean) để giữ biển sâu";
       if (!t.land && !m.move.has("shallow")) return "Cần năng lực đi-nước (thuyền) để giữ ô biển nông";
@@ -1820,11 +1847,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         return `Vùng biển không giáp bờ của bạn phải nằm trong ${SEA.pierReach} ô quanh một Bến thuyền của bạn (Cảng: thêm 3 ô)`;
       if ((n.stock.food || 0) < CLAIM_FOOD) return `Cần ${CLAIM_FOOD} lương thực`;
       if (claims.some(c => c.n === n && c.tile === tile)) return "Đã khai hoang ô này trong lượt";
-      // §2.3 v0.57 the limit is on what the people can newly settle: land already held stays the nation's
-      const weight = (i: number) => (world.tiles[i].land ? 1 : SEA.limitWeight), limit = tileLimit(world, n);
-      if (governed(world, n) + claims.filter(c => c.n === n).reduce((s2, c) => s2 + weight(c.tile), 0) + weight(tile) > limit + 1e-9)
-        return `Đã tới giới hạn khai hoang ${limit} ô (đang giữ ${governed(world, n)}): đất đang giữ vẫn là của bạn, nhưng muốn khai hoang thêm phải nâng giới hạn (dân số, điểm định cư, đường nối các trung tâm)`;
-      claims.push({ n, tile });
+      // §2.3c (v0.60) no limit on claims: the land is held by the people on it and the warriors that reach it
+      claims.push({ n, tile, from });
       return null;
     }
     case "accept_migrants": {

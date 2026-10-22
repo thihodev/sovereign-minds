@@ -6,7 +6,23 @@
 
 import { COMPACT } from "./rules.ts";
 import { NEIGHBORS, col, row } from "./hex.ts";
+import { unheldTiles } from "./hold.ts";
+import { treatiesBetween } from "./diplomacy.ts";
 import type { Nation, World } from "./types.ts";
+
+/** §2.3c the land it leaves unheld, and the neighbours' unheld land it could take. */
+function holdView(world: World, n: Nation) {
+  const mine = unheldTiles(world, n), next: Array<{ nation: string; tile: number[] }> = [];
+  for (const o of world.nations) {
+    if (o.id === n.id || !o.alive || !o.founded || !n.met.includes(o.id)) continue;
+    if (treatiesBetween(world, n.id, o.id, ["non_aggression", "alliance", "peace", "vassal"]).length) continue;
+    for (const i of unheldTiles(world, o)) if (NEIGHBORS[i].some(j => world.tiles[j].owner === n.id)) next.push({ nation: o.name, tile: [col(i), row(i)] });
+  }
+  return {
+    unheld: mine.length ? { count: mine.length, sample: mine.slice(0, 6).map(i => [col(i), row(i)]) } : undefined,
+    unheld_next_door: next.length ? next.slice(0, 6) : undefined,
+  };
+}
 
 export interface Territory {
   /** Tiles joined to the capital over the nation's own tiles (land and water). */
@@ -67,5 +83,6 @@ export function territoryView(world: World, n: Nation) {
     main_block_tiles: t.main.size, interior_tiles: t.interior.size, home_market_tax_bonus: homeMarket(world, n),
     exclaves: t.exclaves.length ? t.exclaves.map(b => ({ tiles: b.length, at: [col(b[0]), row(b[0])] })) : undefined,
     gaps_to_fill: gaps.size ? [...gaps].sort((a, b) => a - b).slice(0, 6).map(i => [col(i), row(i)]) : undefined,
+    ...holdView(world, n),
   };
 }

@@ -15,6 +15,7 @@ import { liveHordes } from "./wild.ts";
 import { borderLength, borderOf } from "./border.ts";
 import { aidCivilWar, civilShare } from "./civil.ts";
 import { isInterior } from "./compact.ts";
+import { militiaAt, reachAt } from "./hold.ts";
 import { quarantined } from "./contagion.ts";
 import { add, part, take, add as addPeople, take as takePeople } from "./people.ts";
 import { noteExodus } from "./exodus.ts";
@@ -555,8 +556,10 @@ export function resolveBattles(ctx: DiploCtx): void {
     // Defenders spread their warriors and militia over the whole front: every tile of theirs that touches
     // an enemy at war with them, or at least every attack they face this tick
     const fronts = frontOf(D);
-    const dMen = Math.floor(D.labor.warrior / fronts);
-    const militia = Math.max(1, Math.floor(workers(D) * WAR.militiaShare / fronts));
+    // §2.3c (v0.60) the land is held where it is lived on: the militia is the people of the tile and around it, and
+    // only the warriors that can reach it in time stand there (all near a centre or along a road joined to the capital)
+    const dMen = Math.floor(D.labor.warrior * reachAt(world, D, s.tile) / fronts);
+    const militia = Math.floor(militiaAt(world, D, s.tile));
     // §4.5 the old nation fights the traitors harder
     const aStr = strength(A, s.warriors, 0, false) * (D.origin?.from === A.id ? 1 + KIN.vengeance : 1), dStr = strength(D, dMen, militia, true) * (A.origin?.from === D.id ? 1 + KIN.vengeance : 1) * (1 - civilShare(world, D)); // §4.5b a land torn by civil war defends worse
     const won = aStr > dStr;

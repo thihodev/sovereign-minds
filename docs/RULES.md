@@ -80,7 +80,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 - **Khởi đầu:** ô thủ đô + 6 ô kề. Tầm nhìn ban đầu là bán kính 4 quanh thủ đô; sau mỗi lượt, mọi ô trong vòng 3 ô quanh lãnh thổ được thêm vào tầm nhìn. Ô đã thấy thì không bị che lại. Phần còn lại là sương mù cho đến khi được thám hiểm.
 - **Mở rộng:** hành động `claim_tile` cho một ô vô chủ kề lãnh thổ (đất liền, hoặc lãnh hải theo mục 2.6). Tốn 2 AP và 5 lương thực (trừ lúc ô về tay). Ô thuộc về quốc gia ngay trong lượt đó.
-- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. **Từ v0.57, giới hạn chỉ chặn việc khai hoang thêm** (`claim_tile`): đất đã giữ (khai hoang, chiếm được, được nhượng, hay bị cắt rời khỏi trung tâm) **luôn là của nước đó**, không bao giờ tự thành đất hoang, kể cả khi dân giảm. Nước có thể đưa dân tới sống trên đất đó bất cứ lúc nào. Giữ nhiều đất hơn giới hạn không làm mất ổn định, cũng không làm dân bất mãn.
+- **Giới hạn quản lý:** số ô tối đa = 7 + floor(√dân số) + thưởng từ phát minh (Hội đồng bộ lạc +2, hiệu ứng `tile_limit`) + 3 cho mỗi điểm định cư + thưởng đường sá (mục 2.5). Ô biển chỉ tính 1/3 ô (mục 2.6). Ví dụ: 17 ô ở 100 dân, 22 ô ở 225 dân, 27 ô ở 400 dân (chưa tính thưởng và định cư). Đất tăng chậm hơn dân, nên muốn đông người thì phải lập điểm định cư hoặc trồng trọt. **Từ v0.60, không còn giới hạn khai hoang.** Con số này chỉ còn là "sức cai quản thoải mái" để cố vấn tham khảo. Đất đã giữ (khai hoang, chiếm được, được nhượng, hay bị cắt rời khỏi trung tâm) không bao giờ tự thành đất hoang. Nhưng đất chỉ **được giữ** nếu có người ở và có quân tới được (mục 2.3c); đất bỏ trống có thể bị láng giềng lấn chiếm.
 - **Bỏ ô:** `abandon_tile` (0 AP) trả một ô về vô chủ. Không bỏ được ô thủ đô hay ô điểm định cư. Công trình trên ô bị mất.
 - **Định cư mới:** `found_settlement` (3 AP) trên ô đất liền vô chủ, không phải núi, cách thủ đô và mọi điểm định cư khác ≥ 6 ô, và cách lãnh thổ hiện có ≤ 10 ô. Cần năng lực `tổ-chức`, dân số ≥ 50, **25 đơn vị gỗ và/hoặc đá** (trộn theo tỷ lệ bất kỳ; Engine lấy từ loại đang có nhiều hơn trước) và một tên 2–30 ký tự. Giá trả bằng vật liệu không hư, không bằng lương thực, vì lương thực hư 30% mỗi lượt nên nước đất nhỏ không gom nổi. Điểm định cư nhận ô đó cùng các ô kề còn vô chủ (trừ biển sâu), cho thêm +10 chỗ ở, chỗ cho 3 công trình có chỗ ở nữa (mục 4.2) và +3 giới hạn ô. 10 dân dời sang điểm mới: họ vẫn là dân của quốc gia (dân số không đổi), nhưng cuộc di dời làm ổn định −5. Mỗi điểm định cư vượt quá 3 làm ổn định −1 mỗi lượt (mục 4.4).
 - **Biên giới:** mỗi ô chỉ thuộc một quốc gia. Đoàn thám hiểm đi qua lãnh thổ nước khác khi không có hiệp ước đi lại hoặc liên minh là vi phạm biên giới: mỗi ô vi phạm có 30% bị phát hiện, khi đó bên kia được thông báo và "đã gặp" bên vi phạm.
@@ -90,6 +90,22 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 - **Cái giá:** 30 gỗ và/hoặc đá, −8 ổn định, và 30 lượt mới dời lại được một lần.
 - **Sau khi dời:** thủ đô cũ thành điểm định cư. Mọi thứ tính từ thủ đô đổi theo: lối về của các điểm định cư (mục 2.7), tỉnh xa (mục 2.8), nước ngọt, chỗ ở khởi điểm.
 - **AI thấy** `capital_move`: thủ đô và từng điểm định cư có sông, ven biển, nước ngọt, đường kề bên, mạch giàu và tài nguyên quanh 2 ô hay không. Lời cố vấn gợi ý dời đô khi thủ đô thiếu nước ngọt mà có điểm định cư bên sông.
+
+### 2.3c Giữ đất (từ v0.60)
+
+Đất là của nước đó chừng nào còn giữ được. Code ở `src/hold.ts`.
+- **Dân quân tại chỗ:** khi bị tấn công, dân quân của một ô là những người sống trên ô đó và 6 ô quanh (× 0,7 người làm việc × 10% ra trận), không chia đều từ cả nước như trước.
+- **Chiến binh tới được bao nhiêu:** chiến binh đóng ở các trung tâm.
+  - Ô cách một trung tâm tối đa 3 ô, hoặc có đường nối về thủ đô: chiến binh tới đủ.
+  - Xa hơn thì tới ít dần: 1 / (1 + (khoảng cách − 3) × 0,5), thấp nhất 10%. Ví dụ cách 5 ô thì tới một nửa.
+  - Ô trống người ở xa gần như mất trắng khi bị đánh; ô đông dân gần trung tâm rất khó chiếm.
+- **Đất bỏ trống:** ô có dưới 3 người sống trên đó và quanh đó, không có công trình, cách mọi trung tâm hơn 3 ô và không có đường nối về thủ đô.
+- **Lấn chiếm:** một láng giềng có đất kề ô bỏ trống, không đang chiến tranh với chủ ô, và không có hiệp ước bất tương xâm, hòa bình, liên minh hay chư hầu với chủ ô, có thể chiếm nó bằng `claim_tile` lúc hòa bình (5 lương thực). Đây là hành vi thù địch:
+  - căng thẳng biên giới +20;
+  - nước lấn chiếm mất 2 uy tín;
+  - nước bị lấn có chính nghĩa tuyên chiến trong 10 lượt.
+- **Cách giữ đất:** cho dân ở (thôn xóm), xây công trình trên đó, làm đường nối về thủ đô, lập điểm định cư gần đó, giữ chiến binh, hoặc ký bất tương xâm với láng giềng.
+- **AI:** thấy `territory.unheld` (đất bỏ trống của mình) và `territory.unheld_next_door` (đất bỏ trống của láng giềng sát đất mình). Cố vấn cảnh báo và gợi ý.
 
 ### 2.3b Lãnh thổ liền khối (từ v0.59)
 

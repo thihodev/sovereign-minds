@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.59";
+export const RULES_VERSION = "0.60";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1158,6 +1158,13 @@ export const HUNT_ZONE = { depth: 2, poachCut: 0.5, linger: 5 };
 // `fill`+ of the nation's tiles around it costs `fillFood` of the food; a piece cut off from the main block with no centre
 // of its own yields −`exclaveYield` and costs `exclaveStability` stability a turn; the main block is one home market:
 // the treasury's taxes +`marketTax` for every `marketPer` land tiles in it, at most +`marketMax`
+// §2.3c Holding the land (v0.60): no limit on claims; a tile is held by the people on and around it (militia) and by
+// the warriors that reach it: all within `near` tiles of a centre or on a road joined to the capital, else
+// 1 / (1 + (distance − near) × `falloff`), at least `minReach`. A tile with fewer than `unheldPeople` people on and
+// around it, no building, out of reach is unheld: a neighbour with no treaty of peace, friendship or vassalage may
+// encroach on it (claim_tile): the border tension +`encroachRise`, the loser a just cause for `encroachCause` turns,
+// the encroacher reputation −`encroachRep`
+export const HOLD = { near: 3, falloff: 0.5, minReach: 0.1, unheldPeople: 3, encroachRise: 20, encroachCause: 10, encroachRep: 2 };
 export const COMPACT = { interiorYield: 0.2, interiorDefense: 0.25, interiorWeight: 0.5, fill: 3, fillFood: 0.5, exclaveYield: 0.25, exclaveStability: 1, marketTax: 0.01, marketPer: 10, marketMax: 0.1 };
 
 // §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`

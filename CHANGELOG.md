@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.60
+
+- **Giữ đất như đời thật (§2.3c):**
+  - Bỏ giới hạn khai hoang: khai hoang bao nhiêu cũng được.
+  - Đất chỉ được giữ bởi người sống trên đó và quân tới được. Dân quân là người sống tại ô đó và quanh đó; chiến binh tới đủ trong 3 ô quanh trung tâm hoặc theo đường nối về thủ đô, xa hơn thì tới ít dần.
+  - Đất bỏ trống (không người, không công trình, xa trung tâm và đường) có thể bị láng giềng không có hiệp ước lấn chiếm lúc hòa bình (hành vi thù địch: căng thẳng +20, uy tín −2, nước bị lấn có chính nghĩa 10 lượt). Khi chiến tranh, đất trống ở xa gần như mất trắng.
+  - AI thấy đất bỏ trống của mình và của láng giềng; cố vấn nhắc cách giữ đất.
+
 ## v0.59
 
 - **0.59.1, thần linh trò chuyện với vua (§10.9):** trong khung Chat chọn "👑 Vua …", hoặc bấm "Hỏi vua" ở khung chi tiết một nước, để hỏi người trị vì mọi điều về đất nước họ. Vua trả lời đúng vai và tính cách, bằng chính model của nước đó, dựa vào đúng dữ liệu vua thấy mỗi lượt cùng ghi nhớ của mình; câu trả lời ngắn gọn, đúng số liệu. Cuộc trò chuyện không thay đổi thế giới. Hội thoại với mỗi vua được lưu riêng.
