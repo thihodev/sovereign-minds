@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, CROWD, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, CROWD, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -261,7 +261,7 @@ export function advice(world: World, n: Nation): Advice[] {
     const st = world.borders?.[n.id < o.id ? `${n.id}-${o.id}` : `${o.id}-${n.id}`];
     const recent = (st?.brawls ?? []).filter(x => world.tick - x.tick < BORDER.brawlWindow);
     if (recent.length >= BORDER.brawlsToWar - 1 && !activeWar(world, n.id, o.id))
-      say(3, `Biên giới với ${o.name} đã có ${recent.length} vụ xô xát chết người trong ${BORDER.brawlWindow} lượt: thêm một vụ nữa là chiến tranh. Hạ căng thẳng ngay (hiệp ước, buôn bán, quà tặng) hoặc chuẩn bị chiến binh ở biên giới.`);
+      say(3, `Biên giới với ${o.name} đã có ${recent.length} vụ xô xát chết người trong ${BORDER.brawlWindow} lượt: thêm một vụ nữa là chiến tranh. Hạ căng thẳng ngay: mỗi cuộc trao đổi hoàn thành (trade_offer) là một phiên chợ đình chiến, xóa một vụ xô xát khỏi sổ máu đòi máu; hoặc ký hiệp ước, tặng quà, hay chuẩn bị chiến binh ở biên giới.`);
   }
 
   // §7.4b at war: the score, the dead, the border clashes, the price of peace, and where to strike
@@ -293,8 +293,8 @@ export function advice(world: World, n: Nation): Advice[] {
   // §4.5 betrayal: the old nation and the traitors
   for (const o of world.nations) {
     if (!o.alive || !o.founded || !hostile(world, n, o)) continue;
-    if (o.origin?.from === n.id) say(1, `${o.name} là kẻ phản bội đã tách khỏi ta (lượt ${o.origin.tick}): hai nước thù địch, không buôn bán. Ta luôn có chính nghĩa đánh họ và đánh mạnh hơn ${KIN.vengeance * 100}%; mỗi ô lấy lại +${KIN.retake} ổn định; chiếm được thủ đô của họ thì cả nước họ trở về. Muốn buôn bán lại: ký hòa bình (peace) hoặc buộc họ làm chư hầu.`);
-    else say(2, `${o.name} coi ta là kẻ phản bội: hai nước thù địch, không buôn bán, họ có thể tấn công bất cứ lượt nào mà không mất uy tín (và đánh mạnh hơn ${KIN.vengeance * 100}%). Giữ chiến binh và hàng rào ở biên giới với họ, tìm đồng minh nơi khác, hoặc cầu hòa (treaty peace) để yên ổn.`);
+    if (o.origin?.from === n.id) say(1, `${o.name} là kẻ phản bội đã tách khỏi ta (lượt ${o.origin.tick}): hai nước thù địch, chỉ buôn được ${TRUCE.max} phiên chợ đình chiến trong ${TRUCE.window} lượt. Ta luôn có chính nghĩa đánh họ và đánh mạnh hơn ${KIN.vengeance * 100}%; mỗi ô lấy lại +${KIN.retake} ổn định; chiếm được thủ đô của họ thì cả nước họ trở về. Muốn buôn bán lại: ký hòa bình (peace) hoặc buộc họ làm chư hầu.`);
+    else say(2, `${o.name} coi ta là kẻ phản bội: hai nước thù địch, chỉ buôn được ${TRUCE.max} phiên chợ đình chiến trong ${TRUCE.window} lượt (trade_offer; mỗi phiên làm dịu biên giới), họ có thể tấn công bất cứ lượt nào mà không mất uy tín (và đánh mạnh hơn ${KIN.vengeance * 100}%). Giữ chiến binh và hàng rào ở biên giới với họ, tìm đồng minh nơi khác, hoặc cầu hòa (treaty peace) để yên ổn.`);
   }
 
   // §6.4 herds: wild ones on the land to tame, a herd outgrowing its room, meat in a famine

@@ -2,6 +2,13 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.43
+
+- **Phiên chợ đình chiến (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**
+  - Trên biên giới đang tranh chấp (từ 70), mỗi cuộc trao đổi hoàn thành xóa vụ xô xát gần nhất khỏi sổ máu đòi máu.
+  - Nước gốc và nước ly khai được trao đổi với nhau 5 lần trong 10 lượt mà không cần hòa bình.
+  - Hai bên nhận thông báo về mỗi phiên chợ; AI thấy số phiên còn lại (`neighbours[].truce_markets_left`). Luật và lời cố vấn chỉ cách dùng phiên chợ này để tránh chiến tranh.
+
 ## v0.42
 
 - **Sửa lỗi hòa ước tan vỡ ngay khi ký (§7.9):**

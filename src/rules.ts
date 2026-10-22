@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.42";
+export const RULES_VERSION = "0.43";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1054,3 +1054,7 @@ export const GATE = { below: 10, value: 1.25, calm: 1 };
 
 // §2.11 Rock salt (a nation's idea, taken up in part): a seam of salt in some hills and deserts, regrowing very slowly
 export const ROCK_SALT = { chance: { hill: 0.15, desert: 0.3 } as Record<string, number>, min: 20, max: 40, regen: 0.01 };
+
+// §7.9 Truce markets (a nation's idea, taken up in part): on a disputed border every completed trade also clears a
+// brawl from the blood-for-blood count; the old nation and its seceders may trade `max` times in `window` turns without peace
+export const TRUCE = { max: 5, window: 10 };

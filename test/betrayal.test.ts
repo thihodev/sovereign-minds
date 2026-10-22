@@ -36,7 +36,7 @@ function turn(w: World, acts: Record<number, AIResponse> = {}) {
   return out;
 }
 
-test("the old nation and the traitors: hostile, no trade, no old pacts, a tense border, one tongue", () => {
+test("the old nation and the traitors: hostile, no old pacts, a tense border, one tongue", () => {
   const w = split("betray"), [a, b] = w.nations;
   turn(w); // the turn after the update: they know each other, the old pact falls
   a.stock.hide = 50;
@@ -45,7 +45,7 @@ test("the old nation and the traitors: hostile, no trade, no old pacts, a tense 
   assert.equal(w.treaties.find(t => t.id === 77)!.active, false, "the old pact falls");
   assert.equal(relation(w, a.id, b.id), "thù địch");
   assert.ok(hostile(w, a, b) && sharedLanguage(w, a, b));
-  assert.ok(a.lastRejected.some(r => r.action === "trade_offer" && /kẻ phản bội/.test(r.reason)), JSON.stringify(a.lastRejected));
+  assert.ok(!a.lastRejected.some(r => r.action === "trade_offer"), "a truce market is open to them (v0.43)");
   assert.ok(borderOf(w, a.id, b.id).tension >= KIN.tensionFloor, `tension ${borderOf(w, a.id, b.id).tension}`);
   assert.equal(borderOf(w, a.id, b.id).market, 0, "no border market");
   // what each AI is told
@@ -87,4 +87,24 @@ test("a nation that falls: its people live on under the victor, a fifth flee, it
   assert.equal(a.population - popA, 50 - Math.floor(50 * WAR.fallFlee), "the rest live on under the victor");
   assert.equal(w.tiles.filter(t => t.owner === a.id).length >= tilesD, true, "the land passed to the victor");
   assert.ok((a.stock.wood || 0) >= woodA + 40, "and the stores");
+});
+
+test("truce markets: hostile kin may trade a few times in a while; each trade clears a brawl from the blood-for-blood count", async () => {
+  const { TRUCE } = await import("../src/rules.ts");
+  const w = split("truce"), [a, b] = w.nations;
+  turn(w);
+  const st = borderOf(w, a.id, b.id);
+  let done = 0, cleared = false;
+  for (let k = 0; k < TRUCE.max + 1; k++) {
+    a.stock.hide = 50; b.stock.food = 400; st.tension = 50; st.brawls = [{ tick: w.tick, dead: { [a.id]: 1 } }];
+    turn(w, { 0: { actions: [{ type: "trade_offer", to: b.name, give: { hide: 2 }, get: { food: 2 } }] } });
+    const off = w.tradeOffers.filter(o => o.from === a.id && o.status === "open").at(-1);
+    if (!off) { assert.ok(a.lastRejected.some(r => /phiên chợ đình chiến/.test(r.reason)), JSON.stringify(a.lastRejected)); break; }
+    st.tension = 50; st.brawls = [{ tick: w.tick, dead: { [a.id]: 1 } }];
+    turn(w, { 1: { actions: [{ type: "accept_trade", offer: off.id }] } });
+    if (off.status === "done") { done++; if (!(st.brawls ?? []).some(x => x.dead[String(a.id)] === 1 && x.tick === w.tick - 1)) cleared = true; }
+  }
+  assert.equal(done, TRUCE.max, "five truce markets in the window, not more");
+  assert.ok(cleared, "a truce market clears the brawl");
+  assert.ok(a.lastEvents.some(e => /Phiên chợ đình chiến/.test(e)) || b.lastEvents.some(e => /Phiên chợ đình chiến/.test(e)) || done === TRUCE.max);
 });

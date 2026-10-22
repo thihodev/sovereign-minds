@@ -6,6 +6,7 @@ import { NEIGHBORS, col, row, dist, within } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx, fxDeath } from "./fx.ts";
 import {
+  TRUCE,
   BORDER,
   GESTURES, HAMLET, INJECTION, KIN, LAND, ROADS, MESSAGE_MAX, OFFICIALS, RIVER, SEA, SHARED_LANGUAGE_TRADES, TERRAIN, TRADE, TREATY, TREATY_NAME, TREATY_TYPES, WAR,
 } from "./rules.ts";
@@ -95,8 +96,13 @@ export function findTarget(world: World, n: Nation, v: unknown): Nation | string
 }
 
 /** §9.5 Why no goods may pass between two peoples while one of them is in quarantine, or null. */
+/** §7.9 Truce-market trades the two hostile kin have left in this window (they may trade that many times without peace). */
+export function truceLeft(world: World, a: number, b: number): number {
+  const st = borderOf(world, a, b);
+  return Math.max(0, TRUCE.max - (st.truce ?? []).filter(t => world.tick - t < TRUCE.window).length);
+}
 function closedFor(world: World, n: Nation, o: Nation): string | null {
-  if (hostile(world, n, o)) return `${o.name} ${o.origin?.from === n.id ? "là kẻ phản bội đã tách khỏi nước bạn" : "coi nước bạn là kẻ phản bội"}: hai nước thù địch, không buôn bán cho tới khi ký hòa bình (peace) hoặc một bên làm chư hầu`;
+  if (hostile(world, n, o) && truceLeft(world, n.id, o.id) <= 0) return `${o.name} ${o.origin?.from === n.id ? "là kẻ phản bội đã tách khỏi nước bạn" : "coi nước bạn là kẻ phản bội"}: hai nước thù địch. Đã hết ${TRUCE.max} phiên chợ đình chiến trong ${TRUCE.window} lượt; muốn buôn bán thêm thì ký hòa bình (peace) hoặc một bên làm chư hầu`;
   if (quarantined(n, world.tick)) return "Đang cách ly: không buôn bán với nước ngoài (quarantine turns 0 để dỡ)";
   if (quarantined(o, world.tick)) return `${o.name} đang cách ly: không nhận buôn bán`;
   return null;
@@ -300,6 +306,16 @@ export function startWar(world: World, n: Nation, o: Nation, tick: number, reaso
   }
 }
 
+/** §7.9 A trade completed over a disputed border is a truce market: it clears the latest deadly brawl from the
+ *  blood-for-blood count; between hostile kin it uses one of their truce-market turns. */
+function truceMarket(world: World, A: Nation, B: Nation): void {
+  const st = borderOf(world, A.id, B.id), foes = hostile(world, A, B);
+  if (foes) (st.truce ??= []).push(world.tick);
+  if (st.tension < BORDER.dispute && !foes) return;
+  const cleared = (st.brawls ?? []).pop();
+  const note = `Phiên chợ đình chiến với ${"%"}: ${cleared ? "một vụ xô xát được bỏ qua, máu đòi máu chậm lại" : "biên giới dịu đi"}${foes ? `; còn ${truceLeft(world, A.id, B.id)} phiên trong ${TRUCE.window} lượt khi chưa có hòa bình` : ""}.`;
+  A.lastEvents.push(note.replace("%", B.name)); B.lastEvents.push(note.replace("%", A.name));
+}
 /** §7.4b A word between two nations at war goes into that war's record of talks (the latest 40). */
 function talk(world: World, from: number, to: number, kind: WarTalk["kind"], text: string): void {
   const w = world.wars.find(x => x.end === null && ((x.a === from && x.b === to) || (x.a === to && x.b === from)));
@@ -414,6 +430,7 @@ export function resolveRelations(ctx: DiploCtx): void {
       eta.push(`${from.name} → ${to.name} ${road.mode === "water" ? `bằng ${road.boats} thuyền` : `với ${road.porters} người khuân vác`}, ${road.ticks} lượt`);
     }
     A.trades[String(B.id)] = (A.trades[String(B.id)] || 0) + 1; B.trades[String(A.id)] = (B.trades[String(A.id)] || 0) + 1;
+    truceMarket(world, A, B);
     say(B.id, "trade", `${A.name} và ${B.name} trao đổi: ${fmtGoods(world, off.give)} ⇄ ${fmtGoods(world, off.get)}${eta.length ? ` (đoàn buôn: ${eta.join("; ")})` : ""}.`);
   }
   for (const o of world.tradeOffers) if (o.status === "open" && tick - o.tick > TRADE.offerTicks) o.status = "expired";
@@ -815,7 +832,8 @@ export function betrayalPhase(world: World, say: Say): void {
       for (const x of [p, c]) x.lastEvents.push(`Hiệp ước ${TREATY_NAME[tr.type]} #${tr.id} với ${(x === p ? c : p).name} bị hủy: ${x === p ? "kẻ phản bội" : "nước cũ coi bạn là kẻ phản bội"} không thể là bạn.`);
       say(p.id, "treaty", `${p.name} và ${c.name} — nước gốc và kẻ ly khai — không thể là bạn: hiệp ước ${TREATY_NAME[tr.type]} bị hủy.`);
     }
-    if (hostile(world, p, c)) for (const o of world.tradeOffers) if (o.status === "open" && ((o.from === p.id && o.to === c.id) || (o.from === c.id && o.to === p.id))) o.status = "expired";
+    // §7.9 hostile kin trade only through their truce markets: offers beyond them lapse
+    if (hostile(world, p, c) && truceLeft(world, p.id, c.id) <= 0) for (const o of world.tradeOffers) if (o.status === "open" && ((o.from === p.id && o.to === c.id) || (o.from === c.id && o.to === p.id))) o.status = "expired";
   }
 }
 

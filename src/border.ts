@@ -21,7 +21,9 @@ import type { Nation, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number;
   /** deadly brawls lately: who lost how many */
-  brawls?: Array<{ tick: number; dead: Record<string, number> }> }
+  brawls?: Array<{ tick: number; dead: Record<string, number> }>;
+  /** §7.9 the turns of truce-market trades between two hostile kin */
+  truce?: number[] }
 export const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 export function borderOf(world: World, a: number, b: number): BorderState {
   const all = (world.borders ??= {}), k = pairKey(a, b);
