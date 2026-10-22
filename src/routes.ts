@@ -11,10 +11,11 @@ import { activeWar, landGap, treatiesBetween } from "./diplomacy.ts";
 import { buildingWorks, mods, workers } from "./engine.ts";
 import type { Nation, World } from "./types.ts";
 import { ROADS, TERRAIN, TRADE, type RoadLevel } from "./rules.ts";
+import { airLink, airLoad } from "./air.ts";
 import type { Tile } from "./types.ts";
 
 export interface Route {
-  mode: "near" | "land" | "water";
+  mode: "near" | "land" | "water" | "air";
   /** Tiles from the sender to the receiver (empty for "near"). */
   path: number[];
   ticks: number;
@@ -137,6 +138,9 @@ export function planRoute(world: World, from: Nation, to: Nation, goods: Record<
   const portersFree = Math.floor(workers(from) * TRADE.porterShare) - away.porters; // anyone may carry; the economy takes them from the gatherers first
   const byLand = land ? Math.max(1, Math.ceil(land.cost / (TRADE.landSpeed * lift))) : Infinity;
   const byWater = water ? Math.max(1, Math.ceil(water.cost / (TRADE.waterSpeed * lift))) : Infinity;
+  // §7.3b a flight: one turn, no tolls, no carriers, if the load fits the planes
+  const air = airLink(world, from, to);
+  if (air && units <= airLoad(world, from) + 1e-9 && Math.min(byLand, byWater) > 1) return { mode: "air", path: [air.a, air.b], ticks: 1, tolls: [], porters: 0, boats: 0 };
   if (water && byWater <= byLand) return { mode: "water", path: water.path, ticks: byWater, tolls: water.tolls, porters: 0, boats: boatsNeed };
   if (land && portersFree >= portersNeed) return { mode: "land", path: land.path, ticks: byLand, tolls: land.tolls, porters: portersNeed, boats: 0 };
   if (water) return { mode: "water", path: water.path, ticks: byWater, tolls: water.tolls, porters: 0, boats: boatsNeed };

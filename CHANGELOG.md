@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.48
+
+- **Sân bay (§7.3b):** Hàng không (K23) thôi cộng +10% vận chuyển chung cho cả nước; máy bay giờ cần sân bay.
+  - Mỗi trung tâm xây được một sân bay (30 sắt, 30 đá, 10 dầu). Mỗi lượt tốn 4 tiền và 1 dầu, thiếu thì đóng cửa.
+  - Các trung tâm có sân bay nối với nhau bằng đường bay: điểm định cư cách biển, cách núi không còn bị cô lập.
+  - Hai nước cùng có sân bay và không đánh nhau: hàng bay tới trong 1 lượt (tối đa 40 hàng mỗi sân bay), không phí qua đất, không cướp, không bão.
+- AI thấy mục `airports`, cố vấn nhắc xây; giao diện có chỉ số "✈ Sân bay", đoàn buôn bay có biểu tượng ✈.
+
 ## v0.47
 
 - **Năm loại bệnh (§9.6)** thay cho một thứ "dịch bệnh" chung. Mỗi bệnh lây và giết người theo cách riêng:

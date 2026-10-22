@@ -8,10 +8,11 @@ import { CONNECT, RIVER, ROADS } from "./rules.ts";
 import { mods, roadNet } from "./engine.ts";
 import { activeWar } from "./diplomacy.ts";
 import { piers } from "./routes.ts";
+import { openAirports } from "./air.ts";
 import { governorYield } from "./provinces.ts";
 import type { Nation, World } from "./types.ts";
 
-export type Link = "capital" | "road" | "water" | "walk" | null;
+export type Link = "capital" | "road" | "water" | "air" | "walk" | null;
 
 const centresOf = (n: Nation) => [n.capital, ...n.settlements.map(s => s.tile)];
 
@@ -55,11 +56,12 @@ export function links(world: World, n: Nation): Map<number, Link> {
   const out = new Map<number, Link>([[n.capital, "capital"]]);
   const all = centresOf(n).filter(c => world.tiles[c]?.owner === n.id), m = mods(world, n);
   const ocean = m.move.has("ocean"), climb = m.move.has("mountain"), ports = piers(world, n);
-  const roads = new Set(roadNet(world, n).linked);
+  const roads = new Set(roadNet(world, n).linked), fly = new Set(openAirports(world, n));
   const linkBetween = (a: number, b: number): Link => {
     if (walk(world, n, a, b, climb)) return "walk";
     if ((a === n.capital && roads.has(b)) || (b === n.capital && roads.has(a)) || (roads.has(a) && roads.has(b))) return "road";
     if (sail(world, n, a, b, ocean, ports)) return "water";
+    if (fly.has(a) && fly.has(b)) return "air"; // §7.3b
     return null;
   };
   // grow the capital's region one link at a time

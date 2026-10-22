@@ -1123,6 +1123,20 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Chưa có tiền tệ:** thời đồ đá chỉ có hàng đổi hàng. Tiền xuất hiện khi có phát minh mang năng lực `trao-đổi-giá-trị` (chưa có trong engine).
 - **Chợ biên giới:** hai bên hòa ước cùng dựng một chợ trên ô biên giới để giao ngay (chưa có trong engine).
 
+
+### 7.3b Sân bay và đường bay
+
+Phát minh **Hàng không** (K23) chỉ cho năng lực `hàng-không` (điều kiện vào thời Nguyên Tử) và thám hiểm xa thêm 6. Máy bay cần sân bay để cất và hạ cánh.
+
+**Sân bay** (`airport`):
+- **Xây:** cần K23; 30 sắt, 30 đá, 10 dầu mỏ; 25 công. Xây ngay trên thủ đô hoặc một điểm định cư, mỗi trung tâm một sân bay.
+- **Vận hành:** mỗi lượt ngân khố trả 4 tiền (dòng "vận hành sân bay") và đốt 1 dầu cho mỗi sân bay. Thiếu một trong hai thì sân bay đóng cửa lượt sau.
+
+**Đường bay trong nước:** hai trung tâm cùng có sân bay đang mở được nối với nhau (cách nối `air`, xem 2.7). Điểm định cư bên kia biển hay sau dãy núi không còn bị cô lập. Đường bay không thay được đường bộ ở chỗ thị trấn cần đường bộ nối về thủ đô để lớn lên (2.13).
+
+**Đường bay giữa hai nước:** khi cả hai nước có sân bay đang mở và không đánh nhau, một lần giao hàng bay tới trong 1 lượt nếu hàng vừa máy bay: tối đa 40 đơn vị hàng cho mỗi sân bay đang mở của bên gửi. Đoàn bay không cần người khuân vác hay thuyền, không nộp phí qua đất nước thứ ba, không bị cướp, bão hay bị tịch thu dọc đường. Hàng nhiều hơn thì đi đường bộ hoặc đường thủy như cũ. Đường bay chỉ được dùng khi nó nhanh hơn đường bộ, đường thủy.
+
+Mất trung tâm có sân bay thì mất sân bay đó. AI thấy mục `airports` (sân bay nào mở, đóng, đang xây, chở được bao nhiêu, bay được tới nước nào). Cố vấn nhắc xây sân bay khi đã biết Hàng không, nhất là khi có điểm định cư bị cô lập.
 ### 7.4 Chiến tranh
 
 - **Tuyên chiến bắt buộc** (`declare_war`, 2 AP). Chiến tranh bắt đầu từ lượt sau, để bên kia có một lượt chuẩn bị. Đang có hiệp ước bất tương xâm, liên minh, hòa bình hoặc chư hầu thì phải phá ước trước (đi lại và cống nạp không chặn). Chư hầu không được tuyên chiến với ai, và muốn đánh tông chủ thì dùng `declare_independence`.

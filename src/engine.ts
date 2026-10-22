@@ -36,6 +36,7 @@ import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, cureDiscount, orderQuarantine, outbreakTurn, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
+import { airPhase } from "./air.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
@@ -900,6 +901,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
     }
   }
   powerPhase(world, L); // §6.8 the plants burn their fuel and light the centres the roads join
+  airPhase(world, L); // §7.3b the airports are paid and fuelled for the next turn
   treasuryPhase(world, L); // §4.13 taxes and public works fill the treasury
   classPhase(world, say); // §4.15 the orders of society take stock
   updateMarket(world, L); // §6.3 prices follow what the nations made, used and hold

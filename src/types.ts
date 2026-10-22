@@ -119,6 +119,8 @@ export interface Nation {
   treasury?: import("./treasury.ts").Treasury;
   /** §6.8 this turn's electric power: made, asked for, the share of the people reached, the centres on the grid */
   power?: import("./power.ts").PowerState;
+  /** §7.3b its airports open this turn (tiles), and how many stand shut */
+  air?: import("./air.ts").AirState;
   /** §4.14 the royal house: its name and its princes and princesses (those married in carry `from`) */
   house?: string; royals?: import("./royals.ts").Royal[];
   /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */
@@ -351,7 +353,7 @@ export interface TradeOffer { id: number; from: number; to: number; give: Record
 export interface Caravan {
   id: number; from: number; to: number; goods: Record<string, number>; arrive: number; offer: number;
   /** §7.3 How it travels (worlds before v0.4 have none of these). */
-  mode?: "land" | "water";
+  mode?: "land" | "water" | "air";
   /** The road, first tile at the sender; `depart` is the tick it left. */
   path?: number[];
   depart?: number;

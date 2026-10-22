@@ -427,7 +427,7 @@ export function resolveRelations(ctx: DiploCtx): void {
       world.caravans.push({ id: world.nextId++, from: from.id, to: to.id, goods: load, arrive: tick + road.ticks, offer: off.id, mode: road.mode, path: road.path, depart: tick, porters: road.porters, boats: road.boats });
       L.toCaravan(load);
       fx({ kind: "caravan", tile: road.path[0], nation: from.id, to: road.path[road.path.length - 1], path: road.path, text: road.mode, n: road.ticks });
-      eta.push(`${from.name} → ${to.name} ${road.mode === "water" ? `bằng ${road.boats} thuyền` : `với ${road.porters} người khuân vác`}, ${road.ticks} lượt`);
+      eta.push(`${from.name} → ${to.name} ${road.mode === "air" ? "bằng máy bay" : road.mode === "water" ? `bằng ${road.boats} thuyền` : `với ${road.porters} người khuân vác`}, ${road.ticks} lượt`);
     }
     A.trades[String(B.id)] = (A.trades[String(B.id)] || 0) + 1; B.trades[String(A.id)] = (B.trades[String(A.id)] || 0) + 1;
     truceMarket(world, A, B);
@@ -476,7 +476,7 @@ function onTheRoad(ctx: DiploCtx, c: Caravan, from: Nation): void {
     for (const [k, q] of Object.entries(c.goods)) { const x = q * part; if (x <= 0) continue; c.goods[k] = q - x; out[k] = x; L.caravanLoss(k, x); if (to) L.stock(to, k, x, reason); }
     return out;
   };
-  if (at >= 0) {
+  if (at >= 0 && c.mode !== "air") { // §7.3b a flight is out of reach
     // On the land of a nation now at war with the sender: everything is seized
     const owner = world.tiles[at].owner, enemy = owner >= 0 && owner !== from.id ? world.nations[owner] : null;
     if (enemy && activeWar(world, from.id, enemy.id)) {

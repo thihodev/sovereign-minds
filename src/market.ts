@@ -13,7 +13,7 @@ import type { Nation, ResKey, World } from "./types.ts";
 export const LAND_GOODS: ResKey[] = ["copper", "tin", "iron", "gold", "silver", "gems", "marble", "salt", "flint", "clay", "ochre", "stone", "wood", "reeds", "herbs", "honey", "spice", "fur", "amber", "horse", "coal", "oil", "sulfur", "fish", "pearl", "coral", "whale", "game"];
 /** Ledger reasons that are making or using a good, not moving it between nations or losing it. */
 const MADE = new Set(["gather", "hunt", "fish", "extract", "mine", "craft", "growth", "bounty"]);
-const USED = new Set(["eat", "craft", "wear", "build", "road", "settle", "claim", "officials", "reward", "births", "luxury", "power"]);
+const USED = new Set(["eat", "craft", "wear", "build", "road", "settle", "claim", "officials", "reward", "births", "luxury", "power", "air"]);
 
 /** The Ledger's note of a stock change, by nation: what was made and what was used this turn. */
 export function noteFlow(flows: Map<number, Record<string, [number, number]>>, n: Nation, key: string, delta: number, reason: string): void {

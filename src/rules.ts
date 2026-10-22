@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.47";
+export const RULES_VERSION = "0.48";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -496,7 +496,7 @@ const FRAME: Array<[string, string, string[], string[], number, string[], Invent
   ["K20", "Lọc dầu", [], ["thăm-dò-dầu", "luyện-cốc"], 10, ["lọc-dầu"], {}, "Chưng cất dầu thô thành nhiên liệu."],
   ["K21", "Động cơ đốt trong", [], ["lọc-dầu", "thép"], 11, ["động-cơ-đốt-trong"], { transport: 0.1 }, "Nhiên liệu cháy trong xi lanh, nhỏ và mạnh hơn máy hơi nước."],
   ["K22", "Vô tuyến", [], ["điện", "in-ấn"], 10, ["vô-tuyến"], { explore: 4 }, "Sóng điện từ truyền tin không cần dây."],
-  ["K23", "Hàng không", [], ["động-cơ-đốt-trong", "điện"], 12, ["hàng-không"], { explore: 6, transport: 0.1 }, "Khung nhẹ, cánh và động cơ đưa người lên trời."],
+  ["K23", "Hàng không", [], ["động-cơ-đốt-trong", "điện"], 12, ["hàng-không"], { explore: 6 }, "Khung nhẹ, cánh và động cơ đưa người lên trời; máy bay cần sân bay để cất và hạ cánh."],
   ["K24", "Tên lửa", [], ["hàng-không", "thuốc-súng"], 13, ["tên-lửa"], { range: 2 }, "Nhiên liệu đẩy phản lực ra khỏi khí quyển."],
   // §9.6 cures and vaccines
   ["K25", "Chủng đậu", ["P14"], ["ghi-chép"], 4, ["chủng-đậu"], { medicine: 0.05 }, "Lấy vảy đậu của người bệnh nhẹ cấy cho người lành: dân gần như không mắc đậu mùa."],
@@ -555,7 +555,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §6.7 a grinding stone: food it turns into flour each turn */
   grind?: number;
   /** §6.8 a power plant: power it makes each turn, and the coal (or oil) it burns for it */
-  power?: number; fuel?: number }
+  power?: number; fuel?: number;
+  /** §7.3b an airport */
+  airport?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -588,6 +590,8 @@ export const BUILDINGS: BuildingDef[] = [
   // §6.8 electric power
   { type: "power_plant", name: "Nhà máy nhiệt điện", needs: "K18", cost: { iron: 20, stone: 20, copper: 10 }, work: 20, perTile: true, desc: "Đốt 2 than (hết than thì 2 dầu) mỗi lượt, ngân khố trả 3 tiền: làm 20 điện. Điện chạy theo đường sá, đường sắt của ta tới các trung tâm được nối; trung tâm có điện thì chế tác +20%, nghiên cứu +10% (theo phần dân có điện) và dân có ánh sáng.", effect: { power: 20, fuel: 2 } },
   { type: "hydro_dam", name: "Đập thủy điện", needs: "K18", cost: { stone: 40, iron: 10, copper: 10 }, work: 30, perTile: true, desc: "Trên ô có sông, ở đồi hay giáp đồi núi: không cần nhiên liệu, ngân khố trả 3 tiền mỗi lượt, làm 15 điện chạy theo đường sá tới các trung tâm.", effect: { power: 15 } },
+  // §7.3b flight
+  { type: "airport", name: "Sân bay", needs: "K23", cost: { iron: 30, stone: 30, oil: 10 }, work: 25, perCentre: true, desc: "Mỗi trung tâm một sân bay, xây ngay trên trung tâm; mỗi lượt ngân khố trả 4 tiền và đốt 1 dầu (thiếu thì đóng cửa). Các trung tâm có sân bay nối với nhau bằng đường bay (không bị cô lập dù cách biển, núi); đoàn buôn bay tới nước có sân bay trong 1 lượt, không cướp, không bão, không phí qua đất, mỗi chuyến chở tối đa 40 hàng mỗi sân bay.", effect: { airport: 1 } },
   { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
@@ -1106,4 +1110,7 @@ export const FLOUR = { food: 4, flour: 3, keep: 1.5, spoil: 0.08 };
 // §6.8 Electric power: each plant costs `upkeep` coin a turn; a centre on the grid asks `perPerson` power for each of
 // its people; the share of the people reached lifts craft by `craft` and research by `rp`; a nation whose share is at
 // least `light` has light and power for its homes (§4.16)
+// §7.3b Airports: `upkeep` coin and `fuel` oil a turn each; a flight carries `load` goods for each open airport of the sender
+export const AIR = { upkeep: 4, fuel: 1, load: 40 };
+
 export const POWER = { upkeep: 3, perPerson: 0.05, craft: 0.2, rp: 0.1, light: 0.5 };

@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, inv, invName } from "../catalog.ts";
 import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -328,6 +328,14 @@ export function advice(world: World, n: Nation): Advice[] {
     const rails = ownedTiles(world, n.id).filter(t => (t.road || 0) >= 4).length, roads = ownedTiles(world, n.id).filter(t => t.land && (t.road || 0) > 0 && (t.road || 0) < 4).length;
     const def = ROADS.levels[3];
     if (roads > 0 && rails < roads) say(1, `Đã biết làm Đường sắt: nâng các đường chính lên ray (build_road level 4, mỗi ô ${Object.entries(def.cost).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}, ${def.work} công): đất có đường sắt nộp thêm ${ROADS.yield[4] * 100}%, đoàn buôn đi nhanh gấp ${Math.round(ROADS.levels[2].move / def.move * 10) / 10} lần đường lát đá và an toàn hơn. Đang có ${rails} ô ray, ${roads} ô đường thường.`);
+  }
+
+  // §7.3b airports once the nation can fly
+  if (n.founded && n.inventions.includes("K23")) {
+    const ports = n.buildings.filter(b => b.type === "airport"), cut = isolated(world, n);
+    if (!ports.length) say(cut.length ? 2 : 1, `Đã biết Hàng không nhưng máy bay cần sân bay: build airport trên thủ đô hay một điểm định cư (${Object.entries(BUILDING_BY_TYPE.airport.cost).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}; mỗi lượt ${AIR.upkeep} tiền, ${AIR.fuel} dầu). Các trung tâm có sân bay nối với nhau bằng đường bay${cut.length ? ` (đang có ${cut.length} điểm định cư bị cô lập)` : ""}; đoàn buôn bay tới nước có sân bay trong 1 lượt, không phí, không cướp.`);
+    else if (n.air?.shut) say(2, `${n.air.shut} sân bay đang đóng: cần ${AIR.fuel} dầu và ${AIR.upkeep} tiền mỗi sân bay mỗi lượt.`);
+    else if (cut.length && ports.length === 1) say(1, `${cut.length} điểm định cư bị cô lập: một sân bay ở đó sẽ nối nó với ${n.capitalName} bằng đường bay.`);
   }
 
   // §6.8 electric power: plants once the nation knows electricity, the grid along its roads

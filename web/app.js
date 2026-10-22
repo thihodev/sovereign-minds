@@ -268,7 +268,7 @@
     raid: f => `🔥 ${f.text} cướp phá`, repelled: f => `🛡 đẩy lui ${f.text}`, clear: f => f.text === "won" ? "🏳 đánh tan man di" : "⚔️ đánh man di thất bại", battle: f => { const [res, kind, foe] = String(f.text).split(":"); return kind === "clash" ? `⚔️ giao tranh biên giới: thắng ${foe}${f.n ? ` (${f.n} người ra trận)` : ""}` : `⚔️ ${res === "won" ? "thắng" : "thua"} ${kind === "raid" ? "trận đột kích" : "trận"}${foe ? ` khi đánh ${foe}` : ""}`; },
     brawl: f => `🤜 xô xát biên giới với ${f.text} (${f.n} người chết, không phải chiến tranh)`,
     beasts: f => `🐺 ${f.text || "thú dữ"} tấn công`, flood: () => "🌊 lũ lụt", quake: () => "💥 động đất", winter: () => "❄ mùa đông khắc nghiệt", plague: () => "🦠 dịch bệnh", famine: () => "🍂 nạn đói",
-    fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
+    fishrun: () => "🐟 mùa cá về", caravan: f => `${f.text === "air" ? "✈" : f.text === "water" ? "⛵" : "🐂"} đoàn buôn lên đường (${f.n} lượt)`, toll: f => `🪙 thu phí đoàn buôn của ${nm(f.from)}`,
     schism: f => `✊ ${f.n} người theo ${f.text} xin ly khai, chờ bạn duyệt`, road: f => `🛤 làm xong ${String(f.text || "đường").toLowerCase()}`, robbed: f => `🔥 ${f.text} cướp đoàn buôn`, storm: () => "⛈ bão nhấn chìm thuyền", seized: f => `⛓ tịch thu đoàn buôn của ${nm(f.from)}`,
     contagion: f => `🦠 dịch lan từ ${f.text} sang ${S.nations[f.nation] ? nationName(S.nations[f.nation]) : "?"}${{ border: " qua biên giới", caravan: " theo đoàn buôn", market: " qua chợ biên giới" }[f.cause] || ""}`,
     minister: f => `🏛 có ${String(f.text || "bộ trưởng").toLowerCase()} mới`,
@@ -598,7 +598,7 @@
           const path = f.path || [f.tile], upto = Math.max(1, Math.floor(path.length * Math.min(1, t * 1.4)));
           route(g, path.slice(0, upto).map(center), px);
           const [ex, ey] = center(path[upto - 1]); figure(g, ex, ey, clamp(s * .22 * z, 2.5, 5) * px, nc, px);
-          icon(g, f.kind === "caravan" ? (f.text === "water" ? "⛵" : "🐂") : "🧭", ex, ey - unit * 1.3, big * .9);
+          icon(g, f.kind === "caravan" ? (f.text === "air" ? "✈" : f.text === "water" ? "⛵" : "🐂") : "🧭", ex, ey - unit * 1.3, big * .9);
           break;
         }
         case "raid": case "repelled": case "clear": case "battle": case "brawl": case "migrate": case "robbed": {
@@ -976,7 +976,7 @@
         pos = [x1 + (x2 - x1) * prog, y1 + (y2 - y1) * prog];
       }
       const [x, y] = pos, r = 4.5 * px, off = (k % 3 - 1) * 4 * px;
-      if (s * z >= 4) icon(g, c.mode === "water" ? "⛵" : "🐂", x + off, y - r * 2.6, clamp(s * .9 * z, 11, 18) * px);
+      if (s * z >= 4) icon(g, c.mode === "air" ? "✈" : c.mode === "water" ? "⛵" : "🐂", x + off, y - r * 2.6, clamp(s * .9 * z, 11, 18) * px);
       g.fillStyle = nationColor(c.from); g.strokeStyle = "#0b1a22"; g.lineWidth = 1.5 * px;
       g.beginPath(); g.rect(x + off - r, y - r * .8, r * 2, r * 1.6); g.fill(); g.stroke();
       g.beginPath(); g.moveTo(x + off - r, y - r * .8); g.lineTo(x + off, y); g.lineTo(x + off + r, y - r * .8); g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = px; g.stroke();
@@ -1470,6 +1470,7 @@
     if (n.living) g.push(`<span title="Mức sống 0–100${n.living.expected.some(x => !x.met) ? `: thiếu ${n.living.expected.filter(x => !x.met).map(x => x.name).join(", ")}` : ""}">🏠 Mức sống <b class="${toneOf(n.living.score, 75, 40)}">${n.living.score}</b></span>`);
     if (n.prosperity && n.alive && n.founded) g.push(`<span title="Thịnh vượng 0–100, hạng ${n.prosperity.rank?.rank ?? "?"}/${n.prosperity.rank?.of ?? "?"} trong các nước quen biết${n.prosperity.mood === "acclaim" ? " · dân tung hô" : n.prosperity.mood === "envy" ? " · dân ganh tị" : ""}">✨ Thịnh vượng <b class="${n.prosperity.mood === "envy" ? "bad" : n.prosperity.mood === "acclaim" ? "good" : ""}">${n.prosperity.score}</b></span>`);
     if (n.alive && n.founded) g.push(`<span title="Bất mãn 0–100: tới 100 một phái xin ly khai">✊ Bất mãn <b class="${n.discontent >= 70 ? "bad" : n.discontent >= 40 ? "warn" : ""}">${n.discontent}</b></span>`);
+    if (n.air) g.push(`<span title="${esc(n.air.airports.map(x => `${x.at}: ${x.state === "open" ? "mở" : x.state === "shut" ? "đóng (thiếu dầu hay tiền)" : "đang xây"}`).join(" · ") + (n.air.can_fly_to ? ` · bay được tới: ${n.air.can_fly_to.join(", ")}` : ""))}">✈ Sân bay <b class="${n.air.airports.some(x => x.state === "shut") ? "bad" : ""}">${n.air.airports.filter(x => x.state === "open").length}/${n.air.airports.length}</b></span>`);
     if (n.power) g.push(`<span title="${esc(`${n.power.plants} nhà máy điện${n.power.idle_plants ? ` (${n.power.idle_plants} đang đứng: thiếu nhiên liệu hay tiền)` : ""} · làm ${n.power.made}, cần ${n.power.need} · có điện: ${n.power.on_grid.join(", ") || "chưa nơi nào"}${n.power.off_grid.length ? ` · chưa có: ${n.power.off_grid.join(", ")}` : ""}`)}">⚡ Điện <b class="${n.power.people_reached >= 0.5 ? "good" : n.power.idle_plants ? "bad" : "warn"}">${Math.round(n.power.people_reached * 100)}%</b></span>`);
     g.push(`<span title="${esc(n.nextEra ? `Để sang ${n.nextEra.era} còn cần: ${n.nextEra.missing.join(", ") || "đã đủ"}` : "Kỷ nguyên")}">🏺 <b>${esc(n.era)}</b></span>`);
     if (n.royals?.house) g.push(`<span title="${esc(`${(n.royals.unwed || []).length} hoàng thân chưa thành hôn${(n.royals.in_laws || []).length ? ` · thông gia: ${n.royals.in_laws.map(x => x.nation).join(", ")}` : ""}`)}">👑 <b>${esc(n.royals.house)}</b></span>`);
@@ -1619,7 +1620,7 @@
       <div class="chips"><span title="Phong tục sinh đẻ">👪 ${esc(n.family.birthsName)}</span><span title="Ai ra trận">${SWORD} ${esc(n.family.fightersName)}</span></div>`, { fold: false, help: `Lượt trước: ${d.born} trẻ sinh, ${d.infants} trẻ sơ sinh mất, ${d.aged} người qua đời vì tuổi già hay lao lực.` })}</div>`;
   }
   // §2.8 the provinces: one per centre, its land, its people, its way home, its governor and its mood
-  const WAY = { capital: "thủ đô", road: "🛤 đường bộ", water: "⛵ đường thủy", walk: "🚶 đi bộ" };
+  const WAY = { capital: "thủ đô", road: "🛤 đường bộ", water: "⛵ đường thủy", air: "✈ đường bay", walk: "🚶 đi bộ" };
   // §6.1 the nation's buildings: what is going up (in the order the builders take them), what stands, what it can build
   const at = i => `(${i % geo.N}, ${(i / geo.N) | 0})`;
   const costText = c => Object.entries(c || {}).map(([k, q]) => `${q} ${RES[k] || k}`).join(" + ") || "không tốn vật liệu";
