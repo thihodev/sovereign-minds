@@ -2,6 +2,10 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.62
+
+- **Cá thịt khô muối (§6.5d), sáng kiến #31 của Văn Phong, trọng tài chấp thuận một phần:** công thức mới tại Bãi chế tác cho mọi nước có năng lực nhiệt-cao: 3 lương thực + 1 muối → 2 cá thịt khô muối. Hư 10% mỗi lượt, ăn được thay lương thực khi thiếu ăn, bán được.
+
 ## v0.61
 
 - **Sắt nổi trên đồi (§2.11a), sáng kiến #30 của Việt Phú, trọng tài chấp thuận một phần:** 10% số đồi chưa có sắt có 2–6 sắt trên mặt đất, thấy khi có nhận-biết-khoáng, đào như mọi mỏ sắt (không phải mạch giàu), tái tạo 1% mỗi lượt. Cổng Đồ Sắt không đổi: ô sắt nổi không tính là mỏ sắt cho cổng, phải đào đủ 20 sắt vào kho. Thế giới cũ được gieo một lần khi tải.

@@ -1155,6 +1155,15 @@ Muối giữ thực phẩm lâu hơn và đáp ứng nhu cầu "Muối, gia vị
 - **Xay:** mỗi lượt mỗi cối biến 4 lương thực thành 3 bột (`flour`). Cối chỉ xay khi kho còn đủ ít nhất 1,5 lượt ăn.
 - **Bột:** hư 8% mỗi lượt (lương thực 30%); ăn được như lương thực khi thiếu ăn; là một loại hàng (giá 1,5), buôn bán được và tính cho sự đa dạng hàng hóa.
 
+### 6.5d Cá thịt khô muối (sáng kiến #31 của Văn Phong, chấp thuận một phần)
+
+Một món hàng chế biến để giữ lương thực qua mùa đông và hạn hán, không phải thêm một lớp chống hư:
+- **Công thức `dried_food`:** 3 lương thực + 1 muối → 2 cá thịt khô muối; 1 công, tại Bãi chế tác. Mở cho mọi nước có năng lực `nhiệt-cao`.
+- **Hư:** 10% mỗi lượt, chậm hơn nhiều so với lương thực tươi.
+- **Ăn:** khi lương thực không đủ, dân ăn cá thịt khô (sau bột), 1 đơn vị thay 1 lương thực.
+- **Buôn bán:** là một loại hàng (giá gốc 1,8), bán được theo giá thế giới, tính vào sự đa dạng hàng hóa.
+- Cố vấn gợi ý làm khi kho đủ 1,5 lượt ăn và có muối.
+
 ### 6.6 Thảo dược đồng và Vườn thảo dược (hai sáng kiến của các quốc gia)
 
 **Thảo dược đồng:** mỗi ô đồng cỏ và đồi có 10–20 thảo dược, tái sinh 2% mỗi lượt (chậm hơn thảo dược rừng, 8%).

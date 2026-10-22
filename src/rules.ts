@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.61";
+export const RULES_VERSION = "0.62";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -44,7 +44,7 @@ export const RES_NAME: Record<string, string> = {
   dog: "chó", goat: "dê cừu", cattle: "bò", pig: "lợn", fowl: "gà",
   food: "lương thực", fiber: "sợi", hide: "da", bone: "xương",
   stone_tool: "công cụ đá", blade: "lưỡi đá", rope: "dây thừng", hide_coat: "áo da", spear: "giáo",
-  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền", flour: "bột", jewelry: "trang sức", food_reserve: "lương dự trữ (kho làng)",
+  bow: "cung tên", axe: "rìu đá mài", pottery: "gốm", cloth: "vải", coin: "tiền", flour: "bột", dried_food: "cá thịt khô muối", jewelry: "trang sức", food_reserve: "lương dự trữ (kho làng)",
 };
 
 // §4 Population and production
@@ -644,6 +644,8 @@ export interface Recipe { id: string; name: string; needs: string; input: Record
   alt?: Record<string, string[]> }
 export const RECIPES: Recipe[] = [
   // §2.11b jewellery (Hà Dương's idea, taken up in part): gold or silver set with a pearl, amber or a gem
+  // §6.7b dried food (Văn Phong's idea #31, taken up in part): fish and meat salted and dried
+  { id: "dried_food", name: "Cá thịt khô muối", needs: "K1", cap: "nhiệt-cao", input: { food: 3, salt: 1 }, output: { dried_food: 2 }, work: 1, building: "workshop" },
   { id: "jewelry", name: "Trang sức", needs: "K1", cap: "nhiệt-cao", input: { gold: 2, pearl: 1 }, alt: { gold: ["silver"], pearl: ["amber", "gems"] }, output: { jewelry: 1 }, work: 2, building: "workshop" },
   { id: "stone_tool", name: "Công cụ đá thô", needs: "stone_tools", input: { stone: 2 }, output: { stone_tool: 1 }, work: 1, building: "workshop" },
   { id: "blade", name: "Lưỡi đá", needs: "P1", input: { flint: 2 }, output: { blade: 1 }, work: 1, building: "workshop" },
@@ -664,7 +666,7 @@ export const GOOD_VALUE: Record<string, number> = {
   food: 1, fiber: 1, hide: 2, bone: 1, wood: 0.5, stone: 0.3, flint: 1, clay: 0.5, salt: 2, reeds: 0.5, herbs: 2,
   copper: 3, tin: 4, iron: 4, boat: 8, coal: 2, oil: 4, sulfur: 3, horse: 6,
   dog: 4, goat: 4, cattle: 8, pig: 4, fowl: 1,
-  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, jewelry: 35, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5, coin: 1, flour: 1.5,
+  honey: 3, spice: 5, fur: 5, amber: 6, ochre: 1.5, marble: 2, gold: 12, silver: 8, gems: 15, pearl: 12, coral: 8, whale_oil: 6, jewelry: 35, dried_food: 1.8, stone_tool: 2, blade: 3, rope: 2, hide_coat: 8, spear: 6, bow: 8, axe: 5, pottery: 2, cloth: 5, coin: 1, flour: 1.5,
 };
 export const TOOL_LIFE = 10; // ticks
 /** §6.4 Animals. `wild`: the wild kind on the map that hunters bring home alive (with the capability `cap`); `breed`: growth
@@ -1174,6 +1176,9 @@ export const COMPACT = { interiorYield: 0.2, interiorDefense: 0.25, interiorWeig
 // §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`
 // of flour a turn while the store holds `keep` turns of eating; flour spoils `spoil` a turn and is eaten as food in need
 export const FLOUR = { food: 4, flour: 3, keep: 1.5, spoil: 0.08 };
+// §6.7b Dried food (Văn Phong's idea #31, taken up in part): the recipe dried_food; it spoils `spoil` a turn and is eaten
+// as food, one for one, when the food runs short
+export const DRIED = { spoil: 0.1 };
 
 // §6.8 Electric power: each plant costs `upkeep` coin a turn; a centre on the grid asks `perPerson` power for each of
 // its people; the share of the people reached lifts craft by `craft` and research by `rp`; a nation whose share is at

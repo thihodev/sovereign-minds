@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, CIVIL, COMPACT, HOLD, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, CIVIL, COMPACT, DRIED, HOLD, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, eraIndex, inv, invName } from "../catalog.ts";
 import { civilChance, civilStrength, landRoom, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -459,6 +459,11 @@ export function advice(world: World, n: Nation): Advice[] {
     const onLand = LUXURY.goods.filter(g => !lux.kinds.includes(g) && (res[g]?.amount ?? 0) > 0 && canSeeRes(world, n, g)).map(g => goodVi(world, g));
     const sellers = known.filter(o => LUXURY.goods.some(g => surpluses(world, o).some(x => x.good === g))).map(o => o.name);
     say(1, `Xa xỉ phẩm: dân đang dùng ${lux.kinds.length ? lux.kinds.map(g => goodVi(world, g)).join(", ") : "không thứ nào"} (+${lux.stability} ổn định/lượt). Mỗi loại có đủ ${lux.need} trong kho cho thêm +${LUXURY.stability}/lượt (tối đa +${LUXURY.max}).${onLand.length ? ` Trên đất bạn có: ${onLand.join(", ")} (hái lượm, săn, đánh cá hay đào mỏ để lấy).` : ""}${sellers.length ? ` Mua của ${sellers.slice(0, 3).join(", ")}.` : ""}`);
+  }
+  // §6.7b dried fish and meat: spare food and salt, a store against winter and drought
+  if (n.founded && m.unlocked.has("dried_food") && !(n.crafts.dried_food > 0) && (n.stock.salt || 0) >= 2) {
+    const turns = (n.stock.food || 0) / Math.max(1, mouths(n) * m.foodPerPerson);
+    if (turns >= 1.5) say(1, `Kho đủ ${Math.round(turns * 10) / 10} lượt ăn và có ${Math.floor(n.stock.salt || 0)} muối: làm cá thịt khô muối tại Bãi chế tác ("crafts": {"dried_food": n}; 3 lương thực + 1 muối → 2, hư ${DRIED.spoil * 100}% mỗi lượt thay vì hư nhanh như lương thực tươi), ăn được khi thiếu ăn, bán được.`);
   }
   // §2.11b jewellery: gold or silver idle in the stores, a gem beside it, and the furnace to work them
   if (n.founded && m.unlocked.has("jewelry") && !(n.crafts.jewelry > 0)) {
