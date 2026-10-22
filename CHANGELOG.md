@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.59
+
+- **Lãnh thổ liền khối (§2.3b):** không bắt buộc đất liền nhau, nhưng đất liền thì lợi rõ.
+  - Ô nội địa (6 ô quanh đều là đất mình hoặc biển): sản lượng +20%, phòng thủ +25%, chỉ tính nửa ô vào giới hạn quản lý.
+  - Khai hoang ô trống có từ 3 ô của mình bao quanh: nửa giá lương thực.
+  - Chợ nội địa: thuế +1% cho mỗi 10 ô đất liền với thủ đô (tối đa +10%).
+  - Mảnh đất tách rời không có trung tâm: sản lượng −25%, mỗi mảnh −1 ổn định mỗi lượt.
+  - AI thấy mục `territory` (khối chính, ô nội địa, mảnh tách rời, ô nên lấp); cố vấn nhắc.
+
 ## v0.58
 
 - **Báo luật mới cho các vua (§10.8):** khi luật đổi, trong 5 lượt đầu mỗi vua thấy mục `new_rules` kể những gì mới (lấy từ nhật ký thay đổi), và được dặn bỏ những gì trong ghi nhớ mà luật mới làm sai. Trước đây luật mới có hiệu lực ngay, nhưng không ai báo cho vua biết điều gì đã đổi.

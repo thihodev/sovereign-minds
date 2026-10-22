@@ -10,6 +10,7 @@ import { price } from "./market.ts";
 import { inLaws } from "./royals.ts";
 import { urbanCoin } from "./urban.ts";
 import { striking } from "./classes.ts";
+import { homeMarket } from "./compact.ts";
 import type { Nation, World } from "./types.ts";
 
 type Say = (nation: number | null, kind: string, text: string) => void;
@@ -167,7 +168,7 @@ export function treasuryPhase(world: World, L: Ledger): void {
     const made = L.byNation.get(n.id) ?? {};
     let base = 0;
     for (const [g, [m]] of Object.entries(made)) if (g !== "coin" && m > 0) base += m * price(world, g);
-    earn(L, n, base * t.tax * (striking(world, n, "officials") ? 0.5 : 1), "tax"); // §4.15 striking officials collect half
+    earn(L, n, base * t.tax * (striking(world, n, "officials") ? 0.5 : 1) * (1 + homeMarket(world, n)), "tax"); // §4.15 striking officials collect half; §2.3b one home market
     earn(L, n, workIncome(world, n), "works");
     earn(L, n, urbanCoin(n), "cities"); // §2.13 towns and cities pay their dues
     if ((n.roadWorks?.length ?? 0) || world.tiles.some(x => x.owner === n.id && (x.road || 0) > 0)) {

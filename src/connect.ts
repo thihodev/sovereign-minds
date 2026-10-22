@@ -9,6 +9,7 @@ import { mods, roadNet } from "./engine.ts";
 import { activeWar } from "./diplomacy.ts";
 import { piers } from "./routes.ts";
 import { openAirports } from "./air.ts";
+import { compactYield } from "./compact.ts";
 import { governorYield } from "./provinces.ts";
 import type { Nation, World } from "./types.ts";
 
@@ -91,7 +92,7 @@ export function yieldShares(world: World, n: Nation): (tile: number) => number {
   // the best road of the nation's own on the tile or beside it
   const ownRoad = (i: number) => { let lv = world.tiles[i].owner === n.id ? world.tiles[i].road || 0 : 0; for (const j of NEIGHBORS[i]) { const t = world.tiles[j]; if (t.owner === n.id && t.land && (t.road || 0) > lv) lv = t.road!; } return Math.min(lv, ROADS.yield.length - 1); };
   const roadNear = (i: number) => (world.tiles[i].road || 0) > 0 || NEIGHBORS[i].some(j => (world.tiles[j].road || 0) > 0 && world.tiles[j].land);
-  const memo = new Map<number, number>(), gov = governorYield(n);
+  const memo = new Map<number, number>(), gov = governorYield(n), shape = compactYield(world, n);
   return (i: number) => {
     const hit = memo.get(i); if (hit !== undefined) return hit;
     const { c: best, d } = nearestCentre(cs, i);
@@ -99,6 +100,7 @@ export function yieldShares(world: World, n: Nation): (tile: number) => number {
     if (d > CONNECT.reach && !roadNear(i)) share *= CONNECT.farYield;
     share *= 1 + ROADS.yield[ownRoad(i)]; // §2.5 a road carries the harvest home
     share *= gov.get(best) ?? 1;
+    share *= shape(i); // §2.3b interior land yields more, cut-off land less
     memo.set(i, share);
     return share;
   };

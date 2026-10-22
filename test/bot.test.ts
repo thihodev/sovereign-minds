@@ -62,7 +62,7 @@ test("a bot puts a small grounded invention before the judge", () => {
   assert.equal(prop.power, 2);
 });
 
-test("a strong bot attacks a much weaker neighbour, takes land, then makes peace", () => {
+test("a strong bot attacks a much weaker neighbour, takes land, and the war ends (peace or conquest)", () => {
   // A seed where B has room to hold on: on some maps its capital falls before it can sue for peace
   const w = createWorld("bot-war-3", bots(2));
   tick(w); // founding
@@ -97,6 +97,7 @@ test("a strong bot attacks a much weaker neighbour, takes land, then makes peace
   assert.ok(fought.some(b => b.won) && ownedTiles(w, B.id).length < tilesB, "A takes land");
   assert.notEqual(war.end, null, "the war ends");
   assert.equal(activeWar(w, A.id, B.id), undefined);
-  assert.ok(w.treaties.some(t => t.type === "peace" && [t.a, t.b].includes(A.id) && [t.a, t.b].includes(B.id)), "with a peace treaty");
-  assert.ok(B.alive);
+  // a nation four times the other's size: the war ends in a peace, or its capital falls (§7.4)
+  const peace = w.treaties.some(t => t.type === "peace" && [t.a, t.b].includes(A.id) && [t.a, t.b].includes(B.id));
+  assert.ok(peace ? B.alive : B.fate?.cause === "conquest" && B.fate.by === A.id, "with a peace treaty, or by conquest");
 });

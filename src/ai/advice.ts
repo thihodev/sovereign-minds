@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, CIVIL, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, CIVIL, COMPACT, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, eraIndex, inv, invName } from "../catalog.ts";
 import { civilChance, civilStrength, landRoom, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -12,6 +12,7 @@ import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
 import { civilWarsAbroad } from "../civil.ts";
+import { territoryView } from "../compact.ts";
 import { WAY_NAME, contagious, cureDiscount, diseaseOf, plagueNearby, quarantined, shield, spreadOf, vaccinated } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
@@ -136,6 +137,12 @@ export function advice(world: World, n: Nation): Advice[] {
     say(1, `Thủ đô không có nước ngọt trong 2 ô: dân tăng chậm hơn và dễ mắc dịch. Đào Giếng (build well) hoặc chiếm đất tới sông (nearest_river)${wet && (n.capitalMoved === undefined || world.tick - n.capitalMoved >= CAPITAL_MOVE.every) ? `, hoặc dời đô về ${wet.name} bên sông (move_capital, ${CAPITAL_MOVE.materials} gỗ/đá, −${CAPITAL_MOVE.stability} ổn định)` : ""}.`);
   }
 
+  // §2.3b a compact realm: fill the gaps first, join the exclaves
+  if (n.founded) {
+    const tv = territoryView(world, n);
+    if (tv.gaps_to_fill?.length) say(1, `Ô trống lọt giữa đất mình (khai hoang nửa giá lương thực, biến các ô quanh thành nội địa: sản lượng +${COMPACT.interiorYield * 100}%, phòng thủ +${COMPACT.interiorDefense * 100}%, chỉ tính ${COMPACT.interiorWeight} ô vào giới hạn): ${tv.gaps_to_fill.map(([c, r]) => `[${c}, ${r}]`).join(", ")}.`);
+    if (tv.exclaves?.length) say(2, `${tv.exclaves.length} mảnh đất tách khỏi khối chính, không có trung tâm (${tv.exclaves.map(e => `${e.tiles} ô quanh [${e.at.join(", ")}]`).join("; ")}): sản lượng −${COMPACT.exclaveYield * 100}%, ổn định −${COMPACT.exclaveStability} mỗi mảnh mỗi lượt. Khai hoang nối về, lập điểm định cư ở đó, hoặc bỏ đi.`);
+  }
   // Land over the limit
   const held = governed(world, n), limit = tileLimit(world, n);
   if (held >= limit) say(1, `Đang giữ ${held}/${limit} ô: đất đang giữ vẫn là của bạn, nhưng muốn khai hoang thêm phải nâng giới hạn (đường nối các trung tâm: mỗi ${ROADS.tilesPerLimit} ô đường +1; điểm định cư; dân số).`);

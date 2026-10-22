@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.58";
+export const RULES_VERSION = "0.59";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1152,6 +1152,13 @@ export const TOWER = { calm: 1, incidents: 0.25 };
 // poaching on that border falls by `poachCut` (on top of a watchtower's cut), and still for `linger` turns after the
 // grounds are given up; the treaty calms the border BORDER.treatyCalm.hunt a turn
 export const HUNT_ZONE = { depth: 2, poachCut: 0.5, linger: 5 };
+
+// §2.3b A compact realm: an interior land tile (every neighbour the nation's own or the sea) yields +`interiorYield`,
+// defends +`interiorDefense` and weighs `interiorWeight` of a tile against the tile limit; claiming a free tile with
+// `fill`+ of the nation's tiles around it costs `fillFood` of the food; a piece cut off from the main block with no centre
+// of its own yields −`exclaveYield` and costs `exclaveStability` stability a turn; the main block is one home market:
+// the treasury's taxes +`marketTax` for every `marketPer` land tiles in it, at most +`marketMax`
+export const COMPACT = { interiorYield: 0.2, interiorDefense: 0.25, interiorWeight: 0.5, fill: 3, fillFood: 0.5, exclaveYield: 0.25, exclaveStability: 1, marketTax: 0.01, marketPer: 10, marketMax: 0.1 };
 
 // §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`
 // of flour a turn while the store holds `keep` turns of eating; flour spoils `spoil` a turn and is eaten as food in need

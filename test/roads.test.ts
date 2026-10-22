@@ -169,11 +169,13 @@ test("a connected realm: a settlement with no way home yields less; a road joins
   for (const i of within(site.i, 1)) if (w.tiles[i].owner === -1 && w.tiles[i].land) w.tiles[i].owner = n.id;
   n.settlements.push({ tile: site.i, name: "Xa", tick: -100 }); // past its grace turns
   assert.equal(links(w, n).get(site.i), null, "cut off");
-  assert.equal(yieldShares(w, n)(site.i), CONNECT.isolatedYield);
+  const { compactYield } = await import("../src/compact.ts");
+  const shape = compactYield(w, n)(site.i); // §2.3b the settlement's tile is interior land
+  assert.ok(Math.abs(yieldShares(w, n)(site.i) - CONNECT.isolatedYield * shape) < 1e-9);
   for (const i of roadPlan(w, n, site.i)) w.tiles[i].road = 1;
   assert.equal(links(w, n).get(site.i), "road");
   const { ROADS } = await import("../src/rules.ts");
-  assert.equal(yieldShares(w, n)(site.i), 1 + ROADS.yield[1], "joined, and a road beside it carries the harvest home");
+  assert.ok(Math.abs(yieldShares(w, n)(site.i) - (1 + ROADS.yield[1]) * shape) < 1e-9, "joined, and a road beside it carries the harvest home");
 });
 
 test("transport is the lifeblood: roads raise yields, bring help, widen markets; abandoned roads fall apart", async () => {

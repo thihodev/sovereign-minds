@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  RULES_VERSION, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
+  COMPACT, RULES_VERSION, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, FLOUR, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -37,6 +37,7 @@ import { contagionPhase, cureDiscount, orderQuarantine, outbreakTurn, tradeLinks
 import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
 import { aidLosses, aidStrength, civilShare, ravage } from "./civil.ts";
+import { fillsGap, territory } from "./compact.ts";
 import { airPhase } from "./air.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
@@ -341,7 +342,8 @@ export function tileLimit(world: World, n: Nation): number {
 /** §2.6 How much a nation governs, against its tile limit: a water tile weighs SEA.limitWeight. */
 export function governed(world: World, n: Nation): number {
   let k = 0;
-  for (const t of world.tiles) if (t.owner === n.id) k += t.land ? 1 : SEA.limitWeight;
+  const inner = territory(world, n).interior; // §2.3b land deep inside the realm is easy to govern
+  for (const t of world.tiles) if (t.owner === n.id) k += t.land ? (inner.has(t.i) ? COMPACT.interiorWeight : 1) : SEA.limitWeight;
   return Math.round(k * 100) / 100;
 }
 /** §2.5 May this nation's people walk a road on this tile: its own land, the wilds, or a treaty partner's land. */
@@ -792,8 +794,9 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
   for (const [tile, ns] of [...byTile.entries()].sort((a, b) => a[0] - b[0])) {
     const winner = ns.length === 1 ? ns[0] : ns[Math.floor(crand() * ns.length)];
     if (world.tiles[tile].owner !== -1) { winner.lastRejected.push({ action: "claim_tile", reason: "Ô đã có chủ trước khi khai hoang xong" }); continue; }
-    if ((winner.stock.food || 0) < CLAIM_FOOD) { winner.lastRejected.push({ action: "claim_tile", reason: "Hết lương thực để khai hoang" }); continue; }
-    L.stock(winner, "food", -CLAIM_FOOD, "claim");
+    const cost = CLAIM_FOOD * (fillsGap(world, winner, tile) ? COMPACT.fillFood : 1); // §2.3b filling a gap in one's land is cheap
+    if ((winner.stock.food || 0) < cost) { winner.lastRejected.push({ action: "claim_tile", reason: "Hết lương thực để khai hoang" }); continue; }
+    L.stock(winner, "food", -cost, "claim");
     world.tiles[tile].owner = winner.id;
     fx({ kind: "claim", tile, nation: winner.id });
     for (const o of ns) if (o !== winner) o.lastRejected.push({ action: "claim_tile", reason: `${winner.name} giành được ô này cùng lượt` });
@@ -1250,6 +1253,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Stability (§4.4)
   n.stability += Math.min(1, doneEffect(world, n, "stability")) + m.stabilityPerTick;
   if (ownsWonder(world, n, "spring")) n.stability += 2;
+  // §2.3b land cut off from the main block with no centre of its own unsettles the people
+  const exclaves = territory(world, n).exclaves;
+  if (exclaves.length && n.founded) { n.stability -= exclaves.length * COMPACT.exclaveStability; n.lastEvents.push(`${exclaves.length} mảnh đất tách khỏi khối chính và không có trung tâm nào (${exclaves.map(b => `${b.length} ô quanh (${col(b[0])}, ${row(b[0])})`).join(", ")}): sản lượng ở đó −${COMPACT.exclaveYield * 100}%, ổn định −${exclaves.length * COMPACT.exclaveStability}. Nối chúng về khối chính hoặc lập điểm định cư ở đó.`); }
   if (n.silentStreak >= 3) n.stability -= 5;
   // Too many centres to govern from one hearth (§4.4)
   const sprawl = n.settlements.length - roadNet(world, n).linked.length - SETTLEMENT.freeCentres; // §2.5 a road to the capital holds a settlement close

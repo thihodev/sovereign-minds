@@ -15,6 +15,7 @@ import { herdView } from "../herds.ts";
 import { treasuryView } from "../treasury.ts";
 import { powerView } from "../power.ts";
 import { civilWarsAbroad } from "../civil.ts";
+import { territoryView } from "../compact.ts";
 import { ruleNews } from "../rulenews.ts";
 import { airView } from "../air.ts";
 import { royalsView } from "../royals.ts";
@@ -22,7 +23,7 @@ import { urbanView } from "../urban.ts";
 import { classView } from "../classes.ts";
 import { greatsView } from "../greats.ts";
 import { livingStandard } from "../living.ts";
-import { AIR, CIVIL, DEMOGRAPHY, HUNT_ZONE, CLASSES, CROWD, DISEASE, DISEASES, EVENTS, FLOUR, POWER, ROCK_SALT, TOWER, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
+import { AIR, CIVIL, COMPACT, DEMOGRAPHY, HUNT_ZONE, CLASSES, CROWD, DISEASE, DISEASES, EVENTS, FLOUR, POWER, ROCK_SALT, TOWER, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
 import { seaView } from "../sea.ts";
 import { landReserves, localPrice, price, shortages, specialtiesOf, surpluses, techEdge, trend, veinsNear, worth } from "../market.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
@@ -133,6 +134,7 @@ ROCK SALT (an idea a nation proposed, taken up in part): besides the coasts, som
 
 HEALING HERBS (two ideas nations proposed and the gods built in): herbs grow wild in forests, jungles and swamps, and now a few (${MEADOW_HERBS.min}–${MEADOW_HERBS.max}) on every grass and hill tile too, regrowing ${MEADOW_HERBS.regen * 100}% a turn there; your gatherers bring them home. With Trồng trọt (P14) you can plant "herb_garden" (${Object.entries(BUILDING_BY_TYPE.herb_garden.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.herb_garden.work} work): on your own warm land (temperate or tropical; grass, hill, forest, jungle, swamp or coast) within ${HERB_GARDEN.near} tiles of a centre, at most ${HERB_GARDEN.perCentre} for each centre; each gives ${BUILDING_BY_TYPE.herb_garden.effect.herbs} herbs a turn with no hands. One herb per ${HERBS.perPeople} people halves the deaths of a plague; herbs save newborns and meet the people's need for medicine.
 
+A COMPACT REALM PAYS (§2.3b): your land need not be one block, but one block is worth more. An INTERIOR tile (every neighbour your own land or the sea) yields +${COMPACT.interiorYield * 100}%, defends +${COMPACT.interiorDefense * 100}%, cannot be poached across a border, and weighs only ${COMPACT.interiorWeight} of a tile against your tile_limit. Claiming a GAP (a free tile with ${COMPACT.fill}+ of your tiles around it) costs half the food. Your main block (all land joined to your capital over your own tiles) is one home market: taxes +${COMPACT.marketTax * 100}% for every ${COMPACT.marketPer} of its land tiles (at most +${COMPACT.marketMax * 100}%). A piece of land cut off from the main block with no centre of its own yields −${COMPACT.exclaveYield * 100}% and costs ${COMPACT.exclaveStability} stability a turn each. "territory" in the observation shows your main block, interior tiles, exclaves and the gaps worth filling first.
 SHARED HUNTING GROUNDS (an idea a nation proposed, taken up in part): a treaty of kind "hunt" with a neighbour whose land touches yours (no tribute, no tiles; not between an old nation and its seceders while they are hostile). While it stands, each side's hunters also hunt the other's land up to ${HUNT_ZONE.depth} tiles from the border, lawfully (after your own land; the game is taken from that land); poaching on that border falls by ${HUNT_ZONE.poachCut * 100}% (and a watchtower's cut on top), and the border calms ${BORDER.treatyCalm.hunt} more a turn. Either side may give it up with break_treaty at no cost in reputation; poaching returns to normal ${HUNT_ZONE.linger} turns later. A war between the two ends it. "neighbours[].hunting_grounds" shows it.
 WATCHTOWERS (an idea a nation proposed, taken up in part): build "watchtower" (${Object.entries(BUILDING_BY_TYPE.watchtower.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.watchtower.work} work; needs Hàng rào gỗ P10) on a tile of yours touching a neighbour's land, joined by your own road to one of your centres; one for each neighbour. Its guards hold the tile and those around it ${Math.round(BUILDING_BY_TYPE.watchtower.effect.defense! * 100)}% harder, calm that border ${TOWER.calm} a turn (each side that has one), and cut border incidents (poaching, deadly brawls) by ${TOWER.incidents * 100}%. Guard a tense border instead of bleeding on it ("neighbours[].watchtower").
 
@@ -391,6 +393,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
       const xs = plagueNearby(world, n).map(x => ({ name: x.o.name, disease: x.d.name, contagious_until: x.until, could_reach_you_by: x.ways.length ? x.ways : undefined, in_quarantine: x.quarantined || undefined }));
       return xs.length ? xs : undefined;
     })(),
+    territory: n.founded ? territoryView(world, n) : undefined, // §2.3b
     civil_wars_abroad: civilWarsAbroad(world, n),
     new_rules: ruleNews(world), // §10.8 the rules changed lately: read what is new (the rules above already hold it)
     migrants_asking: (() => {

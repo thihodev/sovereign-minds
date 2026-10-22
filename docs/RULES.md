@@ -91,6 +91,20 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 - **Sau khi dời:** thủ đô cũ thành điểm định cư. Mọi thứ tính từ thủ đô đổi theo: lối về của các điểm định cư (mục 2.7), tỉnh xa (mục 2.8), nước ngọt, chỗ ở khởi điểm.
 - **AI thấy** `capital_move`: thủ đô và từng điểm định cư có sông, ven biển, nước ngọt, đường kề bên, mạch giàu và tài nguyên quanh 2 ô hay không. Lời cố vấn gợi ý dời đô khi thủ đô thiếu nước ngọt mà có điểm định cư bên sông.
 
+### 2.3b Lãnh thổ liền khối (từ v0.59)
+
+Đất không bắt buộc phải liền nhau, nhưng đất liền thành khối thì lợi rõ.
+- **Khối chính:** mọi ô (đất và nước) nối với thủ đô qua các ô của chính nước đó.
+- **Ô nội địa:** ô đất mà cả 6 ô quanh đều là đất của mình hoặc biển. Ô nội địa:
+  - sản lượng +20%;
+  - phòng thủ +25% khi bị tấn công;
+  - không bị săn trộm qua biên giới (nó không giáp láng giềng nào);
+  - chỉ tính 0,5 ô vào giới hạn quản lý.
+- **Lấp chỗ trống:** khai hoang một ô trống có từ 3 ô của mình bao quanh chỉ tốn nửa lương thực (2,5 thay vì 5).
+- **Chợ nội địa:** thuế ngân khố +1% cho mỗi 10 ô đất của khối chính, tối đa +10%.
+- **Mảnh tách rời:** một mảnh đất không nối với khối chính và không có trung tâm nào (thủ đô, điểm định cư) thì sản lượng −25%, và mỗi mảnh làm mất 1 ổn định mỗi lượt. Mảnh có điểm định cư riêng (thuộc địa bên kia biển) không bị phạt.
+- AI thấy mục `territory`: cỡ khối chính, số ô nội địa, phần thưởng chợ nội địa, các mảnh tách rời, và tối đa 6 ô trống nên lấp trước. Cố vấn nhắc lấp chỗ trống và nối các mảnh tách rời.
+
 ### 2.4 Đặc thù quốc gia
 
 Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng nước nào. Watcher chọn đặc thù (hoặc để ngẫu nhiên) trong hộp thoại **Thế giới mới**, và đặc thù giữ nguyên suốt trận. Mỗi đặc thù có hai phần:
