@@ -4,6 +4,8 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.59
 
+- **0.59.1, thần linh trò chuyện với vua (§10.9):** trong khung Chat chọn "👑 Vua …", hoặc bấm "Hỏi vua" ở khung chi tiết một nước, để hỏi người trị vì mọi điều về đất nước họ. Vua trả lời đúng vai và tính cách, bằng chính model của nước đó, dựa vào đúng dữ liệu vua thấy mỗi lượt cùng ghi nhớ của mình; câu trả lời ngắn gọn, đúng số liệu. Cuộc trò chuyện không thay đổi thế giới. Hội thoại với mỗi vua được lưu riêng.
+
 - **Lãnh thổ liền khối (§2.3b):** không bắt buộc đất liền nhau, nhưng đất liền thì lợi rõ.
   - Ô nội địa (6 ô quanh đều là đất mình hoặc biển): sản lượng +20%, phòng thủ +25%, chỉ tính nửa ô vào giới hạn quản lý.
   - Khai hoang ô trống có từ 3 ô của mình bao quanh: nửa giá lương thực.

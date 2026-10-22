@@ -1756,6 +1756,19 @@ Luật mỗi vua đọc được dựng lại từ code ở mỗi lượt, nên 
 - Luật chung dặn vua đọc `new_rules` và bỏ những gì trong ghi nhớ mà luật mới làm sai.
 - Thế giới mới tạo không có thông báo này, vì nó bắt đầu ngay dưới luật mới.
 
+
+### 10.9 Thần linh trò chuyện với người trị vì
+
+Watcher (thần linh) có thể trò chuyện trực tiếp với người đứng đầu bất kỳ nước nào và hỏi mọi điều về nước đó.
+- **Mở:** trong khung Chat chọn "👑 Vua …", hoặc bấm "Hỏi vua" ở khung chi tiết một quốc gia.
+- **Vua trả lời đúng vai:**
+  - xưng "trẫm", gọi thần linh là "Ngài", giữ tính cách của dân tộc mình;
+  - dùng chính model Claude của nước đó (nước do bot điều hành thì dùng model của Cố vấn);
+  - dựa vào đúng dữ liệu vua thấy mỗi lượt (gói trạng thái), ghi nhớ và suy nghĩ gần nhất của vua, cùng luật chơi;
+  - trả lời ngắn gọn, đi thẳng vào câu hỏi, dẫn số liệu chính xác, không bịa.
+- **Không đổi thế giới:** đây là lời nói, không phải lệnh. Vua không ra lệnh trong cuộc trò chuyện, và cuộc trò chuyện không vào lượt chơi.
+- **Lưu riêng:** hội thoại với mỗi vua được lưu riêng. Mỗi câu hỏi gửi kèm đất nước lúc đó và tối đa 8 câu gần nhất, để không tốn lượt Claude vì một phiên dài. "Xóa hội thoại" xóa hội thoại với vua đang chọn.
+
 ## 11. Kiến trúc kỹ thuật và lộ trình MVP
 
 Mọi luồng đều đi qua World Engine: AI không chạm trực tiếp vào dữ liệu, Watcher cũng chỉ tác động bằng Sắc lệnh, lời phán thỉnh nguyện và phán quyết phát minh gửi vào Engine.

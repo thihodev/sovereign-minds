@@ -1505,7 +1505,7 @@
       return [...out, ...[...done.values()].map(({ b, n }) => `<span${b.desc ? ` title="${esc(b.desc)}"` : ""}>${bIcon(b)} ${esc(b.name)}${n > 1 ? ` <b>×${n}</b>` : ""}</span>`)];
     })();
     const head = `<div class="head"><span class="flag"></span><div class="grow"><h3 class="nname"></h3><div class="sub nmeta"></div></div><div class="pills">${healthPills(n)}${statusPill(n)}</div></div>`;
-    const actions = `<div class="actions"><button type="button" class="primary sm" data-act="detail">Hồ sơ đầy đủ</button>${n.alive ? `<button type="button" class="sm" data-act="locate" title="Xem trên bản đồ">📍 Bản đồ</button>` : ""}${tile === null ? `<button type="button" class="more" data-act="list">Tất cả quốc gia ›</button>` : ""}</div>`;
+    const actions = `<div class="actions"><button type="button" class="primary sm" data-act="detail">Hồ sơ đầy đủ</button>${n.alive ? `<button type="button" class="sm" data-act="locate" title="Xem trên bản đồ">📍 Bản đồ</button><button type="button" class="sm" data-act="talk" title="Thần linh trò chuyện với người trị vì nước này">👑 Hỏi vua</button>` : ""}${tile === null ? `<button type="button" class="more" data-act="list">Tất cả quốc gia ›</button>` : ""}</div>`;
     if (tile !== null) {
       el.innerHTML = `${head}${keyTiles(n, true)}${bchips.length ? sec("", "Công trình trên ô này", chipList(bchips), { fold: false, count: blds.length }) : ""}${actions}`;
     } else {
@@ -1532,6 +1532,7 @@
     const q = el.querySelector(".quote"); if (q) { q.textContent = `“${n.thought}”`; q.title = n.thought; }
     el.querySelector("[data-act=detail]").onclick = () => openNation(n.id);
     el.querySelector("[data-act=locate]")?.addEventListener("click", () => centerOn(n.capital));
+    el.querySelector("[data-act=talk]")?.addEventListener("click", () => talkTo(n.id));
     el.querySelector("[data-act=list]")?.addEventListener("click", () => openRight("nations"));
     return el;
   }
@@ -2304,13 +2305,27 @@
     $("#cl-submit")?.addEventListener("click", async () => { const r = await api("/api/claude/login/code", { method: "POST", body: { code: $("#cl-code").value } }); renderLogin(); if (r.state !== "done" && r.error) msg("err", r.error); });
     $("#cl-cancel")?.addEventListener("click", async () => { await api("/api/claude/login/cancel", { method: "POST" }); renderLogin(); });
   }
-  let chatLoaded = false;
-  async function loadChat() {
-    renderLogin();
-    if (chatLoaded) return; chatLoaded = true;
-    const hist = await api("/api/chat").catch(() => []);
-    log.innerHTML = ""; for (const m of hist) msg(m.role, m.text);
+  // §10.9 who the Watcher talks with: the adviser (""), or the ruler of a nation (its id)
+  let chatLoaded = false, chatTo = "";
+  const chatUrl = () => chatTo === "" ? "/api/chat" : `/api/rulerchat/${chatTo}`;
+  function chatTargets() {
+    const sel = $("#chat-to"), live = Object.values(S.nations || {}).filter(n => n.alive && n.founded).sort((a, b) => a.id - b.id);
+    const want = [["", "🧠 Cố vấn Claude"], ...live.map(n => [String(n.id), `👑 Vua ${nationName(n)}`])];
+    if (sel.options.length !== want.length || want.some(([v, t], k) => sel.options[k]?.value !== v || sel.options[k]?.textContent !== t))
+      sel.innerHTML = want.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+    sel.value = chatTo;
   }
+  async function loadChat(force = false) {
+    renderLogin(); chatTargets();
+    if (chatLoaded && !force) return; chatLoaded = true;
+    const hist = await api(chatUrl()).catch(() => []);
+    log.innerHTML = ""; for (const m of hist) msg(m.role, m.text);
+    const n = chatTo === "" ? null : S.nations[chatTo];
+    $("#chat-input").placeholder = n ? `Hỏi vua ${nationName(n)} bất cứ điều gì về đất nước của họ` : "Hỏi Claude về thế giới, ví dụ: Quốc gia nào đang gặp nguy?";
+  }
+  /** Open the chat with a nation's ruler. */
+  function talkTo(id) { chatTo = String(id); setDock("left", true); loadChat(true); $("#chat-input").focus(); }
+  $("#chat-to").onchange = e => { chatTo = e.target.value; loadChat(true); };
   $("#chatform").onsubmit = async e => {
     e.preventDefault();
     const text = $("#chat-input").value.trim(); if (!text) return;
@@ -2318,7 +2333,7 @@
     const out = msg("claude", "…"); let first = true;
     $("#chat-send").disabled = true;
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: text }) });
+      const res = await fetch(chatUrl(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: text }) });
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || `HTTP ${res.status}`); }
       const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
       for (;;) {
@@ -2335,7 +2350,7 @@
     $("#chat-send").disabled = false;
   };
   $("#chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatform").requestSubmit(); } });
-  $("#chat-clear").onclick = async () => { await api("/api/chat", { method: "DELETE" }); log.innerHTML = ""; };
+  $("#chat-clear").onclick = async () => { await api(chatUrl(), { method: "DELETE" }); log.innerHTML = ""; };
 
   // ---------------------------------------------------------------- inventions
   const nm = id => S.nations[id]?.name ?? `#${id}`;

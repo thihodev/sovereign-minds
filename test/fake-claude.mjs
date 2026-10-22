@@ -21,6 +21,11 @@ if (args[0] === "-p") {
     console.log(JSON.stringify({ is_error: false, result: JSON.stringify({ rulings }) }));
     process.exit(0);
   }
+  if (system.startsWith("Bạn là người trị vì")) { // §10.9 a ruler talks with the gods: plain words, from its nation's data
+    const pop = input.match(/"population":\{"total":(\d+)/)?.[1] ?? input.match(/"total":(\d+)/)?.[1] ?? "?";
+    console.log(JSON.stringify({ type: "result", is_error: false, result: `Thưa Ngài, dân của trẫm có **${pop}** người.` }));
+    process.exit(0);
+  }
   const minister = system.startsWith("You are a MINISTER"); // §4.9
   console.log(JSON.stringify({ is_error: false, result: JSON.stringify(minister ? { thought: "Thần xin tuân lệnh.", actions: [] } : { thought: "Giữ lửa và đi săn.", actions: [] }) }));
   process.exit(0);

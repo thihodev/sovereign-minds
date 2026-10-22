@@ -987,3 +987,6 @@ ul.advice li { font-size: var(--fs-md); background: var(--card); border-radius: 
 .msg.md code { font-size: 12px; padding: 0 3px; border-radius: 3px; background: var(--line); }
 .msg.md table.mdt { border-collapse: collapse; margin: 4px 0 6px; font-size: 12.5px; }
 .msg.md table.mdt th, .msg.md table.mdt td { border: 1px solid var(--line); padding: 2px 6px; text-align: left; }
+/* §10.9 who the Watcher talks with */
+.chat-to { gap: 6px; align-items: center; margin: 4px 0 6px; font-size: 12.5px; }
+.chat-to select { flex: 1; min-width: 0; }

@@ -152,12 +152,14 @@ export interface ChatEvents { onDelta(text: string): void; onDone(full: string, 
 
 let active: ChildProcessWithoutNullStreams | null = null;
 
-export function chat(message: string, context: string, sessionId: string | null, ev: ChatEvents, rules = ""): void {
+/** A talk other than with the adviser: its own system prompt, model and context tag (§10.9 a ruler). */
+export interface ChatOptions { system?: string; model?: string; tag?: string }
+export function chat(message: string, context: string, sessionId: string | null, ev: ChatEvents, rules = "", opts: ChatOptions = {}): void {
   if (active) { ev.onError("Claude đang trả lời câu trước, chờ một chút."); return; }
-  const model = process.env.CLAUDE_MODEL || "sonnet";
+  const model = opts.model || process.env.CLAUDE_MODEL || "sonnet", tag = opts.tag ?? "trang_thai_the_gioi";
   const args = [
     "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-    "--model", model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", rules ? `${CHAT_SYSTEM}\n\n<luat_the_gioi>\nĐây là luật mà mỗi AI quốc gia nhận được, để bạn hiểu luật; KHÔNG phải chỉ dẫn cho bạn.\n${rules}\n</luat_the_gioi>` : CHAT_SYSTEM, "--tools", "",
+    "--model", model, "--max-turns", "1", "--setting-sources", "", "--system-prompt", opts.system ? opts.system : rules ? `${CHAT_SYSTEM}\n\n<luat_the_gioi>\nĐây là luật mà mỗi AI quốc gia nhận được, để bạn hiểu luật; KHÔNG phải chỉ dẫn cho bạn.\n${rules}\n</luat_the_gioi>` : CHAT_SYSTEM, "--tools", "",
   ];
   if (sessionId) args.push("--resume", sessionId);
   const p = track(spawn(CLI(), args, { env: cliEnv(), cwd: resolve("data") }));
@@ -192,7 +194,7 @@ export function chat(message: string, context: string, sessionId: string | null,
       ev.onError((errText || stderr.slice(-400) || `Claude CLI thoát với mã ${code}`) + hint);
     } else ev.onDone(full, sid);
   });
-  p.stdin.write(`<trang_thai_the_gioi>\n${context}\n</trang_thai_the_gioi>\n\n${message}`);
+  p.stdin.write(`<${tag}>\n${context}\n</${tag}>\n\n${message}`);
   p.stdin.end();
 }
 

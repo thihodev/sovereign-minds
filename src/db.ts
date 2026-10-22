@@ -46,6 +46,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS nation_stats (tick INTEGER, nation INTEGER, population INTEGER, food REAL, stability INTEGER, tiles INTEGER, inventions INTEGER, status TEXT, PRIMARY KEY (tick, nation));
       CREATE TABLE IF NOT EXISTS watcher_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tick INTEGER, kind TEXT, payload TEXT, created_at TEXT);
       CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, text TEXT, tick INTEGER, created_at TEXT);
+      CREATE TABLE IF NOT EXISTS ruler_chat (id INTEGER PRIMARY KEY AUTOINCREMENT, nation INTEGER, role TEXT, text TEXT, tick INTEGER, created_at TEXT);
       CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, from_tick INTEGER, to_tick INTEGER, title TEXT, text TEXT, author TEXT, created_at TEXT);
       CREATE TABLE IF NOT EXISTS nation_log (tick INTEGER, nation INTEGER, events TEXT, PRIMARY KEY (tick, nation));
     `);
@@ -156,6 +157,14 @@ export class Store {
     return (this.db.prepare("SELECT id, role, text, tick, created_at FROM chat ORDER BY id DESC LIMIT ?").all(limit) as unknown[]).reverse();
   }
   clearChat(): void { this.db.exec("DELETE FROM chat"); }
+  /** §10.9 the gods' talks with each ruler */
+  addRulerChat(nation: number, role: string, text: string, tick: number): void {
+    this.db.prepare("INSERT INTO ruler_chat (nation, role, text, tick, created_at) VALUES (?, ?, ?, ?, ?)").run(nation, role, text, tick, new Date().toISOString());
+  }
+  rulerChatHistory(nation: number, limit: number): unknown[] {
+    return (this.db.prepare("SELECT id, role, text, tick, created_at FROM ruler_chat WHERE nation = ? ORDER BY id DESC LIMIT ?").all(nation, limit) as unknown[]).reverse();
+  }
+  clearRulerChat(nation: number): void { this.db.prepare("DELETE FROM ruler_chat WHERE nation = ?").run(nation); }
 
   /** Copy the whole database to data/backups/, then empty it for a new world. Returns the backup's path. */
   backupAndReset(): string {

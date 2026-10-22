@@ -17,6 +17,7 @@ import { governed, housing, housingParts, housingSlots, mods, inventionCost, max
 import { DEMO, DISEASES, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { LINE_VI } from "./treasury.ts";
 import { powerView } from "./power.ts";
+import { rulerChatContext, rulerChatSystem, rulerModel } from "./ai/rulerchat.ts";
 import { airView } from "./air.ts";
 import { royalsView } from "./royals.ts";
 import { classView } from "./classes.ts";
@@ -402,6 +403,32 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       if (path === "/api/claude/logout" && method === "POST") { logout(); runner.store.setMeta("claude_session", ""); return send(res, 200, { ok: true }); }
       if (path === "/api/chat" && method === "GET") return send(res, 200, runner.store.chatHistory(100));
       if (path === "/api/chat" && method === "DELETE") { runner.store.clearChat(); runner.store.setMeta("claude_session", ""); return send(res, 200, { ok: true }); }
+      // §10.9 the gods speak with a ruler
+      const rc = path.match(/^\/api\/rulerchat\/(\d+)$/);
+      if (rc) {
+        const n = runner.world.nations[Number(rc[1])];
+        if (!n || !n.founded) return send(res, 404, { error: "Không có quốc gia này" });
+        if (method === "GET") return send(res, 200, runner.store.rulerChatHistory(n.id, 100));
+        if (method === "DELETE") { runner.store.clearRulerChat(n.id); return send(res, 200, { ok: true }); }
+        if (method === "POST") {
+          if (!n.alive) return send(res, 400, { error: `${n.name} đã diệt vong` });
+          const b = await readBody(req), message = String(b.message ?? "").trim().slice(0, 4000);
+          if (!message) return send(res, 400, { error: "Tin nhắn trống" });
+          const tick = runner.world.tick;
+          const before = runner.store.rulerChatHistory(n.id, 8) as Array<{ role: string; text: string; tick: number }>;
+          runner.store.addRulerChat(n.id, "user", message, tick);
+          res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+          const ev = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+          // each question carries the nation as it is now and the last words exchanged (no long session to grow)
+          const talk = before.length ? `\n\nNHỮNG LỜI GẦN ĐÂY GIỮA THẦN LINH VÀ BẠN:\n${before.map(x => `${x.role === "user" ? "Thần linh" : "Bạn"} (lượt ${x.tick}): ${x.text.slice(0, 800)}`).join("\n")}` : "";
+          chat(message, rulerChatContext(runner.world, n) + talk, null, {
+            onDelta: t => ev("delta", { text: t }),
+            onDone: full => { runner.store.addRulerChat(n.id, "claude", full, tick); ev("done", {}); res.end(); },
+            onError: msg => { ev("error", { error: msg }); res.end(); },
+          }, "", { system: rulerChatSystem(runner.world, n), model: rulerModel(n), tag: "dat_nuoc_cua_ban" });
+          return;
+        }
+      }
       if (path === "/api/chat" && method === "POST") {
         const b = await readBody(req), message = String(b.message ?? "").trim().slice(0, 4000);
         if (!message) return send(res, 400, { error: "Tin nhắn trống" });

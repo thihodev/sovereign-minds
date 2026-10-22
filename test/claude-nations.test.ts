@@ -207,3 +207,29 @@ test("the Watcher's chat sees every nation's buildings, centres and treasury, to
     r.store.close?.();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the gods speak with a ruler: it answers in its own voice from its nation's data, with its own model", async () => {
+  const { chat } = await import("../src/claude.ts");
+  const { rulerChatContext, rulerChatSystem, rulerModel } = await import("../src/ai/rulerchat.ts");
+  const dir = mkdtempSync(join(tmpdir(), "sm-ruler-"));
+  try {
+    const r = runnerWithFake(dir), n = r.world.nations[0];
+    Object.assign(n, { founded: true, name: "Văn Hà", capitalName: "Kinh Thiên", memory: "Giữ biên giới phía bắc." });
+    n.population = 123;
+    const system = rulerChatSystem(r.world, n), context = rulerChatContext(r.world, n);
+    assert.match(system, /^Bạn là người trị vì nước Văn Hà/);
+    assert.match(system, /THẦN LINH/); assert.match(system, /<luat_the_gioi>/);
+    assert.match(context, /GHI NHỚ CỦA BẠN:\nGiữ biên giới phía bắc\./);
+    assert.match(context, /DỮ LIỆU ĐẤT NƯỚC/);
+    assert.equal(rulerModel(n), n.provider === "claude" ? n.model : undefined);
+    const answer = await new Promise<string>((ok, bad) => chat("Dân của khanh bao nhiêu người?", context, null,
+      { onDelta: () => {}, onDone: full => ok(full), onError: bad }, "", { system, model: rulerModel(n), tag: "dat_nuoc_cua_ban" }));
+    assert.match(answer, /Thưa Ngài, dân của trẫm có \*\*123\*\* người/);
+    const call = turnCalls(dir).at(-1)!;
+    assert.equal(call[call.indexOf("--model") + 1], rulerModel(n) ?? (process.env.CLAUDE_MODEL || "sonnet"), "the ruler's own model");
+    r.store.addRulerChat(n.id, "user", "hỏi", 1); r.store.addRulerChat(n.id, "claude", "đáp", 1);
+    assert.equal((r.store.rulerChatHistory(n.id, 10) as unknown[]).length, 2);
+    r.store.clearRulerChat(n.id);
+    assert.equal((r.store.rulerChatHistory(n.id, 10) as unknown[]).length, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
