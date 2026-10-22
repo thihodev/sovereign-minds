@@ -32,10 +32,11 @@ import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
-import { borderPhase, huntZone, pairKey } from "./border.ts";
+import { borderOf, borderPhase, huntZone, pairKey } from "./border.ts";
 import { contagionPhase, cureDiscount, orderQuarantine, outbreakTurn, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
+import { aidLosses, aidStrength, civilShare, ravage } from "./civil.ts";
 import { airPhase } from "./air.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
@@ -935,7 +936,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
 function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null, kind: string, text: string) => void, away: number): void {
   const tick = world.tick, m = mods(world, n), erand = rngFor(world.seed, tick, "nation", n.id);
   const owned = ownedTiles(world, n.id);
-  const stabMult = n.stability < 30 ? 0.75 : 1;
+  const stabMult = (n.stability < 30 ? 0.75 : 1) * (1 - civilShare(world, n)); // §4.5b the rebels work for no one
   const labor = { ...n.labor };
   // People away (explorers, porters) come from the gatherers first, then from the other trades
   let short = Math.max(0, away - labor.gather);
@@ -1280,6 +1281,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   if (cutOff) dis += cutOff * CONNECT.isolatedDiscontent;
   if (n.founded) dis += provinceTurn(world, n, say); // §2.8 restless provinces press on the nation
   if (n.stability >= SCHISM.calm) dis -= SCHISM.fade;
+  if (n.civilScar && world.tick < n.civilScar.until) dis += n.civilScar.rate; // §4.5b the wound of a civil war
   n.discontent = Math.max(0, Math.min(100, Math.round(dis * 10) / 10));
 }
 
@@ -1358,7 +1360,7 @@ function schismPhase(world: World, L: Ledger, say: Say): void {
       else if (x.status === "asking" && tick >= (x.askUntil ?? tick)) goHome(n, x, `${world.nations[x.to!]?.name ?? "nước kia"} không nhận họ`);
     }
     if (open?.status === "approved") secede(world, n, open, L, say);
-    if (open?.status === "fighting" && open.tick < tick) civilBattle(world, n, open, say);
+    if (open?.status === "fighting" && open.tick < tick) civilBattle(world, n, open, L, say);
   }
 }
 
@@ -1369,7 +1371,8 @@ export function civilChance(n: Nation, site: number): number {
 /** §4.5b The strength of the two sides of a civil war this turn. */
 export function civilStrength(world: World, n: Nation, x: Schism): { rebels: number; crown: number; odds: number } {
   const m = mods(world, n), share = Math.min(0.9, x.people / Math.max(1, n.population));
-  const crown = homeDefence(world, n) * (1 - share), rebels = x.people * WORKER_SHARE * CIVIL.rise * (1 + (m.role.warrior || 0) + m.combat);
+  const aid = aidStrength(world, x); // other nations' warriors and goods
+  const crown = homeDefence(world, n) * (1 - share) + aid.crown, rebels = x.people * WORKER_SHARE * CIVIL.rise * (1 + (m.role.warrior || 0) + m.combat) + aid.rebels;
   return { rebels, crown, odds: Math.round(rebels / Math.max(1e-9, rebels + crown) * 100) / 100 };
 }
 /** §4.5b A faction rises to kill the ruler and take the throne. */
@@ -1383,23 +1386,30 @@ function riseForThrone(world: World, n: Nation, list: Schism[], r: () => number,
   say(n.id, "civil", `Nội chiến ở ${n.name}: ${x.people} người theo ${leader} nổi dậy đòi lật đổ người trị vì, vì ${x.grievance}.`);
   fx({ kind: "riot", tile: n.capital, nation: n.id, text: `nội chiến: ${leader}` });
 }
-/** §4.5b One turn of civil war: the two sides fight; two turns won decide it. */
-function civilBattle(world: World, n: Nation, x: Schism, say: Say): void {
+/** §4.5b One turn of civil war: the two sides fight, the land is ravaged; CIVIL.win turns won decide it. */
+function civilBattle(world: World, n: Nation, x: Schism, L: Ledger, say: Say): void {
   const tick = world.tick, s = civilStrength(world, n, x), r = rngFor(world.seed, tick, "civil", n.id), rebelsWin = r() < s.odds;
-  const score = (x.score ??= { rebels: 0, crown: 0 });
+  const score = (x.score ??= { rebels: 0, crown: 0 }), toll = (x.toll ??= { dead: 0, fled: 0, burned: 0, ruined: 0 });
   if (rebelsWin) score.rebels++; else score.crown++;
   x.odds = s.odds;
-  const rebelsDead = Math.min(x.people, Math.ceil(x.people * (rebelsWin ? CIVIL.dead : CIVIL.loserDead)));
-  const crownDead = Math.ceil(Math.max(0, n.population - x.people) * (rebelsWin ? CIVIL.loserDead : CIVIL.dead) * 0.5);
-  takePeople(n, Math.min(n.population - 1, rebelsDead + crownDead), "war"); x.people = Math.max(0, x.people - rebelsDead);
-  fxDeath(n.capital, n.id, rebelsDead + crownDead, "war");
+  const rebelRate = rebelsWin ? CIVIL.dead : CIVIL.loserDead, crownRate = rebelsWin ? CIVIL.loserDead : CIVIL.dead;
+  const rebelsDead = Math.min(x.people, Math.ceil(x.people * rebelRate));
+  const crownDead = Math.ceil(Math.max(0, n.population - x.people) * crownRate * 0.5);
+  const dead = Math.min(n.population - 1, rebelsDead + crownDead);
+  takePeople(n, dead, "war"); x.people = Math.max(0, x.people - rebelsDead); toll.dead += dead;
+  aidLosses(world, x, "rebels", rebelRate); aidLosses(world, x, "crown", crownRate);
+  fxDeath(n.capital, n.id, dead, "war");
   n.stability = Math.max(0, n.stability - CIVIL.stability);
-  n.lastEvents.push(`Nội chiến, lượt ${score.rebels + score.crown}: ${rebelsWin ? `phe ${x.leader} thắng` : "quân triều đình thắng"} (${rebelsDead} người nổi dậy, ${crownDead} người phía triều đình chết). Tỉ số: nổi dậy ${score.rebels} – triều đình ${score.crown}.`);
+  const ruin = ravage(world, n, x, L, r);
+  n.lastEvents.push(`Nội chiến, lượt ${score.rebels + score.crown}: ${rebelsWin ? `phe ${x.leader} thắng` : "quân triều đình thắng"} (${rebelsDead} người nổi dậy, ${crownDead} người phía triều đình chết${ruin.length ? `; ${ruin.join(", ")}` : ""}). Tỉ số: nổi dậy ${score.rebels} – triều đình ${score.crown}.`);
+  const helpers = (side: "crown" | "rebels") => [...new Set((x.aid ?? []).filter(y => y.side === side).map(y => y.nation))].map(id => world.nations[id]).filter(o => o?.alive);
   if (score.crown >= CIVIL.win || x.people <= 0) {
     x.status = "crushed"; x.decidedTick = tick;
     n.discontent = Math.min(n.discontent ?? 0, CIVIL.crushedDiscontent); n.stability = Math.min(100, n.stability + CIVIL.crushedStability);
-    n.lastEvents.push(`Quân triều đình dẹp tan cuộc nổi dậy; ${x.leader} bị xử tử. Ngai vàng còn đó, nhưng bất mãn còn ${n.discontent}: cai trị cho tốt, kẻo lần sau không may như vậy.`);
-    say(n.id, "civil", `${n.name} dẹp tan cuộc nổi dậy của ${x.leader}.`);
+    n.civilScar = { until: tick + CIVIL.scarTurns, rate: CIVIL.scarCrushed }; // the vanquished nurse their hatred
+    for (const o of helpers("crown")) { const st = borderOf(world, n.id, o.id); st.tension = Math.max(0, st.tension - 10); }
+    n.lastEvents.push(`Quân triều đình dẹp tan cuộc nổi dậy sau ${score.rebels + score.crown} lượt (${toll.dead} người chết, ${toll.fled} người chạy nạn, ${toll.burned} công trình bị đốt); ${x.leader} bị xử tử. Ngai vàng còn đó, nhưng máu đã đổ: những người sống sót còn ôm thù ${CIVIL.scarTurns} lượt (bất mãn +${CIVIL.scarCrushed} mỗi lượt).${helpers("rebels").length ? ` ${helpers("rebels").map(o => o.name).join(", ")} đã giúp phản quân: ta có chính nghĩa để đánh họ.` : ""}`);
+    say(n.id, "civil", `${n.name} dẹp tan cuộc nổi dậy của ${x.leader} sau ${score.rebels + score.crown} lượt nội chiến; ${toll.dead} người chết.`);
   } else if (score.rebels >= CIVIL.win) newRuler(world, n, x, say);
 }
 /** §4.5b The rebels win: the ruler is killed and the leader takes the throne with a new house and a new character. */
@@ -1413,6 +1423,12 @@ function newRuler(world: World, n: Nation, x: Schism, say: Say): void {
   n.memory = `Ta là ${x.leader}, nhà ${house}. Ở lượt ${tick} phe ta nổi dậy vì ${x.grievance}, giết ${fallen} và lên ngôi. Ta không mang ký ức của triều cũ; dân theo ta vì tin ta sẽ cai trị khác. Tính cách của ta: ${trait.name}. Trong ${RENAME.windowTicks} lượt ta có thể đổi tên nước, cờ và viết tuyên ngôn mới (rename_nation, kèm manifesto). Nếu ta cũng cai trị tệ, dân sẽ lật đổ ta như vậy.`;
   n.lastThought = "";
   n.discontent = 0; n.stability = Math.max(n.stability, CIVIL.wonStability);
+  n.civilScar = { until: tick + CIVIL.scarTurns, rate: CIVIL.scarWon }; // the old court's men do not forget
+  const friends = [...new Set((x.aid ?? []).filter(y => y.side === "rebels").map(y => y.nation))].map(id => world.nations[id]).filter(o => o?.alive);
+  const foes = [...new Set((x.aid ?? []).filter(y => y.side === "crown").map(y => y.nation))].map(id => world.nations[id]).filter(o => o?.alive);
+  for (const o of friends) { const st = borderOf(world, n.id, o.id); st.tension = Math.max(0, st.tension - 20); }
+  for (const o of foes) n.casusBelli[String(o.id)] = Math.max(n.casusBelli[String(o.id)] ?? -1, tick + CIVIL.helpCause);
+  if (friends.length || foes.length) n.memory += `${friends.length ? ` ${friends.map(o => o.name).join(", ")} đã giúp ta lên ngôi.` : ""}${foes.length ? ` ${foes.map(o => o.name).join(", ")} đã giúp triều cũ chống ta.` : ""}`;
   x.status = "won"; x.decidedTick = tick; x.nation = n.id;
   n.lastEvents.push(`Phe nổi dậy thắng: ${fallen} bị giết. ${x.leader} lên ngôi, lập nhà ${house}, với tính cách mới (${trait.name}).`);
   say(n.id, "civil", `Nội chiến ở ${n.name} kết thúc: ${fallen} bị giết, ${x.leader} lên ngôi, lập nhà ${house}.`);

@@ -11,6 +11,7 @@ import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
+import { civilWarsAbroad } from "../civil.ts";
 import { WAY_NAME, contagious, cureDiscount, diseaseOf, plagueNearby, quarantined, shield, spreadOf, vaccinated } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
@@ -137,6 +138,8 @@ export function advice(world: World, n: Nation): Advice[] {
   if (held > limit) say(2, `Đang giữ ${held} ô, quá giới hạn quản lý ${limit}: không đủ người làm, mỗi lượt ${LAND.overRelease} ô thừa (trống, xa, nghèo nhất) tự thành đất hoang. Muốn giữ đất: nâng giới hạn bằng đường nối các trung tâm (mỗi ${ROADS.tilesPerLimit} ô đường +1), lập điểm định cư hoặc tăng dân; hoặc tự chọn ô bỏ (abandon_tile) để giữ ô tốt.`);
 
   // Discontent
+  // §4.5b a neighbour's civil war: a chance to make a friend of the winner, or to strike while it is weak
+  for (const w2 of civilWarsAbroad(world, n) ?? []) say(1, `${w2.nation} đang nội chiến (${w2.score}; ${w2.rebels} người theo ${w2.leader}, khả năng phản quân thắng mỗi lượt ~${Math.round((w2.rebels_odds ?? 0) * 100)}%). Có thể giúp một bên (aid_civil_war: warriors, goods): bên thắng sẽ nhớ ơn; giúp phản quân thì triều đình ${w2.nation} có chính nghĩa đánh ta ${CIVIL.helpCause} lượt. Nước đang nội chiến cũng thủ yếu hơn.`);
   // §4.5b the throne in danger: a people badly governed kills its ruler
   const civil = (world.schisms ?? []).find(x => x.from === n.id && x.kind === "civil" && x.status === "fighting");
   if (civil) {

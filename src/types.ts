@@ -125,6 +125,8 @@ export interface Nation {
   house?: string; royals?: import("./royals.ts").Royal[];
   /** §4.5b the ruler's name when one took the throne in a civil war, the houses that ruled, and the turn the last one did */
   ruler?: string; dynasties?: Array<{ tick: number; house: string; leader: string; trait: string; from?: string }>; dynastyTick?: number;
+  /** the wound a civil war left: extra discontent a turn until `until` */
+  civilScar?: { until: number; rate: number };
   /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */
   urban?: Record<string, import("./urban.ts").Urban>;
   /** §4.15 each order of society's mood, 0–100 */
@@ -303,6 +305,9 @@ export interface Schism {
   score?: { rebels: number; crown: number };
   odds?: number;
   mind?: boolean;
+  /** v0.55 the nations that aided a side, turn by turn; the war's toll so far */
+  aid?: Array<{ nation: number; side: "crown" | "rebels"; tick: number; warriors: number; worth: number }>;
+  toll?: { dead: number; fled: number; burned: number; ruined: number };
 }
 
 export interface Demography {

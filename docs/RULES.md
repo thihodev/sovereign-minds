@@ -558,18 +558,28 @@ Bất mãn lên 100 có hai lối ra: ly khai (4.5) hoặc **nội chiến**. Ng
   - +20% khi ổn định dưới 15;
   - tối đa 90%.
 - **Phe nổi dậy:** 20–35% dân, càng đông khi ổn định càng thấp, có một thủ lĩnh.
-- **Mỗi lượt nội chiến:**
-  - Sức của triều đình = sức thủ tại nhà (chiến binh, vũ khí, dân quân, tường thành, nhân ổn định; xem 9.4) × (1 − phần dân nổi dậy).
-  - Sức của phe nổi dậy = số người nổi dậy × 0,7 × 0,6 × (1 + thưởng chiến binh và chiến đấu của nước).
-  - Bên thắng lượt được chọn theo tỉ lệ sức (RNG có seed). Bên thua lượt mất 6% người của mình, bên thắng mất 3%. Cả nước mất 3 ổn định.
-  - Bên nào thắng 2 lượt trước thì thắng cả cuộc.
-- **Triều đình thắng:** thủ lĩnh bị xử tử; bất mãn giảm còn tối đa 40; ổn định +5.
+- **Mỗi lượt nội chiến** (từ v0.55, một cuộc chiến đẫm máu; code ở `src/civil.ts`):
+  - Sức của triều đình = sức thủ tại nhà (chiến binh, vũ khí, dân quân, tường thành, nhân ổn định; xem 9.4) × (1 − phần dân nổi dậy), cộng phần các nước giúp triều đình.
+  - Sức của phe nổi dậy = số người nổi dậy × 0,7 × 0,6 × (1 + thưởng chiến binh và chiến đấu của nước), cộng phần các nước giúp phản quân.
+  - Bên thắng lượt được chọn theo tỉ lệ sức (RNG có seed). Bên thua lượt mất 10% người của mình, bên thắng mất 5% (phía triều đình tính trên một nửa số dân trung thành). Cả nước mất 3 ổn định.
+  - **Đất nước tê liệt:** phe nổi dậy không làm việc cho ai. Mọi sản lượng của nước giảm theo phần dân nổi dậy, kéo theo thuế. Sức thủ khi bị nước ngoài tấn công cũng giảm theo phần đó.
+  - **Tàn phá:** mỗi lượt 5% mọi thứ trong kho bị đốt, cướp hay quân hai bên ăn mất; 40% khả năng một công trình bị đốt; 2 ô đường bị phá một cấp.
+  - **Chạy nạn:** mỗi lượt 2% dân chạy sang nước quen biết yên ổn nhất (tính như dân bỏ đi, 4.8).
+  - Bên nào thắng 3 lượt trước thì thắng cả cuộc, thường mất 3–5 lượt. Cả cuộc có thể giết một phần năm dân.
+- **Nước khác can thiệp** (`aid_civil_war`, 2 AP): `{"type":"aid_civil_war","to":"…","side":"crown"|"rebels","warriors":n,"goods":{…}}`.
+  - Chiến binh gửi sang đánh cho bên đó trong lượt và chịu cùng tỉ lệ thương vong.
+  - Hàng gửi bị tiêu vào chiến tranh: mỗi 10 giá trị (giá thế giới) thêm sức bằng một chiến binh.
+  - Giúp phản quân thì triều đình có chính nghĩa đánh nước giúp trong 20 lượt.
+  - Nếu phản quân thắng: người trị vì mới nhớ ai đã giúp mình (căng thẳng biên giới −20) và có chính nghĩa đánh những nước đã giúp triều cũ.
+  - Nếu triều đình thắng: biên giới với nước đã giúp triều đình dịu đi 10.
+  - AI thấy `civil_wars_abroad` (nội chiến ở các nước quen biết) và được cố vấn gợi ý.
+- **Triều đình thắng:** thủ lĩnh bị xử tử; bất mãn giảm còn tối đa 40; ổn định +5. Những người sống sót còn ôm thù: bất mãn +1,5 mỗi lượt trong 20 lượt.
 - **Phe nổi dậy thắng:** người trị vì bị giết. Thủ lĩnh lên ngôi:
   - lập nhà mới (họ của thủ lĩnh), hoàng tộc cũ không còn;
   - mang **tính cách mới**: một nét dân tộc khác (2.4), có đạo lý và hiệu ứng riêng;
   - mang **bộ não mới** nếu Watcher đã chọn model; nếu không, nước dùng model cũ;
   - **không mang ký ức của triều cũ**: bộ nhớ AI được viết lại thành câu chuyện lên ngôi;
-  - ổn định ít nhất 65, bất mãn về 0;
+  - ổn định ít nhất 65, bất mãn về 0 (người của triều cũ còn ấm ức: bất mãn +0,5 mỗi lượt trong 20 lượt);
   - trong 10 lượt được đổi tên nước, cờ và viết tuyên ngôn mới (`rename_nation`, kèm `manifesto`).
 - **Watcher:** mỗi cuộc nội chiến hiện trong mục Thỉnh nguyện, kèm tỉ số và khả năng phe nổi dậy thắng mỗi lượt. Watcher chọn model và effort cho người trị vì mới nếu phe nổi dậy thắng, hoặc giữ bộ não cũ. Watcher không chặn được nội chiến.
 - **Cảnh báo cho người trị vì:**

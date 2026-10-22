@@ -2,6 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.55
+
+- **Nội chiến đẫm máu (§4.5b):**
+  - Thương vong cao hơn: bên thua mỗi lượt mất 10%, bên thắng 5%. Bên nào thắng 3 lượt trước thì thắng, nên một cuộc nội chiến có thể giết một phần năm dân.
+  - Đất nước tê liệt: phe nổi dậy không làm việc. Sản lượng, thuế và sức thủ trước nước ngoài đều giảm theo phần dân nổi dậy.
+  - Tàn phá mỗi lượt: 5% kho bị đốt, cướp; có thể một công trình bị đốt; đường bị phá.
+  - Dân chạy nạn sang nước láng giềng yên ổn (2% mỗi lượt).
+  - Nước khác can thiệp được bằng lệnh mới `aid_civil_war` (chiến binh, hàng hóa). Giúp phản quân thì triều đình có chính nghĩa đánh lại. Bên thắng nhớ ai đã giúp, ai đã chống.
+  - Vết thương kéo dài 20 lượt sau chiến tranh: bất mãn tăng thêm mỗi lượt.
+- Thẻ nội chiến hiện số người chết, chạy nạn, công trình bị đốt và các nước can thiệp.
+
 ## v0.54
 
 - **0.54.1, sửa lỗi tỉnh "chật người" giả:** từ v0.53, khi chia chỗ ở cho từng tỉnh, chỗ ở của điểm định cư chưa nhân hệ số thời đại. Tổng chỗ ở các tỉnh vì vậy thấp hơn của cả nước, mọi tỉnh bị tính là chật người, và bất mãn tăng dù ổn định cao (ví dụ Văn Hà: ổn định 100 mà bất mãn 79). Giờ chỗ ở các tỉnh cộng lại đúng bằng của cả nước; bất an do chật người sẽ tự nguội dần.

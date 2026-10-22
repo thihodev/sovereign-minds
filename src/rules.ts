@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.54";
+export const RULES_VERSION = "0.55";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -135,8 +135,16 @@ export const SCHISM = {
  *  The rebels win: the ruler is killed and the leader takes the throne — a new house, a new character (another trait),
  *  a new mind if the Watcher gives one, stability at least `wonStability`, discontent 0, and RENAME.windowTicks turns to
  *  rename the nation, change its flag and write a new manifesto. From `warn` discontent the ruler is told the danger. */
-export const CIVIL = { chance: 0.5, noLand: 0.3, weak: 0.2, weakBelow: 15, max: 0.9, rise: 0.6, win: 2, dead: 0.03, loserDead: 0.06, stability: 3,
-  crushedDiscontent: 40, crushedStability: 5, wonStability: 65, warn: 60 };
+export const CIVIL = { chance: 0.5, noLand: 0.3, weak: 0.2, weakBelow: 15, max: 0.9, rise: 0.6, win: 3, dead: 0.05, loserDead: 0.1, stability: 3,
+  crushedDiscontent: 40, crushedStability: 5, wonStability: 65, warn: 60,
+  /** v0.55 a bloody war: the rebels down tools (the nation makes less by their share, and defends worse by it against
+   *  a foreign enemy); each turn `ruin` of every good in store is burnt, plundered or eaten by the armies, a building
+   *  burns with chance `burn`, `roads` road tiles lose a level, and `flee` of the people flee to the calmest neighbour.
+   *  Other nations may aid a side (aid_civil_war): their warriors fight for it this turn and share its losses, and goods
+   *  worth `aidPer` (world prices) arm one more fighter for it. Arming the rebels gives the crown a just cause against the
+   *  helper for `helpCause` turns. After it ends the wound stays `scarTurns` turns: discontent +`scarCrushed` a turn
+   *  where the crown won by blood, +`scarWon` where the rebels did. */
+  ruin: 0.05, burn: 0.4, roads: 2, flee: 0.02, aidPer: 10, helpCause: 20, scarTurns: 20, scarCrushed: 1.5, scarWon: 0.5 };
 /** §2.7 A connected realm: goods reach the stores along a way (a walk of at most `walk` tiles over one's own land,
  *  a road, or water between piers). A centre cut off from the capital yields `isolatedYield` and adds
  *  `isolatedDiscontent` a turn, once `grace` turns have passed since it was founded (time to build its road);
@@ -260,7 +268,7 @@ export const AP_COST: Record<string, number> = {
   appoint_official: 1, dismiss_official: 0, reward_official: 0,
   found_nation: 0, accept_migrants: 1, build: 1, research: 1, explore: 1, claim_tile: 2, abandon_tile: 0, rename: 0, mission: 2, festival: 1, cull: 0, move_capital: 3, invite_great: 2, tax: 1, invest: 1, royal_marriage: 2, accept_marriage: 1, city_focus: 1, grant: 1, build_road: 1, family_policy: 1, plant_spy: 2, petition: 1,
   propose_invention: 2, found_settlement: 3, rename_nation: 3, sabotage: 2, steal_tech: 2, incite: 2,
-  message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2,
+  message: 1, trade_offer: 1, accept_trade: 1, treaty: 2, accept_treaty: 2, break_treaty: 2, aid_civil_war: 2,
   declare_war: 2, declare_independence: 2, attack: 1, raid: 1, clear_wild: 2,
   quarantine: 1, request_minister: 1,
 };

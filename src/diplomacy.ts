@@ -13,6 +13,7 @@ import {
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
 import { borderLength, borderOf } from "./border.ts";
+import { aidCivilWar, civilShare } from "./civil.ts";
 import { quarantined } from "./contagion.ts";
 import { add, part, take, add as addPeople, take as takePeople } from "./people.ts";
 import { noteExodus } from "./exodus.ts";
@@ -137,6 +138,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       talk(world, n.id, o.id, "message", text);
       return null;
     }
+    case "aid_civil_war": return aidCivilWar(world, n, a, ctx.L); // §4.5b
     case "trade_offer": {
       const o = findTarget(world, n, a.to); if (typeof o === "string") return o;
       if (pendingOrActiveWar(world, n.id, o.id)) return `Đang chiến tranh với ${o.name}`;
@@ -555,7 +557,7 @@ export function resolveBattles(ctx: DiploCtx): void {
     const dMen = Math.floor(D.labor.warrior / fronts);
     const militia = Math.max(1, Math.floor(workers(D) * WAR.militiaShare / fronts));
     // §4.5 the old nation fights the traitors harder
-    const aStr = strength(A, s.warriors, 0, false) * (D.origin?.from === A.id ? 1 + KIN.vengeance : 1), dStr = strength(D, dMen, militia, true) * (A.origin?.from === D.id ? 1 + KIN.vengeance : 1);
+    const aStr = strength(A, s.warriors, 0, false) * (D.origin?.from === A.id ? 1 + KIN.vengeance : 1), dStr = strength(D, dMen, militia, true) * (A.origin?.from === D.id ? 1 + KIN.vengeance : 1) * (1 - civilShare(world, D)); // §4.5b a land torn by civil war defends worse
     const won = aStr > dStr;
     const lossRate = (win: boolean) => { const [lo, hi] = win ? WAR.winLoss : WAR.loseLoss; return lo + r() * (hi - lo); };
     const lossA = Math.min(s.warriors, Math.round(s.warriors * lossRate(won)));

@@ -2051,6 +2051,8 @@
     const el = document.createElement("article"); el.className = "petition schism";
     el.innerHTML = `<div class="row"><h3></h3><span class="grow"></span><span class="pill ${cls}">${st}</span></div>
       <div class="meta">⚔️ #${x.id} · ${nationTag(x.from)} · từ L${x.tick} · <b>${x.people}</b> người nổi dậy · tỉ số nổi dậy <b>${x.score?.rebels ?? 0}</b> – triều đình <b>${x.score?.crown ?? 0}</b>${open && x.odds !== undefined ? ` · khả năng nổi dậy thắng mỗi lượt ~${Math.round(x.odds * 100)}%` : ""}</div>
+      ${x.toll ? `<div class="meta">💀 ${x.toll.dead} chết · 🏃 ${x.toll.fled} chạy nạn · 🔥 ${x.toll.burned} công trình bị đốt · kho mất ~${x.toll.ruined}</div>` : ""}
+      ${(x.aid || []).length ? `<div class="meta">Can thiệp: ${[...new Map(x.aid.map(y => [`${y.nation}:${y.side}`, y])).values()].map(y => `${nationTag(y.nation)} giúp ${y.side === "crown" ? "triều đình" : "phản quân"}`).join(" · ")}</div>` : ""}
       <div class="body"></div>
       ${ask ? `<div class="row"><label class="sr-only" for="civ-model-${x.id}">Model</label><select id="civ-model-${x.id}">${mindOptions()}</select><label class="sr-only" for="civ-effort-${x.id}">Effort</label><select id="civ-effort-${x.id}">${effortOptions()}</select>${tip("Nếu phe nổi dậy thắng, người trị vì bị giết; thủ lĩnh lên ngôi với nhà mới, tính cách mới (một nét dân tộc khác) và không mang ký ức của triều cũ. Chọn bộ não cho người trị vì mới; \"Giữ bộ não cũ\" thì nước vẫn dùng model hiện tại.")}</div>
         <textarea rows="1" placeholder="Lời phán (tùy chọn)"></textarea>

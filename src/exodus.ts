@@ -5,8 +5,8 @@
 import { EXODUS } from "./rules.ts";
 import type { Nation } from "./types.ts";
 
-export type Why = "unrest" | "envy" | "border" | "faction" | "schism" | "conquest" | "faith";
-export const WHY_VI: Record<Why, string> = { unrest: "bất ổn", envy: "ganh tị với nước giàu hơn", border: "vượt biên sang nơi yên ổn hơn", faction: "phái bất mãn xin sang nước khác", schism: "ly khai lập quốc riêng", conquest: "đất bị chiếm, dân ở lại dưới quyền kẻ chiếm", faith: "theo đạo của nhà truyền giáo nước khác" };
+export type Why = "unrest" | "envy" | "border" | "faction" | "schism" | "conquest" | "faith" | "civil";
+export const WHY_VI: Record<Why, string> = { civil: "chạy nạn nội chiến", unrest: "bất ổn", envy: "ganh tị với nước giàu hơn", border: "vượt biên sang nơi yên ổn hơn", faction: "phái bất mãn xin sang nước khác", schism: "ly khai lập quốc riêng", conquest: "đất bị chiếm, dân ở lại dưới quyền kẻ chiếm", faith: "theo đạo của nhà truyền giáo nước khác" };
 
 /** Write down who left this turn. */
 export function noteExodus(n: Nation, tick: number, k: number, to: number | null, why: Why): void {
