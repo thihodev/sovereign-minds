@@ -7,7 +7,7 @@
 import { NEIGHBORS, dist } from "./hex.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GATE, GOOD_VALUE, KIN, ROADS, TOWER, WAR } from "./rules.ts";
+import { BORDER, GATE, GOOD_VALUE, HUNT_ZONE, KIN, ROADS, TOWER, WAR } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { buildingOf, goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
@@ -17,7 +17,7 @@ import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
 import { importDuty, marketTax } from "./treasury.ts";
 import { hasGreat } from "./greats.ts";
-import type { Nation, World } from "./types.ts";
+import type { Nation, Tile, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number;
   /** deadly brawls lately: who lost how many */
@@ -186,6 +186,8 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
   const roll = r();
   let text = "", rise = 0;
   if (roll < 0.4) {
+    // §7.9 shared hunting grounds keep half the poachers home (and a while after they are given up)
+    if (huntGrounds(world, a.id, b.id, true) && r() < HUNT_ZONE.poachCut) return 0;
     // Poaching or felling on the other side
     const key = (at.res.game || 0) >= (at.res.wood || 0) ? "game" : "wood";
     const q = Math.min(at.res[key] || 0, BORDER.poach);
@@ -216,4 +218,27 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
   for (const x of [a, b]) x.lastEvents.push(`Sự cố biên giới: ${text}. Căng thẳng với ${(x === a ? b : a).name} tăng.`);
   say(victim.id, "border", `${text}.`);
   return rise;
+}
+
+/** §7.9 Is there a shared hunting ground between the two (or, with `linger`, one given up in the last HUNT_ZONE.linger turns)? */
+export function huntGrounds(world: World, a: number, b: number, linger = false): boolean {
+  return world.treaties.some(t => t.type === "hunt" && ((t.a === a && t.b === b) || (t.a === b && t.b === a))
+    && (t.active || (linger && t.end !== null && world.tick - t.end < HUNT_ZONE.linger)));
+}
+/** §7.9 The land of its hunting partners a nation's hunters may hunt: their tiles up to HUNT_ZONE.depth from its own. */
+export function huntZone(world: World, n: Nation): Tile[] {
+  const partners = new Set(world.treaties.filter(t => t.active && t.type === "hunt" && (t.a === n.id || t.b === n.id)).map(t => t.a === n.id ? t.b : t.a));
+  if (!partners.size) return [];
+  const out = new Map<number, Tile>();
+  let edge = world.tiles.filter(t => t.owner === n.id && t.land).map(t => t.i);
+  for (let d = 0; d < HUNT_ZONE.depth; d++) {
+    const next: number[] = [];
+    for (const i of edge) for (const j of NEIGHBORS[i]) {
+      const t = world.tiles[j];
+      if (out.has(j) || !t.land || !partners.has(t.owner) || world.nations[t.owner]?.alive === false) continue;
+      out.set(j, t); next.push(j);
+    }
+    edge = next;
+  }
+  return [...out.values()].sort((x, y) => x.i - y.i);
 }

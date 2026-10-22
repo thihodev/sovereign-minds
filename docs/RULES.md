@@ -1327,6 +1327,14 @@ Hai dân tộc có đất giáp nhau không sống cạnh nhau trong im lặng.
 - **Quà tặng:** `trade_offer` chỉ có "give" và "get" rỗng là một món quà.
 - Watcher chỉnh được độ căng thẳng mỗi ô, ngưỡng tranh chấp và chợ biên giới bằng sắc lệnh luật.
 
+- **Khu săn chung** (hiệp ước `hunt`, sáng kiến #26 của Hắc Sơn Quốc, chấp thuận một phần):
+  - **Lập:** một nước đề nghị `{"type":"treaty","to":"…","kind":"hunt"}`, nước kia chấp nhận bằng `accept_treaty`. Chỉ giữa hai láng giềng có đất giáp nhau. Không kèm cống nạp hay nhượng đất. Không lập được giữa nước gốc và nước ly khai khi hai bên còn thù địch (4.5).
+  - **Săn hợp pháp:** thợ săn mỗi bên săn trên đất của mình trước, rồi săn trên đất bên kia, sâu tối đa 2 ô tính từ biên giới. Thú bị trừ vào trữ lượng của ô đất đó, không tính là săn trộm.
+  - **Săn trộm giảm:** trên biên giới đó, số vụ săn trộm giảm 50%, cộng thêm mức giảm 25% của Trạm canh nếu có.
+  - **Biên giới dịu:** thêm 0,5 mỗi lượt, như mọi hiệp ước khác.
+  - **Rút lui:** một bên rút bằng `break_treaty`, không mất uy tín; khu tan từ lượt sau. Săn trộm trở lại bình thường 5 lượt sau khi khu tan. Hai nước đánh nhau thì khu tan ngay.
+  - AI thấy `neighbours[].hunting_grounds` (số ô đất bên kia được săn). Cố vấn gợi ý lập khu khi có săn trộm ở biên giới trong 10 lượt gần đây. Giao diện hiện hiệp ước "khu săn chung" 🦌 trong mục Ngoại giao.
+
 ### 7.10 Đặc sản, thế mạnh và chỗ thiếu
 
 Mỗi nước giàu một thứ, giỏi một nghề và thiếu một thứ khác. Đó là lý do để buôn bán, ký hiệp ước, hay chiếm đất. Engine tính và cho mỗi AI thấy trong `market`:

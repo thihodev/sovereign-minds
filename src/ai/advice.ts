@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, inv, invName } from "../catalog.ts";
 import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -185,6 +185,9 @@ export function advice(world: World, n: Nation): Advice[] {
     else if (t >= 40) say(2, `Biên giới với ${o.name} đang căng (${t}/100)${st.incidents.length ? `; gần nhất: ${st.incidents.at(-1)!.text}` : ""}. ${treaty.length ? "" : "Chưa có hiệp ước nào: một hiệp ước bất tương xâm hạ căng thẳng mỗi lượt."}${!hasTower(world, n, o.id) && n.inventions.includes("P10") ? ` Dựng Trạm canh (build watchtower, tile: ô của ta giáp ${o.name}, có đường nối về trung tâm): biên giới bớt căng ${TOWER.calm} mỗi lượt, sự cố ít đi ${TOWER.incidents * 100}%.` : ""}${!hasGate(world, n, o.id) && n.inventions.includes("P12") ? ` Dựng Chợ cửa khẩu (build border_gate, tile: ô của ta giáp ${o.name}, có đường nối về trung tâm): chợ biên giới còn họp tới căng thẳng ${BORDER.marketBelow + GATE.below}, mỗi phiên làm dịu gấp đôi.` : ""}`);
     else if (!treaty.length && !(n.trades[String(o.id)] || 0)) say(1, `${o.name} giáp bạn ${border} ô mà hai bên chưa buôn bán hay ký gì: gửi trade_offer hoặc treaty để mở quan hệ (chợ biên giới đã tự đổi ${st.market} lần).`);
     if (cause) say(2, `Bạn có chính nghĩa để tuyên chiến với ${o.name} tới lượt ${n.casusBelli[String(o.id)]} (không mất uy tín).`);
+    // §7.9 poachers on this border: shared hunting grounds turn the quarrel into a common good
+    const poached = st.incidents.filter(x => world.tick - x.tick <= 10 && /săn trộm/.test(x.text)).length;
+    if (poached && !treaty.includes("hunt") && !hostile(world, n, o)) say(1, `${poached} vụ săn trộm ở biên giới với ${o.name} trong 10 lượt: đề nghị Khu săn chung ({"type":"treaty","to":"${o.name}","kind":"hunt"}): thợ săn hai bên săn hợp pháp sâu ${HUNT_ZONE.depth} ô vào đất nhau, săn trộm giảm ${HUNT_ZONE.poachCut * 100}%, biên giới dịu thêm ${BORDER.treatyCalm.hunt} mỗi lượt.`);
   }
 
   // §7.4b peace offers waiting for the ruler's answer, and its own that go unanswered

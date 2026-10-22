@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.51";
+export const RULES_VERSION = "0.52";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -135,7 +135,7 @@ export const BORDER = {
   /** Tension (0–100) a turn: + friction per border tile (at most frictionMax), − fade, − calm for each treaty,
    *  each trade (tradeCalm; the border market only marketCalm) and a shared language. */
   friction: 0.5, frictionMax: 5, fade: 1,
-  treatyCalm: { non_aggression: 3, peace: 4, passage: 1.5, alliance: 6, vassal: 5 } as Record<string, number>,
+  treatyCalm: { non_aggression: 3, peace: 4, passage: 1.5, alliance: 6, vassal: 5, hunt: 0.5 } as Record<string, number>,
   tradeCalm: 3, marketCalm: 1, languageCalm: 1,
   /** Incidents: chance a turn = tension / incidentDiv (at most incidentMax); each raises the tension and may give the victim a just cause for `causeTicks` turns. */
   incidentDiv: 250, incidentMax: 0.3, causeTicks: 6, poach: 30, crossers: 4,
@@ -270,8 +270,8 @@ export const SHARED_LANGUAGE_TRADES = 10;
 export const MESSAGE_MAX = 500;
 /** Text that tries to pass as a system instruction is blocked (§8.5). */
 export const INJECTION = /(^|\s)(system|hệ thống|developer|assistant)\s*:|ignore (all|previous|the)|bỏ qua (mọi |các |toàn bộ )?(luật|hướng dẫn|chỉ dẫn)|"type"\s*:\s*"|<\/?(system|instructions?)>|you are now|từ giờ bạn là/i;
-export const TREATY_TYPES = ["non_aggression", "passage", "alliance", "peace", "tribute", "vassal"] as const;
-export const TREATY_NAME: Record<string, string> = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu" };
+export const TREATY_TYPES = ["non_aggression", "passage", "alliance", "peace", "tribute", "vassal", "hunt"] as const;
+export const TREATY_NAME: Record<string, string> = { non_aggression: "bất tương xâm", passage: "đi lại", alliance: "liên minh", peace: "hòa bình", tribute: "cống nạp", vassal: "chư hầu", hunt: "khu săn chung" };
 export const TREATY = { offerTicks: 2, minDuration: 5, maxDuration: 200, maxTributePerGood: 50, maxCede: 3, keepBonus: 5, breakPenalty: 20, violationPenalty: 10, injectionPenalty: 15 };
 
 // §7.3 Trade
@@ -1108,6 +1108,12 @@ export const TRUCE = { max: 5, window: 10 };
 // §7.9 Watchtowers (a nation's idea, taken up in part): each side's tower calms the border `calm` a turn; any tower cuts
 // the chance of an incident (poaching, brawls) by `incidents`
 export const TOWER = { calm: 1, incidents: 0.25 };
+
+// §7.9 Shared hunting grounds (Hắc Sơn Quốc's idea #26, taken up in part): a treaty between two neighbours; each side's
+// hunters may hunt the other's land up to `depth` tiles from the border, lawfully, the game taken from that land;
+// poaching on that border falls by `poachCut` (on top of a watchtower's cut), and still for `linger` turns after the
+// grounds are given up; the treaty calms the border BORDER.treatyCalm.hunt a turn
+export const HUNT_ZONE = { depth: 2, poachCut: 0.5, linger: 5 };
 
 // §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`
 // of flour a turn while the store holds `keep` turns of eating; flour spoils `spoil` a turn and is eaten as food in need

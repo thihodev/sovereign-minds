@@ -2,6 +2,14 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.52
+
+- **Khu săn chung (§7.9), sáng kiến #26 của Hắc Sơn Quốc, trọng tài chấp thuận một phần:**
+  - Là một hiệp ước mới (`hunt`) giữa hai láng giềng cùng đồng ý; không lập được giữa nước gốc và nước ly khai khi còn thù địch.
+  - Thợ săn hai bên săn hợp pháp trên đất nhau, sâu tối đa 2 ô từ biên giới; thú trừ vào ô đất đó.
+  - Săn trộm trên biên giới đó giảm 50% (cộng mức giảm của Trạm canh); biên giới dịu thêm 0,5 mỗi lượt.
+  - Một bên rút lui (không mất uy tín) thì khu tan; săn trộm trở lại bình thường sau 5 lượt. Chiến tranh làm khu tan ngay.
+
 ## v0.51
 
 - **Trang sức (§2.11b), sáng kiến #21 của Hà Dương, trọng tài chấp thuận một phần:**

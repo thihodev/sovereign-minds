@@ -12,7 +12,7 @@ import {
 } from "./rules.ts";
 import { busy, piers, planRoute, roadOf } from "./routes.ts";
 import { liveHordes } from "./wild.ts";
-import { borderOf } from "./border.ts";
+import { borderLength, borderOf } from "./border.ts";
 import { quarantined } from "./contagion.ts";
 import { add, part, take, add as addPeople, take as takePeople } from "./people.ts";
 import { noteExodus } from "./exodus.ts";
@@ -174,12 +174,18 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       let tribute: Record<string, number> = {};
       if (a.tribute) { const g = goods(world, a.tribute, TREATY.maxTributePerGood); if (typeof g === "string") return `tribute: ${g}`; tribute = g; }
       if ((t === "tribute" || t === "vassal") && !Object.keys(tribute).length) return "Hiệp ước cống nạp/chư hầu cần tribute";
+      if (t === "hunt") { // §7.9 shared hunting grounds: neighbours at peace with each other, no terms
+        if (!borderLength(world, n.id, o.id)) return `Khu săn chung chỉ lập được với láng giềng giáp đất: ${o.name} không giáp bạn`;
+        if (hostile(world, n, o)) return `${o.name} và nước bạn còn thù địch (nước gốc và nước ly khai): chưa lập được khu săn chung`;
+        if (treatiesBetween(world, n.id, o.id, ["hunt"]).length) return `Đã có khu săn chung với ${o.name}`;
+      }
       const cede: number[] = [];
       for (const c of Array.isArray(a.cede) ? a.cede.slice(0, TREATY.maxCede) : []) { const i = parseTile(c); if (i >= 0) cede.push(i); }
       // payer: who pays tribute and cedes tiles. Default: the proposer.
       const payerIsMe = String(a.payer ?? "me") !== "them";
       const from = payerIsMe ? n.id : o.id;
       if (cede.some(i => world.tiles[i].owner !== from)) return "Chỉ nhượng được ô thuộc bên trả";
+      if (t === "hunt" && (Object.keys(tribute).length || cede.length)) return "Khu săn chung không kèm cống nạp hay nhượng đất";
       if (t === "peace") { const early = peaceTooEarly(world, n.id, o.id, tribute, dur, cede); if (early) return early; }
       if (t === "peace" && from === o.id && (Object.keys(tribute).length || cede.length)) { // §7.4b the beaten cannot dictate terms
         const w = pendingOrActiveWar(world, n.id, o.id), out = w ? peaceOutlook(w, n.id) : null;
@@ -207,9 +213,9 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       t.end = tick + 1; t.brokenBy = n.id;
       const o = world.nations[t.a === n.id ? t.b : t.a];
       // §7.9 a just cause (a border dispute, an incident, a caught spy) excuses breaking the treaty
-      const just = (n.casusBelli[String(o.id)] ?? -1) >= tick;
+      const just = (n.casusBelli[String(o.id)] ?? -1) >= tick || t.type === "hunt"; // §7.9 either side may give up the hunting grounds
       if (!just) n.reputation = Math.max(0, n.reputation - TREATY.breakPenalty);
-      say(n.id, "treaty", `${n.name} xé hiệp ước ${TREATY_NAME[t.type]} với ${o.name}.${just ? " Có chính nghĩa, không mất uy tín." : ` Uy tín −${TREATY.breakPenalty}.`}`);
+      say(n.id, "treaty", t.type === "hunt" ? `${n.name} rút khỏi khu săn chung với ${o.name}; khu tan từ lượt sau.` : `${n.name} xé hiệp ước ${TREATY_NAME[t.type]} với ${o.name}.${just ? " Có chính nghĩa, không mất uy tín." : ` Uy tín −${TREATY.breakPenalty}.`}`);
       o.lastEvents.push(`${n.name} xé hiệp ước ${TREATY_NAME[t.type]} #${t.id}; hết hiệu lực từ lượt sau.`);
       return null;
     }
@@ -300,6 +306,7 @@ export function fmtGoods(world: World, g: Record<string, number>): string {
 
 export function startWar(world: World, n: Nation, o: Nation, tick: number, reason: string, say: Say): void {
   world.wars.push({ id: world.nextId++, a: n.id, b: o.id, declared: tick, start: tick + 1, end: null, reason, tally: {} });
+  for (const t of treatiesBetween(world, n.id, o.id, ["hunt"])) { t.active = false; t.end = tick; t.endedBy = "tan vì chiến tranh"; } // §7.9
   say(n.id, "war", `${n.name} tuyên chiến với ${o.name}${reason ? ` (${reason})` : ""}. Chiến sự bắt đầu từ lượt sau.`);
   o.lastEvents.push(`${n.name} tuyên chiến với chúng ta! Chiến sự bắt đầu từ lượt sau.`);
   // Allies and the overlord of the defender join (§7.4, §7.7)

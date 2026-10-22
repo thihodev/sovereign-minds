@@ -32,7 +32,7 @@ import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
-import { borderPhase, pairKey } from "./border.ts";
+import { borderPhase, huntZone, pairKey } from "./border.ts";
 import { contagionPhase, cureDiscount, orderQuarantine, outbreakTurn, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
@@ -948,12 +948,14 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // §2.7 what a tile yields reaches the stores only in part when it lies cut off or far from any road
   const share = yieldShares(world, n);
   let taken = 0; // what the last take() worked from the land, before the losses on the way
-  const take = (key: ResKey, want: number, reason: string): number => {
+  const take = (key: ResKey, want: number, reason: string, more: Tile[] = []): number => {
     let got = 0, home = 0;
     // the land whose yield reaches home first (§2.7), then the richest
     const src = owned.filter(t => (t.res[key] || 0) > 0).sort((a, b) => (share(b.i) - share(a.i)) || (b.res[key]! - a.res[key]!) || a.i - b.i);
     // §2.10 a rich vein yields more for the same work
     for (const t of src) { if (got >= want) break; const x = Math.min(want - got, t.res[key]!); L.tile(t, key, -x, reason); got += x; home += x * share(t.i) * (t.vein === key ? 1 + VEIN.yield : 1); }
+    // §7.9 then the shared hunting grounds on a partner's land, game taken from that land
+    for (const t of more) { if (got >= want) break; const x = Math.min(want - got, t.res[key] || 0); if (x <= 0) continue; L.tile(t, key, -x, reason); got += x; home += x; }
     taken = got;
     return home;
   };
@@ -966,7 +968,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   // Hunting: one tool serves four hunters; hunters without tools work at half strength
   const tools = HUNT_TOOLS.reduce((s, k) => s + (n.stock[k] || 0), 0);
   const equipped = Math.min(labor.hunt, Math.floor(tools) * 4);
-  const h = take("game", ((equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt")) * (1 + dogBonus(n, labor.hunt)), "hunt"); // §6.4 dogs on the trail
+  const h = take("game", ((equipped + (labor.hunt - equipped) * 0.5) * YIELD.hunt * mult("hunt")) * (1 + dogBonus(n, labor.hunt)), "hunt", huntZone(world, n)); // §6.4 dogs on the trail; §7.9 shared grounds
   L.stock(n, "food", h, "hunt"); L.stock(n, "hide", h * YIELD.huntHide, "hunt"); L.stock(n, "bone", h * YIELD.huntBone, "hunt"); foodMade += h;
   // §2.1 a people that can tame horses brings some back alive
   if (m.caps.has(HORSES.cap) && labor.hunt) L.stock(n, "horse", take("horse", labor.hunt * HORSES.huntShare * mult("hunt"), "hunt"), "hunt");

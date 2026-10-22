@@ -326,7 +326,7 @@ export interface Official {
 
 export interface Message { from: number; tick: number; text: string; gesture: boolean }
 
-export type TreatyType = "non_aggression" | "passage" | "alliance" | "peace" | "tribute" | "vassal";
+export type TreatyType = "non_aggression" | "passage" | "alliance" | "peace" | "tribute" | "vassal" | "hunt";
 export interface Treaty {
   id: number;
   type: TreatyType;
