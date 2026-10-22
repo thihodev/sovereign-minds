@@ -671,7 +671,19 @@ ul.needs li.no b { color: var(--ink); }
 .war-tally .talks li { font-size: 12.5px; padding: 2px 0; }
 .war-tally .talks .t { color: var(--muted); margin-right: 4px; }
 
+/* city banners over the 3D map: [people] Name ●●○, the badge in the nation's colour */
+.m3-banner { display: grid; grid-template-columns: auto auto auto; align-items: center; column-gap: 6px; }
+.m3-banner > small { grid-column: 1 / -1; }
+.m3-pop { min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--nc, #ffd84a); font: 800 10.5px/16px "Be Vietnam Pro", system-ui, sans-serif; text-shadow: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+.m3-capital .m3-pop { font-size: 12px; line-height: 19px; min-width: 22px; }
+.m3-capital > span::before { display: none; }
+.m3-tier { display: inline-flex; gap: 2px; font-style: normal; }
+.m3-tier u { width: 5px; height: 5px; border-radius: 1px; transform: rotate(45deg); background: rgba(255,255,255,.22); text-decoration: none; }
+.m3-tier u.on { background: var(--nc, #ffd84a); box-shadow: 0 0 3px var(--nc, #ffd84a); }
+.m3-town.m3-banner { border-left: 0; padding: 1px 7px 1px 2px; border-radius: 99px; border-bottom: 2px solid var(--nc, #ffd84a); }
 .mapctl .only-3d { display: none; font-weight: 800; font-size: 12px; }
+.mapctl .q3d { font-size: 10px; letter-spacing: -.01em; }
+.mapctl .q3d[aria-pressed="true"] { background: #ffe9a6; }
 body.view-3d .mapctl .only-3d { display: grid; }
 
 /* §10.7 the judge's verdict on an idea, and the Watcher's override tucked away */

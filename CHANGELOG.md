@@ -12,6 +12,16 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
   - Cúm: lây nhanh nhất nhưng ít chết.
 - **Thuốc và vắc-xin:** phát minh mới K25 Chủng đậu, K26 Ký ninh, K27 Kính hiển vi, K28 Vi trùng học, K29 Vắc-xin. Có thuốc thì khó mắc và ít chết hơn. Một nước đã mắc bệnh mà chưa có thuốc thì nghiên cứu thuốc đó rẻ hơn 15% mỗi lần (tối đa −45%).
 - AI thấy bệnh đang mắc, thuốc đang có và các bệnh ở nước láng giềng; cố vấn nhắc nghiên cứu thuốc. Giao diện hiện tên bệnh và số thuốc đã có (💉).
+- **0.47.1, bản đồ 3D trau chuốt như game chiến thuật thương mại:**
+  - Nút **Đẹp / Nhanh** ở góc bản đồ (nhớ cho lần sau; máy di động mặc định Nhanh). Nhanh nhẹ như trước.
+  - Đẹp có hậu kỳ: bóng mờ ở khe và chân nhà (AO), ánh sáng lóa nhẹ ở lửa và ánh nắng trên nước, chỉnh màu (bóng hơi xanh, sáng hơi ấm), làm mờ kiểu tilt-shift xa gần khi nhìn từ xa (tắt khi đến gần), khử răng cưa FXAA.
+  - Mặt đất có vân: cỏ loang chỗ xanh chỗ úa, đốm nhỏ khi đến gần, vách đá có vỉa, cát ướt sát mép nước; bóng mây trôi chậm; tuyết chỉ trên đỉnh và sườn thoải, sườn dốc lộ đá. Luống ruộng chạy theo đường đồng mức trên sườn đồi.
+  - Nước: xanh ngọc chỗ cạn, sẫm dần ra khơi, ánh sáng lăn tăn dưới đáy cạn, đường bọt sát bờ và những lớp sóng xô vào, phản chiếu bầu trời, ánh nắng lấp lánh; sông có vệt chảy và bọt ven bờ, dừng ở cửa biển.
+  - Bầu trời: nhìn nghiêng thấy chân trời, sương xa cùng màu với trời.
+  - Camera: xa thì nhìn dốc xuống, gần thì nghiêng thấp như máy quay phim; con lăn phóng to mượt, trôi theo đà, về phía con trỏ (góc nghiêng người xem tự chỉnh, kể cả nhìn thẳng xuống, được giữ khi phóng).
+  - Sự sống: khói bếp bay lên từ ống khói, cây đung đưa trong gió, hải âu lượn ven biển.
+  - Băng rôn thành phố như Civ: số dân trên nền màu quốc gia, tên, và hạt thể hiện cấp (làng, thị trấn, thành phố); nhãn không còn chồng lên nhau.
+  - Mô hình: mái theo màu quốc gia nhưng dịu lại; tường thành có lỗ châu mai, lối đi trên tường, tháp có mái; thành lũy thủ đô có bệ, gờ, bốn tháp góc và sảnh; thị trấn có tháp chuông; bến có ván lát trên dầm.
 
 ## v0.46
 

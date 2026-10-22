@@ -2727,7 +2727,7 @@
           onZoom: rel => { $("#zoom-level").textContent = `${rel < 9.95 ? rel.toFixed(1) : Math.round(rel)}×`; },
         }));
         const m = await M3loading;
-        if (!M3) { M3 = m; M3.setStatic(ST); }
+        if (!M3) { M3 = m; M3.setStatic(ST); showQuality(); }
       } catch (e) { is3D = false; M3loading = null; btn3d.classList.remove("on"); btn3d.setAttribute("aria-pressed", "false"); btn3d.title = `Không mở được bản đồ 3D: ${e.message}`; console.error("[3D]", e); try { localStorage.setItem("sm-3d", "0"); } catch { } return; }
       finally { btn3d.disabled = false; }
     }
@@ -2740,6 +2740,13 @@
   btn3d.onclick = () => set3D(!is3D);
   $("#view-north").onclick = () => M3?.faceNorth(false);
   $("#view-top").onclick = () => M3?.faceNorth(true);
+  // the 3D picture's quality: "Đẹp" (finishing passes) or "Nhanh" (for weak machines); the map keeps the choice
+  function showQuality() {
+    const hi = M3?.quality?.() !== "lo", b = $("#view-quality");
+    b.textContent = hi ? "Đẹp" : "Nhanh"; b.setAttribute("aria-pressed", String(hi));
+    b.title = hi ? "Hình Đẹp: bóng đổ mềm, ánh sáng và chiều sâu. Bấm để chuyển sang Nhanh (cho máy yếu)" : "Hình Nhanh, nhẹ cho máy yếu. Bấm để chuyển sang Đẹp";
+  }
+  $("#view-quality").onclick = () => { if (!M3?.quality) return; M3.quality(M3.quality() === "lo" ? "hi" : "lo"); showQuality(); };
 
   // ---------------------------------------------------------------- data flow
   async function refresh() {
