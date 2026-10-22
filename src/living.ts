@@ -3,7 +3,7 @@
 // doctors. A people that has what its age expects has leisure to think and invent; one that lacks it grows restless.
 // From the Iron Age on, a nation crosses into the next era only with the life its people expect.
 
-import { LIVING, LUXURY } from "./rules.ts";
+import { LIVING, LUXURY, POWER } from "./rules.ts";
 import { allRecipes, eraIndex } from "./catalog.ts";
 import { freshWater, housing, mods, ownedTiles, workers } from "./engine.ts";
 import { NEIGHBORS } from "./hex.ts";
@@ -42,7 +42,7 @@ export function needs(world: World, n: Nation): Need[] {
     { id: "learning", name: "Chữ viết, học hành", era: 4, met: (m.caps.has("ghi-chép") || m.caps.has("chữ-viết")) && n.labor.research >= workers(n) * LIVING.researchShare, have: `${n.labor.research} người nghiên cứu`, want: `chữ viết và ${Math.ceil(workers(n) * LIVING.researchShare)} người nghiên cứu`, how: "Ký hiệu (P12), chữ viết, nuôi người học" },
     { id: "trade", name: "Buôn bán", era: 4, met: Object.values(n.trades).filter(k => k > 0).length >= 2, have: `${Object.values(n.trades).filter(k => k > 0).length} bạn hàng`, want: "2 bạn hàng", how: "trade_offer, chợ biên giới" },
     { id: "variety", name: "Hàng hóa đa dạng", era: 5, met: kinds >= LIVING.kinds, have: `${kinds} loại`, want: `${LIVING.kinds} loại hàng trong kho`, how: "khai thác, chế tác, buôn bán nhiều loại hàng" },
-    { id: "power", name: "Ánh sáng, năng lượng", era: 7, met: sum(n, ["coal", "oil", "whale_oil"]) >= pop / LIVING.perFuel, have: `${r(sum(n, ["coal", "oil", "whale_oil"]))}`, want: `${r(pop / LIVING.perFuel)} than, dầu hay dầu cá voi`, how: "khai than, dầu; săn cá voi" },
+    { id: "power", name: "Ánh sáng, năng lượng", era: 7, met: sum(n, ["coal", "oil", "whale_oil"]) >= pop / LIVING.perFuel || (n.power?.share ?? 0) >= POWER.light, have: n.power ? `${Math.round(n.power.share * 100)}% dân có điện, ${r(sum(n, ["coal", "oil", "whale_oil"]))} nhiên liệu` : `${r(sum(n, ["coal", "oil", "whale_oil"]))}`, want: `${r(pop / LIVING.perFuel)} than, dầu hay dầu cá voi, hoặc điện tới ${Math.round(POWER.light * 100)}% dân`, how: "khai than, dầu; săn cá voi; nhà máy điện nối đường tới các trung tâm" },
     { id: "doctors", name: "Y tế", era: 8, met: m.medicine >= LIVING.medicine, have: `${Math.round(m.medicine * 100)}%`, want: `${Math.round(LIVING.medicine * 100)}% y thuật`, how: "phát minh y học" },
   ];
   return list;

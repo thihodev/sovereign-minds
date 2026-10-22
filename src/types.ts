@@ -117,6 +117,8 @@ export interface Nation {
   greats?: Great[]; invited?: number;
   /** §4.13 tax rates and this turn's and last turn's books (the coin itself is stock.coin) */
   treasury?: import("./treasury.ts").Treasury;
+  /** §6.8 this turn's electric power: made, asked for, the share of the people reached, the centres on the grid */
+  power?: import("./power.ts").PowerState;
   /** §4.14 the royal house: its name and its princes and princesses (those married in carry `from`) */
   house?: string; royals?: import("./royals.ts").Royal[];
   /** §2.13 each centre's tier (village, town, city) and focus, by centre tile */

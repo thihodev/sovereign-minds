@@ -35,6 +35,7 @@ import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } fro
 import { borderPhase, pairKey } from "./border.ts";
 import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
+import { powerMods, powerPhase } from "./power.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
 import { beastRisk, floodChance, hordeCap, landDistance, newHordes, raidChance, raidParty, raidTarget, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
@@ -212,6 +213,7 @@ export function mods(world: World, n: Nation): Mods {
   greatMods(n, m, world.tick); // §4.12 the great people serving it
   urbanMods(n, m); // §2.13 its towns and cities
   classMods(world, n, m); // §4.15 contented and striking orders
+  powerMods(n, m); // §6.8 the centres the grid lights
   m.medicine = Math.min(0.8, m.medicine);
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
@@ -315,7 +317,7 @@ function roadOpen(world: World, n: Nation, t: Tile): boolean {
   return t.owner === n.id || t.owner === -1 || treatiesBetween(world, n.id, t.owner, ["passage", "alliance"]).length > 0;
 }
 /** §2.5 Tiles reached from `starts` along roads open to the nation (its centres count as junctions). */
-function roadWalk(world: World, n: Nation, starts: number[]): Set<number> {
+export function roadWalk(world: World, n: Nation, starts: number[]): Set<number> {
   const hubs = new Set(centres(n)), seen = new Set(starts.filter(i => world.tiles[i]?.owner === n.id)), stack = [...seen];
   while (stack.length) {
     const k = stack.pop()!;
@@ -896,6 +898,7 @@ export function step(world: World, inputs: Record<number, TurnInput>, rulings: R
       say(n.id, "decree", `${n.name} trái lệnh ${rd.code} của các vị thần.`);
     }
   }
+  powerPhase(world, L); // §6.8 the plants burn their fuel and light the centres the roads join
   treasuryPhase(world, L); // §4.13 taxes and public works fill the treasury
   classPhase(world, say); // §4.15 the orders of society take stock
   updateMarket(world, L); // §6.3 prices follow what the nations made, used and hold
@@ -1692,6 +1695,8 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       }
       const t = world.tiles[tile];
       if (!t.land) return "Không xây được trên biển";
+      if (def.type === "hydro_dam" && !(t.river && (t.terrain === "hill" || NEIGHBORS[tile].some(j => ["hill", "mountain"].includes(world.tiles[j].terrain)))))
+        return `${def.name} cần ô có sông, ở đồi hay giáp đồi núi (nước từ trên cao đổ xuống)`; // §6.8
       if (def.perTile) {
         if (n.buildings.some(b => b.tile === tile && buildingOf(world, b.type)?.perTile)) return "Ô này đã có công trình sản xuất";
         if (def.terrains && !(def.terrains.includes(t.terrain) || (def.river && t.river))) return `${def.name} cần ô ${def.terrains.join("/")}${def.river ? " hoặc ô có sông" : ""}`;

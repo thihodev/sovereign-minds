@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.46
+
+- **Điện (§6.8):** khi có phát minh Điện (K18) thì dựng được:
+  - Nhà máy nhiệt điện: đốt 2 than (hoặc dầu) mỗi lượt, làm 20 điện;
+  - Đập thủy điện: trên sông ở vùng đồi núi, không cần nhiên liệu, làm 15 điện.
+- Mỗi nhà máy tốn 3 tiền ngân khố mỗi lượt. Điện đi theo đường sá tới các trung tâm được nối với nhà máy.
+- Dân có điện thì chế tác tới +20%, nghiên cứu tới +10%. Từ 50% dân có điện trở lên thì đáp ứng nhu cầu "Ánh sáng, năng lượng".
+- AI thấy mục `power` và được cố vấn nhắc. Giao diện có chỉ số "⚡ Điện".
+
 ## v0.45
 
 - **Cối đá (§6.5c), sáng kiến #16 của Sơn Thạch Quốc, trọng tài chấp thuận một phần:**

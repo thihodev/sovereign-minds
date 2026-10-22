@@ -16,6 +16,7 @@ import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
 import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { LINE_VI } from "./treasury.ts";
+import { powerView } from "./power.ts";
 import { royalsView } from "./royals.ts";
 import { classView } from "./classes.ts";
 import { FOCUS_VI, TIER_VI, urbanNeeds } from "./urban.ts";
@@ -135,6 +136,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         herds: n.alive && n.founded ? herdView(w, n) ?? null : null, // §6.4
         living: n.alive && n.founded ? livingStandard(w, n) : null, // §4.11
         treasury: n.alive && n.founded && n.treasury ? (() => { const t = n.treasury!; return { coin: Math.round((n.stock.coin || 0) * 10) / 10, tax: t.tax, tariff: t.tariff, last: t.last ?? null, lines: LINE_VI, fair: TREASURY.fair, safe: TREASURY.safe }; })() : null,
+        power: n.alive && n.founded ? powerView(w, n) ?? null : null, // §6.8
         royals: n.alive && n.founded ? royalsView(w, n) : null,
         classes: n.alive && n.founded ? classView(w, n) : [],
         greats: n.alive && n.founded ? (n.greats ?? []).filter(g => g.dies > w.tick).map(g => ({ ...g, title: GREATS.kinds[g.kind]?.name, gift: GREATS.kinds[g.kind]?.desc, fromName: g.from !== undefined ? w.nations[g.from]?.name : undefined })) : [], // §4.12

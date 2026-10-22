@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.45";
+export const RULES_VERSION = "0.46";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -547,7 +547,9 @@ export interface BuildingEffect { housing?: number; stability?: number; spoilage
   /** §7.9 a watchtower: guards on the border calm it and stop poachers and brawls */
   tower?: number;
   /** §6.7 a grinding stone: food it turns into flour each turn */
-  grind?: number }
+  grind?: number;
+  /** §6.8 a power plant: power it makes each turn, and the coal (or oil) it burns for it */
+  power?: number; fuel?: number }
 export interface BuildingDef {
   type: string; name: string; needs: string; cost: Record<string, number>; work: number;
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
@@ -577,6 +579,9 @@ export const BUILDINGS: BuildingDef[] = [
   { type: "herb_garden", name: "Vườn thảo dược", needs: "P14", cost: { fiber: 5 }, work: 6, perTile: true, terrains: ["grass", "hill", "forest", "jungle", "swamp", "coast"], desc: "Trồng cây thuốc trên đất ấm (ôn đới, nhiệt đới) cách thủ đô hay điểm định cư tối đa 2 ô, tối đa 2 vườn mỗi trung tâm: tự cho 0,5 thảo dược mỗi lượt, không cần người làm.", effect: { herbs: 0.5 } },
   { type: "granary", name: "Kho làng", needs: "stone_tools", cost: { wood: 10, stone: 6 }, work: 5, perCentre: true, desc: "Mỗi trung tâm một kho: mỗi lượt cất 10% lương thực dư (tối đa 100 mỗi kho), không hư; tự mở cứu đói khi cả nước thiếu ăn. Điểm định cư bị cắt đường có kho thì bất mãn tăng chậm một nửa.", effect: { reserve: 100 } },
   { type: "market", name: "Chợ", needs: "P12", cost: { wood: 10, stone: 6 }, work: 6, max: 3, desc: "Công trình công cộng: dân họp chợ, ngân khố thu 2 tiền/lượt, thêm 1 tiền mỗi 50 dân và 1 tiền mỗi bạn hàng.", effect: { income: 2, market: 1 } },
+  // §6.8 electric power
+  { type: "power_plant", name: "Nhà máy nhiệt điện", needs: "K18", cost: { iron: 20, stone: 20, copper: 10 }, work: 20, perTile: true, desc: "Đốt 2 than (hết than thì 2 dầu) mỗi lượt, ngân khố trả 3 tiền: làm 20 điện. Điện chạy theo đường sá, đường sắt của ta tới các trung tâm được nối; trung tâm có điện thì chế tác +20%, nghiên cứu +10% (theo phần dân có điện) và dân có ánh sáng.", effect: { power: 20, fuel: 2 } },
+  { type: "hydro_dam", name: "Đập thủy điện", needs: "K18", cost: { stone: 40, iron: 10, copper: 10 }, work: 30, perTile: true, desc: "Trên ô có sông, ở đồi hay giáp đồi núi: không cần nhiên liệu, ngân khố trả 3 tiền mỗi lượt, làm 15 điện chạy theo đường sá tới các trung tâm.", effect: { power: 15 } },
   { type: "temple", name: "Đền cẩm thạch", needs: "P5", cost: { marble: 20, stone: 10 }, work: 10, max: 1, desc: "Đền thờ đá cẩm thạch: +2 ổn định mỗi lượt.", effect: { stability: 2 } },
 ];
 export const BUILDING_BY_TYPE: Record<string, BuildingDef> = Object.fromEntries(BUILDINGS.map(b => [b.type, b]));
@@ -1072,3 +1077,8 @@ export const TOWER = { calm: 1, incidents: 0.25 };
 // §6.7 Grinding stones (a nation's idea, taken up by the Judge of Ideas): each grinds `food` of the spare food into `flour`
 // of flour a turn while the store holds `keep` turns of eating; flour spoils `spoil` a turn and is eaten as food in need
 export const FLOUR = { food: 4, flour: 3, keep: 1.5, spoil: 0.08 };
+
+// §6.8 Electric power: each plant costs `upkeep` coin a turn; a centre on the grid asks `perPerson` power for each of
+// its people; the share of the people reached lifts craft by `craft` and research by `rp`; a nation whose share is at
+// least `light` has light and power for its homes (§4.16)
+export const POWER = { upkeep: 3, perPerson: 0.05, craft: 0.2, rp: 0.1, light: 0.5 };

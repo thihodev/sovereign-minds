@@ -13,12 +13,13 @@ import { busy, planRoute } from "../routes.ts";
 import { blessing } from "../faith.ts";
 import { herdView } from "../herds.ts";
 import { treasuryView } from "../treasury.ts";
+import { powerView } from "../power.ts";
 import { royalsView } from "../royals.ts";
 import { urbanView } from "../urban.ts";
 import { classView } from "../classes.ts";
 import { greatsView } from "../greats.ts";
 import { livingStandard } from "../living.ts";
-import { CLASSES, CROWD, FLOUR, ROCK_SALT, TOWER, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
+import { CLASSES, CROWD, FLOUR, POWER, ROCK_SALT, TOWER, TRUCE, THRIVE, GATE, GRANARY, MEADOW_HERBS, HERB_GARDEN, GREATS, ROYALS, TREASURY, URBAN, INITIATIVE, LIVING, CAPITAL_MOVE, ANIMALS, HERDS, GOOD_VALUE, DEMO, FESTIVAL, MISSION, UNREST, HARVEST, KEEP, LUXURY, MARKET, ORE_SENSE_CAP, SEA_HARVEST, VEIN, BUILDING_BY_TYPE } from "../rules.ts";
 import { seaView } from "../sea.ts";
 import { landReserves, localPrice, price, shortages, specialtiesOf, surpluses, techEdge, trend, veinsNear, worth } from "../market.ts";
 import { demo, fighters, households, mouths } from "../people.ts";
@@ -113,6 +114,8 @@ TRUCE MARKETS (an idea a nation proposed, taken up in part): trading calms a bor
 BORDER GATE MARKETS (an idea a nation proposed, taken up in part): build "border_gate" (${Object.entries(BUILDING_BY_TYPE.border_gate.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.border_gate.work} work; needs Ký hiệu P12) on a tile of yours touching a neighbour's land, joined by your own road to one of your centres (tile = that tile); one for each neighbour. It earns no coin of its own, but the border market with that neighbour stays open up to tension ${BORDER.marketBelow + GATE.below} (not ${BORDER.marketBelow}), trades ${Math.round((GATE.value - 1) * 100)}% more, and each market day calms the border ${GATE.calm} more for each side that has a gate (so ${BORDER.marketCalm + GATE.calm} with one, ${BORDER.marketCalm + 2 * GATE.calm} with both). "neighbours[].border_gate" shows who has one. Trade over a tense border instead of fighting for it; a treaty still calms it most.
 
 GRINDING STONES (an idea a nation proposed, taken up in part): build "grinder" (${Object.entries(BUILDING_BY_TYPE.grinder.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.grinder.work} work; needs Đá mài P10) on a centre (tile = your capital or a settlement; one each). Each turn each stone grinds ${FLOUR.food} food into ${FLOUR.flour} flour while your store keeps ${FLOUR.keep} turns of eating. Flour spoils only ${FLOUR.spoil * 100}% a turn (food ${SPOILAGE.food * 100}%), is eaten like food when food runs short, and can be traded.
+
+ELECTRIC POWER (from the invention Điện K18): build "power_plant" (${Object.entries(BUILDING_BY_TYPE.power_plant.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.power_plant.work} work; one production building per tile) — it burns ${BUILDING_BY_TYPE.power_plant.effect.fuel} coal a turn (oil when the coal runs out) and makes ${BUILDING_BY_TYPE.power_plant.effect.power} power; or "hydro_dam" (${Object.entries(BUILDING_BY_TYPE.hydro_dam.cost).map(([g, q]) => `${q} ${g}`).join(", ")}, ${BUILDING_BY_TYPE.hydro_dam.work} work) on a river tile that is a hill or touches hills or mountains — no fuel, ${BUILDING_BY_TYPE.hydro_dam.effect.power} power. Each plant costs the treasury ${POWER.upkeep} coin a turn (no coin or no fuel: it stands idle). The grid follows YOUR roads and railways: a centre (capital, settlement) joined by road to a running plant asks ${POWER.perPerson} power per person, and gets its share of what the plants make. The share of your people reached lifts craft by up to +${POWER.craft * 100}% and research by up to +${POWER.rp * 100}%, and once it reaches ${POWER.light * 100}% your people have light and power (the era-7 living need). "power" in the observation shows what is made and asked for, and the centres on and off the grid.
 
 VILLAGE GRANARIES (an idea a nation proposed and the gods built in): build "granary" on a centre (tile = your capital or a settlement; one each; ${Object.entries(BUILDING_BY_TYPE.granary.cost).map(([g, q]) => `${q} ${g}`).join(", ")}). Each turn the granaries set aside ${GRANARY.share * 100}% of the food left after eating, up to ${BUILDING_BY_TYPE.granary.effect.reserve} per granary ("food_reserve" in your stock): it never spoils and cannot be traded, and when the food falls short of a meal the granaries open by themselves before anyone starves. A settlement cut off from the capital with a granary of its own grows restless half as fast.
 
@@ -404,6 +407,7 @@ export function buildObservation(world: World, n: Nation): Record<string, unknow
     sea: seaView(world, n),
     herds: n.founded ? herdView(world, n) : undefined,
     treasury: n.founded ? treasuryView(world, n) : undefined,
+    power: n.founded ? powerView(world, n) : undefined,
     greats: n.founded ? greatsView(world, n) : undefined,
     royals: n.founded ? royalsView(world, n) : undefined,
     towns: n.founded ? urbanView(world, n, provinces(world, n)) : undefined,

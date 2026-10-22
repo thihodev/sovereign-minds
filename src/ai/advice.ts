@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, invName } from "../catalog.ts";
 import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -319,6 +319,18 @@ export function advice(world: World, n: Nation): Advice[] {
     const rails = ownedTiles(world, n.id).filter(t => (t.road || 0) >= 4).length, roads = ownedTiles(world, n.id).filter(t => t.land && (t.road || 0) > 0 && (t.road || 0) < 4).length;
     const def = ROADS.levels[3];
     if (roads > 0 && rails < roads) say(1, `Đã biết làm Đường sắt: nâng các đường chính lên ray (build_road level 4, mỗi ô ${Object.entries(def.cost).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}, ${def.work} công): đất có đường sắt nộp thêm ${ROADS.yield[4] * 100}%, đoàn buôn đi nhanh gấp ${Math.round(ROADS.levels[2].move / def.move * 10) / 10} lần đường lát đá và an toàn hơn. Đang có ${rails} ô ray, ${roads} ô đường thường.`);
+  }
+
+  // §6.8 electric power: plants once the nation knows electricity, the grid along its roads
+  if (n.founded && n.inventions.includes("K18")) {
+    const plants = n.buildings.filter(b => b.type === "power_plant" || b.type === "hydro_dam"), p = n.power;
+    if (!plants.length) say(1, `Đã biết Điện: dựng Nhà máy nhiệt điện (build power_plant: ${Object.entries(BUILDING_BY_TYPE.power_plant.cost).map(([g, q]) => `${q} ${goodVi(world, g)}`).join(", ")}; đốt ${BUILDING_BY_TYPE.power_plant.effect.fuel} than mỗi lượt) hay Đập thủy điện (hydro_dam, trên ô có sông ở đồi hay giáp đồi núi, không cần nhiên liệu). Trung tâm có đường nối tới nhà máy thì có điện: chế tác tới +${POWER.craft * 100}%, nghiên cứu tới +${POWER.rp * 100}%, dân có ánh sáng.`);
+    else if (p) {
+      if (p.idle) say(2, `${p.idle} nhà máy điện đang đứng: thiếu than, dầu hay thiếu ${POWER.upkeep} tiền mỗi nhà máy mỗi lượt.`);
+      if (p.need > 0 && p.made < p.need) say(1, `Điện chỉ đủ ${Math.round(p.made / p.need * 100)}% nhu cầu (làm ${p.made}, cần ${p.need}): dựng thêm nhà máy.`);
+      const all = [n.capital, ...n.settlements.map(s2 => s2.tile)], off = all.filter(c => !p.centres.includes(c));
+      if (p.made > 0 && off.length) say(1, `${off.length} trung tâm chưa có điện (${off.slice(0, 3).map(c => c === n.capital ? n.capitalName : n.settlements.find(s2 => s2.tile === c)?.name).join(", ")}): làm đường nối chúng tới nhà máy (build_road).`);
+    }
   }
 
   // §6.6 herb gardens: medicine grown at home

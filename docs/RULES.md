@@ -1054,6 +1054,31 @@ Thảo dược dùng để:
 - cứu trẻ sơ sinh;
 - đáp ứng nhu cầu "Thuốc men" của mức sống.
 
+### 6.8 Điện
+
+Khi đã có phát minh **Điện** (K18), một nước dựng được nhà máy điện. Điện đi theo đường sá của chính nước đó.
+
+**Nhà máy nhiệt điện** (`power_plant`):
+- **Xây:** 20 sắt, 20 đá, 10 quặng đồng; 20 công. Là công trình sản xuất, mỗi ô một công trình.
+- **Chạy:** mỗi lượt đốt 2 than đá (hết than thì đốt 2 dầu mỏ) và làm ra 20 điện.
+
+**Đập thủy điện** (`hydro_dam`):
+- **Xây:** 40 đá, 10 sắt, 10 quặng đồng; 30 công. Phải đặt trên ô có sông, ô đó là đồi hoặc giáp đồi, núi (nước từ trên cao đổ xuống).
+- **Chạy:** không cần nhiên liệu, mỗi lượt làm ra 15 điện.
+
+**Chi phí:** mỗi nhà máy tốn 3 tiền ngân khố mỗi lượt (dòng "vận hành nhà máy điện"). Không đủ tiền hoặc hết nhiên liệu thì nhà máy đứng, không làm ra điện.
+
+**Lưới điện:**
+- Một trung tâm (thủ đô, điểm định cư) có điện khi đường sá, đường sắt của nước đó nối nó tới một nhà máy đang chạy. Nhà máy đặt ngay trên trung tâm hoặc cạnh đường cũng tính.
+- Mỗi trung tâm có điện cần 0,05 điện cho mỗi người dân. Nếu nhà máy làm ra ít hơn tổng nhu cầu, mọi trung tâm trên lưới được chia đều phần thiếu.
+- **Phần dân có điện** = số dân các trung tâm trên lưới × (phần nhu cầu được đáp ứng) / tổng dân.
+
+**Tác dụng** (theo phần dân có điện, tính ở lượt sau):
+- chế tác tối đa +20%, nghiên cứu tối đa +10%;
+- từ 50% dân có điện trở lên thì đáp ứng nhu cầu "Ánh sáng, năng lượng" của mức sống, thay cho việc trữ than, dầu.
+
+AI thấy mục `power` trong quan sát: số nhà máy, điện làm ra, nhu cầu, phần dân có điện, các trung tâm có và chưa có điện. Cố vấn nhắc khi nhà máy đứng, khi điện thiếu, và khi còn trung tâm chưa được nối đường.
+
 ## 7. Quan hệ quốc gia: ngoại giao, giao thương, chiến tranh
 
 Một quốc gia chỉ có thể nhắn tin, đề nghị trao đổi, ký ước hay tuyên chiến với nước khác sau khi **đã gặp** nước đó, tức là đã thấy ít nhất một ô lãnh thổ của họ (hoặc bắt được người thám hiểm của họ, hoặc bị kéo vào chiến tranh với họ). "Đã gặp" là một chiều: A thấy B chưa chắc B đã thấy A. Mọi cam kết có hiệu lực đều là điều khoản máy đọc được, do Engine thi hành. Lời nói suông không ràng buộc ai.
