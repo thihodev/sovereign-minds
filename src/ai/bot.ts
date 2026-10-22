@@ -18,7 +18,7 @@ import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
 import { borderOf } from "../border.ts";
-import { immune, plagueNearby, quarantined } from "../contagion.ts";
+import { contagious, plagueNearby, quarantined } from "../contagion.ts";
 import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, eraIndex, invName, recipeOf } from "../catalog.ts";
@@ -230,7 +230,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
 
   // 0b. §9.5 A plague next door or on the trade road and little medicine: shut the borders while it lasts (two turns at most)
   let shut = quarantined(n, tick);
-  if (n.founded && tick > 0 && !shut && !immune(n, tick) && v.m.medicine < 0.4) {
+  if (n.founded && tick > 0 && !shut && !contagious(n, tick) && v.m.medicine < 0.4) {
     const sick = plagueNearby(world, n).filter(x => x.ways.length && !x.quarantined);
     const turns = Math.min(2, Math.max(0, ...sick.map(x => x.until - tick + 1)));
     if (turns >= 1 && spend("quarantine", { turns })) shut = true;

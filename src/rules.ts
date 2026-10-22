@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.46";
+export const RULES_VERSION = "0.47";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -301,8 +301,8 @@ export const RIVER = {
   fieldBonus: 0.5, deltaBonus: 1,
   /** §2.1 The river's plenty, laid on every river tile after the spawns: more fish, wild grain on the floodplain, reeds. */
   plenty: { fish: 60, plants: 40, reeds: 20 } as Record<string, number>,
-  /** A capital with no river, swamp, spring or well within `waterReach` tiles grows ×dryGrowth and catches plague ×dryPlague. */
-  waterReach: 2, dryGrowth: 0.75, dryPlague: 1.5,
+  /** A capital with no river, swamp, spring or well within `waterReach` tiles grows ×dryGrowth (and catches cholera ×DISEASE.dry, §9.6). */
+  waterReach: 2, dryGrowth: 0.75,
   /** Fish run: chance a turn with river land; up to `runTiles` river tiles get `runFish` fish. */
   runChance: 0.05, runFish: 80, runTiles: 3,
   /** Explorers with boats spend half a step on a river tile. */
@@ -498,6 +498,12 @@ const FRAME: Array<[string, string, string[], string[], number, string[], Invent
   ["K22", "Vô tuyến", [], ["điện", "in-ấn"], 10, ["vô-tuyến"], { explore: 4 }, "Sóng điện từ truyền tin không cần dây."],
   ["K23", "Hàng không", [], ["động-cơ-đốt-trong", "điện"], 12, ["hàng-không"], { explore: 6, transport: 0.1 }, "Khung nhẹ, cánh và động cơ đưa người lên trời."],
   ["K24", "Tên lửa", [], ["hàng-không", "thuốc-súng"], 13, ["tên-lửa"], { range: 2 }, "Nhiên liệu đẩy phản lực ra khỏi khí quyển."],
+  // §9.6 cures and vaccines
+  ["K25", "Chủng đậu", ["P14"], ["ghi-chép"], 4, ["chủng-đậu"], { medicine: 0.05 }, "Lấy vảy đậu của người bệnh nhẹ cấy cho người lành: dân gần như không mắc đậu mùa."],
+  ["K26", "Ký ninh", ["P14"], ["chữ-viết"], 5, ["ký-ninh"], {}, "Vỏ cây canh-ki-na sắc uống chữa và phòng sốt rét."],
+  ["K27", "Kính hiển vi", [], ["in-ấn"], 7, ["kính-hiển-vi"], { rp: 0.05 }, "Thấu kính mài ghép trong ống đồng: thấy được những sinh vật nhỏ trong nước và máu."],
+  ["K28", "Vi trùng học", [], ["kính-hiển-vi"], 8, ["vi-trùng-học"], { medicine: 0.1 }, "Biết bệnh do vi trùng: đun sôi nước, đào cống, rửa tay; dịch tả giảm một nửa."],
+  ["K29", "Vắc-xin", [], ["vi-trùng-học"], 9, ["vắc-xin"], { medicine: 0.05 }, "Mầm bệnh làm yếu tiêm cho người lành: chặn dịch hạch, dịch tả và một nửa bệnh cúm."],
 ];
 
 export const INVENTIONS: Invention[] = [
@@ -782,6 +788,25 @@ export const HERBS = { gather: 0.08, perPeople: 10, plagueCut: 0.5 };
  *  tension +`quarantineTension` a turn with every bordering neighbour, stability −`quarantineStability` a turn;
  *  a sick people in quarantine earns +`selfQuarantineRep` reputation a contagious turn. */
 export const CONTAGION = { sickTurns: 2, immuneTurns: 3, border: 0.25, trade: 0.15, quarantineMax: 5, quarantineTension: 2, quarantineStability: 1, selfQuarantineRep: 1 };
+
+// §9.6 Diseases. Each spreads and kills its own way; each has a cure or vaccine (a capability: from the inventions in
+// the book, or from one a nation proposes and the judge grants) that keeps it out (`protect` of the chance) and spares
+// that much of its dead. `weight` × EVENTS.plague.chance is the chance a turn that a people catches it by itself
+// (malaria: for each swamp or jungle tile outside the cold lands, up to DISEASE.wetMax); `crowd`: twice as likely above
+// EVENTS.plague.bigPop people; `water`: ×DISEASE.dry without fresh water, halved by DISEASE.sanitation. A people that
+// lived through a disease (unprotected) studies the cure for it faster: −`lore` of its research cost per outbreak,
+// up to `loreMax` outbreaks. Dịch hạch (plague) kills EVENTS.plague.min–max and crosses borders at CONTAGION.border.
+export interface DiseaseDef { id: string; name: string; weight: number; deaths: [number, number]; sick: number; immune: number;
+  border: number; trade: number; river: number; crowd?: boolean; water?: boolean; vaccine: string; protect: number; how: string }
+export const DISEASES: DiseaseDef[] = [
+  { id: "plague", name: "Dịch hạch", weight: 0.3, deaths: [0.10, 0.20], sick: 2, immune: 3, border: 0.25, trade: 0.15, river: 0, crowd: true, vaccine: "vắc-xin", protect: 0.9, how: "bọ chét trên chuột theo đoàn buôn và chợ" },
+  { id: "smallpox", name: "Đậu mùa", weight: 0.2, deaths: [0.15, 0.30], sick: 2, immune: 40, border: 0.35, trade: 0.2, river: 0, crowd: true, vaccine: "chủng-đậu", protect: 0.95, how: "qua hơi thở, rất dễ lây; ai qua khỏi thì miễn dịch 40 lượt" },
+  { id: "cholera", name: "Dịch tả", weight: 0.25, deaths: [0.05, 0.20], sick: 2, immune: 3, border: 0.1, trade: 0.1, river: 0.4, water: true, vaccine: "vắc-xin", protect: 0.8, how: "nước bẩn: theo dòng sông chung, nặng khi thiếu nước sạch" },
+  { id: "malaria", name: "Sốt rét", weight: 0.15, deaths: [0.03, 0.08], sick: 3, immune: 2, border: 0, trade: 0, river: 0, vaccine: "ký-ninh", protect: 0.9, how: "muỗi ở đầm lầy, rừng rậm; không lây sang nước khác nhưng ốm lâu" },
+  { id: "flu", name: "Cúm", weight: 0.3, deaths: [0.02, 0.06], sick: 1, immune: 2, border: 0.45, trade: 0.35, river: 0, crowd: true, vaccine: "vắc-xin", protect: 0.5, how: "lây nhanh theo mọi đường, ít chết; biến chủng nên vắc-xin chỉ chặn một nửa" },
+];
+export const DISEASE_BY_ID: Record<string, DiseaseDef> = Object.fromEntries(DISEASES.map(d => [d.id, d]));
+export const DISEASE = { wetMax: 10, dry: 2, sanitation: "vi-trùng-học", sanitationCut: 0.5, lore: 0.15, loreMax: 3 };
 
 // §12.3 Wonders
 export const WONDER_DEFS = [

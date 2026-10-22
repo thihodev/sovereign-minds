@@ -41,7 +41,7 @@ Thế giới là lưới ô lục giác 64 × 64. Mỗi quốc gia bắt đầu 
 
 - **Sông** không phải một địa hình mà là một dấu trên ô. Ô có sông được thêm cá (60), đất sét (150), sậy (40) và cây dại bãi bồi (20); ô sông trong vòng 3 ô của đồi hay núi (thượng nguồn) có thêm đá lửa cuội (25). Ô có sông được +25% phòng thủ khi bị tấn công, trừ khi bên công có Bến thuyền trong vòng 3 ô.
 - **Phù sa:** ruộng trên ô có sông cho +25% lương thực, trên châu thổ +50%.
-- **Nước ngọt:** thủ đô không có sông, đầm lầy, Suối Nước Nóng hay Giếng (công trình `well`, cần Công cụ đá thô, 10 đá + 4 gỗ) trong vòng 2 ô thì dân tăng chậm hơn (×0,75) và dịch bệnh ×1,5.
+- **Nước ngọt:** thủ đô không có sông, đầm lầy, Suối Nước Nóng hay Giếng (công trình `well`, cần Công cụ đá thô, 10 đá + 4 gỗ) trong vòng 2 ô thì dân tăng chậm hơn (×0,75) và dễ mắc dịch tả gấp đôi (mục 9.6).
 - **Mùa cá:** mỗi lượt, nước có ô sông có 5% cơ hội cá về: tối đa 3 ô sông được thêm 80 cá (một lần).
 - **Sông là đường đi:** khi có năng lực `đi-nước`, đoàn thám hiểm đi một ô sông chỉ tốn nửa bước, nên đi dọc sông được xa gấp đôi. Có Bến thuyền trong vòng 3 ô thì quân tấn công với tới thêm 1 ô khi mục tiêu là ô sông hoặc ô ven biển nông, và bên thủ mất +25% của sông.
 - **Di chuyển:** cột "lượt/ô" là thiết kế cho đoàn người đi trên bản đồ (mục 7.6) (chưa có trong engine). Engine hiện chỉ dùng địa hình để quyết định ô nào đi qua được: biển nông cần `đi-nước` (hoặc hiệu ứng `move` biển nông), núi cần hiệu ứng `move` núi, biển sâu không bao giờ đi được. Sa mạc thiếu nước (chưa có trong engine).
@@ -1441,7 +1441,7 @@ Mỗi lượt, mỗi quốc gia bốc thăm sự kiện từ bảng dưới đâ
 | Mùa đông khắc nghiệt | 4% (×2 ở hàn đới, không có ở nhiệt đới); có đất trong vòng 4 ô của Tường Băng: ít nhất 3%, rồi ×1,5, kể cả ở nhiệt đới | mọi nơi | mất 30% lương thực làm ra trong lượt, 5% dân chết rét | mỗi thứ sau giảm một nửa số chết: Thuộc da, có công trình có chỗ ở (Lều), áo da đủ cho nửa dân số |
 | Hạn hán | 3% | không ở hàn đới | hái lượm và ruộng −50% trong 2 lượt | tưới tiêu (phải tự phát minh) |
 | Lũ lụt | 3% (×2 nếu có châu thổ) | có ô sông hoặc đầm lầy | nước cuốn 10% lương thực trong kho và 1 công trình trên ô sông/đầm; ruộng +20% trong 2 lượt sau | xây công trình xa nước |
-| Dịch bệnh | 2% (×2 nếu dân > 80, ×0,7 nếu có Suối Nước Nóng) | mọi nơi | 10–20% dân chết (× (1 − y học)). Nước có dịch lây được sang láng giềng và bạn hàng trong 2 lượt (mục 9.5); vừa qua dịch thì miễn dịch 3 lượt nữa | thảo dược: có ≥ 1 thảo dược cho mỗi 10 dân thì số chết giảm một nửa (dùng hết số đó) |
+| Dịch bệnh | khoảng 2% tổng cộng, chia cho năm bệnh, mỗi bệnh một khả năng riêng (mục 9.6); ×0,7 nếu có Suối Nước Nóng | mọi nơi (sốt rét: đất đầm lầy, rừng rậm) | tùy bệnh, từ 2% (cúm) tới 30% dân chết (đậu mùa), × (1 − y học). Nước có dịch lây được sang nước khác theo đường riêng của từng bệnh (mục 9.5, 9.6) | thảo dược: có ≥ 1 thảo dược cho mỗi 10 dân thì số chết giảm một nửa (dùng hết số đó); thuốc chủng, vắc-xin (mục 9.6) |
 | Đàn thú di cư | 5% | có ô đồng cỏ | +100 thú săn trên một ô đồng cỏ (một lần, không tái tạo) | — |
 | Mùa bội thu | 5% | mọi nơi | +30% lương thực làm ra trong lượt | — |
 | Cháy rừng | 2% | có ô rừng còn gỗ | ô rừng đó mất 50% gỗ. Lộ đất trồng (chưa có trong engine) | — |
@@ -1472,14 +1472,15 @@ Watcher xem cùng báo cáo đó nhưng đầy đủ (kể cả bộ lạc và q
 
 Dịch bệnh không dừng ở biên giới. Code ở `src/contagion.ts`, chạy sau phần kinh tế của mọi nước trong lượt (pha 6b).
 
-- **Đang có dịch:** nước bị dịch (tự phát ở 9.2 hoặc bị lây) **lây được** trong 2 lượt: lượt dịch tới và lượt sau. Sau đó **miễn dịch** thêm 3 lượt: trong thời gian đó không bị dịch tự phát hay bị lây lại.
-- **Lây:** mỗi lượt còn lây, nước có dịch có thể truyền dịch sang:
+- **Đang có dịch:** nước bị dịch (tự phát ở 9.2 hoặc bị lây) **lây được** trong số lượt ốm của bệnh đó (dịch hạch 2 lượt: lượt dịch tới và lượt sau). Sau đó **miễn dịch** với bệnh đó thêm một thời gian (dịch hạch 3 lượt, đậu mùa 40 lượt). Mỗi lúc một nước chỉ mắc một bệnh.
+- **Lây:** mỗi lượt còn lây, nước có dịch có thể truyền bệnh của mình sang (con số của dịch hạch; các bệnh khác ở mục 9.6):
   - mỗi nước có đất giáp đất mình: 25%
   - mỗi nước có đoàn buôn đang đi giữa hai bên (chiều nào cũng vậy, kể cả đoàn vừa tới nơi): 15%
   - mỗi nước vừa họp chợ biên giới với mình trong lượt: 15%
+  - mỗi nước cùng có đất trên một dòng sông với mình (chỉ dịch tả): 40%
 
-  Mỗi đường bốc thăm riêng (RNG có seed theo lượt và cặp nước); khả năng nhân (1 − y học của bên nhận), tức hiệu ứng `medicine` vừa làm dịch nhẹ hơn vừa che chắn trước dịch của láng giềng. Không đường nào đi qua một nước đang cách ly (bên truyền hay bên nhận). Chỉ những nước có dịch từ đầu pha mới truyền; nước vừa bị lây bắt đầu truyền từ lượt sau.
-- **Bị lây:** như dịch tự phát (9.2): 10–20% dân chết × (1 − y học), thảo dược đủ (1 cho mỗi 10 dân) thì chết một nửa; trẻ em và người già chết trước. Biên niên sử và bản đồ ghi "dịch lan từ X sang Y" (một đường nối hai thủ đô).
+  Mỗi đường bốc thăm riêng (RNG có seed theo lượt và cặp nước); khả năng nhân (1 − y học của bên nhận) và phần thuốc phòng của bên nhận chặn được (mục 9.6), tức hiệu ứng `medicine` vừa làm dịch nhẹ hơn vừa che chắn trước dịch của láng giềng. Không đường nào đi qua một nước đang cách ly (bên truyền hay bên nhận). Chỉ những nước có dịch từ đầu pha mới truyền; nước vừa bị lây bắt đầu truyền từ lượt sau.
+- **Bị lây:** như dịch tự phát (9.2, 9.6): số chết tùy bệnh × (1 − y học), thảo dược đủ (1 cho mỗi 10 dân) thì chết một nửa; trẻ em và người già chết trước. Biên niên sử và bản đồ ghi "dịch lan từ X sang Y" (một đường nối hai thủ đô).
 - **`quarantine` (1 AP):** `{"type":"quarantine","turns":1–5}` đóng cửa biên giới từ lượt ra lệnh, trong ngần ấy lượt; `{"type":"quarantine","turns":0}` dỡ ngay. Trong khi cách ly:
   - dịch không vào, không ra qua biên giới, đoàn buôn hay chợ
   - chợ biên giới với mọi láng giềng ngừng họp
@@ -1487,9 +1488,31 @@ Dịch bệnh không dừng ở biên giới. Code ở `src/contagion.ts`, chạ
   - căng thẳng với mỗi láng giềng giáp biên +2 mỗi lượt
   - ổn định −1 mỗi lượt
   - nước đang có dịch mà cách ly để giữ dịch trong nhà: uy tín +1 mỗi lượt còn lây
-- **Quan sát:** gói trạng thái có `health` (đang lây tới lượt nào, miễn dịch tới lượt nào, cách ly tới lượt nào) và `plague_nearby` (các nước đã biết đang có dịch, đường nào có thể lây sang mình: `border`, `caravan`, `market`, và họ có đang cách ly không). Cố vấn nhắc khi láng giềng hay bạn hàng có dịch, khi chính mình có dịch, và khi đang cách ly mà quanh mình không còn dịch.
+- **Quan sát:** gói trạng thái có `health` (đang mắc bệnh gì, lây tới lượt nào, cách ly tới lượt nào, các bệnh đã có thuốc, đang miễn dịch hay đã từng mắc) và `plague_nearby` (các nước đã biết đang có dịch, bệnh gì, đường nào có thể lây sang mình: `border`, `caravan`, `market`, `river`, và họ có đang cách ly không). Cố vấn nhắc khi láng giềng hay bạn hàng có dịch, khi chính mình có dịch, và khi đang cách ly mà quanh mình không còn dịch.
 - Bot cách ly 1–2 lượt (tới khi nước kia hết lây) khi một nước giáp biên hoặc có đoàn buôn với mình đang có dịch và y học của mình dưới 40%; không bao giờ cách ly lâu hơn thế.
-- Watcher chỉnh được khả năng lây qua biên giới, qua đường buôn và căng thẳng mỗi lượt cách ly bằng sắc lệnh luật.
+- Watcher chỉnh được khả năng lây qua biên giới, qua đường buôn (của dịch hạch) và căng thẳng mỗi lượt cách ly bằng sắc lệnh luật. Sắc lệnh "Khả năng dịch bệnh" nhân khả năng tự phát của cả năm bệnh.
+
+### 9.6 Các loại bệnh, thuốc chủng và vắc-xin
+
+Mỗi bệnh lây và giết người theo cách riêng. Code ở `src/contagion.ts`, số liệu ở `DISEASES` trong `src/rules.ts`.
+
+| Bệnh | Tự phát mỗi lượt | Chết | Ốm (lây) / miễn dịch sau đó | Lây sang nước khác | Thuốc (năng lực) |
+| --- | --- | --- | --- | --- | --- |
+| Dịch hạch | 0,6% (×2 nếu dân > 80) | 10–20% | 2 / 3 lượt | giáp biên 25%, đoàn buôn, chợ 15% | `vắc-xin`, chặn 90% |
+| Đậu mùa | 0,4% (×2 nếu dân > 80) | 15–30% | 2 / 40 lượt | giáp biên 35%, đoàn buôn, chợ 20% | `chủng-đậu`, chặn 95% |
+| Dịch tả | 0,5% (×2 nếu thiếu nước ngọt) | 5–20% | 2 / 3 lượt | chung sông 40%, giáp biên, đoàn buôn, chợ 10% | `vắc-xin`, chặn 80%; `vi-trùng-học` giảm thêm một nửa |
+| Sốt rét | 0,3% cho mỗi ô đầm lầy, rừng rậm ngoài hàn đới (tối đa 10 ô) | 3–8% | 3 / 2 lượt | không lây | `ký-ninh`, chặn 90% |
+| Cúm | 0,6% (×2 nếu dân > 80) | 2–6% | 1 / 2 lượt | giáp biên 45%, đoàn buôn, chợ 35% | `vắc-xin`, chặn 50% (biến chủng) |
+
+- Khả năng tự phát và khả năng bị lây đều nhân (1 − y học). Có thuốc của bệnh thì khả năng mắc **và** số chết đều giảm theo phần thuốc chặn được. Mỗi lượt một nước tự phát nhiều nhất một bệnh.
+- **Thuốc trong Sổ phát minh:**
+  - K25 Chủng đậu: cần Trồng trọt (P14) và năng lực `ghi-chép`; cho `chủng-đậu`, y học +5%.
+  - K26 Ký ninh: cần Trồng trọt và `chữ-viết`; cho `ký-ninh`.
+  - K27 Kính hiển vi: cần `in-ấn`; nghiên cứu +5%.
+  - K28 Vi trùng học: cần `kính-hiển-vi`; cho `vi-trùng-học` (nước sạch), y học +10%.
+  - K29 Vắc-xin: cần `vi-trùng-học`; cho `vắc-xin`, y học +5%.
+  - Một nước cũng có thể đề xuất phát minh riêng có năng lực thuốc của một bệnh, nếu tiền đề hợp lý (trọng tài quyết).
+- **Đau thương dạy người chữa bệnh:** mỗi lần một nước mắc một bệnh khi chưa có thuốc của bệnh đó, phát minh cho thuốc ấy rẻ hơn 15% (tối đa 3 lần, −45%; lấy mức lớn nhất giữa các giảm giá khác). Cố vấn nhắc nghiên cứu thuốc của những bệnh đã đánh vào dân.
 
 ### 9.3 Kết thúc và xếp hạng
 

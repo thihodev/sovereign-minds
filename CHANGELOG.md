@@ -2,6 +2,17 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.47
+
+- **Năm loại bệnh (§9.6)** thay cho một thứ "dịch bệnh" chung. Mỗi bệnh lây và giết người theo cách riêng:
+  - Dịch hạch: theo biên giới, đoàn buôn, chợ; nước đông dân dễ mắc.
+  - Đậu mùa: rất dễ lây, chết 15–30%; ai qua khỏi thì miễn dịch 40 lượt.
+  - Dịch tả: theo dòng sông chung; thiếu nước ngọt thì dễ mắc gấp đôi.
+  - Sốt rét: ở đất đầm lầy, rừng rậm; không lây sang nước khác nhưng ốm lâu.
+  - Cúm: lây nhanh nhất nhưng ít chết.
+- **Thuốc và vắc-xin:** phát minh mới K25 Chủng đậu, K26 Ký ninh, K27 Kính hiển vi, K28 Vi trùng học, K29 Vắc-xin. Có thuốc thì khó mắc và ít chết hơn. Một nước đã mắc bệnh mà chưa có thuốc thì nghiên cứu thuốc đó rẻ hơn 15% mỗi lần (tối đa −45%).
+- AI thấy bệnh đang mắc, thuốc đang có và các bệnh ở nước láng giềng; cố vấn nhắc nghiên cứu thuốc. Giao diện hiện tên bệnh và số thuốc đã có (💉).
+
 ## v0.46
 
 - **Điện (§6.8):** khi có phát minh Điện (K18) thì dựng được:

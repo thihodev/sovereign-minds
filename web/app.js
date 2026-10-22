@@ -1570,7 +1570,8 @@
   /** §9.5 an outbreak that can still spread, a quarantine in force */
   function healthPills(n) {
     const h = n.health || {};
-    return (h.outbreak ? `<span class="pill bad" title="Còn lây được sang láng giềng và bạn hàng tới hết lượt ${h.outbreakUntil}">🦠 Đang có dịch</span> ` : "")
+    return (h.outbreak ? `<span class="pill bad" title="Còn lây được sang láng giềng và bạn hàng tới hết lượt ${h.outbreakUntil}">🦠 ${esc(h.disease || "Đang có dịch")}</span> ` : "")
+      + (h.cures?.length ? `<span class="pill good" title="Đã có thuốc phòng: ${esc(h.cures.join(", "))}">💉 ${h.cures.length}</span> ` : "")
       + (h.quarantine ? `<span class="pill warn" title="Đóng cửa biên giới tới hết lượt ${h.quarantineUntil}: không buôn bán, không chợ biên giới">🚧 Đang cách ly</span> ` : "");
   }
   function statusPill(n) {

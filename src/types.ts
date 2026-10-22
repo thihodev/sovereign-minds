@@ -191,6 +191,11 @@ export interface Nation {
    *  and the last turn of its quarantine (all inclusive). */
   outbreakUntil?: number;
   immuneUntil?: number;
+  /** §9.6 the disease it has or last had (absent: dịch hạch), the last turn it is immune to each disease it lived
+   *  through, and how many outbreaks of each it suffered unprotected (it studies their cures faster) */
+  disease?: string;
+  immunity?: Record<string, number>;
+  diseaseLore?: Record<string, number>;
   quarantineUntil?: number;
   /** §2.8 each province's unrest 0–100, by its centre tile (absent = 0) */
   provinceUnrest?: Record<string, number>;

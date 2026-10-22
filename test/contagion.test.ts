@@ -115,7 +115,7 @@ test("medicine cuts the chance of catching it", () => withRules(() => {
     if (med) giveMedicine(w, b, med);
     let hits = 0;
     for (let k = 0; k < 16; k++) {
-      sicken(w, a); b.immuneUntil = -1; b.outbreakUntil = -1; b.population = 60; b.stock.food = 400;
+      sicken(w, a); b.immuneUntil = -1; b.outbreakUntil = -1; delete b.immunity; b.population = 60; b.stock.food = 400;
       turn(w);
       if (contagious(b, w.tick - 1)) hits++;
     }
@@ -139,7 +139,7 @@ test("a caravan carries the plague; the AI sees it coming and the advisor speaks
   assert.deepEqual(near.map(x => [x.o.name, x.ways]), [["Nuoc A", ["caravan"]]]);
   const obs = buildObservation(w, b) as Record<string, unknown>;
   assert.ok(Array.isArray(obs.plague_nearby) && JSON.stringify(obs.plague_nearby).includes("caravan"), JSON.stringify(obs.plague_nearby));
-  assert.ok(advice(w, b).some(x => /Nuoc A.*dịch/.test(x.text) && /quarantine/.test(x.text)));
+  assert.ok(advice(w, b).some(x => /Nuoc A.*dịch/i.test(x.text) && /quarantine/.test(x.text)));
   assert.ok(advice(w, a).some(x => /quarantine/.test(x.text)), "the sick one is told it can shut its borders");
   // A bot with no medicine shuts its borders for a turn or two, never for good
   const r = botTurn(w, b, rngFor("t", 1));

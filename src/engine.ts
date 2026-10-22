@@ -33,7 +33,7 @@ import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
 import { cedeProvince, provinces, provinceTurn, restlessProvince, CAUSE_VI } from "./provinces.ts";
 import { borderPhase, pairKey } from "./border.ts";
-import { contagionPhase, immune, orderQuarantine, plagueStrike, tradeLinks } from "./contagion.ts";
+import { contagionPhase, cureDiscount, orderQuarantine, outbreakTurn, tradeLinks } from "./contagion.ts";
 import { prosperityPhase } from "./prosperity.ts";
 import { powerMods, powerPhase } from "./power.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
@@ -400,6 +400,7 @@ export function inventionCost(world: World, n: Nation, id: string): number {
   }
   if (v.custom?.by === n.id) discount = Math.max(discount, 0.2);
   if (n.stolenTech.includes(id)) discount = Math.max(discount, SPY_OPS.stealDiscount);
+  discount = Math.max(discount, cureDiscount(n, v.caps)); // §9.6 a people that suffered a disease seeks its cure
   return Math.ceil(baseCost(world, id) * (1 - discount));
 }
 /** §5.5: the listed RP scaled by depth (depthCostMult: × (1 + 0.75 × (d − 1))), rounded up to a multiple of 5. */
@@ -1056,9 +1057,9 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   if (capZone !== "cold" && erand() < EVENTS.drought.chance) { n.eventTimers.drought = EVENTS.drought.ticks; fx({ kind: "drought", tile: n.capital, nation: n.id }); n.lastEvents.push("Hạn hán: cây dại và ruộng giảm một nửa trong 2 lượt."); }
   const dry = !freshWater(world, n);
-  const plagueChance = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1) * (ownsWonder(world, n, "spring") ? 0.7 : 1) * (dry ? RIVER.dryPlague : 1) * (1 - m.medicine);
-  // §9.5 a people just through a plague does not catch it again for a while
-  if (erand() < plagueChance && !immune(n, tick)) plagueStrike(world, n, L, say, erand(), m.medicine);
+  // §9.6 diseases of its own: each by its own odds (crowds, bad water, swamps), shielded by medicine and cures
+  erand(); erand(); // (the rolls the single plague once took, so the later events keep their dice)
+  outbreakTurn(world, n, L, say, m, dry, ownsWonder(world, n, "spring"));
   if (erand() < EVENTS.bounty.chance) { const x = foodMade * EVENTS.bounty.gain; L.stock(n, "food", x, "bounty"); fx({ kind: "bounty", tile: n.capital, nation: n.id }); n.lastEvents.push(`Mùa bội thu: thêm ${fmt(x)} lương thực.`); }
   const grassTile = owned.find(t => t.terrain === "grass");
   if (grassTile && erand() < EVENTS.herd.chance) { L.tile(grassTile, "game", EVENTS.herd.game, "herd"); fx({ kind: "herd", tile: grassTile.i, nation: n.id }); n.lastEvents.push("Đàn bò rừng di cư qua lãnh thổ: thêm 100 thú săn."); }

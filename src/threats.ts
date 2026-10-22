@@ -6,11 +6,12 @@ import { col, row, dist } from "./hex.ts";
 import { buildingOf } from "./catalog.ts";
 import { mouths } from "./people.ts";
 import { canSeeRes, freshWater, governed, homeDefence, housing, mods, ownedTiles, tileLimit, workers } from "./engine.ts";
-import { LAND, SCHISM, UNREST } from "./rules.ts";
+import { DISEASE, LAND, SCHISM, UNREST } from "./rules.ts";
 import { BEASTS, EVENTS, FLOOD, HERBS, HIDDEN_ORES, HORDES, HUNT_TOOLS, ICE_WIND, QUAKE, REGEN, RES_NAME, RIVER, ROLE_RESOURCE, SPOILAGE, TERRAIN } from "./rules.ts";
 import { beastRisk, floodChance, iceWind, landDistance, liveHordes, raidChance, raidParty, tileDanger, winterChance, winterDeathShare } from "./wild.ts";
 import type { Nation, ResKey, Role, Tile, World } from "./types.ts";
 import { RESOURCE_KEYS } from "./worldgen.ts";
+import { diseaseChances, vaccinated } from "./contagion.ts";
 
 /** 0 = noted, 1 = watch, 2 = serious, 3 = urgent. */
 export interface Threat { kind: string; level: number; title: string; detail: string }
@@ -40,13 +41,14 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   }
 
   // Plague and herbs
-  const plague = EVENTS.plague.chance * (n.population > EVENTS.plague.bigPop ? 2 : 1);
+  // §9.6 each disease by its own odds
   const herbsNeed = Math.ceil(n.population / HERBS.perPeople), herbs = Math.floor(n.stock.herbs || 0);
-  add("plague", n.population > EVENTS.plague.bigPop && herbs < herbsNeed ? 2 : herbs < herbsNeed ? 1 : 0, "Dịch bệnh",
-    `${pct(plague)} mỗi lượt${n.population > EVENTS.plague.bigPop ? ` (×2 vì trên ${EVENTS.plague.bigPop} dân)` : ""}; chết ${pct(EVENTS.plague.min)}–${pct(EVENTS.plague.max)} dân. Thảo dược ${herbs}/${herbsNeed} cần để giảm một nửa số chết${herbs >= herbsNeed ? " (đủ)" : ""}.`);
+  const odds = diseaseChances(world, n, m, !freshWater(world, n), false).filter(x => x.p > 0.0005), plague = odds.reduce((s, x) => s + x.p, 0);
+  add("plague", plague >= 0.03 && herbs < herbsNeed ? 2 : herbs < herbsNeed ? 1 : 0, "Dịch bệnh",
+    `${pct(plague)} mỗi lượt: ${odds.map(x => `${x.d.name} ${pct(x.p)}${vaccinated(x.d, m) ? " (đã có thuốc)" : ""}`).join(", ")}${n.population > EVENTS.plague.bigPop ? ` (dịch hạch, đậu mùa, cúm ×2 vì trên ${EVENTS.plague.bigPop} dân)` : ""}. Thảo dược ${herbs}/${herbsNeed} cần để giảm một nửa số chết${herbs >= herbsNeed ? " (đủ)" : ""}.`);
 
   // Fresh water (§2.1)
-  if (!freshWater(world, n)) add("water", 1, "Thiếu nước ngọt", `Thủ đô không có sông, đầm, suối hay giếng trong vòng ${RIVER.waterReach} ô: dân tăng chậm hơn (×${RIVER.dryGrowth}) và dịch bệnh ×${RIVER.dryPlague}. Xây Giếng (well) gần thủ đô.`);
+  if (!freshWater(world, n)) add("water", 1, "Thiếu nước ngọt", `Thủ đô không có sông, đầm, suối hay giếng trong vòng ${RIVER.waterReach} ô: dân tăng chậm hơn (×${RIVER.dryGrowth}) và dịch tả ×${DISEASE.dry}. Xây Giếng (well) gần thủ đô.`);
 
   // Drought
   if ((n.eventTimers.drought || 0) > 0) add("drought", 2, "Hạn hán", `Còn ${n.eventTimers.drought} lượt: hái lượm và ruộng −50%.`);

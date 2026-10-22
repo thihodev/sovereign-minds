@@ -14,7 +14,7 @@ import { allBuildings, allInventions, allRecipes, buildingEffectText, buildingOf
 import { fmtGoods, relation, warSide } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
 import { governed, housing, housingParts, housingSlots, mods, inventionCost, maxOfficials, nextEraNeeds, ownedTiles, roadLevelMax, roadNet, tileLimit, workers, luxuries } from "./engine.ts";
-import { DEMO, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
+import { DEMO, DISEASES, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { LINE_VI } from "./treasury.ts";
 import { powerView } from "./power.ts";
 import { royalsView } from "./royals.ts";
@@ -38,7 +38,7 @@ import { systemPrompt } from "./ai/prompt.ts";
 import { advice } from "./ai/advice.ts";
 import { applyLaws, lawTable } from "./laws.ts";
 import { links } from "./connect.ts";
-import { contagious, quarantined } from "./contagion.ts";
+import { contagious, diseaseOf, quarantined } from "./contagion.ts";
 import { CAUSE_VI, provinces } from "./provinces.ts";
 import { knownProsperity, prosperityRank } from "./prosperity.ts";
 import type { Runner } from "./runner.ts";
@@ -108,7 +108,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
         roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n, w), works: (n.roadWorks ?? []).length } : null,
         links: n.alive && n.founded ? Object.fromEntries(links(w, n)) : {},
-        health: { outbreak: n.alive && contagious(n, w.tick), outbreakUntil: n.outbreakUntil ?? null, quarantine: n.alive && quarantined(n, w.tick), quarantineUntil: n.quarantineUntil ?? null },
+        health: { outbreak: n.alive && contagious(n, w.tick), disease: n.alive && contagious(n, w.tick) ? diseaseOf(n).name : null, outbreakUntil: n.outbreakUntil ?? null, cures: n.alive && n.founded ? (caps => DISEASES.filter(d => caps.has(d.vaccine)).map(d => d.name))(mods(w, n).caps) : [], quarantine: n.alive && quarantined(n, w.tick), quarantineUntil: n.quarantineUntil ?? null },
         provinces: n.alive && n.founded ? provinces(w, n).map(p => ({ centre: p.centre, name: p.name, capital: p.capital, tiles: p.tiles.length, people: p.people, housing: Math.round(p.housing), way: p.way, distance: p.distance, governor: p.governor ? { name: p.governor.name, skill: p.governor.skill, loyalty: p.governor.loyalty } : null, loyal: p.loyal, mood: Math.round(p.mood), causes: p.causes.map(c => CAUSE_VI[c]), ...urbanOf(w, n, p) })) : [],
         stock: Object.fromEntries(Object.entries(n.stock).filter(([, v]) => v >= 0.1).map(([k, v]) => [k, Math.round(v * 10) / 10])),
         labor: n.labor, crafts: n.crafts,

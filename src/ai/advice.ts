@@ -3,15 +3,15 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, BUILDING_BY_TYPE, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
-import { allBuildings, invName } from "../catalog.ts";
+import { allBuildings, inv, invName } from "../catalog.ts";
 import { thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
 import { mouths } from "../people.ts";
 import { WHY_VI, exodusOf } from "../exodus.ts";
 import { borderOf, hasGate, hasTower, neighbours } from "../border.ts";
 import { isolated } from "../connect.ts";
-import { WAY_NAME, contagious, immune, plagueNearby, quarantined } from "../contagion.ts";
+import { WAY_NAME, contagious, cureDiscount, diseaseOf, plagueNearby, quarantined, shield, spreadOf, vaccinated } from "../contagion.ts";
 import { PROSPERITY } from "../rules.ts";
 import { estimateProsperity, knownProsperity } from "../prosperity.ts";
 import { activeWar, hostile, peaceOutlook, touching, treatiesBetween, warSide } from "../diplomacy.ts";
@@ -190,13 +190,22 @@ export function advice(world: World, n: Nation): Advice[] {
   // Plague next door, or at home (§9.5)
   const tick = world.tick, cost = `ổn định −${CONTAGION.quarantineStability} và căng thẳng với mỗi láng giềng giáp biên +${CONTAGION.quarantineTension} mỗi lượt, chợ biên giới và buôn bán ngừng`;
   const sickNear = plagueNearby(world, n).filter(x => x.ways.length && !x.quarantined);
-  if (contagious(n, tick) && !quarantined(n, tick))
-    say(2, `Dân đang có dịch, còn lây được tới hết lượt ${n.outbreakUntil}: láng giềng giáp biên có ${CONTAGION.border * 100}% mỗi lượt bị lây, bạn hàng có đoàn buôn hay chợ biên giới với bạn ${CONTAGION.trade * 100}%. Cách ly (quarantine, ${AP_COST.quarantine} AP, turns 1–2) giữ dịch trong nhà và được +${CONTAGION.selfQuarantineRep} uy tín mỗi lượt có dịch; đổi lại ${cost}.`);
-  else if (!quarantined(n, tick) && !immune(n, tick))
+  if (contagious(n, tick) && !quarantined(n, tick)) {
+    const d = diseaseOf(n), ways = [`láng giềng giáp biên ${spreadOf(d, "border") * 100}%`, spreadOf(d, "caravan") && `bạn hàng có đoàn buôn hay chợ biên giới ${spreadOf(d, "caravan") * 100}%`, d.river && `nước chung sông ${d.river * 100}%`].filter(Boolean);
+    if (spreadOf(d, "border") + spreadOf(d, "caravan") + d.river > 0)
+      say(2, `Dân đang mắc ${d.name}, còn lây được tới hết lượt ${n.outbreakUntil}: mỗi lượt ${ways.join(", ")} có thể bị lây. Cách ly (quarantine, ${AP_COST.quarantine} AP, turns 1–2) giữ dịch trong nhà và được +${CONTAGION.selfQuarantineRep} uy tín mỗi lượt có dịch; đổi lại ${cost}.`);
+  } else if (!quarantined(n, tick))
     for (const x of sickNear) {
-      const p = Math.round(Math.max(...x.ways.map(w => w === "border" ? CONTAGION.border : CONTAGION.trade)) * (1 - m.medicine) * 100);
-      say(2, `${x.o.name} đang có dịch (lây được tới hết lượt ${x.until}), có thể lây sang bạn ${x.ways.map(w => WAY_NAME[w]).join(", ")} (tới ${p}% mỗi đường mỗi lượt). Cách ly 1–2 lượt (quarantine) chặn được, đổi lại ${cost}.${m.medicine ? "" : " Y học (hiệu ứng medicine) cũng giảm khả năng lây."}`);
+      const p = Math.round(Math.max(...x.ways.map(w => spreadOf(x.d, w))) * shield(x.d, m) * 100);
+      say(2, `${x.o.name} đang mắc ${x.d.name} (lây được tới hết lượt ${x.until}), có thể lây sang bạn ${x.ways.map(w => WAY_NAME[w]).join(", ")} (tới ${p}% mỗi đường mỗi lượt). Cách ly 1–2 lượt (quarantine) chặn được, đổi lại ${cost}.${vaccinated(x.d, m) ? "" : ` Thuốc phòng (năng lực ${x.d.vaccine}) chặn ${x.d.protect * 100}%.`}`);
     }
+  // §9.6 the cure for what killed us: cheaper to study after each outbreak
+  for (const d of DISEASES) {
+    const lived = n.diseaseLore?.[d.id] ?? 0;
+    if (!lived || vaccinated(d, m)) continue;
+    const cure = researchOptions(world, n).map(id => inv(world, id)!).find(v => v?.caps.includes(d.vaccine));
+    say(lived >= 2 ? 2 : 1, `${d.name} đã đánh vào dân ${lived} lần; năng lực ${d.vaccine} chặn được ${d.protect * 100}% lần mắc và số chết.${cure ? ` Nghiên cứu ${cure.name} (${cure.id}) đang rẻ hơn ${Math.round(cureDiscount(n, cure.caps) * 100)}% vì dân đã trải qua bệnh.` : ` Chưa nghiên cứu được thuốc này: đi tiếp nhánh phát minh dẫn tới nó (xem K25–K29), hoặc đề xuất phát minh riêng có năng lực "${d.vaccine}".`}`);
+  }
   if (quarantined(n, tick) && !contagious(n, tick) && !sickNear.length)
     say(1, `Đang cách ly tới hết lượt ${n.quarantineUntil} mà quanh bạn không còn dịch: dỡ cách ly ({"type":"quarantine","turns":0}) để buôn bán và chợ biên giới họp lại.`);
   // Prosperity and pride (§4.7): how the people lives against the nations it knows, and what raises it
