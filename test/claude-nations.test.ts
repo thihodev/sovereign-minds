@@ -166,3 +166,30 @@ test("new world: backs up the old one and starts from the setup", async () => {
     old.close(); r.store.close();
   } finally { process.env = prev; rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the Judge of Ideas (Claude) rules on the nations' initiatives; the Watcher only marks what is built", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "sm-ideas-"));
+  const prev = { ...process.env };
+  try {
+    process.env.FAKE_CLAUDE_MODE = "ok";
+    const r = runnerWithFake(dir);
+    await r.runTick();
+    const w = r.world, [a, b] = w.nations;
+    const idea = (n: number, title: string) => w.petitions.push({ id: w.petitions.length + 1, nation: n, tick: w.tick - 1, category: "sáng kiến", kind: "cơ chế", title, text: "Một cơ chế cụ thể có con số, đủ dài để được xét: mỗi làng có giếng thì dịch bệnh lây chậm hơn 20%.", reason: "Cho mọi nước", context: { population: 50, stability: 60, food: 100, tiles: 20, era: "Đồ Đá Cũ" }, status: "pending", verdict: "", decidedTick: null, mergedInto: null, delivered: false } as never);
+    idea(a.id, "Giếng chống dịch"); idea(b.id, "Lúa hoang");
+    await r.runTick();
+    const [p1, p2] = w.petitions.slice(-2);
+    assert.equal(p1.status, "partial"); assert.equal(p2.status, "rejected");
+    assert.match(p1.judge ?? "", /Claude/);
+    assert.ok(p1.verdict.length > 10 && p2.verdict.length > 10);
+    // the Watcher's own ruling still wins, and the judge is then forgotten
+    assert.equal(r.decidePetition(p2.id, "accepted", "Thần linh đổi ý.", null), null);
+    assert.equal(p2.status, "accepted"); assert.equal(p2.judge, undefined);
+    // off by switch
+    process.env.IDEA_JUDGE = "off";
+    idea(a.id, "Ý mới");
+    await r.runTick();
+    assert.equal(w.petitions.at(-1)!.status, "pending");
+    r.store.close?.();
+  } finally { process.env = prev; rmSync(dir, { recursive: true, force: true }); }
+});

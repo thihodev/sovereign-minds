@@ -384,6 +384,8 @@ export type PetitionStatus = "pending" | "accepted" | "partial" | "rejected" | "
 /** A nation's request to the gods (the Watcher) to change the world (§10.5). */
 export interface Petition {
   id: number;
+  /** §10.7 the AI judge that ruled on it (absent: the Watcher) */
+  judge?: string;
   /** §10.5 the field the nation wants the gift of a mind in, should the idea be taken up */
   mind?: string;
   nation: number;

@@ -673,3 +673,7 @@ ul.needs li.no b { color: var(--ink); }
 
 .mapctl .only-3d { display: none; font-weight: 800; font-size: 12px; }
 body.view-3d .mapctl .only-3d { display: grid; }
+
+/* §10.7 the judge's verdict on an idea, and the Watcher's override tucked away */
+.petition .verdict { margin: 6px 0; padding: 6px 10px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 6px; font-size: 13px; }
+.petition .override summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin: 4px 0; }

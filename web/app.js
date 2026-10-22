@@ -1986,10 +1986,11 @@
     $("#ideas").innerHTML = ideas.length ? ideas.sort((a, b) => order(a) - order(b) || b.id - a.id).map(p => { const [st, cls] = IDEA_STATE(p); return `<article class="petition idea">
       <div class="row"><b>${esc(p.title)}</b><span class="pill">${esc(p.kind || "khác")}</span><span style="flex:1"></span><span class="pill ${cls}">${esc(st)}</span></div>
       <div class="meta">#${p.id} · ${esc(S.nations[p.nation]?.name ?? "?")} · lượt ${p.tick}${p.implemented ? ` · đưa vào game lượt ${p.implemented}${p.implementedNote ? `: ${esc(p.implementedNote)}` : ""}` : ""}</div>
-      <div class="body">${esc(p.text)}</div><div class="meta">Lý do: ${esc(p.reason || "—")}${p.verdict ? ` · Lời phán: ${esc(p.verdict)}` : ""}</div>
-      ${p.status === "pending" ? `<textarea rows="2" placeholder="Lời phán của các vị thần (gửi lại cho quốc gia này)" data-verdict="${p.id}"></textarea>
+      <div class="body">${esc(p.text)}</div><div class="meta">Lý do: ${esc(p.reason || "—")}</div>
+      ${p.verdict ? `<div class="verdict"><b>${p.judge ? `⚖ ${esc(p.judge)}` : "⚖ Các vị thần"}:</b> ${esc(p.verdict)}</div>` : ""}
+      ${p.status === "pending" ? `<p class="note">⚖ Trọng tài Claude sẽ phán ở lượt tới.</p><details class="override"><summary>Tự quyết thay trọng tài</summary><textarea rows="2" placeholder="Lời phán của các vị thần (gửi lại cho quốc gia này)" data-verdict="${p.id}"></textarea>
       <p class="note">Chấp thuận: nước gửi được một trí tuệ AI (bộ trưởng) trong 10 lượt, +10 uy tín, +5 ổn định, nghiên cứu +25%. Một phần: trí tuệ 5 lượt, +5, +2, +10%. Thưởng một lần.${p.mind ? ` Trí tuệ họ xin: ${esc(p.mind)}.` : ""}</p>
-      <div class="row"><button type="button" class="primary" data-decide="${p.id}" data-s="accepted">Chấp thuận</button><button type="button" data-decide="${p.id}" data-s="partial">Một phần</button><button type="button" data-decide="${p.id}" data-s="rejected">Bác bỏ</button></div>` : ""}
+      <div class="row"><button type="button" class="primary" data-decide="${p.id}" data-s="accepted">Chấp thuận</button><button type="button" data-decide="${p.id}" data-s="partial">Một phần</button><button type="button" data-decide="${p.id}" data-s="rejected">Bác bỏ</button></div></details>` : ""}
       ${(p.status === "accepted" || p.status === "partial") && !p.implemented ? `<div class="row"><input type="text" placeholder="Ghi chú (ví dụ: bản 0.30)" data-note="${p.id}"><button type="button" class="primary" data-built="${p.id}">✅ Đã đưa vào game</button></div>` : ""}
       ${p.implemented && !p.honoured ? `<div class="row"><button type="button" data-unbuilt="${p.id}">Hoàn tác</button><span class="meta">nước gửi sẽ được vinh danh ở lượt sau</span></div>` : ""}
     </article>`; }).join("") : `<p class="note">Chưa có sáng kiến nào. Các AI được nhắc gửi sáng kiến (thỉnh nguyện loại "sáng kiến", miễn phí) và được thưởng một trí tuệ AI khi bạn chấp thuận.</p>`;
@@ -2011,7 +2012,8 @@
     renderSchisms();
     renderMinisterRequests();
     const list = S.petitions.slice().sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1) || b.id - a.id);
-    const pending = list.filter(p => p.status === "pending").length + (S.schisms || []).filter(x => x.status === "pending").length + (S.ministerRequests || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
+    const pending = list.filter(p => p.status === "pending" && p.category !== "sáng kiến").length + // the Judge of Ideas rules on initiatives
+      (S.schisms || []).filter(x => x.status === "pending").length + (S.ministerRequests || []).filter(x => x.status === "pending").length, badge = $("#pet-count");
     badge.hidden = !pending; badge.textContent = pending;
     const box = $("#petitions"); box.innerHTML = list.length || (S.schisms || []).length || (S.ministerRequests || []).length ? "" : `<p class="note">Chưa có thỉnh nguyện nào.</p>`;
     for (const p of list) {

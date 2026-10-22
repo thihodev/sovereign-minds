@@ -12,6 +12,7 @@ import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
 import { backfillAnnals } from "./annals.ts";
 import { PROVIDERS, callModel, extractJson, judgeModel, providerKey, providerModel } from "./ai/gateway.ts";
 import { JUDGE_SYSTEM, JUDGE_SYSTEM_BATCH, judgeBatchPrompt, judgeUserPrompt, parseRuling } from "./ai/judge.ts";
+import { IDEA_JUDGE_SYSTEM, ideaJudgePrompt, parseIdeaRulings } from "./ai/ideas.ts";
 import { migrate, invName } from "./catalog.ts";
 import { relation } from "./diplomacy.ts";
 import { rngFor, shuffle } from "./rng.ts";
@@ -211,6 +212,7 @@ export class Runner {
         return;
       }
       const rulings = await this.judgePending();
+      await this.judgeIdeas(); // §10.7 the Judge of Ideas rules on the initiatives, so the Watcher only marks what is built
       if (this.stopping) return;
       const res = step(w, inputs, rulings);
       if (res.audit.length) {
@@ -253,6 +255,25 @@ export class Runner {
       this.claudeCheck = { at: Date.now(), ok: st.available && st.loggedIn };
     }
     return this.claudeCheck.ok;
+  }
+
+  /** §10.7 The Judge of Ideas (the Watcher's Claude): up to IDEA_BATCH waiting initiatives a turn, ruled against the rules
+   *  of the world and the ideas already decided. Off with IDEA_JUDGE=off; the Watcher may still rule or overrule by hand. */
+  private async judgeIdeas(): Promise<void> {
+    const w = this.world;
+    if (process.env.IDEA_JUDGE === "off" || !this.cfg.judgeProviders.includes("claude")) return;
+    const todo = w.petitions.filter(p => p.category === "sáng kiến" && p.status === "pending" && p.tick < w.tick).slice(0, Math.max(1, Number(process.env.IDEA_BATCH) || 4));
+    if (!todo.length || (this.judgeSleep.get("claude") || 0) >= Date.now() || Date.now() < this.claudeWait.until || !this.claudeReady()) return;
+    const model = process.env.IDEA_JUDGE_MODEL || process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5", started = Date.now();
+    const r = await askClaude(IDEA_JUDGE_SYSTEM, ideaJudgePrompt(w, todo), { model, timeoutMs: Math.max(180, this.cfg.aiTimeoutSec) * 1000 });
+    const j = r.ok ? extractJson(r.text) : null;
+    this.store.logTurn({ tick: w.tick, nation: -1, provider: "claude", model, kind: j ? "idea-ruling" : (r.ok ? "invalid" : r.kind), raw: r.ok ? r.text : "", parsed: j ?? undefined, error: r.ok ? "" : r.message, latencyMs: Date.now() - started });
+    if (!r.ok && (r.kind === "ratelimit" || r.kind === "auth")) { this.judgeSleep.set("claude", Date.now() + 15 * 60 * 1000); this.claudeCheck = { at: 0, ok: false }; return; }
+    for (const x of j ? parseIdeaRulings(j, todo) : []) {
+      const p = w.petitions.find(q => q.id === x.id)!;
+      p.status = x.status; p.verdict = x.verdict; p.decidedTick = w.tick; p.mergedInto = null; p.delivered = false; p.judge = `Claude · ${model}`;
+      this.store.logWatcher(w.tick, "idea-judge", { id: p.id, status: x.status, verdict: x.verdict, model });
+    }
   }
 
   /** Rulings for this tick: the Watcher's first, then an AI judge per pending proposal. */
@@ -319,7 +340,7 @@ export class Runner {
       const awake = judges.find(p => (this.judgeSleep.get(p) || 0) <= Date.now()) ?? judges[0];
       const name = (p: string) => p === "claude" ? process.env.JUDGE_CLAUDE_MODEL || "claude-sonnet-5-5" : PROVIDERS[p]?.label ?? p;
       const spare = judges.filter(p => p !== awake);
-      out.push({ role: "Trọng tài", who: `chấm phát minh${spare.length ? ` · dự phòng khi lỗi hay hết hạn mức: ${spare.map(name).join(", ")}` : ""}`, provider: awake, model: name(awake), effort: "", status: (this.judgeSleep.get(awake) || 0) > Date.now() ? "asleep" : "active", perTurn: this.cfg.judgesPerTick });
+      out.push({ role: "Trọng tài", who: `chấm phát minh và sáng kiến${spare.length ? ` · dự phòng khi lỗi hay hết hạn mức: ${spare.map(name).join(", ")}` : ""}`, provider: awake, model: name(awake), effort: "", status: (this.judgeSleep.get(awake) || 0) > Date.now() ? "asleep" : "active", perTurn: this.cfg.judgesPerTick });
     }
     if (this.historian) out.push({ role: "Sử gia", who: "chép sử mỗi vài lượt", provider: "", model: this.historian.author, effort: "", status: "active", perTurn: 0 });
     return out;
@@ -527,7 +548,7 @@ export class Runner {
     const p = this.world.petitions.find(x => x.id === id);
     if (!p) return "Không có thỉnh nguyện này";
     if (!["accepted", "partial", "rejected", "merged", "pending"].includes(status)) return "Kết quả không hợp lệ";
-    p.status = status as typeof p.status; p.verdict = verdict.slice(0, 500); p.decidedTick = this.world.tick;
+    p.status = status as typeof p.status; p.verdict = verdict.slice(0, 500); p.decidedTick = this.world.tick; delete p.judge;
     p.mergedInto = status === "merged" ? mergedInto : null; p.delivered = false;
     this.store.logWatcher(this.world.tick, "petition", { id, status, verdict, mergedInto });
     this.store.saveState(this.world);

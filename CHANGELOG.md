@@ -4,6 +4,12 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.44
 
+- **0.44.2, trọng tài sáng kiến:**
+  - Claude của Watcher tự chấm các sáng kiến mỗi lượt (tối đa 4), đối chiếu với toàn bộ luật hiện có và các sáng kiến đã quyết.
+  - Kết quả là chấp thuận, một phần hoặc bác bỏ, kèm lời phán tiếng Việt có con số. Watcher chỉ còn bấm "Đã đưa vào game".
+  - Sổ sáng kiến hiện ai đã phán. Nút tự quyết được thu vào "Tự quyết thay trọng tài". Huy hiệu Thỉnh nguyện không còn đếm sáng kiến chờ trọng tài.
+  - Tắt bằng `IDEA_JUDGE=off`; chọn model bằng `IDEA_JUDGE_MODEL`, số sáng kiến mỗi lần bằng `IDEA_BATCH`.
+
 - **Trạm canh (§7.9), sáng kiến của một quốc gia, chấp thuận một phần:**
   - Đặt trên ô giáp láng giềng, có đường nối về trung tâm; mỗi láng giềng một trạm; 8 gỗ, 4 đá, 8 công.
   - Phòng thủ quanh trạm +15%. Biên giới bớt căng 1 mỗi lượt cho mỗi bên có trạm. Sự cố biên giới ít đi 25%.

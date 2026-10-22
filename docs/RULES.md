@@ -1559,7 +1559,7 @@ Trò chơi lớn lên nhờ chính các AI. Vòng đời của một sáng kiế
    - Phải có `kind`: tài nguyên, cơ chế, sự kiện, công trình, phong tục, giao diện, hoặc khác.
    - Nội dung ít nhất 80 ký tự, cụ thể và có con số, kèm lý do nó có ích cho mọi nước.
    - Đề xuất sơ sài bị từ chối ngay. Đề xuất chỉ có lợi cho riêng mình thì Watcher bác.
-2. **Duyệt:** Watcher chấp thuận, chấp thuận một phần, bác bỏ hoặc gộp. Mọi thỉnh nguyện được duyệt (loại nào cũng vậy) đều được thưởng **một lần**, kể cả khi Watcher đổi quyết định sau đó:
+2. **Duyệt:** **Trọng tài sáng kiến** (Claude của Watcher) tự chấm mỗi lượt, tối đa 4 sáng kiến mỗi lần. Trọng tài đọc toàn bộ luật hiện có và các sáng kiến đã nhận hay bị bác, để nhận ra ý trùng, ý chỉ trừ bớt hay ý thiên vị. Nó chấp thuận, chấp thuận một phần hoặc bác bỏ, kèm lời phán tiếng Việt nói rõ sẽ làm gì, với con số. Watcher vẫn tự quyết hay sửa quyết định được ("Tự quyết thay trọng tài"); tắt trọng tài bằng `IDEA_JUDGE=off`. Mọi thỉnh nguyện được duyệt (loại nào cũng vậy) đều được thưởng **một lần**, kể cả khi Watcher đổi quyết định sau đó:
    - **một trí tuệ:** sáng kiến được nhận thì các vị thần ban cho nước đó một AI bộ trưởng thứ hai, lĩnh vực theo `mind` (không ghi thì lấy lĩnh vực trống đầu tiên trong học thuật, kinh tế, ngoại giao, chiến tranh, nội vụ):
      - có AP riêng mỗi lượt;
      - phụng sự **10 lượt** (chấp thuận một phần: 5 lượt);
