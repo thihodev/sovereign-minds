@@ -1262,6 +1262,16 @@ Mọi hiệp ước đang hiệu lực đều nâng tình báo lên ít nhất m
 - **Chợ biên giới:** hai bên hòa ước cùng dựng một chợ trên ô biên giới để giao ngay (chưa có trong engine).
 
 
+### 7.3a Người đi qua đất nước khác (từ v0.64)
+
+Hàng hóa qua đất hay lãnh hải nước thứ ba đã nộp phí qua đất (7.3). Từ v0.64, người cũng vậy:
+- **Đoàn thám hiểm:** đi qua đất hay lãnh hải một nước mà không có hiệp ước thông hành (`passage`) hay liên minh thì phải nộp cho nước đó 1 tiền mỗi người thám hiểm, mỗi nước đi qua. Tiền lấy từ ngân khố, ghi vào dòng "phí qua đất (người)".
+- **Không trả được** (ngân khố thiếu, hoặc đang chiến tranh với nước đó) là vi phạm biên giới:
+  - nước bị đi qua có chính nghĩa tuyên chiến 5 lượt;
+  - căng thẳng biên giới +5.
+- **Quân đội:** chỉ hành quân qua đất của mình, đất vô chủ, đất nước đang chiến tranh với mình, hoặc đất nước có hiệp ước thông hành hay liên minh với mình. Không được tấn công xuyên qua đất một nước thứ ba (lệnh `attack` bị từ chối và nêu tên nước chắn đường).
+- Đột kích (`raid`) vẫn là toán nhỏ lẻn đi, không bị chặn như vậy.
+
 ### 7.3b Sân bay và đường bay
 
 Phát minh **Hàng không** (K23) chỉ cho năng lực `hàng-không` (điều kiện vào thời Nguyên Tử) và thám hiểm xa thêm 6. Máy bay cần sân bay để cất và hạ cánh.

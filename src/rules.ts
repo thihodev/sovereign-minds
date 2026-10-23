@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.63";
+export const RULES_VERSION = "0.64";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1174,6 +1174,11 @@ export const HUNT_ZONE = { depth: 2, poachCut: 0.5, linger: 5 };
 // fishing them: it takes up to `take` of the richest catch (fish or shellfish as food, pearls, whales as whale oil);
 // the victim has a just cause of war for `cause` turns and the border grows `rise` tenser. A pier or harbour of the
 // victim within SEA.pierReach of the water turns back `guard` of the fleets.
+// §7.3b Passage of people (v0.64): explorers crossing a nation's land or waters with no passage or alliance treaty pay it
+// `explorerFee` coin each (from the treasury); unpaid, they trespass: the owner has a just cause for `trespassCause`
+// turns and the border grows `trespassRise` tenser. An army may march only over its own land, the wilds, the enemy's,
+// another enemy's at war, or a land it has a passage or alliance treaty with: no attack through a third nation.
+export const PASSAGE = { explorerFee: 1, trespassCause: 5, trespassRise: 5 };
 export const SEA_RIGHTS = { take: 20, cause: 10, rise: 12, guard: 0.5 };
 export const HOLD = { near: 3, falloff: 0.5, minReach: 0.1, unheldPeople: 3, encroachRise: 20, encroachCause: 10, encroachRep: 2 };
 export const COMPACT = { interiorYield: 0.2, interiorDefense: 0.25, interiorWeight: 0.5, fill: 3, fillFood: 0.5, exclaveYield: 0.25, exclaveStability: 1, marketTax: 0.01, marketPer: 10, marketMax: 0.1 };

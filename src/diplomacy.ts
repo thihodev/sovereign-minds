@@ -267,6 +267,7 @@ export function doDiplomacy(ctx: DiploCtx, n: Nation, type: string, a: Record<st
       const byWater = kind === "attack" && crossesWater(world, n, tile);
       const near = ownedTiles(world, n.id).some(t => dist(t.i, tile) <= reach + (byWater ? 1 : 0));
       if (kind === "attack" && !near) return `Ô mục tiêu cách lãnh thổ bạn quá ${reach} ô${byWater ? " (kể cả thêm 1 ô nhờ thuyền)" : ""}`;
+      if (kind === "attack") { const block = marchBlocked(world, n, tile, reach + (byWater ? 1 : 0)); if (block) return block; } // §7.3b no march through a third nation
       if (kind === "raid" && landGap(world, n.id, target.id) > reach + 3) return "Quá xa để đột kích";
       if (kind === "attack" && world.tiles[tile].terrain === "mountain" && !mods(world, n).move.has("mountain") && !roadOf(world.tiles[tile])) return "Không vượt núi được";
       if (kind === "attack" && !world.tiles[tile].land) {
@@ -523,6 +524,28 @@ function onTheRoad(ctx: DiploCtx, c: Caravan, from: Nation): void {
     }
   }
   if (c.goods.food) { const lost = c.goods.food * (c.mode === "water" ? TRADE.waterSpoil : TRADE.landSpoil); c.goods.food -= lost; L.caravanLoss("food", lost); }
+}
+
+/** §7.3b May an army march from its land to this tile within `reach` steps, over land it may cross: its own, the
+ *  wilds, the lands of nations it is at war with, or of those it has a passage or alliance treaty with? The reason if not. */
+export function marchBlocked(world: World, n: Nation, tile: number, reach: number): string | null {
+  const ok = (owner: number) => owner === -1 || owner === n.id || !!activeWar(world, n.id, owner) || treatiesBetween(world, n.id, owner, ["passage", "alliance"]).length > 0;
+  const dist0 = new Map<number, number>(), queue: number[] = [];
+  for (const t of world.tiles) if (t.owner === n.id) { dist0.set(t.i, 0); queue.push(t.i); }
+  const blockers = new Set<number>();
+  while (queue.length) {
+    const k = queue.shift()!, d = dist0.get(k)!;
+    if (k === tile) return null;
+    if (d >= reach) continue;
+    for (const j of NEIGHBORS[k]) {
+      if (dist0.has(j)) continue;
+      const owner = world.tiles[j].owner;
+      if (j !== tile && !ok(owner)) { blockers.add(owner); continue; }
+      dist0.set(j, d + 1); queue.push(j);
+    }
+  }
+  const names = [...blockers].map(o => world.nations[o]?.name).filter(Boolean);
+  return names.length ? `Quân phải đi qua đất ${names.join(", ")}: cần hiệp ước thông hành (passage) hay liên minh với họ, hoặc đánh từ hướng khác` : null;
 }
 
 /** Battles (§7.4). Defenders split their warriors over all attacks they face this tick. */

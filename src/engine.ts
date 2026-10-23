@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  COMPACT, HOLD, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, SURFACE_IRON, FLOUR, DRIED, RECIPES, type Recipe,
+  COMPACT, HOLD, PASSAGE, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, SURFACE_IRON, FLOUR, DRIED, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -27,7 +27,7 @@ import { greatMods, greatPhase, inviteGreat } from "./greats.ts";
 import { setFocus, urbanMods } from "./urban.ts";
 import { classMods, classPhase, grant } from "./classes.ts";
 import { acceptMarriage, offerMarriage, royalPhase } from "./royals.ts";
-import { buyCost, buyShortfall, invest, setTax, spend, treasuryPhase } from "./treasury.ts";
+import { buyCost, buyShortfall, invest, payCoin, setTax, spend, treasuryPhase } from "./treasury.ts";
 import { writeAnnals } from "./annals.ts";
 import { exodusOf, noteExodus } from "./exodus.ts";
 import { isolated, links, yieldShares } from "./connect.ts";
@@ -2056,7 +2056,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const rand = rngFor(world.seed, world.tick, "explore", n.id, dir);
       const seen = new Set(n.seen), canSail = m.move.has("shallow"), fresh: number[] = [];
       let cur = parseTile(a.from) >= 0 && world.tiles[parseTile(a.from)].owner === n.id ? parseTile(a.from) : n.capital, danger = 0;
-      const walked = [cur];
+      const walked = [cur], crossed = new Set<number>();
       const passable = (i: number) => {
         if (i < 0) return false;
         const t = world.tiles[i];
@@ -2075,11 +2075,19 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         budget -= canSail && t.river ? RIVER.exploreStep : 1;
         danger = Math.max(danger, tileDanger(world, t));
         for (const j of within(cur, canSail ? 3 : 2)) if (!seen.has(j)) { seen.add(j); fresh.push(j); }
-        if (t.owner !== -1 && t.owner !== n.id) {
-          const o = world.nations[t.owner];
-          const passage = treatiesBetween(world, n.id, o.id, ["passage", "alliance"]).length > 0;
-          if (o.alive && !passage && rand() < 0.3) { o.lastEvents.push(`Phát hiện người lạ của ${n.name} trong lãnh thổ (vi phạm biên giới).`); if (!o.met.includes(n.id)) o.met.push(n.id); }
-        }
+        if (t.owner !== -1 && t.owner !== n.id) crossed.add(t.owner);
+      }
+      // §7.3b the lands and waters they crossed: free with a passage or alliance, else a fee to each owner, or trespass
+      for (const id of [...crossed].sort((x, y) => x - y)) {
+        const o = world.nations[id];
+        if (!o?.alive || treatiesBetween(world, n.id, o.id, ["passage", "alliance"]).length) continue;
+        if (!o.met.includes(n.id)) o.met.push(n.id);
+        const fee = PASSAGE.explorerFee * people, paid = activeWar(world, n.id, o.id) ? 0 : payCoin(L, n, o, fee, "passage", "passage");
+        if (paid >= fee - 1e-9) { n.lastEvents.push(`Đoàn thám hiểm đi qua đất ${o.name}, nộp ${paid} tiền phí qua đất.`); o.lastEvents.push(`Đoàn thám hiểm ${people} người của ${n.name} đi qua đất ta, nộp ${paid} tiền phí.`); continue; }
+        o.casusBelli[String(n.id)] = Math.max(o.casusBelli[String(n.id)] ?? -1, world.tick + PASSAGE.trespassCause);
+        const st = borderOf(world, n.id, o.id); st.tension = Math.min(100, st.tension + PASSAGE.trespassRise);
+        o.lastEvents.push(`Phát hiện đoàn thám hiểm của ${n.name} đi qua đất ta mà không xin phép, không nộp phí (vi phạm biên giới): ta có chính nghĩa với họ ${PASSAGE.trespassCause} lượt.`);
+        n.lastEvents.push(`Đoàn thám hiểm đi qua đất ${o.name} mà không có hiệp ước thông hành và không đủ tiền nộp phí (${fee}): ${o.name} coi là vi phạm biên giới.`);
       }
       n.seen = [...seen].sort((x, y) => x - y);
       let dead = 0; for (let k = 0; k < people; k++) if (rand() < BEASTS.explorerBase + BEASTS.explorerPerDanger * danger) dead++;

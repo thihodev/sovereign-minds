@@ -2,6 +2,12 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.64
+
+- **Người đi qua đất nước khác (§7.3a):**
+  - Đoàn thám hiểm đi qua đất hay lãnh hải một nước không có hiệp ước thông hành hay liên minh thì nộp 1 tiền mỗi người cho nước đó. Không trả được thì là vi phạm biên giới: nước kia có chính nghĩa 5 lượt, căng thẳng +5.
+  - Quân đội không được tấn công xuyên qua đất một nước thứ ba, trừ khi có hiệp ước thông hành hay liên minh với nước đó.
+
 ## v0.63
 
 - **Lãnh hải bất khả xâm phạm (§2.6b):** đội thuyền láng giềng có thể vào đánh cá trộm trong lãnh hải (lấy cá, sò ốc, ngọc trai, cá voi). Đó là hành động gây chiến: nước bị xâm phạm có chính nghĩa tuyên chiến 10 lượt, không mất uy tín; biên giới căng thêm 12. Bến thuyền, Cảng gần đó đuổi được một nửa số đội thuyền. Trước đây sự cố săn trộm rơi vào ô biển thì không lấy được gì.
