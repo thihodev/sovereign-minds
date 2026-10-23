@@ -109,24 +109,141 @@
   let pinnedI = -1, focusFx = null, anim = 0;
   const WILD_R = 6; // hexes around each wilderness centre shown as "vùng hoang" (beasts are fiercer there, §9.4)
 
+  // §12.1 the world's shape: the flat map (128 × 128 hexes, odd-r rows) or a globe (ST.shape.kind "sphere"), drawn
+  // as a world map: longitude across, latitude down, east and west joined (the map repeats as it is panned round).
+  // Everything below reaches tiles through these helpers: center, NB, hexDist, tilePath, edgeTo, centerNear, pathXY.
+  let GLOBE = false, GP = null;
+  const wrapLon = d => ((d % 360) + 540) % 360 - 180;
+  /** The globe's geometry: each tile's unit vector, its polygon's corners (longitude from its centre, latitude), how
+   *  far it reaches east and west, whether it crosses the date line or holds a pole, and the mean step between tiles. */
+  function globeGeometry() {
+    GLOBE = ST.shape?.kind === "sphere" && Array.isArray(ST.lon) && Array.isArray(ST.nb);
+    if (!GLOBE) { GP = null; return; }
+    const T = ST.terrain.length, D = Math.PI / 180, P = new Float64Array(T * 3), off = new Int32Array(T + 1);
+    for (let i = 0; i < T; i++) {
+      const la = ST.lat[i] * D, lo = ST.lon[i] * D;
+      P[i * 3] = Math.cos(la) * Math.cos(lo); P[i * 3 + 1] = Math.sin(la); P[i * 3 + 2] = Math.cos(la) * Math.sin(lo);
+      off[i + 1] = off[i] + ST.nb[i].length;
+    }
+    const C = new Float32Array(off[T] * 2), hw = new Float32Array(T), pole = new Int8Array(T), cross = new Int8Array(T);
+    let sum = 0, cnt = 0;
+    for (let i = 0; i < T; i++) {
+      const nb = ST.nb[i], n = nb.length;
+      let prev = 0, first = 0;
+      for (let k = 0; k < n; k++) {
+        // a corner: where the tile meets two neighbours (the middle of their three centres)
+        const a = nb[k], b = nb[(k + 1) % n];
+        let x = P[i * 3] + P[a * 3] + P[b * 3], y = P[i * 3 + 1] + P[a * 3 + 1] + P[b * 3 + 1], z = P[i * 3 + 2] + P[a * 3 + 2] + P[b * 3 + 2];
+        const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+        let d = wrapLon(Math.atan2(z, x) / D - ST.lon[i]);
+        if (k) d = prev + wrapLon(d - prev); else first = d; // round the corners without a jump
+        prev = d;
+        C[(off[i] + k) * 2] = d; C[(off[i] + k) * 2 + 1] = Math.asin(Math.max(-1, Math.min(1, y))) / D;
+        hw[i] = Math.max(hw[i], Math.abs(d));
+      }
+      // a tile round a pole: going round its corners turns a whole circle of longitude
+      if (Math.abs(prev + wrapLon(first - prev) - first) > 180) { pole[i] = ST.lat[i] > 0 ? 1 : -1; hw[i] = 360; }
+      if (ST.lon[i] + hw[i] > 180 || ST.lon[i] - hw[i] < -180) cross[i] = 1;
+      if (i % 7 === 0) for (const j of nb) { sum += Math.acos(Math.max(-1, Math.min(1, P[i * 3] * P[j * 3] + P[i * 3 + 1] * P[j * 3 + 1] + P[i * 3 + 2] * P[j * 3 + 2]))); cnt++; }
+    }
+    GP = { P, off, C, hw, pole, cross, step: sum / cnt, last: 0 };
+  }
+  /** The globe: the tile nearest a longitude and latitude (a walk from tile to nearer tile, from the last one found). */
+  function nearestTile(lon, lat) {
+    const D = Math.PI / 180, q = [Math.cos(lat * D) * Math.cos(lon * D), Math.sin(lat * D), Math.cos(lat * D) * Math.sin(lon * D)], P = GP.P;
+    const dot = i => P[i * 3] * q[0] + P[i * 3 + 1] * q[1] + P[i * 3 + 2] * q[2];
+    let i = GP.last, best = dot(i);
+    for (let guard = 0; guard < 2000; guard++) {
+      let next = -1;
+      for (const j of ST.nb[i]) { const d = dot(j); if (d > best) { best = d; next = j; } }
+      if (next < 0) break;
+      i = next;
+    }
+    GP.last = i;
+    return i;
+  }
+  /** How a tile's coordinates read: (col, row) on the flat map, (105.8°Đ, 21.0°B) on a globe. */
+  const lonLat = (lon, lat) => `${Math.abs(lon).toFixed(1)}°${lon > 0 ? "Đ" : lon < 0 ? "T" : ""}, ${Math.abs(lat).toFixed(1)}°${lat > 0 ? "B" : lat < 0 ? "N" : ""}`;
+  const xyOf = i => i === undefined || i === null || i < 0 ? "(?)" : GLOBE ? `(${lonLat(ST.lon[i], ST.lat[i])})` : `(${i % ST.n}, ${(i / ST.n) | 0})`;
+  /** A pair the engine sent as [col, row] (on a globe [lon, lat]). */
+  const xyPair = t => Array.isArray(t) && t.length >= 2 ? (GLOBE ? `(${lonLat(+t[0], +t[1])})` : `(${t.join(", ")})`) : "";
+
   function layout() {
     // keep what the Watcher was looking at when the screen changes size
     const keep = geo ? { fx: (geo.cw / 2 - view.tx) / view.z / geo.w, fy: (geo.ch / 2 - view.ty) / view.z / geo.h, z: view.z } : null;
-    const N = ST.n, cw = Math.max(200, mapview.clientWidth), ch = Math.max(200, mapview.clientHeight), pad = 6;
-    const uw = (N + 0.5) * SQ3, uh = 1.5 * (N - 1) + 2;
-    const s = Math.min((cw - 2 * pad) / uw, (ch - 2 * pad) / uh), w = uw * s + 2 * pad, h = uh * s + 2 * pad, dpr = Math.min(devicePixelRatio || 1, 2);
+    const N = ST.n, cw = Math.max(200, mapview.clientWidth), ch = Math.max(200, mapview.clientHeight), pad = 6, dpr = Math.min(devicePixelRatio || 1, 2);
+    let s, w, h, u = 0, ox, oy;
+    if (GLOBE) {
+      // a world map two to one: `u` pixels a degree; its width is exactly once round the world, so the copies meet
+      u = Math.min((cw - 2 * pad) / 360, (ch - 2 * pad) / 180); w = 360 * u; h = 180 * u + 2 * pad;
+      s = 0.8 * u; ox = w / 2; oy = pad + 90 * u; // a tile is about 0.8° from its centre to its corners
+    } else {
+      const uw = (N + 0.5) * SQ3, uh = 1.5 * (N - 1) + 2;
+      s = Math.min((cw - 2 * pad) / uw, (ch - 2 * pad) / uh); w = uw * s + 2 * pad; h = uh * s + 2 * pad; ox = pad + s * SQ3 / 2; oy = pad + s;
+    }
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
     // terrain cache: sharper than the screen so moderate zoom stays crisp; deeper zoom draws tiles directly
-    const bs = Math.max(1, Math.min(3, 4096 / (Math.max(w, h) * dpr)));
-    base.width = Math.round(w * dpr * bs); base.height = Math.round(h * dpr * bs);
-    geo = { N, s, pad, w, h, cw, ch, dpr, bs, ox: pad + s * SQ3 / 2, oy: pad + s, zmin: 0.3, zmax: Math.max(4, 110 / s) };
+    const bm = GLOBE ? DUP_M * u : 0, bw = w + 2 * bm; // a globe's picture reaches a little past the date line on each side
+    const bs = Math.max(1, Math.min(3, 4096 / (Math.max(bw, h) * dpr)));
+    base.width = Math.round(bw * dpr * bs); base.height = Math.round(h * dpr * bs);
+    geo = { N, s, u, pad, w, h, cw, ch, dpr, bs, bm, ox, oy, zmin: GLOBE ? 0.6 : 0.3, zmax: Math.max(4, 110 / s), dup: false };
     if (keep) { view.z = keep.z; view.tx = cw / 2 - keep.fx * w * view.z; view.ty = ch / 2 - keep.fy * h * view.z; clampView(view); }
     else Object.assign(view, fitView());
   }
-  const center = i => { const N = geo.N, c = i % N, r = (i / N) | 0; return [geo.ox + geo.s * SQ3 * (c + 0.5 * (r & 1)), geo.oy + 1.5 * geo.s * r]; };
+  const center = i => {
+    if (GLOBE) return [geo.ox + ST.lon[i] * geo.u, geo.oy - ST.lat[i] * geo.u];
+    const N = geo.N, c = i % N, r = (i / N) | 0; return [geo.ox + geo.s * SQ3 * (c + 0.5 * (r & 1)), geo.oy + 1.5 * geo.s * r];
+  };
+  /** A tile's centre on the copy of the globe nearest the point `ref` (the flat map has one copy). */
+  const centerNear = (i, ref) => { const p = center(i); if (GLOBE && ref) p[0] += Math.round((ref[0] - p[0]) / geo.w) * geo.w; return p; };
+  /** The centres along a path of tiles, each beside the one before (a way across the date line stays whole). */
+  const pathXY = path => { const out = []; for (const i of path) out.push(centerNear(i, out[out.length - 1])); return out; };
   const cube = i => { const N = geo.N, c = i % N, r = (i / N) | 0, q = c - (r - (r & 1)) / 2; return [q, r]; };
-  const hexDist = (a, b) => { const [q1, r1] = cube(a), [q2, r2] = cube(b), dq = q1 - q2, dr = r1 - r2; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2; };
+  const hexDist = (a, b) => {
+    if (GLOBE) { if (a === b) return 0; const P = GP.P, d = P[a * 3] * P[b * 3] + P[a * 3 + 1] * P[b * 3 + 1] + P[a * 3 + 2] * P[b * 3 + 2]; return Math.max(1, Math.round(Math.acos(Math.max(-1, Math.min(1, d))) / GP.step)); }
+    const [q1, r1] = cube(a), [q2, r2] = cube(b), dq = q1 - q2, dr = r1 - r2; return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
+  };
   function hexPath(g, x, y, s) { g.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 180 * (60 * k - 30); k ? g.lineTo(x + s * Math.cos(a), y + s * Math.sin(a)) : g.moveTo(x + s * Math.cos(a), y + s * Math.sin(a)); } g.closePath(); }
+  /** Where a globe tile is drawn: once, or (in a single picture of the world, geo.dup) also round the other side when it
+   *  crosses the date line, and three times for a tile round a pole. */
+  const DUP_M = 2; // degrees: the picture of the globe reaches this far past the date line on each side (no seam where copies meet)
+  const shiftsOf = i => {
+    if (!geo.dup) return [0];
+    if (GP.pole[i]) return [-geo.w, 0, geo.w];
+    const e = GP.hw[i] + DUP_M;
+    return ST.lon[i] + e > 180 ? [0, -geo.w] : ST.lon[i] - e < -180 ? [0, geo.w] : [0];
+  };
+  /** A tile's outline added to the path, grown by `k` round its centre (a little over 1 hides the seams). */
+  function tilePath(g, i, k = 1, begin = true) {
+    if (begin) g.beginPath();
+    const [x, y] = center(i);
+    if (!GLOBE) { hexPath2(g, x, y, geo.s * k); return; }
+    const o = GP.off[i], n = ST.nb[i].length, C = GP.C, u = geo.u, la = ST.lat[i], p = GP.pole[i];
+    if (p) { // round the pole: one band along the corners, once round the world for each copy, then back along the pole's line
+      const times = shiftsOf(i).length, last = C[(o + n - 1) * 2], turn = (last + wrapLon(C[o * 2] - last) - C[o * 2]) * u, top = y - (p * 90 - la) * u;
+      const x0 = x + C[o * 2] * u - (times > 1 ? turn : 0); // a picture of the whole globe: from a turn before to a turn after
+      for (let s = 0; s < times; s++) for (let c = 0; c < n; c++) { const px = x - (times > 1 ? turn : 0) + s * turn + C[(o + c) * 2] * u, py = y - (C[(o + c) * 2 + 1] - la) * u; s || c ? g.lineTo(px, py) : g.moveTo(px, py); }
+      const x1 = x0 + times * turn;
+      g.lineTo(x1, y - (C[o * 2 + 1] - la) * u); g.lineTo(x1, top); g.lineTo(x0, top); g.closePath();
+      return;
+    }
+    for (const sh of shiftsOf(i)) {
+      for (let c = 0; c < n; c++) { const px = x + sh + C[(o + c) * 2] * u * k, py = y - (C[(o + c) * 2 + 1] - la) * u * k; c ? g.lineTo(px, py) : g.moveTo(px, py); }
+      g.closePath();
+    }
+  }
+  /** The edge of tile i that faces its k-th neighbour, as a line added to the path; `f` draws it that far out from the centre. */
+  function edgeTo(g, i, k, f = 1) {
+    const [x, y] = center(i);
+    if (!GLOBE) {
+      const s = geo.s * f, a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
+      g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2)); return;
+    }
+    // corner k lies between neighbours k and k + 1: the edge facing neighbour k runs from corner k − 1 to corner k
+    const n = ST.nb[i].length, o = GP.off[i], C = GP.C, u = geo.u * f, la = ST.lat[i], a = (k + n - 1) % n;
+    const ax = C[(o + a) * 2], ay = C[(o + a) * 2 + 1], bx = ax + wrapLon(C[(o + k) * 2] - ax), by = C[(o + k) * 2 + 1];
+    for (const sh of shiftsOf(i)) { g.moveTo(x + sh + ax * u, y - (ay - la) * u); g.lineTo(x + sh + bx * u, y - (by - la) * u); }
+  }
   // size and px are in world units; px = one screen CSS pixel at the current zoom
   function label(g, text, x, y, size, color = "#fff", weight = 600, px = 1) {
     g.font = `${weight} ${size}px "Be Vietnam Pro", system-ui, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
@@ -150,12 +267,12 @@
     label(g, text, x, y, size, color, weight, px);
     return true;
   }
-  const NB = (i) => { const N = geo.N, c = i % N, r = (i / N) | 0, D = r & 1 ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]] : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]; return D.map(([dc, dr]) => [c + dc, r + dr]).map(([cc, rr]) => cc >= 0 && cc < N && rr >= 0 && rr < N ? rr * N + cc : -1); };
+  const NB = (i) => { if (GLOBE) return ST.nb[i]; const N = geo.N, c = i % N, r = (i / N) | 0, D = r & 1 ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]] : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]]; return D.map(([dc, dr]) => [c + dc, r + dr]).map(([cc, rr]) => cc >= 0 && cc < N && rr >= 0 && rr < N ? rr * N + cc : -1); };
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
   function drawTerrain(g, vis, px) {
     const s = geo.s, T = ST.terrain;
-    for (let i = 0; i < T.length; i++) { if (vis && !vis(i)) continue; const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = TERRAIN[T[i]][1]; g.fill(); }
+    for (let i = 0; i < T.length; i++) { if (vis && !vis(i)) continue; tilePath(g, i, 1.02); g.fillStyle = TERRAIN[T[i]][1]; g.fill(); }
     for (let i = 0; i < T.length; i++) {
       const t = T[i]; if (vis && !vis(i)) continue;
       const [x, y] = center(i);
@@ -168,22 +285,27 @@
         g.fillStyle = "#ffffff"; g.beginPath(); g.moveTo(x - s * .5, y + s * .35); g.lineTo(x - s * .2, y - s * .55); g.lineTo(x + s * .05, y + s * .1); g.lineTo(x + s * .3, y - s * .4); g.lineTo(x + s * .55, y + s * .35); g.closePath(); g.fill();
         const nb = NB(i);
         g.strokeStyle = "rgba(38,86,122,.75)"; g.lineWidth = Math.max(1.5 * px, s * .38); g.beginPath();
-        for (let k = 0; k < 6; k++) {
+        for (let k = 0; k < nb.length; k++) {
           if (nb[k] < 0 || T[nb[k]] === "icewall") continue;
-          const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
-          g.moveTo(x + s * .86 * Math.cos(a1), y + s * .86 * Math.sin(a1)); g.lineTo(x + s * .86 * Math.cos(a2), y + s * .86 * Math.sin(a2));
+          edgeTo(g, i, k, .86);
         }
         g.stroke();
       }
     }
     g.lineCap = "round"; g.lineJoin = "round";
-    for (const path of ST.rivers) { g.beginPath(); path.forEach((i, k) => { const [x, y] = center(i); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.strokeStyle = "#5fb4e6"; g.lineWidth = Math.max(1.4 * px, s * .32); g.stroke(); }
+    for (const path of ST.rivers) {
+      if (vis && !path.some(vis)) continue;
+      g.beginPath(); pathXY(path).forEach(([x, y], k) => { k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.strokeStyle = "#5fb4e6"; g.lineWidth = Math.max(1.4 * px, s * .32); g.stroke();
+      if (GLOBE && geo.dup) for (const sh of [-geo.w, geo.w]) { g.beginPath(); pathXY(path).forEach(([x, y], k) => { k ? g.lineTo(x + sh, y) : g.moveTo(x + sh, y); }); g.stroke(); } // round the date line
+    }
   }
   function drawBase() {
     const g = bctx, k = geo.dpr * geo.bs;
-    g.setTransform(k, 0, 0, k, 0, 0);
-    g.fillStyle = TERRAIN.ocean[1]; g.fillRect(0, 0, geo.w, geo.h);
+    g.setTransform(k, 0, 0, k, k * geo.bm, 0);
+    g.fillStyle = TERRAIN.ocean[1]; g.fillRect(-geo.bm, 0, geo.w + 2 * geo.bm, geo.h);
+    geo.dup = GLOBE; // one picture of the whole globe: what crosses the date line is drawn on both sides
     drawTerrain(g, null, 1 / geo.bs);
+    geo.dup = false;
   }
 
   const nationColor = id => S.nations[id]?.founded ? S.nations[id].flag.colors[0] : "#cccccc";
@@ -225,8 +347,8 @@
     const threat = layerKind in THREAT_LAYERS;
     for (let i = 0; i < layerData.length; i++) {
       const v = layerData[i]; if (!(v > 0) || !vis(i)) continue;
-      const a = clamp(v / layerMax, 0, 1), [x, y] = center(i);
-      hexPath(g, x, y, s * 1.02);
+      const a = clamp(v / layerMax, 0, 1);
+      tilePath(g, i, 1.02);
       g.fillStyle = threat ? `rgba(225,45,30,${(0.1 + a * 0.62).toFixed(3)})` : `rgba(255,212,0,${(0.14 + a * 0.68).toFixed(3)})`;
       g.fill();
     }
@@ -477,7 +599,7 @@
         if (!path) continue;
         const L = path.length, at = path[L - 1];
         if (!vis(at) && !vis(path[0])) continue;
-        const [wx, wy] = center(at);
+        const pts = pathXY(path), [wx, wy] = pts[L - 1];
         if (s * z >= 7 && ROLE_ICON[w.role]) { g.globalAlpha = .9; icon(g, ROLE_ICON[w.role], wx + s * .45, wy - s * .45, iconSize); g.globalAlpha = 1; }
         const people = Math.max(1, Math.round(w.n / unit));
         for (let k = 0; k < people; k++) {
@@ -490,7 +612,7 @@
           } else {
             // there and back along the way: walk out, work a while, walk home
             const t = ((now / period) + ph) % 1, leg = t < .4 ? ease(t / .4) : t < .6 ? 1 : 1 - ease((t - .6) / .4);
-            const p = leg * (L - 1), i = Math.min(L - 2, Math.floor(p)), [bx, by] = lerp(center(path[i]), center(path[i + 1]), p - i);
+            const p = leg * (L - 1), i = Math.min(L - 2, Math.floor(p)), [bx, by] = lerp(pts[i], pts[i + 1], p - i);
             // spread round the home and the work, close to the way between them so no one steps off it
             const end = .6 + .4 * leg, sc = end + (.25 - end) * Math.min(1, p, L - 1 - p);
             x = bx + ox * sc; y = by + oy * sc;
@@ -502,7 +624,7 @@
       // §2.11 boats at rest at the piers and harbours
       if ((n.stock?.boat || 0) >= 1 && s * z >= 7) for (const b of (n.buildings || []).filter(b => b.done && (b.type === "pier" || b.type === "harbor"))) {
         if (!vis(b.tile)) continue;
-        const sea = NB(b.tile).find(j => j >= 0 && isWater(j)), [px0, py0] = center(b.tile), [sx, sy] = sea !== undefined ? center(sea) : [px0 + s * .6, py0];
+        const sea = NB(b.tile).find(j => j >= 0 && isWater(j)), [px0, py0] = center(b.tile), [sx, sy] = sea !== undefined ? centerNear(sea, [px0, py0]) : [px0 + s * .6, py0];
         const moored = Math.min(3, Math.floor(n.stock.boat));
         for (let k = 0; k < moored; k++) boat(g, px0 + (sx - px0) * .55 + (k - 1) * s * .28, py0 + (sy - py0) * .55 + Math.sin(now / 600 + k) * s * .02, clamp(s * .26 * z, 3, 6) * px, n.flag.colors[0], px, 1, false);
       }
@@ -552,7 +674,7 @@
   }
   function drawBoats(g, n, from, to, w, now, s, z, px, vis, unit) {
     if (from < 0 || (!vis(from) && !vis(to))) return;
-    const a = center(from), b = center(to), r = clamp(s * .42 * z, 5, 11) * px, still = reduceMotion.matches;
+    const a = center(from), b = centerNear(to, a), r = clamp(s * .42 * z, 5, 11) * px, still = reduceMotion.matches;
     const boats = Math.min(4, Math.max(1, Math.round(w.n / unit / 2)));
     for (let k = 0; k < boats; k++) {
       const ph = hash(w.tile, k, n.id, 31), period = 11000 + ph * 6000, t = still ? .5 : ((now / period) + ph) % 1;
@@ -584,27 +706,28 @@
         case "build": case "settle": case "invention": case "era": case "minister": {
           const rr = unit * (0.6 + t * (f.kind === "era" ? 3.2 : 1.8));
           g.beginPath(); g.arc(x, y, rr, 0, 7); g.lineWidth = 3 * px; g.strokeStyle = f.kind === "invention" || f.kind === "era" ? "#ffd84a" : nc; g.stroke();
-          if (f.kind === "settle" && f.from !== undefined) route(g, [center(f.from), [x, y]], px);
+          if (f.kind === "settle" && f.from !== undefined) route(g, [centerNear(f.from, [x, y]), [x, y]], px);
           icon(g, { build: "🔨", settle: "🏕", invention: "💡", era: "🌟", minister: "🏛" }[f.kind], x, y - unit * 1.2 - t * unit, big * 1.2);
           if (f.text && s * z >= 3) floatText(g, f.text, x, y + unit * 1.3, big * .8, f.kind === "build" || f.kind === "settle" ? "#ffffff" : "#ffe9a0", px);
           break;
         }
         case "claim": case "lost_tile": {
-          hexPath(g, x, y, s * 1.02); g.fillStyle = f.kind === "claim" ? nc : "#9aa3a0"; g.globalAlpha *= .35 + .45 * Math.sin(t * Math.PI * 3) ** 2; g.fill();
+          tilePath(g, f.tile, 1.02); g.fillStyle = f.kind === "claim" ? nc : "#9aa3a0"; g.globalAlpha *= .35 + .45 * Math.sin(t * Math.PI * 3) ** 2; g.fill();
           g.lineWidth = 2.5 * px; g.strokeStyle = "#fff"; g.stroke();
           break;
         }
         case "caravan": case "explore": {
           const path = f.path || [f.tile], upto = Math.max(1, Math.floor(path.length * Math.min(1, t * 1.4)));
-          route(g, path.slice(0, upto).map(center), px);
-          const [ex, ey] = center(path[upto - 1]); figure(g, ex, ey, clamp(s * .22 * z, 2.5, 5) * px, nc, px);
+          const pts = pathXY(path.slice(0, upto));
+          route(g, pts, px);
+          const [ex, ey] = pts[upto - 1]; figure(g, ex, ey, clamp(s * .22 * z, 2.5, 5) * px, nc, px);
           icon(g, f.kind === "caravan" ? (f.text === "air" ? "✈" : f.text === "water" ? "⛵" : "🐂") : "🧭", ex, ey - unit * 1.3, big * .9);
           break;
         }
         case "raid": case "repelled": case "clear": case "battle": case "brawl": case "migrate": case "robbed": {
           const from = f.kind === "migrate" ? f.tile : f.from, to = f.kind === "migrate" ? f.to : f.tile;
           if (from === undefined || to === undefined) break;
-          const a = center(from), b = center(to), walk = Math.min(1, t / .55);
+          const a = center(from), b = centerNear(to, a), walk = Math.min(1, t / .55);
           const color = f.kind === "raid" || f.kind === "repelled" || f.kind === "robbed" ? "#ff6b3d" : nc;
           const men = Math.min(8, Math.max(2, Math.ceil((f.n || 4) / 5)));
           for (let k = 0; k < men; k++) {
@@ -624,7 +747,7 @@
         case "contagion": {
           // §9.5 a line from the sick capital to the one it reaches; the germ travels along it
           if (f.from === undefined) break;
-          const a = center(f.from), b = [x, y], [mx, my] = lerp(a, b, ease(Math.min(1, t / .6)));
+          const a = centerNear(f.from, [x, y]), b = [x, y], [mx, my] = lerp(a, b, ease(Math.min(1, t / .6)));
           g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(mx, my); g.lineCap = "round";
           g.setLineDash([]); g.lineWidth = 5 * px; g.strokeStyle = "rgba(8,20,28,.6)"; g.stroke();
           g.setLineDash([6 * px, 5 * px]); g.lineWidth = 2.6 * px; g.strokeStyle = "#9be06b"; g.stroke(); g.setLineDash([]);
@@ -704,8 +827,11 @@
     S.owners.forEach((o, i) => { if (o === id) all.push(i); });
     if (!all.length) return;
     // dim everything but its land
-    g.save(); g.beginPath(); g.rect(-geo.w, -geo.h, geo.w * 3, geo.h * 3);
-    for (const i of all) { const [x, y] = center(i); hexPath2(g, x, y, s * 1.02); }
+    g.save(); g.beginPath();
+    if (GLOBE) { g.rect(0, -geo.h, geo.w, geo.h * 3); g.clip(); g.beginPath(); g.rect(0, -geo.h, geo.w, geo.h * 3); geo.dup = true; } // this copy of the globe only
+    else g.rect(-geo.w, -geo.h, geo.w * 3, geo.h * 3);
+    for (const i of all) tilePath(g, i, 1.02, false);
+    geo.dup = false;
     g.fillStyle = "rgba(4,10,16,.45)"; g.fill("evenodd"); g.restore();
     // a glowing, breathing border in its colour
     const pulse = .5 + .5 * Math.sin(performance.now() / 380), c = nationColor(id);
@@ -732,7 +858,7 @@
       const last = (S.battles || []).filter(b => (b.attacker === w.a && b.defender === w.b) || (b.attacker === w.b && b.defender === w.a)).at(-1);
       // the heart of the front: the last battle, else the front tile nearest the middle of it
       let heart = last?.tile ?? -1;
-      if (heart < 0 && tiles.length) { const [mx, my] = tiles.map(center).reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(v => v / tiles.length); heart = tiles.reduce((a, b) => { const [ax, ay] = center(a), [bx, by] = center(b); return (bx - mx) ** 2 + (by - my) ** 2 < (ax - mx) ** 2 + (ay - my) ** 2 ? b : a; }); }
+      if (heart < 0 && tiles.length) { const ref = center(tiles[0]), C = t => centerNear(t, ref), [mx, my] = tiles.map(C).reduce((a, b) => [a[0] + b[0], a[1] + b[1]]).map(v => v / tiles.length); heart = tiles.reduce((a, b) => { const [ax, ay] = C(a), [bx, by] = C(b); return (bx - mx) ** 2 + (by - my) ** 2 < (ax - mx) ** 2 + (ay - my) ** 2 ? b : a; }); }
       if (heart < 0) { const A = S.nations[w.a], B = S.nations[w.b]; heart = A?.alive ? A.capital : B?.capital ?? -1; }
       return { war: w, edges, heart, last };
     });
@@ -744,10 +870,7 @@
     for (const f of warFronts()) {
       if (f.edges.length) {
         g.save(); g.beginPath();
-        for (const [i, k] of f.edges) {
-          const [x, y] = center(i), a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
-          g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
-        }
+        for (const [i, k] of f.edges) edgeTo(g, i, k);
         // a hazard line: amber and black, unlike any flag colour
         g.lineCap = "butt"; g.lineWidth = Math.max(4 * px, s * .34); g.strokeStyle = `rgba(255,200,40,${.25 + .25 * pulse})`; g.stroke();
         g.lineWidth = Math.max(2.4 * px, s * .16); g.strokeStyle = "#16120a"; g.stroke();
@@ -820,7 +943,7 @@
     const line = (list, width, color, dash) => {
       if (!list.length) return;
       g.beginPath();
-      for (const [a, b] of list) { const [x1, y1] = center(a), [x2, y2] = center(b); g.moveTo(x1, y1); g.lineTo(x2, y2); }
+      for (const [a, b] of list) { const p = center(a), [x2, y2] = centerNear(b, p); g.moveTo(p[0], p[1]); g.lineTo(x2, y2); }
       g.setLineDash(dash ? dash.map(d => d * s) : []); g.lineWidth = width; g.strokeStyle = color; g.stroke();
     };
     g.save(); g.lineCap = "round";
@@ -847,13 +970,29 @@
   function render() {
     if (!geo || !S) return;
     if (is3D && M3) { M3.setSelected(inspect?.kind === "nation" ? inspect.id : -1); M3.setPinned(pinnedI); return; }
-    const g = ctx, s = geo.s, z = view.z, px = 1 / z, dpr = geo.dpr;
+    const g = ctx, z = view.z, dpr = geo.dpr;
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = "#10283a"; g.fillRect(0, 0, cv.width, cv.height);
+    // a globe is drawn as often as it is seen side by side (panning goes round the world); the flat map once
+    let k0 = 0, k1 = 0;
+    if (GLOBE) { const x0 = -view.tx / z, x1 = (geo.cw - view.tx) / z; k0 = Math.floor(x0 / geo.w - 0.03); k1 = Math.floor(x1 / geo.w + 0.03); }
+    // the sea under every copy in one piece (a seam would show where two fills met)
     g.setTransform(dpr * z, 0, 0, dpr * z, dpr * view.tx, dpr * view.ty);
-    g.fillStyle = TERRAIN.ocean[1]; g.fillRect(0, 0, geo.w, geo.h);
-    const vx0 = -view.tx / z - 2 * s, vy0 = -view.ty / z - 2 * s, vx1 = vx0 + geo.cw / z + 4 * s, vy1 = vy0 + geo.ch / z + 4 * s;
-    const vis = i => { const [x, y] = center(i); return x > vx0 && x < vx1 && y > vy0 && y < vy1; };
-    if (z <= geo.bs * 1.1) g.drawImage(base, 0, 0, geo.w, geo.h); else drawTerrain(g, vis, px);
+    g.fillStyle = TERRAIN.ocean[1]; g.fillRect(k0 * geo.w, 0, (k1 - k0 + 1) * geo.w, geo.h);
+    // the ground of every copy first, then what lies on it (a copy's ground would cover its neighbour's borders)
+    for (const ground of [true, false]) for (let k = k0; k <= k1; k++) renderWorld(k * geo.w, ground);
+  }
+  /** The world drawn once, shifted `off` along x (another copy of the globe): its ground, or all that lies on it. */
+  function renderWorld(off, ground) {
+    const g = ctx, s = geo.s, z = view.z, px = 1 / z, dpr = geo.dpr, tx = view.tx + off * z;
+    g.setTransform(dpr * z, 0, 0, dpr * z, dpr * tx, dpr * view.ty);
+    const vx0 = -tx / z - 2 * s, vy0 = -view.ty / z - 2 * s, vx1 = vx0 + geo.cw / z + 4 * s, vy1 = vy0 + geo.ch / z + 4 * s;
+    const vis = GLOBE ? (i => { const [x, y] = center(i), hw = GP.hw[i] * geo.u; return x + hw > vx0 && x - hw < vx1 && y > vy0 && y < vy1; })
+      : (i => { const [x, y] = center(i); return x > vx0 && x < vx1 && y > vy0 && y < vy1; });
+    if (ground) {
+      if (z <= geo.bs * 1.1) g.drawImage(base, -geo.bm, 0, geo.w + 2 * geo.bm, geo.h);
+      else { geo.dup = GLOBE; drawTerrain(g, vis, px); geo.dup = false; } // the ground is opaque: drawn past the date line, the copies meet without a seam
+      return;
+    }
 
     // wilderness areas and the bison route (§12.4): quiet dashed outlines under everything else
     g.save(); g.setLineDash([6 * px, 5 * px]); g.lineWidth = 1.5 * px;
@@ -862,7 +1001,7 @@
       g.beginPath(); g.arc(x, y, R, 0, 7); g.fillStyle = "rgba(240,248,230,.08)"; g.fill(); g.strokeStyle = "rgba(240,248,230,.55)"; g.stroke();
     }
     if (ST.herd) {
-      const [x1, y1] = center(ST.herd[0]), [x2, y2] = center(ST.herd[1]), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, nx = -(y2 - y1) * .18, ny = (x2 - x1) * .18;
+      const [x1, y1] = center(ST.herd[0]), [x2, y2] = centerNear(ST.herd[1], [x1, y1]), mx = (x1 + x2) / 2, my = (y1 + y2) / 2, nx = -(y2 - y1) * .18, ny = (x2 - x1) * .18;
       g.beginPath(); g.moveTo(x1, y1); g.quadraticCurveTo(mx + nx, my + ny, x2, y2); g.strokeStyle = "rgba(246,214,150,.85)"; g.lineWidth = 2 * px; g.stroke();
       g.setLineDash([]);
       for (const [x, y] of [[x1, y1], [x2, y2]]) { g.beginPath(); g.arc(x, y, 3.5 * px, 0, 7); g.fillStyle = "#f6d696"; g.fill(); }
@@ -873,13 +1012,14 @@
     // (dark green on forest, sand on desert) still reads: the hatch and the outer edge use a contrast colour
     const owned = []; S.owners.forEach((o, i) => { if (o >= 0 && vis(i)) owned.push(i); });
     g.globalAlpha = .34;
-    for (const i of owned) { const [x, y] = center(i); hexPath(g, x, y, s * 1.02); g.fillStyle = nationColor(S.owners[i]); g.fill(); }
+    for (const i of owned) { tilePath(g, i, 1.02); g.fillStyle = nationColor(S.owners[i]); g.fill(); }
     g.globalAlpha = 1;
     if (s * z >= 8) {
       g.save(); g.lineWidth = Math.max(px, s * .05); g.globalAlpha = .14;
       for (const i of owned) {
         const [x, y] = center(i), o = S.owners[i];
-        g.save(); hexPath(g, x, y, s); g.clip();
+        if (GLOBE && GP.pole[i]) continue;
+        g.save(); tilePath(g, i); g.clip();
         g.strokeStyle = contrastOf(nationColor(o)); g.beginPath();
         for (let d = -s * 1.4; d <= s * 1.4; d += s * .55) { g.moveTo(x + d - s, y + s); g.lineTo(x + d + s, y - s); }
         g.stroke(); g.restore();
@@ -890,12 +1030,10 @@
     // borders: a contrast halo under the flag colour
     const bw = clamp(s * .22 * z, 1.5, 5) * px;
     const edges = (i, o) => {
-      const [x, y] = center(i), nb = NB(i);
-      for (let k = 0; k < 6; k++) {
+      const nb = NB(i);
+      for (let k = 0; k < nb.length; k++) {
         if (nb[k] >= 0 && S.owners[nb[k]] === o) continue;
-        // edge k faces neighbour direction k: E, NE, NW, W, SW, SE
-        const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
-        g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
+        edgeTo(g, i, k); // edge k faces neighbour k (flat: E, NE, NW, W, SW, SE)
       }
     };
     const byNation = new Map(); for (const i of owned) { const o = S.owners[i]; if (!byNation.has(o)) byNation.set(o, []); byNation.get(o).push(i); }
@@ -914,11 +1052,10 @@
       for (const [o, tiles] of byNation) {
         if (centresOf(o).length < 2) continue;
         for (const i of tiles) {
-          const [x, y] = center(i), nb = NB(i), p = provOf(i);
-          for (let k = 0; k < 6; k++) {
+          const nb = NB(i), p = provOf(i);
+          for (let k = 0; k < nb.length; k++) {
             const j = nb[k]; if (j < 0 || j < i || S.owners[j] !== o || provOf(j) === p) continue;
-            const a1 = Math.PI / 180 * ([0, -60, -120, 180, 120, 60][k] - 30), a2 = a1 + Math.PI / 3;
-            g.moveTo(x + s * Math.cos(a1), y + s * Math.sin(a1)); g.lineTo(x + s * Math.cos(a2), y + s * Math.sin(a2));
+            edgeTo(g, i, k);
           }
         }
       }
@@ -934,7 +1071,7 @@
     // names of the quiet places, once there is room to read them
     if (s * z >= 5) {
       for (const w of ST.wild || []) { const [x, y] = center(w); tag(g, "Vùng hoang", x, y - (WILD_R + .6) * s * SQ3 - 8 * px, small, "#eef6e6", 500, px); }
-      if (ST.herd) { const [x1, y1] = center(ST.herd[0]), [x2, y2] = center(ST.herd[1]); tag(g, "Tuyến bò rừng", (x1 + x2) / 2 - (y2 - y1) * .09, (y1 + y2) / 2 + (x2 - x1) * .09, small, "#f6d696", 500, px); }
+      if (ST.herd) { const [x1, y1] = center(ST.herd[0]), [x2, y2] = centerNear(ST.herd[1], [x1, y1]); tag(g, "Tuyến bò rừng", (x1 + x2) / 2 - (y2 - y1) * .09, (y1 + y2) / 2 + (x2 - x1) * .09, small, "#f6d696", 500, px); }
     }
     // wonders
     for (const w of ST.wonders) {
@@ -968,10 +1105,11 @@
       if (path?.length > 1) {
         const span = Math.max(1, c.arrive - (c.depart ?? c.arrive - 1)), p = clamp((S.tick - (c.depart ?? S.tick) + frac) / span, 0, 1);
         const f = p * (path.length - 1), i0 = Math.floor(f), i1 = Math.min(path.length - 1, i0 + 1);
-        pos = lerp(center(path[i0]), center(path[i1]), f - i0);
-        g.save(); g.globalAlpha = .55; route(g, path.map(center), px); g.restore();
+        const pts = pathXY(path);
+        pos = lerp(pts[i0], pts[i1], f - i0);
+        g.save(); g.globalAlpha = .55; route(g, pts, px); g.restore();
       } else {
-        const [x1, y1] = center(A.capital), [x2, y2] = center(B.capital);
+        const [x1, y1] = center(A.capital), [x2, y2] = centerNear(B.capital, [x1, y1]);
         const total = Math.max(1, Math.ceil(hexDist(A.capital, B.capital) / 8)), prog = clamp(1 - (c.arrive - S.tick) / total, .12, .88);
         pos = [x1 + (x2 - x1) * prog, y1 + (y2 - y1) * prog];
       }
@@ -1009,9 +1147,9 @@
     }
 
     drawEvents(g, now, s, z, px);
-    if (hoverI >= 0 && hoverI !== pinnedI) { const [x, y] = center(hoverI); hexPath(g, x, y, s * 1.05); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
+    if (hoverI >= 0 && hoverI !== pinnedI) { tilePath(g, hoverI, 1.05); g.lineWidth = 2 * px; g.strokeStyle = "#fff"; g.stroke(); }
     if (pinnedI >= 0) {
-      const [x, y] = center(pinnedI); hexPath(g, x, y, s * 1.08);
+      tilePath(g, pinnedI, 1.08);
       g.lineWidth = 4 * px; g.strokeStyle = "rgba(8,20,28,.8)"; g.stroke(); g.lineWidth = 2.5 * px; g.strokeStyle = "#ffd84a"; g.stroke();
     }
     // "here it is" pulse after locating a nation
@@ -1034,7 +1172,7 @@
     v.z = clamp(v.z, geo.zmin, geo.zmax);
     // the world may slide partly under a dock or off screen, never all the way
     const W = geo.w * v.z, H = geo.h * v.z, mx = Math.min(geo.cw * .45, W * .6), my = Math.min(geo.ch * .45, H * .6);
-    v.tx = clamp(v.tx, Math.min(0, geo.cw - W) - mx, Math.max(0, geo.cw - W) + mx);
+    if (!GLOBE) v.tx = clamp(v.tx, Math.min(0, geo.cw - W) - mx, Math.max(0, geo.cw - W) + mx); // a globe goes on round east and west
     v.ty = clamp(v.ty, Math.min(0, geo.ch - H) - my, Math.max(0, geo.ch - H) + my);
     return v;
   }
@@ -1083,7 +1221,7 @@
     if (!geo || i < 0) return;
     const R = visibleRect(), fz = fitView().z;
     z = clamp(z ?? Math.max(view.z, fz * 3), geo.zmin, geo.zmax);
-    const [x, y] = center(i);
+    const [x, y] = centerNear(i, [(R.x + R.w / 2 - view.tx) / view.z, 0]); // on a globe: the copy nearest the view, the short way round
     setView({ z, tx: R.x + R.w / 2 - x * z, ty: R.y + R.h / 2 - y * z }, true);
     focusFx = { i, t0: performance.now() };
   }
@@ -1106,6 +1244,7 @@
   }
   function pickScreen(sx, sy) {
     const X = (sx - view.tx) / view.z - geo.ox, Y = (sy - view.ty) / view.z - geo.oy;
+    if (GLOBE) { const lat = -Y / geo.u; return Math.abs(lat) > 90 ? -1 : nearestTile(wrapLon(X / geo.u), lat); }
     let q = (SQ3 / 3 * X - Y / 3) / geo.s, r = (2 / 3 * Y) / geo.s, z = -q - r;
     let rq = Math.round(q), rr = Math.round(r), rz = Math.round(z);
     const dq = Math.abs(rq - q), dr = Math.abs(rr - r), dz = Math.abs(rz - z);
@@ -1120,7 +1259,7 @@
     if (i < 0 || !ev) { box.hidden = true; return; }
     const o = S.owners[i], owner = o >= 0 ? S.nations[o] : null, w = ST.wonders.find(x => x.i === i);
     const tags = [ST.river[i] && "sông", ST.delta[i] && "châu thổ", inWild(i) && "vùng hoang"].filter(Boolean).join(" · ");
-    box.innerHTML = `<div class="h"><b>${esc(TERRAIN[ST.terrain[i]][0])}</b>${tags ? ` <span class="muted">· ${tags}</span>` : ""} <span class="muted mono">(${i % geo.N}, ${(i / geo.N) | 0})</span></div>
+    box.innerHTML = `<div class="h"><b>${esc(TERRAIN[ST.terrain[i]][0])}</b>${tags ? ` <span class="muted">· ${tags}</span>` : ""} <span class="muted mono">${xyOf(i)}</span></div>
       ${owner ? `<div><i class="sw" style="background:${esc(nationColor(o))}"></i>${isWater(i) ? "Lãnh hải " : ""}<b>${esc(nationName(owner))}</b></div>` : ""}
       ${S.roads?.[i] ? `<div>🛤 ${esc(isWater(i) ? S.roadLevels[S.roads[i] - 1].lane : S.roadLevels[S.roads[i] - 1].name)}</div>` : ""}${w ? `<div>⭐ <b>${esc(w.name)}</b></div>` : ""}`;
     box.hidden = false;
@@ -1132,7 +1271,7 @@
   }
   /** If an opening dock or sheet now covers the tile, slide the map so it stays in sight. */
   function revealTile(i) {
-    const R = visibleRect(), [x, y] = center(i), sx = x * view.z + view.tx, sy = y * view.z + view.ty, m = 24;
+    const R = visibleRect(), [x, y] = centerNear(i, [(R.x + R.w / 2 - view.tx) / view.z, 0]), sx = x * view.z + view.tx, sy = y * view.z + view.ty, m = 24;
     if (sx >= R.x + m && sx <= R.x + R.w - m && sy >= R.y + m && sy <= R.y + R.h - m) return;
     setView({ z: view.z, tx: R.x + R.w / 2 - x * view.z, ty: R.y + R.h / 2 - y * view.z }, true);
   }
@@ -1398,7 +1537,7 @@
   // §2.11 the sea around a nation, and the fine things its people enjoy
   function seaBlock(n) {
     const v = n.sea, l = n.luxuries, out = [];
-    const xyT = t => `(${t.join(", ")})`;
+    const xyT = xyPair;
     // §6.4 herds
     const h = n.herds;
     if (h) {
@@ -1557,7 +1696,7 @@
       w && `<span class="good">⭐ ${esc(w.name)}</span>`, vein && `<span class="good">◆ Mạch ${esc(vein.name)}</span>`, t.surfaceIron && `<span title="Sỏi sắt nằm trên mặt đồi: đào như mọi mỏ sắt, tái tạo chậm">⛏ Sắt nổi</span>`, !owner && `<span class="dim">Vô chủ</span>`].filter(Boolean);
     const el = document.createElement("div"); el.className = "insp-tile";
     el.innerHTML = `<div class="head"><span class="swatch" style="background:${TERRAIN[t.terrain][1]}"></span><div class="grow"><h3>${esc(TERRAIN[t.terrain][0])}</h3>
-        <div class="meta">(${i % geo.N}, ${(i / geo.N) | 0}) · ${ZONE[t.zone]} · ${esc(REGION[t.region] || "ngoài khơi")}${typeof t.elev === "number" ? ` · cao ${t.elev.toFixed(2)}` : ""}</div></div>
+        <div class="meta">${xyOf(i)} · ${ZONE[t.zone]} · ${esc(REGION[t.region] || "ngoài khơi")}${typeof t.elev === "number" ? ` · cao ${t.elev.toFixed(2)}` : ""}</div></div>
         <button type="button" class="icon" data-act="unpin" aria-label="Bỏ chọn ô" title="Bỏ chọn (Esc)">×</button></div>
       ${tags.length ? `<div class="chips">${tags.join("")}</div>` : ""}
       ${sec("", "Trữ lượng", keys.length ? `<div class="reslist">${keys.map(k => { const now = t.res?.[k] || 0, cap = t.cap?.[k] || 0; return `<span class="n">${esc(RES[k] ?? k)}${HIDDEN_RES.has(k) ? ` <span class="pill" title="Ẩn với AI">ẩn</span>` : ""}</span>${meter(pctOf(now, cap), now < cap * 0.25 ? "warn" : "good")}<span class="q"><b>${fmt(now)}</b>/${fmt(cap)}</span>`; }).join("")}</div>` : `<p class="empty">Không có trữ lượng.</p>`, { fold: false, count: keys.length || "" })}
@@ -1625,7 +1764,7 @@
   // §2.8 the provinces: one per centre, its land, its people, its way home, its governor and its mood
   const WAY = { capital: "thủ đô", road: "🛤 đường bộ", water: "⛵ đường thủy", air: "✈ đường bay", walk: "🚶 đi bộ" };
   // §6.1 the nation's buildings: what is going up (in the order the builders take them), what stands, what it can build
-  const at = i => `(${i % geo.N}, ${(i / geo.N) | 0})`;
+  const at = xyOf;
   const costText = c => Object.entries(c || {}).map(([k, q]) => `${q} ${RES[k] || k}`).join(" + ") || "không tốn vật liệu";
   function buildList(n) {
     const going = (n.buildings || []).filter(b => !b.done), done = (n.buildings || []).filter(b => b.done), rate = n.buildRate || 0;
@@ -1819,7 +1958,7 @@
   const titled = (title, name) => { const t = String(title || ""), v = String(name || ""); return t && v.toLowerCase().startsWith(t.toLowerCase() + " ") ? v : `${t} ${v}`.trim(); };
   function courtList(n) {
     const c = n.officials || [];
-    const body = c.length ? `<ul class="lines">${c.map(o => `<li title="${esc(`Lượt trước: ${o.lastAct}${o.seat !== null && o.seat !== undefined ? ` · giữ (${o.seat % ST.n}, ${(o.seat / ST.n) | 0})` : ""} · từ lượt ${o.since}`)}"><span class="i">${DOMAIN_ICON[o.domain] || "👤"}</span><span class="t"><b>${esc(titled(o.title, o.name))}</b> <span class="dim">· ${esc(o.lastAct)}</span></span><span class="r" title="tay nghề · trung thành">${"★".repeat(o.skill)}<span class="dim">${"☆".repeat(5 - o.skill)}</span> · <span class="${o.loyalty < 30 ? "bad" : o.loyalty < 50 ? "warn" : ""}">♥${o.loyalty}</span></span></li>`).join("")}</ul>` : `<p class="empty">Chưa bổ nhiệm ai.</p>`;
+    const body = c.length ? `<ul class="lines">${c.map(o => `<li title="${esc(`Lượt trước: ${o.lastAct}${o.seat !== null && o.seat !== undefined ? ` · giữ ${xyOf(o.seat)}` : ""} · từ lượt ${o.since}`)}"><span class="i">${DOMAIN_ICON[o.domain] || "👤"}</span><span class="t"><b>${esc(titled(o.title, o.name))}</b> <span class="dim">· ${esc(o.lastAct)}</span></span><span class="r" title="tay nghề · trung thành">${"★".repeat(o.skill)}<span class="dim">${"☆".repeat(5 - o.skill)}</span> · <span class="${o.loyalty < 30 ? "bad" : o.loyalty < 50 ? "warn" : ""}">♥${o.loyalty}</span></span></li>`).join("")}</ul>` : `<p class="empty">Chưa bổ nhiệm ai.</p>`;
     return sec("", "Quan chức", body, { fold: false, count: `${c.length}/${n.courtSlots ?? 0}` });
   }
 
@@ -1945,6 +2084,10 @@
     const d = $("#setup-dialog"), rows = $("#setup-rows");
     $("#setup-claude").textContent = o.claude.loggedIn ? "" : "Claude chưa đăng nhập: các quốc gia sẽ chờ đến khi bạn đăng nhập ở khung Chat Claude.";
     $("#setup-seed").value = `nguyen-dia-${Math.random().toString(36).slice(2, 7)}`;
+    // §12.1 the shape: the flat map or a globe (the current world's shape is offered first)
+    const shapes = o.shapes?.length ? o.shapes : [{ id: "flat", name: "Bản đồ phẳng" }];
+    fillSelect($("#setup-shape"), shapes.map(x => [x.id, x.name]), shapes.some(x => x.id === o.shape) ? o.shape : shapes[0].id);
+    $("#setup-shape").disabled = shapes.length < 2;
     fillSelect($("#setup-count"), [2, 3, 4, 5, 6, 7, 8].map(k => [k, `${k} quốc gia`]), Math.min(8, Math.max(2, o.nations || 6)));
     $("#setup-tick").value = [600, 1200, 1800, 3600].includes(o.tickSeconds) ? o.tickSeconds : 1200;
     const traitPairs = [["", "🎲 Ngẫu nhiên"], ...o.traits.map(t => [t.id, `${t.icon} ${t.name}`])];
@@ -1990,7 +2133,7 @@
     const chosen = nations.map(x => x.trait).filter(Boolean);
     if (new Set(chosen).size !== chosen.length) { $("#setup-msg").textContent = "Mỗi đặc thù chỉ dùng cho một quốc gia."; return; }
     $("#setup-go").disabled = true; $("#setup-msg").textContent = "Đang chờ lượt hiện tại xong rồi tạo thế giới…";
-    try { await api("/api/world/new", { method: "POST", body: { seed: $("#setup-seed").value.trim(), tickSeconds: +$("#setup-tick").value, nations } }); location.reload(); }
+    try { await api("/api/world/new", { method: "POST", body: { seed: $("#setup-seed").value.trim(), shape: $("#setup-shape").value || "flat", tickSeconds: +$("#setup-tick").value, nations } }); location.reload(); }
     catch (e) { $("#setup-msg").textContent = e.message; $("#setup-go").disabled = false; }
   });
 
@@ -2077,7 +2220,7 @@
       if (x.kind === "civil") return civilCard(x, st, cls);
       const el = document.createElement("article"); el.className = "petition schism";
       el.innerHTML = `<div class="row"><h3></h3><span class="grow"></span><span class="pill ${cls}">${st}</span></div>
-        <div class="meta">✊ #${x.id} · từ ${nationTag(x.from)} · L${x.tick} · <b>${x.people}</b> người (~${Math.round(x.share * 100)}%) · ${x.province !== undefined ? `tỉnh ${esc(x.provinceName || "?")}` : "đất mới"} <button class="link" data-act="site" title="Xem trên bản đồ">(${x.site % 128}, ${(x.site / 128) | 0}) ↗</button>${pending ? ` · <span class="warn">còn ${x.waitLeft} lượt</span>` : ""}</div>
+        <div class="meta">✊ #${x.id} · từ ${nationTag(x.from)} · L${x.tick} · <b>${x.people}</b> người (~${Math.round(x.share * 100)}%) · ${x.province !== undefined ? `tỉnh ${esc(x.provinceName || "?")}` : "đất mới"} <button class="link" data-act="site" title="Xem trên bản đồ">${xyOf(x.site)} ↗</button>${pending ? ` · <span class="warn">còn ${x.waitLeft} lượt</span>` : ""}</div>
         <div class="body"></div>
         ${pending ? `<div class="row"><label class="sr-only" for="sch-model-${x.id}">Model</label><select id="sch-model-${x.id}">${mindOptions()}</select><label class="sr-only" for="sch-effort-${x.id}">Effort</label><select id="sch-effort-${x.id}">${effortOptions()}</select>${tip(`${x.province !== undefined ? "Nếu cho phép, tỉnh tách khỏi nước cũ cùng điểm định cư, đất đai và công trình của tỉnh, người sống ở đó, phần kho tương ứng và mọi phát minh, rồi tự đặt tên, cờ ở lượt đầu." : "Nếu cho phép, họ mang theo gia đình, phần kho tương ứng và mọi phát minh của nước cũ, rồi tự đặt tên, cờ ở lượt đầu."} Nếu không, họ sẽ xin sang định cư ở một nước quen biết, hoặc quay về trong uất ức. Chọn trí tuệ cho quốc gia mới.`)}</div>
         <textarea rows="1" placeholder="Lời phán (gửi cho nước cũ, tùy chọn)"></textarea>
@@ -2793,8 +2936,9 @@
       btn3d.disabled = true;
       try {
         // one 3D map only, however many times it is asked for while it loads
-        M3loading ??= import("/map3d.js").then(mod => mod.create($("#map3d"), {
-          terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor, roadTree,
+        // a globe has its own 3D view (web/globe3d.js), the flat map its relief (web/map3d.js); both answer the same calls
+        M3loading ??= import(GLOBE ? "/globe3d.js" : "/map3d.js").then(mod => mod.create($("#map3d"), {
+          terrain: TERRAIN, veinColor: VEIN_COLOR, drawFlag, nationColor, roadTree, bIcon,
           onPick: i => pinTile(i), onHover: (i, ev) => hoverCard(i, ev),
           fxWord: f => FX_WORD[f.kind]?.(f) ?? f.kind, fxTone, fxDur: f => FX_DUR[f.kind] || FX_DEFAULT,
           isDark: () => true, anim: () => ANIM.on,
@@ -2845,6 +2989,8 @@
   initSubtabs(document, (key, name) => { if (key === "stats" && name === "chart" && statsCache) drawChart(); });
   async function boot() {
     ST = await api("/api/static");
+    globeGeometry(); document.body.classList.toggle("globe", GLOBE);
+    if (/[?&#]m3debug/.test(location.search + location.hash)) window.__map = { view, geo: () => geo, GP: () => GP, ST: () => ST, render, centerOn, pickScreen, center, setView, base }; // for checks in the browser only
     layout(); drawBase(); legend(); updateZoomUi();
     await refresh();
     if (S.lastFx?.fx?.length && S.lastFx.tick >= S.tick - 1) showTicker(S.lastFx.fx); // the last turn's news, after a reload
