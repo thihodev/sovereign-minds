@@ -5,6 +5,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 ## v0.67
 
 - **Địa cầu (§12.1b):** thế giới mới có thể là một quả cầu lục giác 25.002 ô thay cho bản đồ phẳng. Ô gọi bằng kinh độ, vĩ độ; không có mép bản đồ (đi mãi về đông sẽ vòng lại từ tây); hai chỏm băng ở cực thay Tường Băng; khí hậu theo vĩ độ ở cả hai bán cầu; 5–8 lục địa giữa đại dương rộng. Các vua được giải thích cách đọc tọa độ và hướng Bắc, Nam khi thám hiểm. Chọn khi tạo thế giới mới (API `shape: "globe"`, hoặc `WORLD_SHAPE=globe`). Thế giới đang chạy giữ bản đồ phẳng.
+- **0.67.1, nhanh hơn trên địa cầu:** mỗi lượt từ khoảng 163 xuống 119 ms. Quanh một ô, các vòng ô đã tính được giữ lại để dùng tiếp. Khoảng cách từ đất tới bọn mọi rợ chỉ xét các ô quanh chúng. Chỗ ở chỉ đếm một lần mỗi lượt. Gió tường băng chỉ xét các ô sát tường. Luật và kết quả không đổi.
 
 ## v0.66
 

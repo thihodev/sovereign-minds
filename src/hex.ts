@@ -114,14 +114,21 @@ function sphereTopology(freq: number): Topology {
   for (let i = 0; i < P.length; i += 7) for (const j of neighbors[i]) { sum += angle(P[i], P[j]); k2++; }
   const stepAngle = sum / k2;
   const dist = (i: number, j: number) => (i === j ? 0 : Math.max(1, Math.round(angle(P[i], P[j]) / stepAngle)));
+  const rings = new Map<number, number[]>(), mark = new Uint32Array(P.length); let stamp = 0, ringSize = 0;
   return {
     shape: { kind: "sphere", freq }, count: P.length, neighbors, points: P,
     col: i => LON[i], row: i => LAT[i], dist,
     within(i, rad) {
-      // the rings out to rad steps, as on the flat world (1 + 6 + 12 + …)
-      const seen = new Set([i]); let ring = [i];
-      for (let r = 0; r < rad && ring.length; r++) { const next: number[] = []; for (const k of ring) for (const j of neighbors[k]) if (!seen.has(j)) { seen.add(j); next.push(j); } ring = next; }
-      return [...seen].sort((a, b) => a - b);
+      // the rings out to rad steps, as on the flat world (1 + 6 + 12 + …); kept, as the rules ask the same rings each turn
+      const key = i * 256 + Math.max(0, Math.min(255, rad)), hit = rings.get(key);
+      if (hit) return hit.slice();
+      if (++stamp === 0xffffffff) { mark.fill(0); stamp = 1; }
+      const out = [i]; mark[i] = stamp; let ring = [i];
+      for (let r = 0; r < rad && ring.length; r++) { const next: number[] = []; for (const k of ring) for (const j of neighbors[k]) if (mark[j] !== stamp) { mark[j] = stamp; next.push(j); out.push(j); } ring = next; }
+      out.sort((a, b) => a - b);
+      if ((ringSize += out.length) > 4e6) { rings.clear(); ringSize = out.length; }
+      rings.set(key, out);
+      return out.slice();
     },
     step(i, d) {
       const want = BEARING[d]; if (want === undefined) return -1;

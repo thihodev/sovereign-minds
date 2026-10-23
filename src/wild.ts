@@ -2,7 +2,7 @@
 // and the ice wall's wind. Pure reads of the World, shared by the engine, the
 // observation sent to each nation, and the Watcher's map.
 
-import { dist } from "./hex.ts";
+import { dist, pointOf, within } from "./hex.ts";
 import { rngFor, shuffle } from "./rng.ts";
 import { BEASTS, EVENTS, FLOOD, HORDES, ICE_WIND } from "./rules.ts";
 import type { Horde, Nation, Tile, World } from "./types.ts";
@@ -36,16 +36,26 @@ export function tileDanger(world: World, t: Tile): number {
   return d;
 }
 
-/** Tiles from a nation's land to a tile (Infinity when it owns none). */
-export function landDistance(world: World, n: Nation, tile: number): number {
+/** Tiles from a nation's land to a tile (Infinity when it owns none, or none within `max` when given). */
+export function landDistance(world: World, n: Nation, tile: number, max?: number): number {
   let best = Infinity;
+  // a bound looks only around the tile (on a globe the rings run a little wider than the steps: a margin)
+  const near = max === undefined ? null : within(tile, pointOf(tile) ? Math.ceil(max * 1.2) + 2 : max);
+  if (near) { for (const i of near) if (world.tiles[i].owner === n.id) { const d = dist(i, tile); if (d < best) best = d; } return best <= max! ? best : Infinity; }
   for (const t of world.tiles) if (t.owner === n.id) { const d = dist(t.i, tile); if (d < best) best = d; }
   return best;
 }
 
 /** Does the ice wall's wind reach this nation's land? */
 export function iceWind(world: World, n: Nation): boolean {
-  return world.tiles.some(t => t.owner === n.id && t.wall !== undefined && t.wall <= ICE_WIND.reach);
+  return windy(world).some(t => t.owner === n.id);
+}
+/** The tiles the wind reaches (the ice wall never moves: kept per map). */
+const windMemo = new WeakMap<Tile[], Tile[]>();
+function windy(world: World): Tile[] {
+  let out = windMemo.get(world.tiles);
+  if (!out) { out = world.tiles.filter(t => t.wall !== undefined && t.wall <= ICE_WIND.reach); windMemo.set(world.tiles, out); }
+  return out;
 }
 
 /** §9.2 + §12.1 Chance of a harsh winter this tick, from the capital's climate and the ice wall's wind. */
@@ -79,7 +89,7 @@ export function raidTarget(world: World, h: Horde): { n: Nation; d: number } | n
   let out: { n: Nation; d: number } | null = null;
   for (const n of world.nations) {
     if (!n.alive || !n.founded || n.population < HORDES.minPop) continue;
-    const d = landDistance(world, n, h.tile);
+    const d = landDistance(world, n, h.tile, HORDES.range);
     if (d <= HORDES.range && (!out || d < out.d)) out = { n, d };
   }
   return out;

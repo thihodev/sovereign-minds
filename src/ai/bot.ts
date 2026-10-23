@@ -149,7 +149,7 @@ function look(world: World, n: Nation): View {
   return {
     want: wantRes,
     world, n, m, owned, mine: new Set(owned.map(t => t.i)), centres: [n.capital, ...n.settlements.map(s => s.tile)],
-    pop: n.population, workers: workers(n), need: mouths(n) * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n), limit: tileLimit(world, n), held: governed(world, n),
+    pop: n.population, workers: workers(n), need: mouths(n) * m.foodPerPerson, food: n.stock.food || 0, house: housing(world, n, owned), limit: tileLimit(world, n), held: governed(world, n),
     has: id => n.inventions.includes(id), stock: k => n.stock[k] || 0,
     wild: { hunt: sustain(world, n, owned, "game", share), gather: sustain(world, n, owned, "plants", share) * drought, fish: sustain(world, n, owned, "fish", share) },
     farmSlots, farmPerWorker: farmSlots ? farmFood / farmSlots * stabMult : 0, stabMult, drought,
@@ -649,7 +649,7 @@ interface WarPlan { warriors: number; strikes: Array<{ tile: number; warriors: n
 function wildGuard(v: View): number {
   const { world, n } = v;
   if (n.population < HORDES.minPop) return 0;
-  const threat = liveHordes(world).filter(h => landDistance(world, n, h.tile) <= HORDES.range + 2).reduce((s, h) => Math.max(s, raidParty(h, n)), 0);
+  const threat = liveHordes(world).filter(h => landDistance(world, n, h.tile, HORDES.range + 2) <= HORDES.range + 2).reduce((s, h) => Math.max(s, raidParty(h, n)), 0);
   if (!threat) return 0;
   // The raid is resolved with homeDefence(): ask it what one more warrior is worth (weapons and walls included)
   const now = homeDefence(world, n), perMan = Math.max(0.1, homeDefence(world, { ...n, labor: { ...n.labor, warrior: n.labor.warrior + 1 } }) - now);

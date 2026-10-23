@@ -83,7 +83,7 @@ export function nationThreats(world: World, n: Nation, forAI = false): Threat[] 
   const def = homeDefence(world, n);
   for (const h of liveHordes(world)) {
     if (forAI && !n.seen.includes(h.tile)) continue;
-    const d = landDistance(world, n, h.tile);
+    const d = landDistance(world, n, h.tile, HORDES.range + 6);
     if (d > HORDES.range + 6) continue;
     const party = raidParty(h, n), rich = n.population >= HORDES.minPop, inRange = d <= HORDES.range && world.tick >= HORDES.grace && rich;
     const ratio = party / Math.max(1, def);

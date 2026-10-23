@@ -358,8 +358,8 @@ export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural
   const urban = [...hubs].reduce((s2, c) => s2 + urbanRoom(n, c), 0);
   return { natural: Math.round(START.naturalHousing * land), settlements: Math.round(n.settlements.length * SETTLEMENT.housing * land), buildings, hamlets: Math.min(hamletMax, Math.round(hamlets * land)), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0, urban };
 }
-export function housing(world: World, n: Nation): number {
-  const p = housingParts(world, n);
+export function housing(world: World, n: Nation, owned?: Tile[]): number {
+  const p = housingParts(world, n, owned);
   return p.natural + p.settlements + p.buildings + p.hamlets + p.wonder + p.urban;
 }
 /** §2.1 Fresh water near the capital: a river, a swamp, the hot spring or a well within RIVER.waterReach tiles. */
@@ -1219,7 +1219,7 @@ function economy(world: World, n: Nation, L: Ledger, say: (nation: number | null
   }
   const surplus = shortage > 1e-9 ? -1 : (n.stock.food || 0) / Math.max(1, need);
   if (surplus > 0) n.stability += 1;
-  const roof = housing(world, n);
+  const roof = housing(world, n, owned);
   // §4.2 a turn of age: the groups move up, the old and the worn die; births replace them (as many as the
   // food fed: a short famine costs some births, not all) and, with food to spare and room to live, add the
   // logistic growth — all as fertile as the people now is
@@ -2025,7 +2025,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       const h = (world.hordes ?? []).find(x => x.id === num(a.horde, -1) && x.alive);
       if (!h) return "Không có bộ lạc man di này (xem threats trong gói trạng thái)";
       if (!n.seen.includes(h.tile)) return "Chưa nhìn thấy nơi ở của bộ lạc này";
-      if (landDistance(world, n, h.tile) > HORDES.clearReach) return `Quá xa: cần đất của mình trong vòng ${HORDES.clearReach} ô quanh nơi ở của chúng`;
+      if (landDistance(world, n, h.tile, HORDES.clearReach) > HORDES.clearReach) return `Quá xa: cần đất của mình trong vòng ${HORDES.clearReach} ô quanh nơi ở của chúng`;
       const men = Math.floor(num(a.warriors, 0)), committed = strikes.filter(s => s.n === n).reduce((s, x) => s + x.warriors, 0);
       if (men < 1 || men + committed > n.labor.warrior) return `Chỉ có ${n.labor.warrior - committed} chiến binh rảnh`;
       strikes.push({ n, target: n, tile: h.tile, warriors: men, kind: "wild" }); // the men are spoken for this turn

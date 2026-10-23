@@ -25,10 +25,10 @@ export function needs(world: World, n: Nation): Need[] {
   const m = mods(world, n), pop = Math.max(1, n.population), eat = pop * m.foodPerPerson, owned = ownedTiles(world, n.id);
   const land = owned.filter(t => t.land), roaded = land.filter(t => (t.road || 0) > 0 || NEIGHBORS[t.i].some(j => world.tiles[j].owner === n.id && (world.tiles[j].road || 0) > 0)).length;
   const lux = LUXURY.goods.filter(g => (n.stock[g] || 0) >= 1).length, metal = metalGoods(world), kinds = Object.entries(n.stock).filter(([g, q]) => q >= 1 && g !== "coin" && g !== "food_reserve").length;
-  const r = (x: number) => Math.round(x * 10) / 10;
+  const r = (x: number) => Math.round(x * 10) / 10, roof = housing(world, n, owned);
   const list: Need[] = [
     { id: "food", name: "Đủ ăn", era: 0, met: (n.stock.food || 0) >= eat, have: `${r(n.stock.food || 0)}`, want: `${r(eat)} (một lượt ăn)`, how: "hái lượm, săn, đánh cá, ruộng, gia súc" },
-    { id: "roof", name: "Chỗ ở", era: 0, met: housing(world, n) >= n.population, have: `${housing(world, n)} chỗ`, want: `${n.population}`, how: "lều, thôn xóm trên đất, điểm định cư" },
+    { id: "roof", name: "Chỗ ở", era: 0, met: roof >= n.population, have: `${roof} chỗ`, want: `${n.population}`, how: "lều, thôn xóm trên đất, điểm định cư" },
     { id: "water", name: "Nước ngọt", era: 0, met: freshWater(world, n), have: freshWater(world, n) ? "có" : "không", want: "sông, đầm hay giếng gần thủ đô", how: "Giếng, chiếm đất tới sông, dời đô bên sông" },
     { id: "clothes", name: "Quần áo", era: 1, met: sum(n, ["hide_coat", "cloth", "fur"]) >= pop / LIVING.perClothes, have: `${r(sum(n, ["hide_coat", "cloth", "fur"]))}`, want: `${r(pop / LIVING.perClothes)} (áo da, vải, lông thú)`, how: "chế tác Áo da, Vải (Dệt), săn lông thú" },
     { id: "tools", name: "Công cụ", era: 1, met: sum(n, ["stone_tool", "axe", "blade", "spear", "bow"]) >= workers(n) / LIVING.perTools, have: `${r(sum(n, ["stone_tool", "axe", "blade", "spear", "bow"]))}`, want: `${r(workers(n) / LIVING.perTools)}`, how: "chế tác công cụ đá, rìu, lưỡi đá" },
