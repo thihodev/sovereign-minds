@@ -8,7 +8,7 @@ import { shortages, specialtiesOf, surpluses, techEdge } from "./market.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
-import { N } from "./hex.ts";
+import { N, NEIGHBORS, col, row } from "./hex.ts";
 import { RULER_CHARACTER_BY_ID, RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allBuildings, allInventions, allRecipes, buildingEffectText, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
 import { fmtGoods, relation, warSide } from "./diplomacy.ts";
@@ -263,6 +263,9 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         const w = runner.world;
         return send(res, 200, {
           seed: w.seed, n: N,
+          // §12.1 the world's shape; on a globe every tile's longitude, latitude and neighbours (counter-clockwise from east)
+          shape: w.shape ?? { kind: "flat" },
+          ...(w.shape?.kind === "sphere" ? { lon: w.tiles.map(t => col(t.i)), lat: w.tiles.map(t => row(t.i)), nb: NEIGHBORS } : {}),
           terrain: w.tiles.map(t => t.terrain), zone: w.tiles.map(t => t.zone), region: w.tiles.map(t => t.region),
           river: w.tiles.map(t => t.river ? 1 : 0), delta: w.tiles.map(t => t.delta ? 1 : 0),
           elev: w.tiles.map(t => Math.round(t.elev * 100)), // §2.1 heights for the 3D map
@@ -319,11 +322,12 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           traits: TRAITS.map(t => ({ id: t.id, name: t.name, icon: t.icon, desc: t.desc, lines: traitLines(t) })),
           models: CLAUDE_MODELS, efforts: CLAUDE_EFFORTS, seed: runner.world.seed, tickSeconds: runner.cfg.tickSeconds,
           nations: runner.world.nations.length, claude: { loggedIn: runner.claudeReady() },
+          shape: runner.world.shape?.kind === "sphere" ? "globe" : "flat", shapes: [{ id: "flat", name: "Bản đồ phẳng (128 × 128, Tường Băng bao quanh)" }, { id: "globe", name: "Địa cầu (25.002 ô, hai cực băng, đi vòng quanh được)" }],
         });
       }
       if (path === "/api/world/new" && method === "POST") {
         const b = await readBody(req);
-        const r = await runner.newWorld({ seed: String(b.seed ?? ""), tickSeconds: Number(b.tickSeconds) || 0, nations: Array.isArray(b.nations) ? (b.nations as Array<Record<string, unknown> | null>).map(x => ({ trait: String(x?.trait ?? ""), model: String(x?.model ?? ""), effort: String(x?.effort ?? "") })) : [] });
+        const r = await runner.newWorld({ seed: String(b.seed ?? ""), shape: b.shape === "globe" ? "globe" : "flat", tickSeconds: Number(b.tickSeconds) || 0, nations: Array.isArray(b.nations) ? (b.nations as Array<Record<string, unknown> | null>).map(x => ({ trait: String(x?.trait ?? ""), model: String(x?.model ?? ""), effort: String(x?.effort ?? "") })) : [] });
         if (r.error) return send(res, 400, { error: r.error });
         runner.store.logWatcher(0, "new_world", { ...b, backup: r.backup });
         return send(res, 200, { ok: true, backup: r.backup });

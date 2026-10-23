@@ -1926,6 +1926,25 @@ Giai đoạn đầu lưu trong **một file SQLite trên máy bạn**. Khi muố
 - **Tối đa 24 sông lớn** (thực tế khoảng 10–12) chảy từ núi hoặc đồi cao ra biển. Ô sông giáp biển là **châu thổ**: đất trồng ×1,5, nhưng lũ lụt ×2 (chưa có trong engine).
 - **Dãy núi** chia mỗi lục địa thành vài vùng. Quặng đồng và thiếc chủ yếu nằm ở đồi và núi, và thiếc hiếm hơn đồng khoảng 4–5 lần, nên thời đồ đồng sẽ sinh ra thương mại đường dài.
 
+
+### 12.1b Địa cầu (từ v0.67)
+
+Khi tạo thế giới mới, Watcher chọn **bản đồ phẳng** (như trên) hoặc **địa cầu**. Thế giới đã có giữ nguyên kiểu bản đồ của nó. Code ở `src/hex.ts` và `src/worldgen.ts`.
+
+- **Lưới:** một quả cầu lục giác dựng từ khối 20 mặt, mỗi cạnh chia 50 phần: **25.002 ô**. Mỗi ô có 6 láng giềng, trừ đúng 12 ô có 5. Mọi luật dùng chung cách tính láng giềng, khoảng cách (theo cung trên mặt cầu, quy ra số bước ô) và vùng bán kính với bản đồ phẳng.
+- **Tọa độ:** mỗi ô gọi bằng `[kinh độ, vĩ độ]`, độ có một chữ số thập phân:
+  - kinh độ từ −180 tới 180, lớn hơn là phía đông; 180 và −180 là một kinh tuyến, nên không có mép bản đồ;
+  - vĩ độ từ −90 (cực nam) tới 90 (cực bắc);
+  - mọi chỗ luật hay gói trạng thái ghi `[col,row]` thì đọc là `[lon,lat]`; AI đưa tọa độ nào thì engine lấy ô gần nhất.
+- **Hướng:** đông, đông bắc, tây bắc, tây, tây nam, đông nam như bản đồ phẳng; đoàn thám hiểm đi được thêm hướng N (bắc) và S (nam).
+- **Sinh thế giới:**
+  - 5–8 lục địa quanh các tâm ngẫu nhiên, méo theo nhiễu 3D, khoảng 42% là đất (Trái Đất 29%), đại dương rộng ngăn cách;
+  - hai chỏm băng ở cực (từ khoảng vĩ độ 78, mép không đều) đóng vai Tường Băng: không ai vượt hay chiếm được, gió băng thổi tới các ô gần đó;
+  - đới khí hậu theo vĩ độ, giống nhau ở hai bán cầu: nhiệt đới trong vòng 23° quanh xích đạo, hàn đới từ 55° trở lên;
+  - vùng của mỗi ô là bán cầu tây hay đông (theo kinh độ); đảo nhỏ vẫn là "đảo";
+  - sông, kỳ quan, vùng hoang, mạch giàu, vị trí xuất phát công bằng như bản đồ phẳng; số lượng và khoảng cách lớn theo diện tích quả cầu.
+- **Tạo:** chọn "Địa cầu" trong hộp thoại Thế giới mới, hoặc đặt `WORLD_SHAPE=globe` cho thế giới đầu tiên.
+
 ### 12.2 Đới khí hậu
 
 | Đới | Vị trí | Địa hình chính | Ảnh hưởng |

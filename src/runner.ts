@@ -5,7 +5,7 @@
 import { actionPoints, createWorld, step, ownedTiles, housing, housingParts, workers, type NationSpec } from "./engine.ts";
 import { advice } from "./ai/advice.ts";
 import { bookLine, demo } from "./people.ts";
-import { TILE_COUNT, tileCountOf, useWorld } from "./hex.ts";
+import { TILE_COUNT, tileCountOf, useWorld, type Shape } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
 import { buildObservation, systemPrompt } from "./ai/prompt.ts";
 import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
@@ -47,7 +47,12 @@ export type RunnerEvent =
   | { type: "reload" };
 
 /** What the Watcher picks before a game (§2.4): one row per nation. */
-export interface WorldSetup { seed: string; tickSeconds: number; nations: Array<{ trait?: string; model?: string; effort?: string }> }
+export interface WorldSetup { seed: string; tickSeconds: number; nations: Array<{ trait?: string; model?: string; effort?: string }>;
+  /** §12.1 the world's shape: the flat map (default) or a globe */
+  shape?: "flat" | "globe" }
+/** §12.1 The globe the Watcher may choose: 25 002 tiles. */
+export const GLOBE_SHAPE: Shape = { kind: "sphere", freq: 50 };
+export const shapeOf = (s: string | undefined): Shape => (s === "globe" || s === "sphere" ? GLOBE_SHAPE : { kind: "flat" });
 
 const SLEEP_STEPS_MIN = [15, 30, 60, 120, 240, 360];
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -130,7 +135,7 @@ export class Runner {
     }
     else {
       const { specs, notes } = nationSpecs(cfg);
-      this.world = createWorld(cfg.seed, specs);
+      this.world = createWorld(cfg.seed, specs, shapeOf(process.env.WORLD_SHAPE)); // §12.1 WORLD_SHAPE=globe for a globe
       for (const n of notes) console.log(`[world] ${n}`);
       store.saveState(this.world);
       store.addChronicle([{ tick: 0, nation: null, kind: "genesis", text: `Khai thiên lập địa: thế giới Nguyên Địa (seed "${cfg.seed}") với ${this.world.nations.length} bộ lạc.` }]);
@@ -513,7 +518,7 @@ export class Runner {
     while (this.busy) await sleep(200);
     if (this.historian) this.historian.stopped = true;
     const backup = this.store.backupAndReset();
-    this.world = createWorld(seed, specs);
+    this.world = createWorld(seed, specs, shapeOf(setup.shape));
     this.cfg.seed = seed;
     this.held = null; this.claudeWait = { until: 0, reason: "" }; this.lastError = ""; this.lastFx = { tick: -1, fx: [] };
     this.manualRulings.clear(); this.judgeSleep.clear();
@@ -525,7 +530,7 @@ export class Runner {
     this.store.setMeta("setup_pending", "0");
     this.setPaused(false);
     this.emit({ type: "reload" });
-    console.log(`[world] Thế giới mới "${seed}" (${this.world.nations.length} quốc gia); bản cũ lưu ở ${backup}`);
+    console.log(`[world] Thế giới mới "${seed}" (${this.world.nations.length} quốc gia, ${this.world.shape?.kind === "sphere" ? "địa cầu" : "bản đồ phẳng"}); bản cũ lưu ở ${backup}`);
     return { backup };
   }
 

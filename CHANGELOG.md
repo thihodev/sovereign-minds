@@ -2,6 +2,10 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.67
+
+- **Địa cầu (§12.1b):** thế giới mới có thể là một quả cầu lục giác 25.002 ô thay cho bản đồ phẳng. Ô gọi bằng kinh độ, vĩ độ; không có mép bản đồ (đi mãi về đông sẽ vòng lại từ tây); hai chỏm băng ở cực thay Tường Băng; khí hậu theo vĩ độ ở cả hai bán cầu; 5–8 lục địa giữa đại dương rộng. Các vua được giải thích cách đọc tọa độ và hướng Bắc, Nam khi thám hiểm. Chọn khi tạo thế giới mới (API `shape: "globe"`, hoặc `WORLD_SHAPE=globe`). Thế giới đang chạy giữ bản đồ phẳng.
+
 ## v0.66
 
 - **0.66.2, sinh thế giới hình cầu (giai đoạn 3):** engine sinh được một địa cầu: 5–8 lục địa quanh các tâm ngẫu nhiên, khoảng 42% là đất, hai chỏm băng ở cực thay Tường Băng, đới khí hậu theo vĩ độ (nhiệt đới quanh xích đạo, hàn đới từ vĩ độ 55), 26–30 dòng sông, kỳ quan, vùng hoang, các nước xuất phát rải khắp địa cầu. Bot chơi được 300 lượt không lỗi. Chưa mở trong giao diện (cần bản đồ mới ở giai đoạn 4); thế giới đang chạy không đổi.
