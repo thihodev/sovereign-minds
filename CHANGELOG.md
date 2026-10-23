@@ -4,6 +4,8 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.64
 
+- **0.64.1, ô Lãnh thổ theo luật giữ đất:** bỏ thanh "đang giữ / giới hạn" (giới hạn khai hoang đã bỏ từ v0.60). Ô Lãnh thổ giờ hiện số ô đang giữ và số ô bỏ trống (không người ở, xa trung tâm và đường), tức đất dễ bị lấn hay mất khi chiến tranh.
+
 - **Người đi qua đất nước khác (§7.3a):**
   - Đoàn thám hiểm đi qua đất hay lãnh hải một nước không có hiệp ước thông hành hay liên minh thì nộp 1 tiền mỗi người cho nước đó. Không trả được thì là vi phạm biên giới: nước kia có chính nghĩa 5 lượt, căng thẳng +5.
   - Quân đội không được tấn công xuyên qua đất một nước thứ ba, trừ khi có hiệp ước thông hành hay liên minh với nước đó.

@@ -17,6 +17,7 @@ import { governed, housing, housingParts, housingSlots, mods, inventionCost, max
 import { DEMO, DISEASES, EXODUS, OFFICIAL_DOMAINS, ROADS, SCHISM } from "./rules.ts";
 import { LINE_VI } from "./treasury.ts";
 import { powerView } from "./power.ts";
+import { unheldTiles } from "./hold.ts";
 import { rulerChatContext, rulerChatSystem, rulerModel } from "./ai/rulerchat.ts";
 import { airView } from "./air.ts";
 import { royalsView } from "./royals.ts";
@@ -108,6 +109,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
         family: { births: n.family?.births ?? "neutral", fighters: n.family?.fighters ?? "all", birthsName: "tự nhiên (theo đời sống)", fightersName: DEMO.fighters[n.family?.fighters ?? "all"] }, housing: housing(w, n), housingParts: n.alive ? housingParts(w, n) : null, stability: n.stability, reputation: n.reputation, era: n.era,
         tiles: ownedTiles(w, n.id).length, tileLimit: tileLimit(w, n), governed: governed(w, n),
         waters: w.tiles.filter(t => t.owner === n.id && !t.land).length,
+        unheld: n.alive && n.founded ? unheldTiles(w, n).length : 0, // §2.3c land no one holds: easy to lose
         roadNet: n.alive && n.founded ? { ...roadNet(w, n), level: roadLevelMax(n, w), works: (n.roadWorks ?? []).length } : null,
         links: n.alive && n.founded ? Object.fromEntries(links(w, n)) : {},
         health: { outbreak: n.alive && contagious(n, w.tick), disease: n.alive && contagious(n, w.tick) ? diseaseOf(n).name : null, outbreakUntil: n.outbreakUntil ?? null, cures: n.alive && n.founded ? (caps => DISEASES.filter(d => caps.has(d.vaccine)).map(d => d.name))(mods(w, n).caps) : [], quarantine: n.alive && quarantined(n, w.tick), quarantineUntil: n.quarantineUntil ?? null },

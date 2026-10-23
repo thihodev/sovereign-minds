@@ -1458,7 +1458,8 @@
     if (few) return `<div class="tiles">${tiles.join("")}</div>`;
     tiles.push(
       statTile({ l: "💰 Ngân khố", v: t ? fmt(t.coin) : "—", d: t?.last ? `${signed(net)}/lượt` : "", dt: net > 0.05 ? "good" : net < -0.05 ? "bad" : "", t: t ? `${fmt1(t.coin)} tiền · thuế ${Math.round(t.tax * 100)}% · thuế quan ${Math.round(t.tariff * 100)}%${t.coin > t.safe ? " · kho đầy, đang thất thoát" : ""}` : "Chưa có ngân khố" }),
-      statTile({ l: "🗺 Lãnh thổ", v: `${n.governed ?? n.tiles}<small>/${n.tileLimit}</small>`, m: pctOf(n.governed ?? n.tiles, n.tileLimit), mt: (n.governed ?? n.tiles) > n.tileLimit ? "bad" : "", t: `${n.governed ?? n.tiles} ô quản lý / giới hạn ${n.tileLimit}${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}` }),
+      // §2.3c no limit on claims (v0.60): what counts is how much of it the people and the army hold
+      statTile({ l: "🗺 Lãnh thổ", v: fmt(n.tiles), d: n.unheld ? `${n.unheld} ô bỏ trống` : "giữ chắc", dt: n.unheld >= 3 ? "bad" : n.unheld ? "" : "good", t: `${n.tiles - (n.waters || 0)} ô đất${n.waters ? ` · ${n.waters} ô lãnh hải` : ""}${n.unheld ? ` · ${n.unheld} ô bỏ trống (không người ở, không công trình, xa trung tâm và đường): láng giềng không có hiệp ước có thể lấn chiếm, khi chiến tranh gần như mất trắng` : " · mọi ô đều có người ở hay quân tới được"}` }),
       statTile({ l: "💡 Phát minh", v: n.inventions.length, d: n.research ? `${Math.round(pctOf(n.research.progress, n.research.cost))}% kế tiếp` : "", t: n.research ? `Đang nghiên cứu ${n.research.name}: ${n.research.progress}/${n.research.cost} RP` : "Không nghiên cứu gì" }),
     );
     return `<div class="tiles">${tiles.join("")}</div>`;
@@ -1594,7 +1595,7 @@
       const top = n.alive ? (n.threats || []).filter(t => t.level >= 2).sort((a, b) => b.level - a.level)[0] : null;
       const who = [n.trait && `${n.trait.name}: ${n.trait.lines.join(" · ")}`, (n.officials || []).length && `Triều đình: ${n.officials.map(o => o.name).join(", ")}`, n.thought && `“${n.thought}”`].filter(Boolean).join("\n");
       el.innerHTML = `<div class="head"><span class="flag"></span><div class="grow"><div class="name">${n.trait ? `${esc(n.trait.icon)} ` : ""}${esc(nationName(n))}</div><div class="model">${esc(n.era)} · ${esc(modelLabel(n))}</div></div>${statusPill(n)}</div>
-        <div class="tiles">${statTile({ l: "Dân", v: fmt(n.population) })}${statTile({ l: "Lương thực", v: fmt(n.stock.food || 0) })}${statTile({ l: "Ổn định", v: n.stability, m: n.stability, mt: toneOf(n.stability, 60, 30) })}${statTile({ l: "Ô", v: `${n.governed ?? n.tiles}<small>/${n.tileLimit}</small>`, t: n.waters ? `${n.waters} ô lãnh hải` : "" })}${statTile({ l: "Phát minh", v: n.inventions.length })}</div>
+        <div class="tiles">${statTile({ l: "Dân", v: fmt(n.population) })}${statTile({ l: "Lương thực", v: fmt(n.stock.food || 0) })}${statTile({ l: "Ổn định", v: n.stability, m: n.stability, mt: toneOf(n.stability, 60, 30) })}${statTile({ l: "Ô", v: fmt(n.tiles), d: n.unheld ? `${n.unheld} bỏ trống` : "", dt: n.unheld >= 3 ? "bad" : "", t: `${n.waters ? `${n.waters} ô lãnh hải · ` : ""}${n.unheld ? `${n.unheld} ô bỏ trống, dễ bị lấn` : "giữ chắc"}` })}${statTile({ l: "Phát minh", v: n.inventions.length })}</div>
         <div class="foot">${n.research ? `<span class="t" title="${esc(`${n.research.progress}/${n.research.cost} RP`)}">📜 ${esc(n.research.name)} · ${Math.round(pct)}%</span>` : `<span class="t"></span>`}${top ? `<span class="threat-tag lv${top.level}" title="${esc(top.detail)}">⚠ ${esc(top.title)}</span>` : ""}
           <button type="button" class="sm" data-act="locate"${n.alive ? "" : " disabled"}>📍</button><button type="button" class="sm" data-act="detail">Hồ sơ</button></div>`;
       if (who) el.title = who;
@@ -2370,7 +2371,7 @@
       case "move": return ["🧭", `đi được ${e.terrain === "shallow" ? "biển nông" : e.terrain === "mountain" ? "núi" : e.terrain === "ocean" ? "biển sâu (vượt đại dương)" : esc(e.terrain)}`];
       case "reveal": return ["⛏", `nhìn thấy ${esc(RES[e.resource] ?? e.resource)}`];
       case "research": return ["📜", `nghiên cứu (RP) +${e.percent}%`];
-      case "tile_limit": return ["🚩", `+${e.amount} ô quản lý`];
+      case "tile_limit": return ["🚩", `+${e.amount} sức cai quản`];
       case "growth": return ["👶", `dân tăng nhanh hơn ${e.percent}%`];
       case "transport": return ["🛞", `đoàn buôn chở nhiều và đi nhanh hơn ${e.percent}%`];
       case "explore": return ["🧭", `thám hiểm xa thêm ${e.tiles} ô`];
