@@ -5,7 +5,7 @@
 import { actionPoints, createWorld, step, ownedTiles, housing, housingParts, workers, type NationSpec } from "./engine.ts";
 import { advice } from "./ai/advice.ts";
 import { bookLine, demo } from "./people.ts";
-import { TILE_COUNT } from "./hex.ts";
+import { TILE_COUNT, tileCountOf, useWorld } from "./hex.ts";
 import { botTurn } from "./ai/bot.ts";
 import { buildObservation, systemPrompt } from "./ai/prompt.ts";
 import { LAW_BY_KEY, fmtLaw, lawError, lawTable, lawsOf } from "./laws.ts";
@@ -118,9 +118,9 @@ export class Runner {
   constructor(store: Store, cfg: RunnerConfig) {
     this.store = store; this.cfg = cfg;
     let saved = store.loadState();
-    if (saved && saved.tiles.length !== TILE_COUNT) {
+    if (saved && saved.tiles.length !== tileCountOf(saved.shape)) {
       // A world from another map size (v0.3 had 64 × 64): keep it in data/backups/ and wait for a new one
-      console.log(`[world] Thế giới đã lưu có ${saved.tiles.length} ô, bản đồ bây giờ ${TILE_COUNT} ô: đã sao lưu vào ${store.backupAndReset()}, chờ tạo thế giới mới.`);
+      console.log(`[world] Thế giới đã lưu có ${saved.tiles.length} ô, bản đồ kiểu này cần ${tileCountOf(saved.shape)} ô: đã sao lưu vào ${store.backupAndReset()}, chờ tạo thế giới mới.`);
       saved = null;
     }
     if (saved) {

@@ -8,6 +8,7 @@ import {
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
 import { dealCharacters } from "./engine.ts";
+import { useWorld } from "./hex.ts";
 import { seedAnimals, seedDeepResources, seedRiches, seedMeadowHerbs, seedRiverPlenty, seedRockSalt, seedSurfaceIron, seedVeins } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
@@ -25,6 +26,7 @@ export function knownGood(world: World, key: string): boolean { return key in GO
 
 /** Old saves gain the fields added after v0.1. */
 export function migrate(world: World): World {
+  useWorld(world); // §12.1 the world's shape
   world.custom ??= { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 };
   world.proposals ??= [];
   world.petitions ??= [];

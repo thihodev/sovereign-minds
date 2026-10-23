@@ -2,7 +2,7 @@
 // step(world, inputs, rulings) applies one tick. It is deterministic: the same
 // world, inputs, judge rulings and seed always give the same result.
 
-import { NEIGHBORS, TILE_COUNT, col, row, dist, within, inBounds, idx } from "./hex.ts";
+import { NEIGHBORS, TILE_COUNT, col, row, dist, within, findTile, stepDir, useShape, useWorld, BEARING } from "./hex.ts";
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
@@ -131,6 +131,7 @@ export function luxuries(world: World, n: Nation): { kinds: string[]; stability:
 export interface NationSpec { controller: "ai" | "bot"; provider: string; model: string; pinnedModel?: string; effort?: string; trait?: string }
 
 export function createWorld(seed: string, specs: NationSpec[]): World {
+  useShape({ kind: "flat" }); // §12.1 (the globe comes with its own generator)
   const gen = generateWorld(seed, specs.length);
   const nations: Nation[] = specs.slice(0, gen.spawns.length).map((spec, k) => newNation(k, spec, gen.spawns[k]));
   const world: World = {
@@ -598,17 +599,11 @@ function applyFounding(n: Nation, a: Record<string, unknown>, manifesto: string)
 
 // ---------------------------------------------------------------- helpers
 
-const DIR_STEPS: Record<string, [number[], number[]]> = {
-  E: [[1, 0], [1, 0]], NE: [[0, -1], [1, -1]], NW: [[-1, -1], [0, -1]], W: [[-1, 0], [-1, 0]], SW: [[-1, 1], [0, 1]], SE: [[0, 1], [1, 1]],
-};
-function stepDir(i: number, d: string): number {
-  const c = col(i), r = row(i), [dc, dr] = DIR_STEPS[d][r & 1];
-  return inBounds(c + dc, r + dr) ? idx(c + dc, r + dr) : -1;
-}
+/** A tile as an AI names it: [col, row] on the flat world, [lon, lat] on the globe (the nearest tile), or an index. */
 export function parseTile(v: unknown): number {
   if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < TILE_COUNT) return v;
-  if (Array.isArray(v) && v.length === 2) { const [c, r] = v.map(Number); if (inBounds(c, r)) return idx(c, r); }
-  if (v && typeof v === "object") { const o = v as Record<string, unknown>; const c = Number(o.col ?? o.c), r = Number(o.row ?? o.r); if (inBounds(c, r)) return idx(c, r); }
+  if (Array.isArray(v) && v.length === 2) { const [c, r] = v.map(Number); return findTile(c, r); }
+  if (v && typeof v === "object") { const o = v as Record<string, unknown>; return findTile(Number(o.col ?? o.c ?? o.lon), Number(o.row ?? o.r ?? o.lat)); }
   return -1;
 }
 function findNation(world: World, v: unknown): Nation | undefined {
@@ -671,6 +666,7 @@ function centres(n: Nation): number[] { return [n.capital, ...n.settlements.map(
 export interface StepResult { chronicle: ChronicleEntry[]; audit: string[]; fx: MapFx[] }
 
 export function step(world: World, inputs: Record<number, TurnInput>, rulings: Record<number, Ruling> = {}): StepResult {
+  useWorld(world); // §12.1 the world's shape (flat or a globe)
   applyLaws(world); // §10.3 the Watcher's law decrees in force this turn
   // §10.8 new rules: the rulers are told what changed for a few turns (a new world simply starts under them)
   if (world.rulesVersion !== RULES_VERSION) {
@@ -2091,7 +2087,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
     }
     case "explore": {
       const dir = String(a.direction ?? "").toUpperCase();
-      if (!DIR_STEPS[dir]) return "Hướng phải là E, NE, NW, W, SW hoặc SE";
+      if (BEARING[dir] === undefined || (world.shape?.kind !== "sphere" && (dir === "N" || dir === "S"))) return `Hướng phải là E, NE, NW, W, SW hoặc SE${world.shape?.kind === "sphere" ? ", N, S" : ""}`;
       const people = Math.max(1, Math.min(5, Math.floor(num(a.people, 2))));
       const spare = n.labor.gather + Math.max(0, workers(n) - ROLES.reduce((s, r) => s + n.labor[r], 0));
       if ((explorers.get(n.id) || 0) + people > spare) return "Người thám hiểm được lấy từ nhóm hái lượm và người rảnh, nhưng không đủ người";
@@ -2106,11 +2102,12 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (!t.land && !(canSail && t.terrain === "shallow") && !(m.move.has("ocean") && t.terrain === "ocean")) return false; // §5.3 ocean ships cross deep water
         return !(t.terrain === "mountain" && !m.move.has("mountain"));
       };
-      const DIRS = ["E", "NE", "NW", "W", "SW", "SE"], k0 = DIRS.indexOf(dir);
+      // the chosen way, and either side of it to skirt water and mountains (on the globe the ring has eight ways)
+      const DIRS = world.shape?.kind === "sphere" ? ["E", "NE", "N", "NW", "W", "SW", "S", "SE"] : ["E", "NE", "NW", "W", "SW", "SE"], k0 = DIRS.indexOf(dir);
       // §2.1 with boats a river tile costs half a step, so expeditions go further along rivers
       for (let budget = EXPLORE_RANGE + m.explore, steps = 0; budget > 0 && steps < (EXPLORE_RANGE + m.explore) * 2; steps++) {
         // Walk the chosen way; skirt around water and mountains to either side
-        const tries = [0, 1, -1].map(o => stepDir(cur, DIRS[(k0 + o + 6) % 6])).filter(passable);
+        const tries = [0, 1, -1].map(o => stepDir(cur, DIRS[(k0 + o + DIRS.length) % DIRS.length])).filter(passable);
         if (!tries.length) break;
         const nx = tries[0];
         const t = world.tiles[nx];

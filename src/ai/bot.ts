@@ -24,7 +24,7 @@ import { buildingsOn, freeSite, inReach, tileSlots } from "../sites.ts";
 import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, eraIndex, invName, recipeOf, allBuildings } from "../catalog.ts";
-import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
+import { NEIGHBORS, col, row, dist, stepDir, within } from "../hex.ts";
 import { actionPoints, canSeeRes, landRoom, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween, warLead, warSide } from "../diplomacy.ts";
 import { pickOne, type Rand } from "../rng.ts";
@@ -72,13 +72,6 @@ const IDEAS: Array<{ prereqs: [string, string]; role: string; name: string; desc
 ];
 
 const DIRS = ["E", "NE", "NW", "W", "SW", "SE"] as const;
-const DIR_STEPS: Record<string, [number[], number[]]> = {
-  E: [[1, 0], [1, 0]], NE: [[0, -1], [1, -1]], NW: [[-1, -1], [0, -1]], W: [[-1, 0], [-1, 0]], SW: [[-1, 1], [0, 1]], SE: [[0, 1], [1, 1]],
-};
-function stepDir(i: number, d: string): number {
-  const c = col(i), r = row(i), [dc, dr] = DIR_STEPS[d][r & 1];
-  return inBounds(c + dc, r + dr) ? idx(c + dc, r + dr) : -1;
-}
 const xy = (i: number) => [col(i), row(i)];
 
 interface View {

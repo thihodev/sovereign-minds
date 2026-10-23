@@ -4,6 +4,8 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.66
 
+- **0.66.1, chuẩn bị thế giới hình cầu (giai đoạn 1–2):** engine hỗ trợ hai kiểu bản đồ qua một lớp hình học chung: bản đồ phẳng (giữ nguyên từng con số) và quả cầu lục giác 25.002 ô (12 ô năm cạnh), gọi ô bằng kinh độ, vĩ độ, không có mép bản đồ. Chưa sinh được thế giới hình cầu; thế giới đang chạy không đổi.
+
 - **Tính cách người trị vì (§2.4b):** mỗi vua có một tính cách riêng từ đầu (12 loại: chinh phục, hiền quân, thương nhân, học giả, xây dựng, đa nghi, ngoại giao, mộ đạo, cơ hội, khai phá, sắt đá, giữ nếp), khác nhau giữa các nước, giữ suốt triều đại và định hình cách AI cai trị. Người lên ngôi sau nội chiến mang tính cách mới; dân tộc giữ văn hóa (trước đây nội chiến đổi nhầm nét dân tộc). Thế giới cũ được gán khi tải.
 - **Nhà ở theo thời đại (§6.1b):** Lều 10, Nhà gỗ 20, Nhà gạch 40, Nhà phố 80, Chung cư 300, mở theo năng lực của từng thời đại. Hết suất thì dựng nhà tốt hơn sẽ thay căn yếu nhất. Bot dựng loại nhà tốt nhất mình có.
 - **Chỗ xây theo địa hình và thời đại:** sa mạc, đầm lầy, lãnh nguyên 1 công trình; núi không xây được; cứ 3 thời đại mỗi ô thêm 1, mỗi trung tâm thêm 2.
