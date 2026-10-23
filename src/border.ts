@@ -4,10 +4,11 @@
 // border incidents, and past a point a just cause for war. Below that, a small border market swaps
 // what each has too much of for what the other lacks, every turn, on its own.
 
-import { NEIGHBORS, dist } from "./hex.ts";
+import { NEIGHBORS, col, dist, row } from "./hex.ts";
+import { piers } from "./routes.ts";
 import { rngFor } from "./rng.ts";
 import { fx } from "./fx.ts";
-import { BORDER, GATE, GOOD_VALUE, HUNT_ZONE, KIN, ROADS, TOWER, WAR } from "./rules.ts";
+import { BORDER, GATE, GOOD_VALUE, HUNT_ZONE, KIN, ROADS, SEA, SEA_RIGHTS, TOWER, WAR } from "./rules.ts";
 import { activeWar, hostile, kin, pendingOrActiveWar, sharedLanguage, startWar, treatiesBetween } from "./diplomacy.ts";
 import { buildingOf, goodName } from "./catalog.ts";
 import { add as addPeople, mouths, take as takePeople } from "./people.ts";
@@ -17,7 +18,7 @@ import { quarantined } from "./contagion.ts";
 import { price } from "./market.ts";
 import { importDuty, marketTax } from "./treasury.ts";
 import { hasGreat } from "./greats.ts";
-import type { Nation, Tile, World } from "./types.ts";
+import type { Nation, ResKey, Tile, World } from "./types.ts";
 
 export interface BorderState { tension: number; incidents: Array<{ tick: number; text: string }>; market: number; /** turns in a row at dispute */ dispute?: number;
   /** deadly brawls lately: who lost how many */
@@ -185,6 +186,7 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
   const at = edge[Math.floor(r() * edge.length)] ?? world.tiles[victim.capital];
   const roll = r();
   let text = "", rise = 0;
+  if (roll < 0.4 && !at.land) return seaPoach(world, culprit, victim, at, st, r, L, say); // §2.6b a foreign fleet in the victim's waters
   if (roll < 0.4) {
     // §7.9 shared hunting grounds keep half the poachers home (and a while after they are given up)
     if (huntGrounds(world, a.id, b.id, true) && r() < HUNT_ZONE.poachCut) return 0;
@@ -220,6 +222,22 @@ function incident(world: World, a: Nation, b: Nation, st: BorderState, r: () => 
   return rise;
 }
 
+/** §2.6b A foreign fishing fleet in a nation's waters: an act of war. Returns how much it raised the tension. */
+function seaPoach(world: World, culprit: Nation, victim: Nation, at: Tile, st: BorderState, r: () => number, L: Ledger, say: (nation: number | null, kind: string, text: string) => void): number {
+  const tick = world.tick;
+  if (piers(world, victim).some(p => dist(p, at.i) <= SEA.pierReach) && r() < SEA_RIGHTS.guard) return 0; // the harbour's boats turn them back
+  const catches: Array<[ResKey, string, string]> = [["fish", "food", "cá"], ["shellfish", "food", "sò ốc"], ["pearl", "pearl", "ngọc trai"], ["whale", "whale_oil", "cá voi"]];
+  const [key, good, name] = catches.filter(([k]) => (at.res[k] || 0) > 0).sort((a, b) => (at.res[b[0]] || 0) - (at.res[a[0]] || 0))[0] ?? ["fish", "food", "cá"];
+  const q = Math.min(at.res[key] || 0, SEA_RIGHTS.take);
+  if (q > 0) { L.tile(at, key, -q, "poach"); L.stock(culprit, good, q, "poach"); }
+  const text = `Thuyền ${culprit.name} xâm phạm lãnh hải ${victim.name} ở (${col(at.i)}, ${row(at.i)}), đánh trộm ${Math.round(q)} ${name}`;
+  st.incidents = [...st.incidents, { tick, text }].slice(-5);
+  victim.casusBelli[String(culprit.id)] = Math.max(victim.casusBelli[String(culprit.id)] ?? -1, tick + SEA_RIGHTS.cause);
+  victim.lastEvents.push(`${text}: xâm phạm lãnh hải là hành động gây chiến, ta có chính nghĩa tuyên chiến với ${culprit.name} trong ${SEA_RIGHTS.cause} lượt (không mất uy tín).`);
+  culprit.lastEvents.push(`${text}. ${victim.name} coi đó là hành động gây chiến: họ có chính nghĩa đánh ta ${SEA_RIGHTS.cause} lượt.`);
+  say(victim.id, "border", `${text}.`);
+  return SEA_RIGHTS.rise;
+}
 /** §7.9 Is there a shared hunting ground between the two (or, with `linger`, one given up in the last HUNT_ZONE.linger turns)? */
 export function huntGrounds(world: World, a: number, b: number, linger = false): boolean {
   return world.treaties.some(t => t.type === "hunt" && ((t.a === a && t.b === b) || (t.a === b && t.b === a))

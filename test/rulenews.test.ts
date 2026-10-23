@@ -20,7 +20,7 @@ test("a new world starts under the rules; a running world is told what changed, 
   step(w, idle);
   assert.deepEqual(w.rulesChange, { from: "0.50", to: RULES_VERSION, tick: w.tick - 1 });
   const news = (buildObservation(w, w.nations[0]) as { new_rules?: { what_changed: string } }).new_rules;
-  assert.ok(news && /v0\.5[1-9]/.test(news.what_changed), "the changelog since 0.50");
+  assert.ok(news && news.what_changed.startsWith(`v${RULES_VERSION}:`), "the changelog since 0.50, newest first");
   assert.doesNotMatch(news!.what_changed, /^- \d+\.\d+\.\d+,/m, "patch notes are left out");
   assert.match(systemPrompt(w), /NEW RULES/);
   for (let k = 0; k < RULE_NEWS.turns; k++) step(w, idle);

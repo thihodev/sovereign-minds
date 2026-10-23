@@ -2,6 +2,10 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.63
+
+- **Lãnh hải bất khả xâm phạm (§2.6b):** đội thuyền láng giềng có thể vào đánh cá trộm trong lãnh hải (lấy cá, sò ốc, ngọc trai, cá voi). Đó là hành động gây chiến: nước bị xâm phạm có chính nghĩa tuyên chiến 10 lượt, không mất uy tín; biên giới căng thêm 12. Bến thuyền, Cảng gần đó đuổi được một nửa số đội thuyền. Trước đây sự cố săn trộm rơi vào ô biển thì không lấy được gì.
+
 ## v0.62
 
 - **Cá thịt khô muối (§6.5d), sáng kiến #31 của Văn Phong, trọng tài chấp thuận một phần:** công thức mới tại Bãi chế tác cho mọi nước có năng lực nhiệt-cao: 3 lương thực + 1 muối → 2 cá thịt khô muối. Hư 10% mỗi lượt, ăn được thay lương thực khi thiếu ăn, bán được.

@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.62";
+export const RULES_VERSION = "0.63";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -1170,6 +1170,11 @@ export const HUNT_ZONE = { depth: 2, poachCut: 0.5, linger: 5 };
 // around it, no building, out of reach is unheld: a neighbour with no treaty of peace, friendship or vassalage may
 // encroach on it (claim_tile): the border tension +`encroachRise`, the loser a just cause for `encroachCause` turns,
 // the encroacher reputation −`encroachRep`
+// §2.6b Inviolable waters (v0.63): a border incident of poaching that falls on the victim's waters is a foreign fleet
+// fishing them: it takes up to `take` of the richest catch (fish or shellfish as food, pearls, whales as whale oil);
+// the victim has a just cause of war for `cause` turns and the border grows `rise` tenser. A pier or harbour of the
+// victim within SEA.pierReach of the water turns back `guard` of the fleets.
+export const SEA_RIGHTS = { take: 20, cause: 10, rise: 12, guard: 0.5 };
 export const HOLD = { near: 3, falloff: 0.5, minReach: 0.1, unheldPeople: 3, encroachRise: 20, encroachCause: 10, encroachRep: 2 };
 export const COMPACT = { interiorYield: 0.2, interiorDefense: 0.25, interiorWeight: 0.5, fill: 3, fillFood: 0.5, exclaveYield: 0.25, exclaveStability: 1, marketTax: 0.01, marketPer: 10, marketMax: 0.1 };
 

@@ -196,6 +196,16 @@ Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay v�
 - **Bão** trên biển sâu xảy ra nhiều gấp đôi biển nông.
 - **Đánh chiếm ô biển** cần `đi-nước` và 1 thuyền rảnh cho mỗi 5 chiến binh.
 
+### 2.6b Lãnh hải bất khả xâm phạm (từ v0.63)
+
+- **Của riêng:** cá, sò ốc, ngọc trai, cá voi trong lãnh hải chỉ thuộc về nước giữ vùng biển đó.
+- **Xâm phạm:** khi lãnh hải của một nước giáp đất hay lãnh hải của láng giềng, sự cố săn trộm ở biên giới (mục 7.9) mà rơi vào ô biển là một đội thuyền láng giềng vào đánh trộm. Đội thuyền lấy tối đa 20 thứ quý nhất ở ô đó: cá, sò ốc thành lương thực; ngọc trai; cá voi thành dầu cá voi.
+- **Là hành động gây chiến:**
+  - nước bị xâm phạm có chính nghĩa tuyên chiến với kẻ xâm phạm trong 10 lượt, không mất uy tín;
+  - căng thẳng biên giới +12.
+- **Canh giữ:** một Bến thuyền hay Cảng của nước đó trong vòng 4 ô quanh ô biển đuổi được 50% đội thuyền trước khi chúng kịp đánh trộm.
+- AI được báo trong luật chơi; cố vấn nhắc khi lãnh hải vừa bị xâm phạm.
+
 ### 2.7 Lãnh thổ liên thông
 
 Kho là chung cho cả nước, nhưng hàng chỉ về được kho theo một lối đi.
