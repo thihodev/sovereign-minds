@@ -2,6 +2,15 @@
 
 Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới `docs/RULES.md`.
 
+## v0.65
+
+- **Công trình theo ô (§6.1b):**
+  - Mỗi ô đất chứa 2 công trình; ô trung tâm chứa nhiều hơn (làng 4, thị trấn 6, thành phố 8).
+  - Công trình phải nằm trong 3 ô quanh một trung tâm (thị trấn 4, thành phố 5) hoặc trên đường nối về thủ đô.
+  - Không chọn ô thì dựng ở thủ đô; thủ đô đầy thì dựng ở ô gần nhất còn chỗ.
+  - Nhà ở tỉ lệ với đất: cứ 3 ô đất được 1 công trình có chỗ ở (ít nhất 3), thay cho "3 mỗi trung tâm".
+  - Bot chọn chỗ xây trong tầm.
+
 ## v0.64
 
 - **0.64.1, ô Lãnh thổ theo luật giữ đất:** bỏ thanh "đang giữ / giới hạn" (giới hạn khai hoang đã bỏ từ v0.60). Ô Lãnh thổ giờ hiện số ô đang giữ và số ô bỏ trống (không người ở, xa trung tâm và đường), tức đất dễ bị lấn hay mất khi chiến tranh.

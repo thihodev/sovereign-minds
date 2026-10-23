@@ -55,13 +55,13 @@ export function provinces(world: World, n: Nation, ls: Map<number, Link> = links
   for (const t of world.tiles) if (t.owner === n.id) { owned.push(t); if (!hubs.has(t.i)) at.get(nearestCentre(cs, t.i).c)!.push(t.i); }
   // housing: the centre's own shelter, the best housing buildings on its land (HOUSING.perCentre and the era's
   // slots each), hamlets on its land, the cave; buildings and hamlets scaled so the provinces sum to the nation's
-  const parts = housingParts(world, n, owned), slots = HOUSING.perCentre + mods(world, n).housingSlots;
+  const parts = housingParts(world, n, owned);
   const homes = new Map<number, number[]>(), worked = farmland(world, n);
   for (const b of n.buildings) { const h = buildingWorks(world, b) ? buildingOf(world, b.type)?.effect.housing || 0 : 0; if (h > 0) homes.set(b.tile, [...(homes.get(b.tile) ?? []), h]); }
   const cave = world.wonders.find(w => w.key === "cave")?.i;
   const raw = cs.map(c => {
     const tiles = at.get(c)!;
-    const roofs = tiles.flatMap(i => homes.get(i) ?? []).sort((a, b) => b - a).slice(0, slots).reduce((a, b) => a + b, 0);
+    const roofs = tiles.flatMap(i => homes.get(i) ?? []).reduce((a, b) => a + b, 0); // v0.65 the nation's cap is on its land, not each centre
     const ham = tiles.reduce((s, i) => s + (i !== c && world.tiles[i].land ? hamletRoom(world.tiles[i]) * (worked.has(i) ? DEMOGRAPHY.farmland : 1) : 0), 0);
     return { roofs, ham, cave: cave !== undefined && tiles.includes(cave) ? parts.wonder : 0 };
   });

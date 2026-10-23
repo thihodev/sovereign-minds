@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.64";
+export const RULES_VERSION = "0.65";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -251,7 +251,11 @@ export const HAMLET = {
   max: 40, perEra: 20,
 };
 /** §4.2 Buildings that give housing (tents, open-invention housing): at most `perCentre` per centre (capital + each settlement). */
-export const HOUSING = { perCentre: 3 };
+/** §4.2 Housing buildings (v0.65): one for every `tilesPerHome` land tiles the nation holds (at least `perCentre`), plus
+ *  the era's and inventions' housing slots for each centre. §6.1b Sites: a land tile holds `tileSlots` buildings, a centre
+ *  `centreSlots[tier]` (village, town, city); a building stands within `reach[tier]` tiles of a centre of that tier, or on
+ *  a road joined to the capital. */
+export const HOUSING = { perCentre: 3, tilesPerHome: 3, tileSlots: 2, centreSlots: [4, 6, 8], reach: [3, 4, 5] };
 
 /** Output per worker per tick (§4.3). */
 export const YIELD = {

@@ -1064,6 +1064,14 @@ Công trình tốn vật liệu, tốn công và cần phát minh mở khóa. M�
 - **Mất công trình:** khi bỏ ô, công trình trên ô mất; khi ô bị chiếm, công trình về tay bên chiếm; núi lửa phun trào phá công trình trong bán kính 2. Gián điệp phá hoại (`sabotage`, mục 7.8) xóa tiến độ một công trình đang xây, hoặc làm một công trình đã xong mất tác dụng 3 lượt.
 - **Hao mòn:** công trình mất 2% độ bền mỗi lượt, khôi phục bằng `repair`, dưới 50% hiệu quả giảm một nửa, 0% thì sập (chưa có trong engine).
 
+### 6.1b Chỗ xây và tầm xây (từ v0.65)
+
+- **Mỗi ô chứa bao nhiêu công trình:** ô đất thường 2; ô trung tâm nhiều hơn: làng 4, thị trấn 6, thành phố 8. Công trình đang xây cũng chiếm chỗ.
+- **Tầm xây:** công trình phải nằm trong 3 ô quanh một trung tâm (quanh thị trấn 4, quanh thành phố 5), hoặc trên đường nối về thủ đô. Xa hơn thì không ai trông nom. Công trình đã có từ trước được giữ nguyên.
+- **Không chọn ô** (`build` không có `tile`): công trình được dựng trên thủ đô; thủ đô đã đầy thì dựng ở ô gần thủ đô nhất còn chỗ và trong tầm.
+- **Công trình có chỗ ở** (Lều…): cả nước được 1 cái cho mỗi 3 ô đất đang giữ (ít nhất 3), cộng phần thưởng thời đại và phát minh cho mỗi trung tâm. Bỏ luật cũ "3 cái mỗi trung tâm". Sức chứa tùy loại công trình (Lều +10).
+- Các luật riêng vẫn giữ: công trình sản xuất mỗi ô một cái; Kho làng, Cối đá, Sân bay đặt ngay trên trung tâm; Trạm canh, Chợ cửa khẩu ở biên giới có đường nối.
+
 ### 6.2 Công thức sản xuất
 
 | Công thức | Đầu vào | Đầu ra | Công | Cần |

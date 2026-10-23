@@ -39,6 +39,7 @@ import { powerMods, powerPhase } from "./power.ts";
 import { aidLosses, aidStrength, civilShare, ravage } from "./civil.ts";
 import { fillsGap, territory } from "./compact.ts";
 import { unheld } from "./hold.ts";
+import { buildingsOn, freeSite, inReach, tileSlots } from "./sites.ts";
 import { airPhase } from "./air.ts";
 import { giftMind, ministerPhase, ministersAct, requestMinister } from "./ministers.ts";
 import { add as addPeople, babies, demo, elders, fertility, fighters, grow, mouths, openBook, breeding, bookLine, take as takePeople, workForce } from "./people.ts";
@@ -299,9 +300,16 @@ export const landRoom = (era: number): number => DEMOGRAPHY.land[Math.max(0, Mat
 export function growthRate(era: number, medicine: number): number {
   return DEMOGRAPHY.rate[Math.max(0, Math.min(DEMOGRAPHY.rate.length - 1, era))] * (1 + DEMOGRAPHY.medicine * medicine);
 }
-/** §4.2: how many housing buildings a nation may have, HOUSING.perCentre for the capital and each settlement. */
-/** §4.2 housing buildings allowed: HOUSING.perCentre per centre, plus what eras and inventions add per centre. */
-export function housingSlots(n: Nation, world?: World): number { return (HOUSING.perCentre + (world ? mods(world, n).housingSlots : 0)) * (1 + n.settlements.length); }
+/** §4.2 housing buildings allowed (v0.65): one for every HOUSING.tilesPerHome land tiles held (at least
+ *  HOUSING.perCentre), plus what eras and inventions add for each centre. */
+export function housingSlots(n: Nation, world?: World): number {
+  if (!world) return HOUSING.perCentre * (1 + n.settlements.length);
+  let land = 0;
+  for (const t of world.tiles) if (t.owner === n.id && t.land) land++;
+  return homeSlots(world, n, land);
+}
+const homeSlots = (world: World, n: Nation, land: number): number =>
+  Math.max(HOUSING.perCentre, Math.floor(land / HOUSING.tilesPerHome)) + mods(world, n).housingSlots * (1 + n.settlements.length);
 export function isHousing(world: World, type: string): boolean { return (buildingOf(world, type)?.effect.housing || 0) > 0; }
 /** §4.2 The families a land tile (not a centre) houses: by terrain, one more on a river. */
 export function hamletRoom(t: Tile): number { return (HAMLET.people[t.terrain] || 0) + (t.river && HAMLET.people[t.terrain] ? HAMLET.river : 0); }
@@ -318,12 +326,13 @@ export function urbanRoom(n: Nation, centre: number): number {
 }
 export function housingParts(world: World, n: Nation, owned?: Tile[]): { natural: number; settlements: number; buildings: number; hamlets: number; hamletMax: number; wonder: number; urban: number } {
   // Only the best housing buildings up to the cap count (a lost settlement leaves surplus tents empty)
-  const buildings = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0)
-    .sort((a, b) => b - a).slice(0, housingSlots(n, world)).reduce((s, h) => s + h, 0);
   const era = eraIndex(n), land = landRoom(era), hubs = new Set(centres(n)), hamletMax = Math.round((HAMLET.max + HAMLET.perEra * era) * land * DEMOGRAPHY.rural[Math.min(era, DEMOGRAPHY.rural.length - 1)]);
   const worked = farmland(world, n);
-  let hamlets = 0;
-  for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land && !hubs.has(t.i)) hamlets += hamletRoom(t) * (worked.has(t.i) ? DEMOGRAPHY.farmland : 1);
+  let hamlets = 0, landTiles = 0;
+  for (const t of owned ?? world.tiles) if (t.owner === n.id && t.land) { landTiles++; if (!hubs.has(t.i)) hamlets += hamletRoom(t) * (worked.has(t.i) ? DEMOGRAPHY.farmland : 1); }
+  const homes = n.buildings.filter(b => buildingWorks(world, b)).map(b => buildingOf(world, b.type)?.effect.housing || 0).filter(h => h > 0);
+  const slots = homes.length <= HOUSING.perCentre ? homes.length : homeSlots(world, n, landTiles); // the full count only when it can matter
+  const buildings = homes.sort((a, b) => b - a).slice(0, slots).reduce((s, h) => s + h, 0);
   // §4.2b each era the land houses more: villages become towns, towns cities; v0.56 towns and cities hold the crowds
   const urban = [...hubs].reduce((s2, c) => s2 + urbanRoom(n, c), 0);
   return { natural: Math.round(START.naturalHousing * land), settlements: Math.round(n.settlements.length * SETTLEMENT.housing * land), buildings, hamlets: Math.min(hamletMax, Math.round(hamlets * land)), hamletMax, wonder: ownsWonder(world, n, "cave") ? 50 : 0, urban };
@@ -1791,10 +1800,12 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (def.max && n.buildings.filter(b => b.type === def.type).length >= def.max) return `Tối đa ${def.max} ${def.name}`;
       if ((def.effect.housing || 0) > 0) {
         const have = n.buildings.filter(b => isHousing(world, b.type)).length, slots = housingSlots(n, world);
-        if (have >= slots) return `Mỗi trung tâm (thủ đô, điểm định cư) chỉ chứa ${HOUSING.perCentre} công trình có chỗ ở: đã có ${have}/${slots}. Lập điểm định cư mới để dựng thêm`;
+        if (have >= slots) return `Đã có ${have}/${slots} công trình có chỗ ở: cứ ${HOUSING.tilesPerHome} ô đất mới được thêm 1 (khai hoang thêm đất, lập điểm định cư, hoặc lên thời đại mới)`;
       }
-      const tile = a.tile === undefined ? n.capital : parseTile(a.tile);
+      let tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
+      // §6.1b with no tile given and the capital full, the nearest free site in reach
+      if (a.tile === undefined && !def.perCentre && !def.perTile && buildingsOn(n, tile) >= tileSlots(n, tile)) tile = freeSite(world, n) ?? tile;
       if (def.effect.gate || def.effect.tower) { // §7.9 on our land at a neighbour's border, joined by road to a centre; one for each neighbour
         const touch = new Set(NEIGHBORS[tile].map(j => world.tiles[j]).filter(t2 => t2.land && t2.owner >= 0 && t2.owner !== n.id && world.nations[t2.owner]?.alive).map(t2 => t2.owner));
         if (!touch.size) return `${def.name} phải đặt trên ô của ta giáp đất một nước láng giềng`;
@@ -1813,6 +1824,9 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (!cs.includes(tile)) return `${def.name} phải xây ngay trên thủ đô hay một điểm định cư (tile của trung tâm đó)`;
         if (n.buildings.some(b => b.type === def.type && b.tile === tile)) return `Trung tâm này đã có ${def.name}`;
       }
+      // §6.1b room on the tile, and a centre near enough to tend it (or a road to the capital)
+      if (buildingsOn(n, tile) >= tileSlots(n, tile)) return `Ô (${col(tile)}, ${row(tile)}) đã đủ ${tileSlots(n, tile)} công trình (mỗi ô đất ${HOUSING.tileSlots}; trung tâm: làng ${HOUSING.centreSlots[0]}, thị trấn ${HOUSING.centreSlots[1]}, thành phố ${HOUSING.centreSlots[2]}): chọn ô khác`;
+      if (!inReach(world, n, tile)) return `Ô (${col(tile)}, ${row(tile)}) quá xa: công trình phải trong ${HOUSING.reach[0]} ô quanh một trung tâm (thị trấn ${HOUSING.reach[1]}, thành phố ${HOUSING.reach[2]}) hoặc trên đường nối về thủ đô`;
       const t = world.tiles[tile];
       if (!t.land) return "Không xây được trên biển";
       if (def.type === "hydro_dam" && !(t.river && (t.terrain === "hill" || NEIGHBORS[tile].some(j => ["hill", "mountain"].includes(world.tiles[j].terrain)))))

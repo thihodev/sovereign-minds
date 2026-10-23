@@ -14,11 +14,13 @@
 import { vietPlace } from "../names.ts";
 import { localPrice, price, veinsNear } from "../market.ts";
 import { ERA_TABLE, FESTIVAL, MISSION, HIDDEN_ORES, DEEP_RES, AP_COST, CLAIM_FOOD, FLAG_LAND_DELTA_E, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, LAND_COLORS, FLAG_SYMBOLS, HORDES, HUNT_TOOLS, MAX_ROLE_BONUS, REGEN, ROADS, SEA, SETTLEMENT, HAMLET, TERRAIN, WAR, YIELD } from "../rules.ts";
+import { HOUSING } from "../rules.ts";
 import { landDistance, liveHordes, raidParty } from "../wild.ts";
 import { fighters, mouths } from "../people.ts";
 import { riverWay } from "./prompt.ts";
 import { borderOf } from "../border.ts";
 import { contagious, plagueNearby, quarantined } from "../contagion.ts";
+import { buildingsOn, freeSite, inReach, tileSlots } from "../sites.ts";
 import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
 import { allInventions, buildingOf, eraIndex, invName, recipeOf } from "../catalog.ts";
@@ -195,7 +197,9 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
   // own ring of tiles, so make room under the limit it raises before founding it.
   const lastSettled = Math.max(-99, ...n.settlements.map(s => s.tick));
   // Tents first: a settlement only once the centres we have are full of them
-  const roofsFull = !v.has("P8") || n.buildings.filter(b => isHousing(world, b.type)).length >= housingSlots(n, world);
+  // (v0.65 the land allows more homes; a bot still moves out once each centre has its few homes around it, as villages do)
+  const homes = n.buildings.filter(b => isHousing(world, b.type)).length;
+  const roofsFull = !v.has("P8") || homes >= Math.min(housingSlots(n, world), HOUSING.perCentre * (1 + n.settlements.length)) || freeSite(world, n) === null;
   const wantSettle = n.founded && v.m.caps.has(SETTLEMENT.cap) && v.pop >= SETTLEMENT.minPopulation && v.house - v.pop <= Math.max(6, v.house * 0.12) && roofsFull && !atWar && tick - lastSettled >= 5
     && (n.settlements.length < SETTLEMENT.freeCentres || n.stability >= 50); // each centre beyond the free ones wears on stability
   const sett = wantSettle ? settlementSite(v) : null;
@@ -331,7 +335,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
       if (spot >= 0) queue("field", spot);
     }
     if (can("pen") && !pendingType("pen") && count("pen") < 1 + Math.floor(count("field") / 3) && avail("rope") >= 6) {
-      const spot = v.owned.find(t => t.land && t.terrain !== "mountain" && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
+      const spot = v.owned.find(t => t.land && siteOk(world, n, t.i) && t.terrain !== "mountain" && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
       if (spot) queue("pen", spot.i);
     }
     const pitMax = buildingOf(world, "pit")?.max ?? 2;
@@ -339,7 +343,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (can("altar") && !built("altar") && avail("stone") >= 14) queue("altar");
     if (can("market") && !count("market") && avail("wood") >= 12 && avail("stone") >= 8) queue("market"); // §4.13 a market fills the treasury
     if (can("kiln") && !built("kiln") && avail("clay") >= 10) {
-      const spot = v.owned.find(t => t.land && t.terrain !== "mountain" && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
+      const spot = v.owned.find(t => t.land && siteOk(world, n, t.i) && t.terrain !== "mountain" && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
       if (spot) queue("kiln", spot.i);
     }
     if (can("palisade") && !built("palisade") && (atWar || hostileBorder(v)) && avail("wood") >= 20) queue("palisade");
@@ -347,7 +351,7 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     if (can("well") && !freshWater(world, n) && !pendingType("well")) queue("well");
     // §7.3 a pier on a river or the shore once boats are known, to trade by water
     if (can("pier") && !built("pier") && !pendingType("pier") && avail("rope") >= 2) {
-      const spot = v.owned.find(t => t.land && (t.river || t.terrain === "coast") && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
+      const spot = v.owned.find(t => t.land && siteOk(world, n, t.i) && (t.river || t.terrain === "coast") && !n.buildings.some(b => b.tile === t.i && buildingOf(world, b.type)?.perTile));
       if (spot) queue("pier", spot.i);
     }
     for (const b of builds) spend("build", { building: b.type, ...(b.tile !== undefined ? { tile: xy(b.tile) } : {}) });
@@ -530,9 +534,11 @@ function atWarFront(v: View, i: number, foes: Set<number>): boolean {
 function freeTile(v: View, t: Tile): boolean {
   return t.land && t.terrain !== "mountain" && !v.n.buildings.some(b => b.tile === t.i && buildingOf(v.world, b.type)?.perTile);
 }
+/** §6.1b a tile with room for a building, near enough to a centre (or on a road to the capital) */
+const siteOk = (world: World, n: Nation, i: number) => inReach(world, n, i) && buildingsOn(n, i) < tileSlots(n, i);
 function fieldTile(v: View): number {
   const def = buildingOf(v.world, "field");
-  const ok = (t: Tile) => freeTile(v, t) && (!def?.terrains || def.terrains.includes(t.terrain) || (def.river && t.river));
+  const ok = (t: Tile) => freeTile(v, t) && siteOk(v.world, v.n, t.i) && (!def?.terrains || def.terrains.includes(t.terrain) || (def.river && t.river));
   const spots = v.owned.filter(ok).sort((a, b) => (b.river ? 1 : 0) - (a.river ? 1 : 0) || (a.res.plants || 0) - (b.res.plants || 0) || a.i - b.i);
   return spots.length ? spots[0].i : -1;
 }

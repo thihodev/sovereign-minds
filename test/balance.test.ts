@@ -31,23 +31,30 @@ function turn(w: World, acts: Record<number, AIResponse>): string[] {
 const freeTiles = (w: World, k: number) => w.tiles.filter(t => t.land && t.owner === -1 && w.nations.every(n => Math.abs(col(t.i) - col(n.capital)) + Math.abs(row(t.i) - row(n.capital)) > 12)).slice(0, k).map(t => t.i);
 const meet = (w: World) => { for (const a of w.nations) for (const b of w.nations) if (a !== b && !a.met.includes(b.id)) a.met.push(b.id); };
 
-test("housing: three tents per centre; only that many count", () => {
+test("housing: one home for every three tiles of land (at least three); a tile holds two buildings, a centre more (v0.65)", async () => {
+  const { HOUSING } = await import("../src/rules.ts");
+  const { housingSlots } = await import("../src/engine.ts");
   const w = founded();
   const n = w.nations[0];
   n.inventions.push("P1", "P3", "P7", "P8");
-  Object.assign(n.stock, { wood: 100, hide: 100, rope: 100 });
+  Object.assign(n.stock, { wood: 200, hide: 200, rope: 200 });
   n.population = 100; // 5 AP
+  const land = () => w.tiles.filter(t => t.owner === n.id && t.land).length;
+  assert.equal(housingSlots(n, w), Math.max(HOUSING.perCentre, Math.floor(land() / HOUSING.tilesPerHome)));
   const tent = { type: "build", building: "tent" };
   turn(w, { 0: { actions: [tent, tent, tent, tent] } });
-  assert.equal(n.buildings.filter(b => b.type === "tent").length, 3);
-  assert.match(n.lastRejected.at(-1)!.reason, /chỉ chứa 3 công trình có chỗ ở: đã có 3\/3/);
-  n.settlements.push({ tile: freeTiles(w, 1)[0], name: "Trại", tick: w.tick });
-  turn(w, { 0: { actions: [tent] } });
-  assert.equal(n.buildings.filter(b => b.type === "tent").length, 4, "a settlement opens three more slots");
+  const slots = housingSlots(n, w);
+  assert.equal(n.buildings.filter(b => b.type === "tent").length, Math.min(4, slots));
+  if (slots < 4) assert.match(n.lastRejected.at(-1)!.reason, /cứ 3 ô đất mới được thêm 1/);
+  // more land, more homes
+  for (const t of freeTiles(w, 9)) w.tiles[t].owner = n.id;
+  assert.ok(housingSlots(n, w) > slots);
+  // the tents went up on the capital until it was full, then on the nearest free tile near it
+  const capital = n.buildings.filter(b => b.tile === n.capital).length;
+  assert.ok(capital <= HOUSING.centreSlots[0], `${capital} on the capital`);
+  assert.ok(n.buildings.every(b => b.tile === n.capital || w.tiles[b.tile].owner === n.id));
   for (const b of n.buildings) if (b.type === "tent") { b.done = true; b.progress = 4; }
-  assert.equal(housing(w, n), 25 + 10 + 4 * 10 + housingParts(w, n).hamlets, "plus the hamlets on the land");
-  n.settlements = []; // the settlement is lost: the fourth tent stands empty
-  assert.equal(housing(w, n), 25 + 3 * 10 + housingParts(w, n).hamlets);
+  assert.equal(housing(w, n), 25 + n.buildings.filter(b => b.type === "tent").length * 10 + housingParts(w, n).hamlets, "plus the hamlets on the land");
 });
 
 test("growth is logistic toward housing; the tile limit grows with √population", () => {

@@ -3,7 +3,7 @@
 // and it is always right about them because it is computed from the same code that applies them.
 
 import { NEIGHBORS, col, dist, row, within } from "../hex.ts";
-import { WAR, AP_COST, AIR, CIVIL, COMPACT, DRIED, HOLD, SEA_RIGHTS, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
+import { WAR, AP_COST, AIR, HOUSING, CIVIL, COMPACT, DRIED, HOLD, SEA_RIGHTS, DEMOGRAPHY, HUNT_ZONE, BUILDING_BY_TYPE, DISEASES, POWER, CLASSES, CROWD, TOWER, TRUCE, GATE, HERBS, HERB_GARDEN, ROYALS, TREASURY, URBAN, GREATS, INITIATIVE, LIVING, CAPITAL_MOVE, RIVER, ANIMALS, HERDS, FESTIVAL, KIN, LUXURY, MISSION, RENAME_DECREE, BORDER, CONNECT, CONTAGION, EXODUS, LAND, HAMLET, ROADS, SCHISM, SETTLEMENT, OFFICIALS, PROVINCE } from "../rules.ts";
 import { CAUSE_VI, provinces } from "../provinces.ts";
 import { allBuildings, eraIndex, inv, invName } from "../catalog.ts";
 import { civilChance, civilStrength, landRoom, thrive, roadLevelMax, freshWater, governed, housing, housingParts, housingSlots, inventionCost, isHousing, maxOfficials, mods, nextEraNeeds, ownedTiles, researchOptions, roadNet, roadPlan, tileLimit, unrenamed, workers, luxuries, canSeeRes } from "../engine.ts";
@@ -91,7 +91,7 @@ export function advice(world: World, n: Nation): Advice[] {
     if (homes.length && tents < slots) ways.push(`dựng ${homes[0].name} (+${homes[0].effect.housing} chỗ; còn ${slots - tents}/${slots} chỗ cho nhà ở)`);
     else if (homes.length && tents >= slots) {
       const best = homes[0].effect.housing || 0, worst = Math.min(...n.buildings.filter(b => isHousing(world, b.type)).map(b => allBuildings(world).find(x => x.type === b.type)?.effect.housing || 0));
-      ways.push(`đã đủ ${slots} nhà ở cho các trung tâm hiện có${worst < best ? ` (nhà yếu nhất chỉ +${worst}, nhà tốt nhất bạn làm được +${best})` : ""}; mỗi điểm định cư mới mở thêm ${slots / (1 + n.settlements.length)} chỗ cho nhà ở`);
+      ways.push(`đã đủ ${slots} nhà ở (cứ ${HOUSING.tilesPerHome} ô đất được 1)${worst < best ? ` (nhà yếu nhất chỉ +${worst}, nhà tốt nhất bạn làm được +${best})` : ""}; khai hoang thêm đất để dựng thêm nhà`);
     } else {
       const tent = researchOptions(world, n).find(id => allBuildings(world).some(b => b.needs === id && (b.effect.housing || 0) > 0));
       if (tent) ways.push(`nghiên cứu ${invName(world, tent)} (${tent}, ${inventionCost(world, n, tent)} RP) để dựng nhà ở`);
