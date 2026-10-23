@@ -14,6 +14,8 @@ export const SCALE = N / 64;
 /** §12.1 The ice wall is WALL.min to WALL.max tiles thick; land within WALL.glacier of it is glacier. */
 export const WALL = { min: 3, max: 6, glacier: 2, reach: 8 };
 /** Spawns at least `min` apart; nearest neighbour ideally no farther than `far`. */
+/** The closest two peoples may start when many share a map. */
+const SPAWN_GAP_MIN = 8;
 export const SPAWN = { min: Math.round(12 * Math.sqrt(SCALE)), far: Math.round(18 * Math.sqrt(SCALE)) };
 /** §12.4 Wilderness: where the barbarian hordes live (§9.4). */
 export const WILD = { count: Math.round(3 * SCALE), fromSpawn: Math.round(8 * Math.sqrt(SCALE)), band: 12, apart: Math.round(14 * Math.sqrt(SCALE)) };
@@ -246,6 +248,7 @@ export function generateWorld(seedStr: string, nNations: number, shape: Shape = 
     return wood >= 150 && stone >= 150 && meat >= 80 && plants >= 60 && home >= 150;
   };
   const withBasics = cands.filter(c => basics(c.i));
+  const anyPlace = cands.slice(), good = new Set(withBasics.map(c => c.i));
   if (withBasics.length >= nNations) cands.splice(0, cands.length, ...withBasics);
   const sortedV = cands.map(c => c.v).sort((a, b) => a - b);
   let best: { score: number; chosen: typeof cands } | null = null;
@@ -264,10 +267,31 @@ export function generateWorld(seedStr: string, nNations: number, shape: Shape = 
     }
     if (best && new Set(best.chosen.map(c => c.zone)).size >= Math.min(3, nNations)) break;
   }
+  // Many peoples on one map: closer together, from a wider band, before the last resort
+  for (let gap = spawn.min - 2; !best && gap >= SPAWN_GAP_MIN; gap -= 2) {
+    for (const width of [0.1, 0.2]) {
+      // the places with every basic first, then other good land (the basics sit in few corners of the map)
+      const mid = sortedV[Math.floor(sortedV.length * 0.5)], band = anyPlace.filter(c => c.v >= mid * (1 - width) && c.v <= mid * (1 + width));
+      const first = band.filter(c => good.has(c.i)), then = band.filter(c => !good.has(c.i));
+      for (let a = 0; a < 80; a++) {
+        const chosen: typeof cands = [];
+        for (const c of [...shuffle(first.slice(), rand), ...shuffle(then.slice(), rand)]) { if (chosen.every(o => dist(o.i, c.i) >= gap)) chosen.push(c); if (chosen.length === nNations) break; }
+        if (chosen.length < nNations) continue;
+        const nearest = chosen.map(c => Math.min(...chosen.filter(o => o !== c).map(o => dist(c.i, o.i))));
+        const score = new Set(chosen.map(c => c.zone)).size * 1000 + Math.min(...nearest);
+        if (!best || score > best.score) best = { score, chosen };
+      }
+      if (best) break;
+    }
+  }
   if (!best) {
-    const chosen: typeof cands = [];
-    // No even band fits everyone: take the richest places that are far enough apart (never a barren one when better exist)
-    for (const c of cands.slice().sort((a, b) => b.v - a.v || a.i - b.i)) { if (chosen.every(o => dist(o.i, c.i) >= spawn.min - 4)) chosen.push(c); if (chosen.length === nNations) break; }
+    // No even band fits everyone: take the richest places that are far enough apart (never a barren one when better exist),
+    // closer and closer until every people has one
+    let chosen: typeof cands = [];
+    for (let gap = spawn.min - 4; gap >= 4 && chosen.length < nNations; gap -= 2) {
+      chosen = [];
+      for (const c of cands.slice().sort((a, b) => b.v - a.v || a.i - b.i)) { if (chosen.every(o => dist(o.i, c.i) >= gap)) chosen.push(c); if (chosen.length === nNations) break; }
+    }
     best = { score: 0, chosen };
   }
   const spawnsSorted = best.chosen.slice().sort((a, b) => a.i - b.i);

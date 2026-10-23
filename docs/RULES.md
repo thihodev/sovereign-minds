@@ -123,7 +123,7 @@ Trữ lượng điển hình mỗi ô (±30% theo seed): thú săn 50–80, cây
 
 ### 2.4 Đặc thù quốc gia
 
-Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng nước nào. Watcher chọn đặc thù (hoặc để ngẫu nhiên) trong hộp thoại **Thế giới mới**, và đặc thù giữ nguyên suốt trận. Mỗi đặc thù có hai phần:
+Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng nước nào. Riêng khi có nhiều nước hơn số đặc thù (9), các đặc thù được chia đều: mỗi đặc thù dùng cho tối đa ⌈số nước / 9⌉ nước. Một thế giới mới có 2–20 nước trên bản đồ phẳng, 2–32 nước trên địa cầu. Watcher chọn đặc thù (hoặc để ngẫu nhiên) trong hộp thoại **Thế giới mới**, và đặc thù giữ nguyên suốt trận. Mỗi đặc thù có hai phần:
 
 - **Luật:** một lợi thế và một điểm yếu, viết cùng dạng với hiệu ứng phát minh (thưởng nghề, RP, chiến đấu, ô quản lý, thiệt hại mùa đông, ổn định mỗi lượt), và Engine cộng như thêm một phát minh. Thương nhân còn được giảm thêm 15 điểm % khi học phát minh từ nước đã gặp (mục 7.5, tối đa 75%). Một số đặc thù đổi uy tín hoặc ổn định lúc khởi đầu.
 - **Bản sắc:** trường `identity` trong gói quan sát (mục 8.2) cho AI biết tên đặc thù, tính cách dân tộc và các con số trên. AI được dặn để bản sắc ấy dẫn dắt tên gọi, văn hóa, ưu tiên và ngoại giao.
@@ -1982,7 +1982,7 @@ Mỗi kỳ quan là duy nhất trên thế giới. Quốc gia sở hữu ô đó
 3. Gán địa hình theo độ cao × độ ẩm × vĩ độ: 8% đất cao nhất là núi, tiếp theo đến 22% là đồi.
 4. Vẽ sông từ đỉnh núi chảy theo dốc xuống biển, đánh dấu châu thổ.
 5. Rải tài nguyên theo địa hình, đặt 7 kỳ quan cách nhau ≥ 6 ô theo luật "mỗi lục địa ít nhất 2".
-6. Chọn điểm khai sinh (cách nhau ≥ 17 ô, xa Tường Băng, rải đều các đới khí hậu, cùng mức giá trị ±5%); trượt thì thử vị trí khác.
+6. Chọn điểm khai sinh (cách nhau ≥ 17 ô, xa Tường Băng, rải đều các đới khí hậu, cùng mức giá trị ±5%); trượt thì thử vị trí khác. Khi nhiều nước không đủ chỗ như thế, các điểm được đặt gần nhau dần, mỗi lần bớt 2 ô (không dưới 8 ô), trong khoảng giá trị ±10% rồi ±20%; ưu tiên nơi có đủ gỗ, đá, thịt, cây dại, thiếu chỗ thì lấy đất tốt khác.
 7. Watcher xem trước bản đồ, đổi seed nếu chưa ưng, rồi bấm "Khai thiên lập địa" để bắt đầu lượt 0 (chưa có trong engine: thế giới được tạo ngay lần khởi động đầu tiên; muốn đổi seed thì xóa `data/world.db`).
 
 ### 12.6 Số quốc gia: 5 khi khởi đầu

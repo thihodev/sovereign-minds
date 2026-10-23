@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createWorld, inventionCost, mods, type NationSpec } from "../src/engine.ts";
 import { Store } from "../src/db.ts";
-import { Runner, nationSpecs, setupSpecs, type RunnerConfig } from "../src/runner.ts";
+import { NATIONS_MAX, Runner, nationSpecs, setupSpecs, type RunnerConfig } from "../src/runner.ts";
 import { limitResetSec } from "../src/claude.ts";
 import { START, TRAITS, TRAIT_BY_ID } from "../src/rules.ts";
 import { buildObservation } from "../src/ai/prompt.ts";
@@ -55,6 +55,23 @@ test("setup: blank traits are drawn from the unused ones, duplicates refused, ba
   assert.ok(list.every(s => s.provider === "claude" && s.controller === "ai"));
   assert.equal(typeof setupSpecs({ seed: "s", tickSeconds: 0, nations: [{ trait: "sages" }, { trait: "sages" }] }), "string");
   assert.equal(typeof setupSpecs({ seed: "s", tickSeconds: 0, nations: [{}] }), "string");
+});
+
+test("setup: many nations, up to 20 on the flat map and 32 on a globe, sharing the traits evenly; every one gets a home", () => {
+  const rows = (k: number) => Array.from({ length: k }, () => ({}));
+  const flat = setupSpecs({ seed: "s", tickSeconds: 0, nations: rows(40) }) as NationSpec[];
+  assert.equal(flat.length, NATIONS_MAX.flat);
+  const globe = setupSpecs({ seed: "s", tickSeconds: 0, shape: "globe", nations: rows(40) }) as NationSpec[];
+  assert.equal(globe.length, NATIONS_MAX.globe);
+  const counts = Object.values(Object.groupBy(globe, x => x.trait ?? "")).map(x => x!.length);
+  assert.equal(counts.length, TRAITS.length, "every trait used");
+  assert.ok(Math.max(...counts) - Math.min(...counts) <= 1, "shared evenly");
+  // two may share a trait once there are more nations than traits, never three
+  const two = Array.from({ length: 12 }, (_, k) => ({ trait: k < 2 ? "sages" : "" }));
+  assert.ok(Array.isArray(setupSpecs({ seed: "s", tickSeconds: 0, nations: two })));
+  assert.equal(typeof setupSpecs({ seed: "s", tickSeconds: 0, nations: two.map((x, k) => (k < 3 ? { trait: "sages" } : x)) }), "string");
+  const w = createWorld("many-b", flat);
+  assert.equal(w.nations.length, NATIONS_MAX.flat, "every nation has a capital");
 });
 
 test("NATIONS=claude:model:effort, and every nation gets a different trait from the seed", () => {

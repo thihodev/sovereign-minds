@@ -81,12 +81,20 @@ export function nationSpecs(cfg: RunnerConfig): { specs: NationSpec[]; notes: st
 }
 
 /** A Watcher's setup as nation specs: unknown values fall back, blank traits are drawn from the unused ones. */
+/** How many nations a new world may start with: a globe has room for more. */
+export const NATIONS_MAX = { flat: 20, globe: 32 } as const;
+/** How many nations may share one trait: one each while there are enough traits. */
+export const traitShare = (count: number): number => Math.max(1, Math.ceil(count / TRAITS.length));
+
 export function setupSpecs(setup: WorldSetup): NationSpec[] | string {
-  const rows = setup.nations.slice(0, 8);
+  const rows = setup.nations.slice(0, NATIONS_MAX[setup.shape === "globe" ? "globe" : "flat"]);
   if (rows.length < 2) return "Cần ít nhất 2 quốc gia";
-  const chosen = rows.map(r => r.trait && TRAIT_BY_ID[r.trait] ? r.trait : "");
-  if (new Set(chosen.filter(Boolean)).size !== chosen.filter(Boolean).length) return "Mỗi đặc thù chỉ dùng cho một quốc gia";
-  const free = shuffle(TRAITS.map(t => t.id).filter(id => !chosen.includes(id)), rngFor(setup.seed, "traits"));
+  const chosen = rows.map(r => r.trait && TRAIT_BY_ID[r.trait] ? r.trait : ""), share = traitShare(rows.length);
+  const used = (id: string) => chosen.filter(x => x === id).length;
+  if (TRAITS.some(t => used(t.id) > share)) return share === 1 ? "Mỗi đặc thù chỉ dùng cho một quốc gia" : `Mỗi đặc thù dùng cho tối đa ${share} quốc gia`;
+  // the traits no one chose first, in an order the seed decides; then a second round of each, and so on
+  const free: string[] = [];
+  for (let round = 0; round < share; round++) free.push(...shuffle(TRAITS.map(t => t.id).filter(id => used(id) <= round), round ? rngFor(setup.seed, "traits", round) : rngFor(setup.seed, "traits")));
   return rows.map((r, k) => ({
     controller: "ai", provider: "claude",
     model: CLAUDE_MODELS.some(m => m.id === r.model) ? r.model! : "haiku",

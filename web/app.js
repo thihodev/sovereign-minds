@@ -2088,7 +2088,12 @@
     const shapes = o.shapes?.length ? o.shapes : [{ id: "flat", name: "Bản đồ phẳng" }];
     fillSelect($("#setup-shape"), shapes.map(x => [x.id, x.name]), shapes.some(x => x.id === o.shape) ? o.shape : shapes[0].id);
     $("#setup-shape").disabled = shapes.length < 2;
-    fillSelect($("#setup-count"), [2, 3, 4, 5, 6, 7, 8].map(k => [k, `${k} quốc gia`]), Math.min(8, Math.max(2, o.nations || 6)));
+    // how many nations: up to the shape's limit (a globe has room for more)
+    const counts = (want) => {
+      const max = shapes.find(x => x.id === $("#setup-shape").value)?.maxNations || 8;
+      fillSelect($("#setup-count"), Array.from({ length: max - 1 }, (_, k) => [k + 2, `${k + 2} quốc gia`]), Math.min(max, Math.max(2, want)));
+    };
+    counts(o.nations || 6);
     $("#setup-tick").value = [600, 1200, 1800, 3600].includes(o.tickSeconds) ? o.tickSeconds : 1200;
     const traitPairs = [["", "🎲 Ngẫu nhiên"], ...o.traits.map(t => [t.id, `${t.icon} ${t.name}`])];
     const byId = Object.fromEntries(o.traits.map(t => [t.id, t]));
@@ -2116,6 +2121,7 @@
       cost();
     };
     $("#setup-count").onchange = build;
+    $("#setup-shape").onchange = () => { counts(+$("#setup-count").value); build(); };
     $("#setup-random").onclick = () => {
       const ids = o.traits.map(t => t.id).sort(() => Math.random() - 0.5);
       rows.querySelectorAll("li").forEach((li, k) => { li.querySelector(".t").value = ids[k % ids.length]; describe(li); keep[k] = { ...keep[k], trait: ids[k % ids.length] }; });
@@ -2130,8 +2136,8 @@
   $("#setup-form").addEventListener("submit", async ev => {
     ev.preventDefault();
     const nations = [...$("#setup-rows").querySelectorAll("li")].map(li => ({ trait: li.querySelector(".t").value, model: li.querySelector(".m").value, effort: li.querySelector(".e").value }));
-    const chosen = nations.map(x => x.trait).filter(Boolean);
-    if (new Set(chosen).size !== chosen.length) { $("#setup-msg").textContent = "Mỗi đặc thù chỉ dùng cho một quốc gia."; return; }
+    const chosen = nations.map(x => x.trait).filter(Boolean), share = Math.max(1, Math.ceil(nations.length / (setupCache?.traitCount || 9)));
+    if (chosen.some(t => chosen.filter(x => x === t).length > share)) { $("#setup-msg").textContent = share === 1 ? "Mỗi đặc thù chỉ dùng cho một quốc gia." : `Mỗi đặc thù dùng cho tối đa ${share} quốc gia.`; return; }
     $("#setup-go").disabled = true; $("#setup-msg").textContent = "Đang chờ lượt hiện tại xong rồi tạo thế giới…";
     try { await api("/api/world/new", { method: "POST", body: { seed: $("#setup-seed").value.trim(), shape: $("#setup-shape").value || "flat", tickSeconds: +$("#setup-tick").value, nations } }); location.reload(); }
     catch (e) { $("#setup-msg").textContent = e.message; $("#setup-go").disabled = false; }

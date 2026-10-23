@@ -44,7 +44,7 @@ import { links } from "./connect.ts";
 import { contagious, diseaseOf, quarantined } from "./contagion.ts";
 import { CAUSE_VI, provinces } from "./provinces.ts";
 import { knownProsperity, prosperityRank } from "./prosperity.ts";
-import type { Runner } from "./runner.ts";
+import { NATIONS_MAX, type Runner } from "./runner.ts";
 
 const WEB = resolve("web");
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".glb": "model/gltf-binary" };
@@ -322,7 +322,8 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
           traits: TRAITS.map(t => ({ id: t.id, name: t.name, icon: t.icon, desc: t.desc, lines: traitLines(t) })),
           models: CLAUDE_MODELS, efforts: CLAUDE_EFFORTS, seed: runner.world.seed, tickSeconds: runner.cfg.tickSeconds,
           nations: runner.world.nations.length, claude: { loggedIn: runner.claudeReady() },
-          shape: runner.world.shape?.kind === "sphere" ? "globe" : "flat", shapes: [{ id: "flat", name: "Bản đồ phẳng (128 × 128, Tường Băng bao quanh)" }, { id: "globe", name: "Địa cầu (25.002 ô, hai cực băng, đi vòng quanh được)" }],
+          shape: runner.world.shape?.kind === "sphere" ? "globe" : "flat", shapes: [{ id: "flat", name: "Bản đồ phẳng (128 × 128, Tường Băng bao quanh)", maxNations: NATIONS_MAX.flat }, { id: "globe", name: "Địa cầu (25.002 ô, hai cực băng, đi vòng quanh được)", maxNations: NATIONS_MAX.globe }],
+          traitCount: TRAITS.length,
         });
       }
       if (path === "/api/world/new" && method === "POST") {
