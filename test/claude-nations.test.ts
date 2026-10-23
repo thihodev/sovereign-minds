@@ -28,7 +28,9 @@ test("a trait counts in mods() like an invention, and its start values apply", (
   assert.equal(mods(w, nomad).winter, 0.75);
   assert.equal(warrior.reputation, START.reputation - 10);
   assert.equal(plain.reputation, START.reputation);
-  assert.equal(buildObservation(w, plain).identity, undefined, "worlds without traits are unchanged");
+  const pid = buildObservation(w, plain).identity as { trait?: string; your_character?: string };
+  assert.equal(pid.trait, undefined, "a people with no trait has none");
+  assert.ok(pid.your_character, "but every ruler has its own character (v0.66)");
   const id = buildObservation(w, sage).identity as { trait: string; effects: string[] };
   assert.equal(id.trait, TRAIT_BY_ID.sages.name);
   assert.ok(id.effects.some(e => e.startsWith("nghiên cứu +")));

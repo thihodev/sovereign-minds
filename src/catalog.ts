@@ -7,6 +7,7 @@ import {
   type BuildingDef, type Invention, type Recipe,
 } from "./rules.ts";
 import { ROLES, type Nation, type Proposal, type Ruling, type World } from "./types.ts";
+import { dealCharacters } from "./engine.ts";
 import { seedAnimals, seedDeepResources, seedRiches, seedMeadowHerbs, seedRiverPlenty, seedRockSalt, seedSurfaceIron, seedVeins } from "./worldgen.ts";
 
 // ---------------------------------------------------------------- lookups
@@ -43,6 +44,7 @@ export function migrate(world: World): World {
   if ((world.riches ?? 0) < 3) { seedRiverPlenty(world.seed, world.tiles); world.riches = 3; } // v0.25 the river's plenty
   if ((world.riches ?? 0) < 4) { seedMeadowHerbs(world.seed, world.tiles); world.riches = 4; } // v0.37 meadow herbs
   if ((world.riches ?? 0) < 5) { seedRockSalt(world.seed, world.tiles); world.riches = 5; } // v0.41 rock salt
+  if (world.nations.some(n => !n.character)) dealCharacters(world); // v0.66 every ruler its own character
   if ((world.riches ?? 0) < 6) { seedSurfaceIron(world.seed, world.tiles); world.riches = 6; } // v0.61 surface iron
   for (const n of world.nations) {
     n.officials ??= [];

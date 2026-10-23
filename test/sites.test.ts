@@ -19,9 +19,9 @@ const build = (w: World, b: Record<string, unknown>) => step(w, { 0: { kind: "ok
 
 test("a tile holds two buildings, a village centre four; with no tile given the next goes to the nearest free site", () => {
   const w = founded("sites-slots"), [n] = w.nations;
-  assert.equal(tileSlots(n, n.capital), HOUSING.centreSlots[0]);
+  assert.equal(tileSlots(w, n, n.capital), HOUSING.centreSlots[0]);
   const other = w.tiles.find(t => t.owner === n.id && t.land && t.i !== n.capital)!;
-  assert.equal(tileSlots(n, other.i), HOUSING.tileSlots);
+  assert.equal(tileSlots(w, n, other.i), HOUSING.tileSlots);
   for (let k = 0; k < HOUSING.centreSlots[0]; k++) n.buildings.push({ id: w.nextBuildingId++, type: "workshop", tile: n.capital, progress: 4, done: true, hp: 100 });
   build(w, { building: "workshop" });
   const last = n.buildings.at(-1)!;

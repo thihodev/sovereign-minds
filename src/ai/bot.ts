@@ -23,7 +23,7 @@ import { contagious, plagueNearby, quarantined } from "../contagion.ts";
 import { buildingsOn, freeSite, inReach, tileSlots } from "../sites.ts";
 import { yieldShares } from "../connect.ts";
 import { provinces } from "../provinces.ts";
-import { allInventions, buildingOf, eraIndex, invName, recipeOf } from "../catalog.ts";
+import { allInventions, buildingOf, eraIndex, invName, recipeOf, allBuildings } from "../catalog.ts";
 import { NEIGHBORS, col, row, dist, inBounds, idx, within } from "../hex.ts";
 import { actionPoints, canSeeRes, landRoom, deltaE, freshWater, governed, homeDefence, housing, maxOfficials, housingSlots, inventionCost, isHousing, mods, ownedTiles, researchOptions, renameDecreed, roadLevelMax, roadNet, roadPlan, settlementPayment, tileLimit, unrenamed, workers, type Mods } from "../engine.ts";
 import { centreFallNeed, frontCap, hostile, kin, pendingOrActiveWar, treatiesBetween, warLead, warSide } from "../diplomacy.ts";
@@ -327,7 +327,12 @@ export function botTurn(world: World, n: Nation, rand: Rand): AIResponse {
     // Housing: a tent when the people are close to the roof and the land can feed ten more
     const roomy = v.house - v.pop > 3;
     const roofSlot = n.buildings.filter(b => isHousing(world, b.type)).length < housingSlots(n, world);
-    if (can("tent") && roofSlot && !roomy && !pendingType("tent") && !settling && capFood >= (v.house + 10) * v.m.foodPerPerson * 1.1) queue("tent");
+    // §4.2c the best home of our age; when the homes are full, a better one replaces the weakest
+    const homeTypes = allBuildings(world).filter(b => (b.effect.housing || 0) > 0 && can(b.type)).sort((x, y) => (y.effect.housing || 0) - (x.effect.housing || 0));
+    const best = homeTypes.find(b => affordable(b.type)) ?? homeTypes[0];
+    const weakest = Math.min(Infinity, ...n.buildings.filter(b => isHousing(world, b.type)).map(b => buildingOf(world, b.type)?.effect.housing || 0));
+    const roomFor = best ? best.effect.housing || 0 : 0;
+    if (best && (roofSlot || roomFor > weakest) && !roomy && !n.buildings.some(b => !b.done && isHousing(world, b.type)) && !settling && capFood >= (v.house + roomFor) * v.m.foodPerPerson * 1.1) queue(best.type);
     // Farms: more slots when the wild runs short of what the people need
     if (can("field") && !pendingType("field")) {
       const wanted = (v.house + 10) * v.m.foodPerPerson * 1.25 > capFood || count("field") < 1;
@@ -535,7 +540,7 @@ function freeTile(v: View, t: Tile): boolean {
   return t.land && t.terrain !== "mountain" && !v.n.buildings.some(b => b.tile === t.i && buildingOf(v.world, b.type)?.perTile);
 }
 /** §6.1b a tile with room for a building, near enough to a centre (or on a road to the capital) */
-const siteOk = (world: World, n: Nation, i: number) => inReach(world, n, i) && buildingsOn(n, i) < tileSlots(n, i);
+const siteOk = (world: World, n: Nation, i: number) => inReach(world, n, i) && buildingsOn(n, i) < tileSlots(world, n, i);
 function fieldTile(v: View): number {
   const def = buildingOf(v.world, "field");
   const ok = (t: Tile) => freeTile(v, t) && siteOk(v.world, v.n, t.i) && (!def?.terrains || def.terrains.includes(t.terrain) || (def.river && t.river));

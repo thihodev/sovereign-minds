@@ -1528,8 +1528,8 @@
     }
     el.querySelector(".flag").replaceWith(flagCanvas(n.flag, tile === null ? 48 : 36, tile === null ? 32 : 24));
     el.querySelector(".nname").textContent = nationName(n);
-    el.querySelector(".nmeta").textContent = [n.trait && `${n.trait.icon} ${n.trait.name}`, n.capitalName && `thủ đô ${n.capitalName}`, modelLabel(n)].filter(Boolean).join(" · ");
-    if (n.trait) el.querySelector(".nmeta").title = `${n.people} · ${n.trait.name}: ${n.trait.lines.join(" · ")}`;
+    el.querySelector(".nmeta").textContent = [n.character && `${n.character.icon} vua ${n.character.name.toLowerCase()}`, n.trait && `${n.trait.icon} ${n.trait.name}`, n.capitalName && `thủ đô ${n.capitalName}`, modelLabel(n)].filter(Boolean).join(" · ");
+    el.querySelector(".nmeta").title = [n.character && `Tính cách người trị vì: ${n.character.name} — ${n.character.desc}`, n.trait && `Dân tộc ${n.people}: ${n.trait.name} — ${n.trait.lines.join(" · ")}`].filter(Boolean).join("\n");
     const q = el.querySelector(".quote"); if (q) { q.textContent = `“${n.thought}”`; q.title = n.thought; }
     el.querySelector("[data-act=detail]").onclick = () => openNation(n.id);
     el.querySelector("[data-act=locate]")?.addEventListener("click", () => centerOn(n.capital));

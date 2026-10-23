@@ -9,7 +9,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { N } from "./hex.ts";
-import { RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
+import { RULER_CHARACTER_BY_ID, RULES_VERSION, TRAITS, TRAIT_BY_ID, traitLines } from "./rules.ts";
 import { allBuildings, allInventions, allRecipes, buildingEffectText, buildingOf, depthOf, goodName, goodValue, inv, invName, describeEffects } from "./catalog.ts";
 import { fmtGoods, relation, warSide } from "./diplomacy.ts";
 import { ranking } from "./ranking.ts";
@@ -97,6 +97,7 @@ export function startServer(runner: Runner, opts: { host: string; port: number; 
       nations: w.nations.map(n => ({
         id: n.id, name: n.name, capitalName: n.capitalName, people: n.people, flag: n.flag, manifesto: n.manifesto, founded: n.founded,
         controller: n.controller, provider: n.provider, model: n.model, effort: n.effort ?? "", alive: n.alive, capital: n.capital,
+        character: RULER_CHARACTER_BY_ID[n.character ?? ""] ? (c => ({ id: c.id, name: c.name, icon: c.icon, desc: c.desc }))(RULER_CHARACTER_BY_ID[n.character!]) : null, // §2.4b
         trait: TRAIT_BY_ID[n.trait ?? ""] ? { id: n.trait, name: TRAIT_BY_ID[n.trait!].name, icon: TRAIT_BY_ID[n.trait!].icon, desc: TRAIT_BY_ID[n.trait!].desc, lines: traitLines(TRAIT_BY_ID[n.trait!]) } : null,
         status: n.status, statusNote: n.statusNote, sleepUntil: n.sleepUntil,
         prosperity: n.alive && n.prosperity ? { ...n.prosperity, rank: prosperityRank(w, n), others: knownProsperity(w, n).map(x => ({ id: x.o.id, name: x.o.name, score: x.score })) } : null, // §4.7

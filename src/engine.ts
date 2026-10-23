@@ -9,7 +9,7 @@ import {
   FORBIDDEN_NAME_WORDS, GROWTH, HIDDEN_ORES, HOUSING, HUNT_TOOLS, INTEL_DECAY_TICKS, MAX_ROLE_BONUS, NOT_YET,
   ORE_SENSE_CAP, PETITION, TRAIT_BY_ID, GOOD_VALUE, DEEP_RES, ERA_TABLE, ERA_RES_STOCK, HORSES, OFFICIALS, OFFICIAL_DOMAINS, eraPerks, LAND_COLORS, FLAG_LAND_DELTA_E, RENAME_DECREE, VEIN, KIN, UNREST, CAPITAL_MOVE, LIVING, INITIATIVE, HARVEST, SEA_HARVEST, LUXURY, KEEP, ANNALS, CONNECT, DEMO, EXODUS, LAND, HAMLET, IDLE, SCHISM, REGEN, RENAME, RESEARCH, ROADS, ROLE_RESOURCE, SEA, SETTLEMENT, SPOILAGE, SPY, SPY_OPS, START, TILES, TOOL_LIFE, WORKER_SHARE,
   YIELD, apFor, depthCostMult, CIVIL, TRAITS,
-  COMPACT, HOLD, PASSAGE, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, SURFACE_IRON, FLOUR, DRIED, RECIPES, type Recipe,
+  BUILDINGS, COMPACT, HOLD, PASSAGE, RULER_CHARACTERS, RULER_CHARACTER_BY_ID, RULES_VERSION, TREATY_NAME, TREASURY, MINISTER_DOMAINS, GRANARY, MEADOW_HERBS, HERB_GARDEN, THRIVE, CROWD, DEMOGRAPHY, ROCK_SALT, SURFACE_IRON, FLOUR, DRIED, RECIPES, type Recipe,
 } from "./rules.ts";
 import { allBuildings, allInventions, applyRuling, buildingOf, checkProposal, nearDuplicate, depthOf, eraIndex, goodName, inv, invName, recipeOf } from "./catalog.ts";
 import { activeWar, betrayalPhase, findTarget, idOf, pendingOrActiveWar, doDiplomacy, resolveBattles, resolveRelations, treatiesBetween, type DiploCtx, type Strike } from "./diplomacy.ts";
@@ -139,11 +139,31 @@ export function createWorld(seed: string, specs: NationSpec[]): World {
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
     treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 6,
   };
+  dealCharacters(world); // §2.4b every ruler its own character
   for (const n of nations) {
     for (const j of within(n.capital, 1)) world.tiles[j].owner = n.id;
     n.seen = within(n.capital, START.sightRadius);
   }
   return world;
+}
+
+/** §2.4b Give every ruler without one its own character: different from the others while there are enough, by the seed. */
+export function dealCharacters(world: World): void {
+  const taken = new Set(world.nations.filter(n => n.character).map(n => n.character));
+  const deck = shuffle(RULER_CHARACTERS.map(c => c.id), rngFor(world.seed, "characters"));
+  for (const n of world.nations) {
+    if (n.character) continue;
+    const free = deck.filter(id => !taken.has(id));
+    n.character = (free.length ? free : deck)[free.length ? 0 : n.id % deck.length];
+    taken.add(n.character);
+  }
+}
+/** §2.4b A new ruler's character: one no other living ruler has (if any left), never the one it replaces. */
+export function newCharacter(world: World, n: Nation, rand: () => number): string {
+  const living = new Set(world.nations.filter(o => o.alive && o.id !== n.id).map(o => o.character));
+  const pool = RULER_CHARACTERS.map(c => c.id).filter(id => id !== n.character), free = pool.filter(id => !living.has(id));
+  const from = free.length ? free : pool;
+  return from[Math.floor(rand() * from.length)];
 }
 
 function newNation(id: number, spec: NationSpec, capital: number): Nation {
@@ -233,6 +253,7 @@ export function mods(world: World, n: Nation): Mods {
   if (m.caps.has(ORE_SENSE_CAP)) for (const r of HIDDEN_ORES) m.reveal.add(r);
   if (m.caps.has("đi-nước")) m.move.add("shallow");
   for (const r of RECIPES) if (r.cap && m.caps.has(r.cap)) m.unlocked.add(r.id); // §2.11b a recipe open to a capability
+  for (const b of BUILDINGS) if (b.cap && m.caps.has(b.cap)) m.unlocked.add(b.type); // §4.2c the homes of each age
   if (ownsWonder(world, n, "falls")) m.rp += 0.2;
   return m;
 }
@@ -1456,12 +1477,12 @@ function civilBattle(world: World, n: Nation, x: Schism, L: Ledger, say: Say): v
 /** §4.5b The rebels win: the ruler is killed and the leader takes the throne with a new house and a new character. */
 function newRuler(world: World, n: Nation, x: Schism, say: Say): void {
   const tick = world.tick, r = rngFor(world.seed, tick, "dynasty", n.id);
-  const others = TRAITS.filter(t => t.id !== n.trait), trait = others[Math.floor(r() * others.length)] ?? TRAITS[0];
+  const character = RULER_CHARACTER_BY_ID[newCharacter(world, n, r)]; // §2.4b a new ruler, a new character (the people keep their culture)
   const fallen = n.ruler ?? (n.house ? `vua nhà ${n.house}` : "người trị vì cũ"), house = x.leader.split(" ")[0], from = n.house;
-  (n.dynasties ??= []).push({ tick, house, leader: x.leader, trait: trait.id, from });
-  n.trait = trait.id; n.house = house; n.ruler = x.leader; n.royals = []; n.dynastyTick = tick;
+  (n.dynasties ??= []).push({ tick, house, leader: x.leader, trait: character.id, from });
+  n.character = character.id; n.house = house; n.ruler = x.leader; n.royals = []; n.dynastyTick = tick;
   if (x.mind && x.model) { n.controller = x.controller ?? n.controller; n.provider = x.provider ?? n.provider; n.model = x.model; n.effort = x.effort; }
-  n.memory = `Ta là ${x.leader}, nhà ${house}. Ở lượt ${tick} phe ta nổi dậy vì ${x.grievance}, giết ${fallen} và lên ngôi. Ta không mang ký ức của triều cũ; dân theo ta vì tin ta sẽ cai trị khác. Tính cách của ta: ${trait.name}. Trong ${RENAME.windowTicks} lượt ta có thể đổi tên nước, cờ và viết tuyên ngôn mới (rename_nation, kèm manifesto). Nếu ta cũng cai trị tệ, dân sẽ lật đổ ta như vậy.`;
+  n.memory = `Ta là ${x.leader}, nhà ${house}. Ở lượt ${tick} phe ta nổi dậy vì ${x.grievance}, giết ${fallen} và lên ngôi. Ta không mang ký ức của triều cũ; dân theo ta vì tin ta sẽ cai trị khác. Tính cách của ta: ${character.name} — ${character.desc} Trong ${RENAME.windowTicks} lượt ta có thể đổi tên nước, cờ và viết tuyên ngôn mới (rename_nation, kèm manifesto). Nếu ta cũng cai trị tệ, dân sẽ lật đổ ta như vậy.`;
   n.lastThought = "";
   n.discontent = 0; n.stability = Math.max(n.stability, CIVIL.wonStability);
   n.civilScar = { until: tick + CIVIL.scarTurns, rate: CIVIL.scarWon }; // the old court's men do not forget
@@ -1471,7 +1492,7 @@ function newRuler(world: World, n: Nation, x: Schism, say: Say): void {
   for (const o of foes) n.casusBelli[String(o.id)] = Math.max(n.casusBelli[String(o.id)] ?? -1, tick + CIVIL.helpCause);
   if (friends.length || foes.length) n.memory += `${friends.length ? ` ${friends.map(o => o.name).join(", ")} đã giúp ta lên ngôi.` : ""}${foes.length ? ` ${foes.map(o => o.name).join(", ")} đã giúp triều cũ chống ta.` : ""}`;
   x.status = "won"; x.decidedTick = tick; x.nation = n.id;
-  n.lastEvents.push(`Phe nổi dậy thắng: ${fallen} bị giết. ${x.leader} lên ngôi, lập nhà ${house}, với tính cách mới (${trait.name}).`);
+  n.lastEvents.push(`Phe nổi dậy thắng: ${fallen} bị giết. ${x.leader} lên ngôi, lập nhà ${house}, với tính cách mới (${character.name}).`);
   say(n.id, "civil", `Nội chiến ở ${n.name} kết thúc: ${fallen} bị giết, ${x.leader} lên ngôi, lập nhà ${house}.`);
   fx({ kind: "riot", tile: n.capital, nation: n.id, text: `${x.leader} lên ngôi` });
 }
@@ -1514,6 +1535,7 @@ function secede(world: World, parent: Nation, x: Schism, L: Ledger, say: Say): v
   child.family = parent.family ? { ...parent.family } : undefined;
   child.stability = SCHISM.startStability; child.reputation = parent.reputation;
   child.origin = { from: parent.id, tick: world.tick, leader: x.leader };
+  child.character = newCharacter(world, child, rngFor(world.seed, world.tick, "character", child.id)); // §2.4b its leader's own
   child.met = [...new Set([parent.id, ...parent.met])].filter(id => world.nations[id]?.alive);
   for (const id of child.met) if (!world.nations[id].met.includes(child.id)) world.nations[id].met.push(child.id);
   const land = prov ? cedeProvince(world, parent, child, prov) : [];
@@ -1800,12 +1822,19 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
       if (def.max && n.buildings.filter(b => b.type === def.type).length >= def.max) return `Tối đa ${def.max} ${def.name}`;
       if ((def.effect.housing || 0) > 0) {
         const have = n.buildings.filter(b => isHousing(world, b.type)).length, slots = housingSlots(n, world);
-        if (have >= slots) return `Đã có ${have}/${slots} công trình có chỗ ở: cứ ${HOUSING.tilesPerHome} ô đất mới được thêm 1 (khai hoang thêm đất, lập điểm định cư, hoặc lên thời đại mới)`;
+        if (have >= slots) {
+          // §4.2c the homes are full: a better one takes the weakest's place (its old site is pulled down)
+          const weakest = n.buildings.filter(b => isHousing(world, b.type)).sort((x, y) => (buildingOf(world, x.type)!.effect.housing || 0) - (buildingOf(world, y.type)!.effect.housing || 0) || x.id - y.id)[0];
+          const old = weakest ? buildingOf(world, weakest.type)! : null;
+          if (!old || (old.effect.housing || 0) >= (def.effect.housing || 0)) return `Đã có ${have}/${slots} công trình có chỗ ở: cứ ${HOUSING.tilesPerHome} ô đất mới được thêm 1 (khai hoang thêm đất, lập điểm định cư), hoặc dựng loại nhà tốt hơn để thay nhà yếu nhất`;
+          n.buildings = n.buildings.filter(b => b !== weakest);
+          n.lastEvents.push(`Dỡ ${old.name} (+${old.effect.housing}) ở (${col(weakest!.tile)}, ${row(weakest!.tile)}) để nhường chỗ cho ${def.name} (+${def.effect.housing}).`);
+        }
       }
       let tile = a.tile === undefined ? n.capital : parseTile(a.tile);
       if (tile < 0 || world.tiles[tile].owner !== n.id) return "Ô xây dựng phải thuộc lãnh thổ của bạn";
       // §6.1b with no tile given and the capital full, the nearest free site in reach
-      if (a.tile === undefined && !def.perCentre && !def.perTile && buildingsOn(n, tile) >= tileSlots(n, tile)) tile = freeSite(world, n) ?? tile;
+      if (a.tile === undefined && !def.perCentre && !def.perTile && buildingsOn(n, tile) >= tileSlots(world, n, tile)) tile = freeSite(world, n) ?? tile;
       if (def.effect.gate || def.effect.tower) { // §7.9 on our land at a neighbour's border, joined by road to a centre; one for each neighbour
         const touch = new Set(NEIGHBORS[tile].map(j => world.tiles[j]).filter(t2 => t2.land && t2.owner >= 0 && t2.owner !== n.id && world.nations[t2.owner]?.alive).map(t2 => t2.owner));
         if (!touch.size) return `${def.name} phải đặt trên ô của ta giáp đất một nước láng giềng`;
@@ -1825,7 +1854,7 @@ function doAction(world: World, n: Nation, type: string, a: Record<string, unkno
         if (n.buildings.some(b => b.type === def.type && b.tile === tile)) return `Trung tâm này đã có ${def.name}`;
       }
       // §6.1b room on the tile, and a centre near enough to tend it (or a road to the capital)
-      if (buildingsOn(n, tile) >= tileSlots(n, tile)) return `Ô (${col(tile)}, ${row(tile)}) đã đủ ${tileSlots(n, tile)} công trình (mỗi ô đất ${HOUSING.tileSlots}; trung tâm: làng ${HOUSING.centreSlots[0]}, thị trấn ${HOUSING.centreSlots[1]}, thành phố ${HOUSING.centreSlots[2]}): chọn ô khác`;
+      if (buildingsOn(n, tile) >= tileSlots(world, n, tile)) return `Ô (${col(tile)}, ${row(tile)}) đã đủ ${tileSlots(world, n, tile)} công trình (mỗi ô đất ${HOUSING.tileSlots}; trung tâm: làng ${HOUSING.centreSlots[0]}, thị trấn ${HOUSING.centreSlots[1]}, thành phố ${HOUSING.centreSlots[2]}): chọn ô khác`;
       if (!inReach(world, n, tile)) return `Ô (${col(tile)}, ${row(tile)}) quá xa: công trình phải trong ${HOUSING.reach[0]} ô quanh một trung tâm (thị trấn ${HOUSING.reach[1]}, thành phố ${HOUSING.reach[2]}) hoặc trên đường nối về thủ đô`;
       const t = world.tiles[tile];
       if (!t.land) return "Không xây được trên biển";

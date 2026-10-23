@@ -3,7 +3,7 @@
 
 import type { ResKey, Role, Terrain } from "./types.ts";
 
-export const RULES_VERSION = "0.65";
+export const RULES_VERSION = "0.66";
 
 // §2.1 Terrain
 export const TERRAIN: Record<Terrain, { name: string; move: number; defense: number }> = {
@@ -255,7 +255,9 @@ export const HAMLET = {
  *  the era's and inventions' housing slots for each centre. §6.1b Sites: a land tile holds `tileSlots` buildings, a centre
  *  `centreSlots[tier]` (village, town, city); a building stands within `reach[tier]` tiles of a centre of that tier, or on
  *  a road joined to the capital. */
-export const HOUSING = { perCentre: 3, tilesPerHome: 3, tileSlots: 2, centreSlots: [4, 6, 8], reach: [3, 4, 5] };
+export const HOUSING = { perCentre: 3, tilesPerHome: 3, tileSlots: 2, centreSlots: [4, 6, 8], reach: [3, 4, 5],
+  /** v0.66 rough land holds fewer (mountains none), and every `eraStep` eras a tile holds one more and a centre two more */
+  terrainSlots: { mountain: 0, glacier: 0, icewall: 0, tundra: 1, desert: 1, swamp: 1 } as Record<string, number>, eraStep: 3 };
 
 /** Output per worker per tick (§4.3). */
 export const YIELD = {
@@ -605,12 +607,19 @@ export interface BuildingDef {
   perTile?: boolean; terrains?: Terrain[]; river?: boolean; max?: number; desc: string;
   /** at most one on each centre (capital, settlement), built on the centre itself */
   perCentre?: boolean;
+  /** open to any nation with this capability, whatever invention gave it (v0.66 the homes of each age) */
+  cap?: string;
   effect: BuildingEffect;
 }
 export const BUILDINGS: BuildingDef[] = [
   { type: "workshop", name: "Bãi chế tác", needs: "stone_tools", cost: { stone: 5 }, work: 4, desc: "Cho 4 thợ chế tác làm việc.", effect: { craftSlots: 4 } },
   { type: "pit", name: "Hố trữ", needs: "stone_tools", cost: { stone: 5 }, work: 3, max: 2, desc: "Hư lương thực −5%.", effect: { spoilage: 0.05 } },
-  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở; mỗi trung tâm tối đa 3 công trình có chỗ ở.", effect: { housing: 10 } },
+  { type: "tent", name: "Lều", needs: "P8", cost: { wood: 6, hide: 4, rope: 2 }, work: 4, desc: "+10 chỗ ở. Cứ 3 ô đất được 1 công trình có chỗ ở.", effect: { housing: 10 } },
+  // §4.2c the homes of each age (v0.66): each opens with its age's capability; one built when the homes are full takes the weakest's place
+  { type: "house_wood", name: "Nhà gỗ", needs: "K3", cap: "luyện-đồng", cost: { wood: 15, stone: 4, rope: 2 }, work: 6, desc: "Nhà khung gỗ dựng bằng công cụ kim loại: +20 chỗ ở.", effect: { housing: 20 } },
+  { type: "house_brick", name: "Nhà gạch", needs: "K7", cap: "luật-pháp", cost: { clay: 20, stone: 10, wood: 6 }, work: 8, desc: "Nhà gạch nung của thời Cổ Đại: +40 chỗ ở.", effect: { housing: 40 } },
+  { type: "townhouse", name: "Nhà phố", needs: "K12", cap: "in-ấn", cost: { stone: 30, wood: 15, iron: 4 }, work: 12, desc: "Dãy nhà phố nhiều tầng: +80 chỗ ở.", effect: { housing: 80 } },
+  { type: "apartment", name: "Chung cư", needs: "K18", cap: "điện", cost: { stone: 60, iron: 40, coal: 10 }, work: 25, desc: "Khối nhà cao tầng có điện, nước, thang: +300 chỗ ở.", effect: { housing: 300 } },
   { type: "altar", name: "Bàn thờ", needs: "P5", cost: { stone: 10 }, work: 6, max: 1, desc: "+1 ổn định mỗi lượt.", effect: { stability: 1 } },
   { type: "palisade", name: "Hàng rào gỗ", needs: "P10", cost: { wood: 15, rope: 3 }, work: 6, desc: "Phòng thủ ô +40%.", effect: { defense: 0.4 } },
   { type: "field", name: "Ruộng", needs: "P14", cost: {}, work: 8, perTile: true, terrains: ["grass", "coast"], river: true, desc: "6 nông dân × 2 lương thực.", effect: { farmSlots: 6, farmFood: 2 } },
@@ -990,6 +999,27 @@ export interface TraitDef {
   diffusion?: number;
   start?: { stability?: number; reputation?: number };
 }
+
+/** §2.4b The ruler's own character (v0.66): who the head of the nation is, apart from the people's culture (TRAITS).
+ *  Each ruler is given one at the start, different from the others while there are enough, and keeps it for its whole
+ *  reign; a ruler who takes the throne in a civil war brings another. It shapes how the AI governs (its prompt), not the
+ *  numbers. `ethos` is what the ruler is told (English, like the rules). */
+export interface RulerCharacter { id: string; name: string; icon: string; desc: string; ethos: string }
+export const RULER_CHARACTERS: RulerCharacter[] = [
+  { id: "conqueror", name: "Nhà chinh phục", icon: "⚔️", desc: "Tham vọng, tin vào sức mạnh; mở đất bằng gươm giáo.", ethos: "You are a CONQUEROR: ambitious and bold. You respect strength and believe land is won by the sword. You build armies, seek wars you can win, and treat weakness in a neighbour as an opportunity — but you never fight a war you would lose." },
+  { id: "benevolent", name: "Hiền quân", icon: "🕊️", desc: "Thương dân, ghét chiến tranh; đặt no ấm của dân lên trên hết.", ethos: "You are a BENEVOLENT ruler: your people's welfare comes before glory. You keep them fed, housed and content, keep taxes light, avoid war unless your people are threatened, and help those in need when you can." },
+  { id: "merchant", name: "Vua thương nhân", icon: "💰", desc: "Giàu nhờ buôn bán; hiệp ước nào có lời thì ký.", ethos: "You are a MERCHANT PRINCE: wealth is power. You seek trade partners, caravans, markets and profitable treaties, fill your treasury, and see war as bad for business — unless someone blocks your trade." },
+  { id: "scholar", name: "Vua học giả", icon: "📜", desc: "Say mê tri thức; phát minh và tầm nhìn dài hạn.", ethos: "You are a SCHOLAR-KING: knowledge is the true wealth of a nation. You invest in research, propose inventions, value the long term over quick gains, and respect wise neighbours." },
+  { id: "builder", name: "Vua xây dựng", icon: "🏛️", desc: "Muốn để lại công trình: đường sá, thành phố, kỳ quan.", ethos: "You are a BUILDER: you want a legacy in stone. You lay roads, grow towns into cities, raise buildings and wonders, and plan your realm compact and well joined." },
+  { id: "cautious", name: "Kẻ đa nghi", icon: "🛡️", desc: "Thận trọng, không tin ai; phòng thủ trước hết.", ethos: "You are CAUTIOUS and distrustful: every neighbour may be a threat. You keep a strong defence, walls and watchtowers, keep reserves of food and coin, read treaties carefully, and never stretch your realm thinner than you can hold." },
+  { id: "diplomat", name: "Nhà ngoại giao", icon: "🤝", desc: "Giỏi hòa giải; liên minh và uy tín là vũ khí.", ethos: "You are a DIPLOMAT: words before swords. You make alliances and non-aggression pacts, mediate quarrels, keep your word and your reputation, and use treaties to make your nation safe and respected." },
+  { id: "pious", name: "Người mộ đạo", icon: "🙏", desc: "Sùng tín, trọng truyền thống, lễ hội và đức tin.", ethos: "You are PIOUS: faith and tradition hold your people together. You honour the gods, hold festivals and missions, keep order and old customs, and answer the gods' decrees faithfully." },
+  { id: "opportunist", name: "Kẻ cơ hội", icon: "🦊", desc: "Thực dụng, lật lọng khi có lợi; nắm thời cơ.", ethos: "You are an OPPORTUNIST: pragmatic and quick. Alliances last as long as they serve you; you seize unheld land, weak moments and good deals, but you are careful not to be caught out and lose your name." },
+  { id: "explorer", name: "Nhà khai phá", icon: "🧭", desc: "Thích đi xa; biển cả, đất mới, dân tộc mới.", ethos: "You are an EXPLORER: the horizon calls. You send expeditions, take to the sea, claim new lands and coasts, found settlements far and wide, and seek out every people of the world." },
+  { id: "ironfist", name: "Người sắt đá", icon: "🪨", desc: "Nghiêm khắc, trọng trật tự và kỷ luật.", ethos: "You are IRON-FISTED: order above all. You rule with discipline, punish disorder, keep a firm army and a full treasury, and will not be pushed by neighbours or factions — though you know a people pushed too hard will rise." },
+  { id: "traditional", name: "Người giữ nếp", icon: "🏺", desc: "Bảo thủ, chậm mà chắc; giữ những gì đã có.", ethos: "You are a TRADITIONALIST: slow and sure. You keep what your forebears built, grow steadily, avoid risky ventures and sudden changes, and value stability and a full granary over adventures." },
+];
+export const RULER_CHARACTER_BY_ID: Record<string, RulerCharacter> = Object.fromEntries(RULER_CHARACTERS.map(c => [c.id, c]));
 
 export const TRAITS: TraitDef[] = [
   {

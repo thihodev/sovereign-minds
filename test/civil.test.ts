@@ -57,7 +57,7 @@ test("a strong crown crushes the rising; the leader dies and discontent falls", 
 test("the rebels win: the ruler is killed; a new house, a new character, a new mind, a new name allowed", () => rising(() => {
   const w = founded("civil-won"), [n] = w.nations;
   n.discontent = 100; n.stability = 5; n.memory = "kế hoạch cũ của vua";
-  const trait = n.trait;
+  const trait = n.trait, character = n.character;
   turn(w);
   const x = w.schisms!.at(-1)!;
   x.mind = true; x.controller = "ai"; x.provider = "claude"; x.model = "claude-sonnet-5-5"; x.effort = "low";
@@ -65,7 +65,8 @@ test("the rebels win: the ruler is killed; a new house, a new character, a new m
   assert.equal(x.status, "won");
   assert.equal(n.ruler, x.leader);
   assert.equal(n.house, x.leader.split(" ")[0]);
-  assert.notEqual(n.trait, trait, "a new character");
+  assert.notEqual(n.character, character, "a new ruler, a new character");
+  assert.equal(n.trait, trait, "the people keep their culture");
   assert.equal(n.model, "claude-sonnet-5-5"); assert.equal(n.provider, "claude");
   assert.match(n.memory, new RegExp(x.leader)); assert.doesNotMatch(n.memory, /kế hoạch cũ/);
   assert.equal(n.discontent, 0); assert.ok(n.stability >= CIVIL.wonStability);

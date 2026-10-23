@@ -84,6 +84,8 @@ export interface Nation {
   effort?: string;
   /** National trait id (§2.4, TRAITS in rules.ts); "" = none (worlds made before v0.4). */
   trait?: string;
+  /** §2.4b the ruler's own character (RULER_CHARACTERS), kept for the whole reign */
+  character?: string;
   founded: boolean;
   name: string;
   capitalName: string;

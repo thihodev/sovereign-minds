@@ -142,6 +142,15 @@ Mỗi quốc gia sinh ra với **một đặc thù**, không nước nào trùng
 
 Cân bằng bằng `tools/traits.ts`: các bot mang đủ 9 đặc thù, xoay vòng qua mọi điểm khai sinh, mỗi seed 300 lượt. Trên bản đồ 128 × 128 có đủ mối đe dọa (mục 9.4), với 3 seed, điểm xếp hạng trung bình của từng đặc thù nằm trong khoảng −10% đến +13% so với mức trung bình, và không nước nào diệt vong. Bot không biết khai thác chiến tranh và giao thương, nên con số này đánh giá thấp Chiến binh và Thương nhân.
 
+### 2.4b Tính cách người trị vì (từ v0.66)
+
+Nét dân tộc (2.4) là văn hóa của dân. Người trị vì có **tính cách riêng**, tách khỏi văn hóa đó:
+- **Khi bắt đầu**, mỗi vua nhận một tính cách, khác với các vua khác chừng nào còn đủ loại (chọn theo seed): Nhà chinh phục, Hiền quân, Vua thương nhân, Vua học giả, Vua xây dựng, Kẻ đa nghi, Nhà ngoại giao, Người mộ đạo, Kẻ cơ hội, Nhà khai phá, Người sắt đá, Người giữ nếp.
+- **Giữ suốt triều đại:** tính cách nằm trong `identity.your_character` mỗi lượt. Luật dặn vua để nó định hình mọi quyết định, cách nói với các nước và cách trả lời thần linh. Khi thần linh trò chuyện với vua (10.9), vua cũng giữ đúng tính cách đó.
+- **Tính cách không đổi con số nào;** nó là cách AI cai trị.
+- **Đổi người trị vì:** người lên ngôi sau nội chiến (4.5b) mang một tính cách mới, khác người cũ; dân tộc giữ nguyên văn hóa. Thủ lĩnh một nước ly khai cũng có tính cách của riêng mình.
+- Thế giới cũ được gán tính cách cho mọi vua khi tải. Giao diện hiện tính cách trước nét dân tộc.
+
 ### 2.5 Đường sá và hải đạo
 
 - **Hành động `build_road`** (1 AP): `{"type":"build_road","path":[[cột,hàng],…],"level":n}` cho tối đa 12 ô. Trên đất liền là đường, trên mặt nước là hải đạo. Không ghi `level` thì Engine chọn cấp cao nhất mà kỷ nguyên cho phép. Ô đã có đường cấp đó (hoặc đang làm) được bỏ qua.
@@ -1071,6 +1080,20 @@ Công trình tốn vật liệu, tốn công và cần phát minh mở khóa. M�
 - **Không chọn ô** (`build` không có `tile`): công trình được dựng trên thủ đô; thủ đô đã đầy thì dựng ở ô gần thủ đô nhất còn chỗ và trong tầm.
 - **Công trình có chỗ ở** (Lều…): cả nước được 1 cái cho mỗi 3 ô đất đang giữ (ít nhất 3), cộng phần thưởng thời đại và phát minh cho mỗi trung tâm. Bỏ luật cũ "3 cái mỗi trung tâm". Sức chứa tùy loại công trình (Lều +10).
 - Các luật riêng vẫn giữ: công trình sản xuất mỗi ô một cái; Kho làng, Cối đá, Sân bay đặt ngay trên trung tâm; Trạm canh, Chợ cửa khẩu ở biên giới có đường nối.
+
+- **Theo địa hình và thời đại** (từ v0.66): ô sa mạc, đầm lầy, lãnh nguyên chứa 1 công trình; núi, băng hà không xây được. Cứ 3 thời đại, mỗi ô chứa thêm 1 và mỗi trung tâm thêm 2.
+- **Nhà ở của từng thời đại** (từ v0.66), mở theo năng lực của thời đại đó:
+
+| Nhà | Chỗ ở | Mở khi có | Giá |
+| --- | --- | --- | --- |
+| Lều | 10 | Lều (P8) | 6 gỗ, 4 da, 2 dây |
+| Nhà gỗ | 20 | `luyện-đồng` | 15 gỗ, 4 đá, 2 dây |
+| Nhà gạch | 40 | `luật-pháp` | 20 đất sét, 10 đá, 6 gỗ |
+| Nhà phố | 80 | `in-ấn` | 30 đá, 15 gỗ, 4 sắt |
+| Chung cư | 300 | `điện` | 60 đá, 40 sắt, 10 than |
+
+  Khi đã hết suất nhà ở, dựng loại nhà tốt hơn thì căn yếu nhất bị dỡ để nhường chỗ.
+- **Công trình ở xa:** đất xa mọi trung tâm mà không có đường gần đó cho sản lượng ít hơn (2.7), nên ruộng, mỏ ở xa chỉ cho đủ năng suất khi có đường.
 
 ### 6.2 Công thức sản xuất
 
