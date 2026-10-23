@@ -57,6 +57,26 @@ export function fbm(x: number, y: number, s: number, oct = 5): number {
   return sum / norm;
 }
 
+/** §12.1 3D value noise and its fractal sum, for land drawn on a globe (no seam anywhere). */
+export function hash3(ix: number, iy: number, iz: number, s: number): number {
+  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(iz, 2147483647) + Math.imul(s, 1442695041)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+export function vnoise3(x: number, y: number, z: number, s: number): number {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz);
+  const L = (a: number, b: number, t: number) => a + (b - a) * t;
+  const c = (dx: number, dy: number, dz: number) => hash3(ix + dx, iy + dy, iz + dz, s);
+  return L(L(L(c(0, 0, 0), c(1, 0, 0), u), L(c(0, 1, 0), c(1, 1, 0), u), v), L(L(c(0, 0, 1), c(1, 0, 1), u), L(c(0, 1, 1), c(1, 1, 1), u), v), w);
+}
+export function fbm3(x: number, y: number, z: number, s: number, oct = 5): number {
+  let sum = 0, amp = 1, f = 1, norm = 0;
+  for (let o = 0; o < oct; o++) { sum += amp * vnoise3(x * f, y * f, z * f, (s + o * 101) | 0); norm += amp; amp *= 0.5; f *= 2; }
+  return sum / norm;
+}
+
 export function shuffle<T>(arr: T[], rand: Rand): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));

@@ -42,3 +42,33 @@ test("the flat world is as it was", () => {
   assert.equal(stepDir(7 * 128 + 5, "E"), 7 * 128 + 6);
   assert.equal(within(64 * 128 + 64, 3).length, 37);
 });
+
+test("a globe world: continents and oceans, polar ice for the ice wall, climate by latitude, fair spawns; bots play it", async () => {
+  const { createWorld, step } = await import("../src/engine.ts");
+  const { botTurn } = await import("../src/ai/bot.ts");
+  const { rngFor } = await import("../src/rng.ts");
+  const { GLOBE } = await import("../src/worldgen.ts");
+  try {
+    const w = createWorld("globe-test", Array.from({ length: 6 }, () => ({ controller: "bot" as const, provider: "bot", model: "bot" })), { kind: "sphere", freq: 50 });
+    assert.equal(w.tiles.length, 25002); assert.deepEqual(w.shape, { kind: "sphere", freq: 50 });
+    const land = w.tiles.filter(t => t.land).length;
+    assert.ok(land > 25002 * 0.3 && land < 25002 * 0.55, `land ${land}`);
+    // the ice is at the poles only
+    assert.ok(w.tiles.filter(t => t.terrain === "icewall").every(t => Math.abs(row(t.i)) >= GLOBE.cap - GLOBE.capJitter - 1));
+    assert.ok(w.tiles.some(t => t.terrain === "icewall" && row(t.i) > 0) && w.tiles.some(t => t.terrain === "icewall" && row(t.i) < 0), "both poles");
+    // climate by latitude, both hemispheres alike
+    for (const t of w.tiles.filter(x => x.land)) {
+      const lat = Math.abs(row(t.i));
+      assert.equal(t.zone, lat >= GLOBE.cold ? "cold" : lat <= GLOBE.tropic ? "trop" : "temp");
+    }
+    assert.ok(w.rivers.length >= 15, `${w.rivers.length} rivers`);
+    assert.equal(w.nations.length, 6);
+    for (const a of w.nations) for (const b of w.nations) if (a !== b) assert.ok(dist(a.capital, b.capital) >= 10);
+    for (let k = 0; k < 15; k++) {
+      const inputs: Record<number, never> = {};
+      for (const n of w.nations) if (n.alive) inputs[n.id] = { kind: "ok", response: botTurn(w, n, rngFor(w.seed, w.tick, "bot", n.id)) } as never;
+      assert.deepEqual(step(w, inputs).audit, []);
+    }
+    assert.ok(w.nations.every(n => n.founded && n.alive));
+  } finally { useShape({ kind: "flat" }); }
+});

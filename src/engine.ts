@@ -2,7 +2,7 @@
 // step(world, inputs, rulings) applies one tick. It is deterministic: the same
 // world, inputs, judge rulings and seed always give the same result.
 
-import { NEIGHBORS, TILE_COUNT, col, row, dist, within, findTile, stepDir, useShape, useWorld, BEARING } from "./hex.ts";
+import { NEIGHBORS, TILE_COUNT, col, row, dist, within, findTile, stepDir, useWorld, BEARING, type Shape } from "./hex.ts";
 import { rngFor, shuffle, pickOne, type Rand } from "./rng.ts";
 import {
   AP_COST, BEASTS, RIVER, FLOOD, HERBS, HORDES, INJECTION, QUAKE, TERRAIN, WAR, CLAIM_FOOD, ERAS, EVENTS, FLAG_LAYOUTS, FLAG_MIN_DELTA_E, FLAG_SYMBOLS, FOOD_PER_PERSON,
@@ -130,12 +130,11 @@ export function luxuries(world: World, n: Nation): { kinds: string[]; stability:
 
 export interface NationSpec { controller: "ai" | "bot"; provider: string; model: string; pinnedModel?: string; effort?: string; trait?: string }
 
-export function createWorld(seed: string, specs: NationSpec[]): World {
-  useShape({ kind: "flat" }); // §12.1 (the globe comes with its own generator)
-  const gen = generateWorld(seed, specs.length);
+export function createWorld(seed: string, specs: NationSpec[], shape: Shape = { kind: "flat" }): World {
+  const gen = generateWorld(seed, specs.length, shape); // §12.1 the flat map of old, or a globe
   const nations: Nation[] = specs.slice(0, gen.spawns.length).map((spec, k) => newNation(k, spec, gen.spawns[k]));
   const world: World = {
-    version: 1, seed, tick: 0, tiles: gen.tiles, nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
+    version: 1, seed, tick: 0, tiles: gen.tiles, ...(shape.kind === "sphere" ? { shape } : {}), nations, wonders: gen.wonders, rivers: gen.rivers, herd: gen.herd,
     wild: gen.wild, hordes: newHordes(seed, gen.wild), registry: {}, nextBuildingId: 1, spies: [], nextSpyId: 1, petitions: [], decrees: [],
     custom: { inventions: {}, recipes: {}, buildings: {}, goods: {}, next: 1 }, proposals: [],
     treaties: [], treatyOffers: [], tradeOffers: [], caravans: [], wars: [], battles: [], nextId: 1, cutoff: {}, eraGates: {}, riches: 6,

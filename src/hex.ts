@@ -14,6 +14,8 @@ export const FLAT_COUNT = N * N;
 
 interface Topology {
   shape: Shape; count: number; neighbors: number[][];
+  /** the unit vector of each tile's centre (the globe only) */
+  points?: number[][];
   col(i: number): number; row(i: number): number;
   dist(i: number, j: number): number; within(i: number, rad: number): number[];
   step(i: number, dir: string): number; find(a: number, b: number): number;
@@ -113,7 +115,7 @@ function sphereTopology(freq: number): Topology {
   const stepAngle = sum / k2;
   const dist = (i: number, j: number) => (i === j ? 0 : Math.max(1, Math.round(angle(P[i], P[j]) / stepAngle)));
   return {
-    shape: { kind: "sphere", freq }, count: P.length, neighbors,
+    shape: { kind: "sphere", freq }, count: P.length, neighbors, points: P,
     col: i => LON[i], row: i => LAT[i], dist,
     within(i, rad) {
       // the rings out to rad steps, as on the flat world (1 + 6 + 12 + …)
@@ -161,6 +163,9 @@ export function useShape(shape: Shape = { kind: "flat" }): void {
 export function useWorld(world: { shape?: Shape }): void { useShape(world.shape ?? { kind: "flat" }); }
 export const currentShape = (): Shape => T.shape;
 export const tileCountOf = (shape: Shape = { kind: "flat" }): number => (shape.kind === "flat" ? FLAT_COUNT : 10 * shape.freq * shape.freq + 2);
+
+/** The globe: the unit vector of a tile's centre (y toward the north pole); undefined on the flat world. */
+export function pointOf(i: number): number[] | undefined { return T.points?.[i]; }
 
 /** Flat: the column; sphere: the longitude (degrees, one decimal). */
 export function col(i: number): number { return T.col(i); }

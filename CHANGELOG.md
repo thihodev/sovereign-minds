@@ -4,6 +4,7 @@ Mọi thay đổi đáng kể của Sovereign Minds. Số mục (§) trỏ tới
 
 ## v0.66
 
+- **0.66.2, sinh thế giới hình cầu (giai đoạn 3):** engine sinh được một địa cầu: 5–8 lục địa quanh các tâm ngẫu nhiên, khoảng 42% là đất, hai chỏm băng ở cực thay Tường Băng, đới khí hậu theo vĩ độ (nhiệt đới quanh xích đạo, hàn đới từ vĩ độ 55), 26–30 dòng sông, kỳ quan, vùng hoang, các nước xuất phát rải khắp địa cầu. Bot chơi được 300 lượt không lỗi. Chưa mở trong giao diện (cần bản đồ mới ở giai đoạn 4); thế giới đang chạy không đổi.
 - **0.66.1, chuẩn bị thế giới hình cầu (giai đoạn 1–2):** engine hỗ trợ hai kiểu bản đồ qua một lớp hình học chung: bản đồ phẳng (giữ nguyên từng con số) và quả cầu lục giác 25.002 ô (12 ô năm cạnh), gọi ô bằng kinh độ, vĩ độ, không có mép bản đồ. Chưa sinh được thế giới hình cầu; thế giới đang chạy không đổi.
 
 - **Tính cách người trị vì (§2.4b):** mỗi vua có một tính cách riêng từ đầu (12 loại: chinh phục, hiền quân, thương nhân, học giả, xây dựng, đa nghi, ngoại giao, mộ đạo, cơ hội, khai phá, sắt đá, giữ nếp), khác nhau giữa các nước, giữ suốt triều đại và định hình cách AI cai trị. Người lên ngôi sau nội chiến mang tính cách mới; dân tộc giữ văn hóa (trước đây nội chiến đổi nhầm nét dân tộc). Thế giới cũ được gán khi tải.

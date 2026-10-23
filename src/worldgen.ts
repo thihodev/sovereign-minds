@@ -3,8 +3,8 @@
 // ice wall nobody can cross (§12.1). Same seed -> same world. Shapes use
 // coordinates from 0 to 1, so they scale with N; counts and distances use SCALE.
 
-import { N, TILE_COUNT, NEIGHBORS, dist, within } from "./hex.ts";
-import { xmur3, mulberry32, fbm, rngFor, shuffle, type Rand } from "./rng.ts";
+import { N, TILE_COUNT, NEIGHBORS, col, dist, pointOf, row, useShape, within, type Shape } from "./hex.ts";
+import { xmur3, mulberry32, fbm, fbm3, rngFor, shuffle, type Rand } from "./rng.ts";
 import { MEADOW_HERBS, RIVER, ROCK_SALT, SURFACE_IRON, VEIN, WONDER_DEFS } from "./rules.ts";
 import type { Tile, Wonder, ResKey } from "./types.ts";
 
@@ -47,11 +47,18 @@ export function tileValue(t: Tile): number {
     + (R.copper ? 25 : 0) + (t.river ? 30 : 0) + (t.delta ? 20 : 0);
 }
 
-export function generateWorld(seedStr: string, nNations: number): GeneratedWorld {
+export function generateWorld(seedStr: string, nNations: number, shape: Shape = { kind: "flat" }): GeneratedWorld {
+  // §12.1 the world's shape: the flat map of old, or a globe (v0.67)
+  useShape(shape);
+  const globe = shape.kind === "sphere";
   const sf = xmur3(seedStr);
   const S1 = sf() | 0, S2 = sf() | 0, S3 = sf() | 0, S4 = sf() | 0, S5 = sf() | 0;
   const rand: Rand = mulberry32(sf());
   const T = TILE_COUNT, J = () => (rand() - 0.5) * 0.08;
+  // counts and distances grow with the world: the flat map is SCALE times the old 64 × 64, a globe by its area
+  const SC = globe ? Math.sqrt(T / 4096) : SCALE;
+  const spawn = globe ? { min: Math.round(12 * Math.sqrt(SC)), far: Math.round(18 * Math.sqrt(SC)) } : SPAWN;
+  const wildK = globe ? { count: Math.round(3 * SC), fromSpawn: Math.round(8 * Math.sqrt(SC)), band: 12, apart: Math.round(14 * Math.sqrt(SC)) } : WILD;
   const c1 = { x: (0.26 + J()) * AX, y: 0.38 + J() }, c2 = { x: (0.74 + J()) * AX, y: 0.62 + J() };
   const isl = { x: (0.11 + J() * 0.5) * AX, y: 0.90 };
   const mx = (c1.x + c2.x) / 2, my = (c1.y + c2.y) / 2;
@@ -59,7 +66,9 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   const ul = Math.hypot(ux, uy); ux /= ul; uy /= ul;
 
   const elev = new Float32Array(T), moist = new Float32Array(T), sdv = new Float32Array(T);
-  for (let i = 0; i < T; i++) {
+  const wall = new Uint8Array(T);
+  if (globe) globeShapes(T, rand, [S1, S2, S3, S4, S5], elev, moist, sdv, wall);
+  else for (let i = 0; i < T; i++) {
     const c = i % N, r = (i / N) | 0;
     const px = ((c + 0.5 * (r & 1)) / N) * AX, py = r / N;
     const wx = px + (fbm(px * 4, py * 4, S3, 3) - 0.5) * 0.12, wy = py + (fbm(px * 4 + 7, py * 4 + 3, S3, 3) - 0.5) * 0.12;
@@ -74,14 +83,13 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     elev[i] = 0.65 * m + 0.35 * fbm(px * 3, py * 3, S1, 5);
     moist[i] = fbm(px * 2.5 + 11, py * 2.5 + 5, S2, 4);
   }
-  // §12.1 the ice wall: a rim of uneven thickness around the whole world
-  const wall = new Uint8Array(T);
-  for (let i = 0; i < T; i++) {
+  // §12.1 the ice wall: a rim of uneven thickness around the whole world (on a globe: the polar caps, above)
+  if (!globe) for (let i = 0; i < T; i++) {
     const c = i % N, r = (i / N) | 0, edge = Math.min(c, r, N - 1 - c, N - 1 - r);
     const thick = WALL.min + Math.floor(fbm(c / N * 9, r / N * 9, S5, 3) * (WALL.max - WALL.min + 1.5));
     if (edge < Math.min(WALL.max, thick)) wall[i] = 1;
   }
-  const thr = Array.from(elev).sort((a, b) => b - a)[Math.floor(T * 0.55)];
+  const thr = Array.from(elev).sort((a, b) => b - a)[Math.floor(T * (globe ? 0.42 : 0.55))]; // a globe is more sea, as on Earth
   const land = new Uint8Array(T);
   for (let i = 0; i < T; i++) land[i] = elev[i] > thr && !wall[i] ? 1 : 0;
   const water = (j: number) => !land[j] && !wall[j];
@@ -96,7 +104,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     const r = Math.round(py * N); if (r < 0 || r >= N) return -1;
     const c = Math.round((px / AX) * N - 0.5 * (r & 1)); return (c < 0 || c >= N) ? -1 : r * N + c;
   };
-  for (const toward of [c1, c2]) {
+  if (!globe) for (const toward of [c1, c2]) { // the isthmus of the flat world
     for (let t = 0; t <= 1; t += 0.004) {
       const i = tileAt(mx + (toward.x - mx) * t, my + (toward.y - my) * t);
       if (i < 0) continue;
@@ -124,12 +132,13 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
 
   const tiles: Tile[] = new Array(T);
   for (let i = 0; i < T; i++) {
-    const r = (i / N) | 0, zone = r <= Math.round(N * 0.2) ? "cold" : r >= Math.round(N * 0.8) ? "trop" : "temp";
+    const r = (i / N) | 0, lat = Math.abs(row(i));
+    const zone = globe ? (lat >= GLOBE.cold ? "cold" : lat <= GLOBE.tropic ? "trop" : "temp") : r <= Math.round(N * 0.2) ? "cold" : r >= Math.round(N * 0.8) ? "trop" : "temp";
     const t: Tile = { i, terrain: "ocean", zone, region: null, land: !!land[i], elev: Math.round(elev[i] * 1000) / 1000, river: false, delta: false, res: {}, cap: {}, wonder: null, owner: -1 };
     if (wallDist[i] <= WALL.reach) t.wall = wallDist[i];
     if (wall[i]) { t.terrain = "icewall"; t.elev = 1; tiles[i] = t; continue; }
     if (land[i]) {
-      t.region = compSize[comp[i]] < 60 * SCALE * SCALE ? "isl" : (sdv[i] < 0 ? "west" : "east");
+      t.region = compSize[comp[i]] < 60 * SC * SC ? "isl" : (sdv[i] < 0 ? "west" : "east");
       const m = mRank[i], e = elev[i];
       if (e >= mThr && !forced[i]) t.terrain = "mountain";
       else if (e >= hThr && !forced[i]) t.terrain = "hill";
@@ -151,10 +160,10 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   const sources = shuffle(landIdx.filter(i => tiles[i].terrain === "mountain" || (tiles[i].terrain === "hill" && elev[i] > hThr + 0.01)), rand);
   const usedSrc: number[] = [];
   for (const s of sources) {
-    if (rivers.length >= Math.round(8 * SCALE * 1.5)) break;
-    if (usedSrc.some(u => dist(u, s) < 7 * SCALE)) continue;
+    if (rivers.length >= Math.round(8 * SC * 1.5)) break;
+    if (usedSrc.some(u => dist(u, s) < (globe ? 9 : 7 * SC))) continue; // a globe has more land: its sources may lie closer
     const path = [s], seen = new Set([s]); let cur = s, end: number | null = null;
-    for (let step = 0; step < 90 * SCALE; step++) {
+    for (let step = 0; step < 90 * SC; step++) {
       const nbs = NEIGHBORS[cur];
       if (nbs.some(j => wall[j])) break; // meltwater pools at the foot of the wall
       const sea = nbs.find(water); if (sea !== undefined) { end = sea; break; }
@@ -207,7 +216,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
       const t = tiles[i];
       if (t.wonder || !WONDER_OK[w.key](t, tiles)) return false;
       if (strict && want && t.region !== want) return false;
-      return wonders.every(o => dist(o.i, i) >= 6 * SCALE);
+      return wonders.every(o => dist(o.i, i) >= 6 * SC);
     });
     let i = pick(true); if (i === undefined) i = pick(false);
     if (i !== undefined) { tiles[i].wonder = w.key; wonders.push({ key: w.key, name: w.name, i }); }
@@ -221,12 +230,12 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   for (const t of tiles) t.cap = { ...t.res };
   seedDeepResources(seedStr, tiles);
 
-  // Spawns: same value band (±5%), ≥ SPAWN.min apart, spread over climate zones, away from the ice
+  // Spawns: same value band (±5%), ≥ spawn.min apart, spread over climate zones, away from the ice
   const areaVal = (i: number) => Math.round(within(i, 3).reduce((s, j) => s + tileValue(tiles[j]), 0));
   const okTerr = ["grass", "forest", "taiga", "coast", "hill", "tundra", "jungle"];
   const cands = landIdx.filter(i => {
     const t = tiles[i], c = i % N, r = (i / N) | 0;
-    return t.region !== "isl" && okTerr.includes(t.terrain) && !t.wonder && wallDist[i] > WALL.reach && r >= 3 && r <= N - 4 && c >= 3 && c <= N - 4 && wonders.every(w => dist(w.i, i) > 3);
+    return t.region !== "isl" && okTerr.includes(t.terrain) && !t.wonder && wallDist[i] > WALL.reach && (globe || (r >= 3 && r <= N - 4 && c >= 3 && c <= N - 4)) && wonders.every(w => dist(w.i, i) > 3);
   }).map(i => ({ i, v: areaVal(i), zone: tiles[i].zone }));
   // Every people needs the basics within reach: wood, stone, meat or fish, and wild plants for fibre and rope (§2.1),
   // and food on the seven tiles it starts with, so it can eat before it claims more.
@@ -244,12 +253,12 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
     const T0 = sortedV[Math.floor(sortedV.length * p)], band = cands.filter(c => c.v >= T0 * 0.95 && c.v <= T0 * 1.05);
     for (let a = 0; a < 250; a++) {
       const chosen: typeof cands = [];
-      for (const c of shuffle(band.slice(), rand)) { if (chosen.every(o => dist(o.i, c.i) >= SPAWN.min)) chosen.push(c); if (chosen.length === nNations) break; }
+      for (const c of shuffle(band.slice(), rand)) { if (chosen.every(o => dist(o.i, c.i) >= spawn.min)) chosen.push(c); if (chosen.length === nNations) break; }
       if (chosen.length < nNations) continue;
       const zones = new Set(chosen.map(c => c.zone)).size;
-      // Neighbours SPAWN.min–SPAWN.far tiles apart meet within a few dozen ticks; farther apart they never do.
+      // Neighbours spawn.min–spawn.far tiles apart meet within a few dozen ticks; farther apart they never do.
       const nearest = chosen.map(c => Math.min(...chosen.filter(o => o !== c).map(o => dist(c.i, o.i))));
-      const tooFar = nearest.reduce((x, d) => x + Math.max(0, d - SPAWN.far), 0);
+      const tooFar = nearest.reduce((x, d) => x + Math.max(0, d - spawn.far), 0);
       const score = zones * 1000 - tooFar * 10 + Math.min(...nearest);
       if (!best || score > best.score) best = { score, chosen };
     }
@@ -258,7 +267,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   if (!best) {
     const chosen: typeof cands = [];
     // No even band fits everyone: take the richest places that are far enough apart (never a barren one when better exist)
-    for (const c of cands.slice().sort((a, b) => b.v - a.v || a.i - b.i)) { if (chosen.every(o => dist(o.i, c.i) >= SPAWN.min - 4)) chosen.push(c); if (chosen.length === nNations) break; }
+    for (const c of cands.slice().sort((a, b) => b.v - a.v || a.i - b.i)) { if (chosen.every(o => dist(o.i, c.i) >= spawn.min - 4)) chosen.push(c); if (chosen.length === nNations) break; }
     best = { score: 0, chosen };
   }
   const spawnsSorted = best.chosen.slice().sort((a, b) => a.i - b.i);
@@ -269,8 +278,8 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   const wild: number[] = [];
   const far = shuffle(landIdx.filter(i => tiles[i].region !== "isl" && tiles[i].terrain !== "mountain" && tiles[i].wall === undefined)
     .map(i => ({ i, d: spawns.length ? Math.min(...spawns.map(s => dist(s, i))) : 99 }))
-    .filter(f => f.d >= WILD.fromSpawn && f.d <= WILD.fromSpawn + WILD.band), rand);
-  for (const f of far) { if (wild.length >= WILD.count) break; if (wild.every(w => dist(w, f.i) >= WILD.apart)) wild.push(f.i); }
+    .filter(f => f.d >= wildK.fromSpawn && f.d <= wildK.fromSpawn + wildK.band), rand);
+  for (const f of far) { if (wild.length >= wildK.count) break; if (wild.every(w => dist(w, f.i) >= wildK.apart)) wild.push(f.i); }
 
   // Bison migration route
   let herd: [number, number] | null = null;
@@ -278,7 +287,7 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   for (let a = 0; a < 400 && grass.length > 2; a++) {
     const p = grass[Math.floor(rand() * grass.length)], q = grass[Math.floor(rand() * grass.length)];
     const d = dist(p, q);
-    if (d >= 12 * SCALE * 0.75 && d <= 20 * SCALE * 0.8 && tiles[p].region === tiles[q].region) { herd = [p, q]; break; }
+    if (d >= 12 * SC * 0.75 && d <= 20 * SC * 0.8 && tiles[p].region === tiles[q].region) { herd = [p, q]; break; }
   }
 
   seedRiches(seedStr, tiles); // §2.11 and §2.10 after the spawns: fair starts are weighed without them
@@ -289,6 +298,31 @@ export function generateWorld(seedStr: string, nNations: number): GeneratedWorld
   seedVeins(seedStr, tiles);
   seedSurfaceIron(seedStr, tiles); // §2.11 a nation's idea (after the veins: surface iron is never a rich vein)
   return { tiles, rivers, wonders, spawns, spawnValues, spread, wild, herd };
+}
+
+/** §12.1 The globe's land and ice: a few continents around random centres, warped by noise, with ridges and basins;
+ *  moisture by noise; the region of a tile is its hemisphere (west < 0° < east); the polar caps are the ice wall. */
+export const GLOBE = { continents: [5, 8] as [number, number], radius: [0.35, 0.7] as [number, number], cap: 78, capJitter: 5, cold: 55, tropic: 23 };
+function globeShapes(T: number, rand: Rand, S: number[], elev: Float32Array, moist: Float32Array, sdv: Float32Array, wall: Uint8Array): void {
+  const [S1, S2, S3] = S, K = GLOBE.continents[0] + Math.floor(rand() * (GLOBE.continents[1] - GLOBE.continents[0] + 1));
+  const centres: Array<{ p: number[]; r: number }> = [];
+  for (let k = 0; k < K; k++) {
+    // a uniform point, away from the poles
+    const z = (rand() * 2 - 1) * 0.8, a = rand() * Math.PI * 2, q = Math.sqrt(1 - z * z);
+    centres.push({ p: [q * Math.cos(a), z, q * Math.sin(a)], r: GLOBE.radius[0] + rand() * (GLOBE.radius[1] - GLOBE.radius[0]) });
+  }
+  for (let i = 0; i < T; i++) {
+    const p = pointOf(i)!;
+    const w = [p[0] + (fbm3(p[0] * 3, p[1] * 3, p[2] * 3, S3, 3) - 0.5) * 0.35, p[1] + (fbm3(p[0] * 3 + 7, p[1] * 3, p[2] * 3, S3, 3) - 0.5) * 0.35, p[2] + (fbm3(p[0] * 3, p[1] * 3 + 5, p[2] * 3, S3, 3) - 0.5) * 0.35];
+    const wl = Math.hypot(w[0], w[1], w[2]);
+    let m = 0;
+    for (const c of centres) { const ang = Math.acos(Math.max(-1, Math.min(1, (w[0] * c.p[0] + w[1] * c.p[1] + w[2] * c.p[2]) / wl))); m = Math.max(m, 1 - ang / c.r); }
+    elev[i] = 0.62 * Math.max(0, m) + 0.38 * fbm3(p[0] * 2.5 + 3, p[1] * 2.5, p[2] * 2.5, S1, 5);
+    moist[i] = fbm3(p[0] * 2 + 11, p[1] * 2 + 5, p[2] * 2, S2, 4);
+    sdv[i] = col(i);
+    const lat = Math.abs(row(i)), cap = GLOBE.cap + (fbm3(p[0] * 4, p[1] * 4, p[2] * 4, S[4], 3) - 0.5) * 2 * GLOBE.capJitter;
+    if (lat >= cap) wall[i] = 1;
+  }
 }
 
 export const RESOURCE_KEYS: ResKey[] = ["game", "plants", "fish", "wood", "stone", "flint", "clay", "salt", "reeds", "herbs", "horse", "copper", "tin", "iron", "coal", "sulfur", "oil",
