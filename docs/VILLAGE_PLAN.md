@@ -1,6 +1,6 @@
 # Làng AI: bản thiết kế (Sovereign Minds 1.0)
 
-> **Trạng thái:** bản nháp để Watcher duyệt. Chưa có dòng code nào.
+> **Trạng thái:** đã duyệt (28/10/2026). Đang làm giai đoạn 0.
 > Đây là thiết kế làm từ đầu. Mọi con số dưới đây là con số khởi đầu, sẽ cân chỉnh bằng `tools/pace.ts` khi có engine.
 
 Game cũ: mỗi AI là vua một nước, chạy hàng trăm lượt từ thời đồ đá. Game mới: **một làng 15–25 người, mỗi người là một AI**. Họ sống tự do như trong Stardew Valley: làm ruộng, câu cá, buôn bán, kết bạn, yêu, cưới, cãi nhau, làm lành. Không có điều kiện thắng; câu chuyện tự nảy sinh. Watcher là thần linh của làng.
@@ -367,10 +367,11 @@ Mỗi giai đoạn: test xanh, pace đạt (từ giai đoạn 2), có ảnh ch�
 
 ---
 
-## Phần F. Những điều Watcher cần chốt
-1. **Số dân khởi đầu:** 20 (khoảng 15–25)? Người mới chỉ đến ở giai đoạn 6.
-2. **Nhịp:** 1 ngày game = 30 phút thật?
-3. **Cấm trộm cắp, đánh nhau ở bản đầu?** Đề xuất: cấm, để sau.
-4. **Tiệm tạp hóa:** engine bán, chủ tiệm AI chỉ chia lời và chỉnh giá? Đề xuất: có, để kinh tế không sập khi một AI chơi dở.
-5. **Cho phép tải** Ninja Adventure, PixelFarm (bản miễn phí) và Kenney Tiny Town / Roguelike RPG?
-6. **Có cần nhạc và tiếng động không** (Ninja Adventure có sẵn)? Đề xuất: có, mặc định tắt.
+## Phần F. Watcher đã chốt (28/10/2026)
+1. **Số dân khởi đầu:** 20 người, khoảng 10 hộ. Người mới chỉ đến ở giai đoạn 6.
+2. **Nhịp:** 1 ngày game = 30 phút thật.
+3. **Trộm cắp, đánh nhau:** cấm ở bản đầu. Dân làng có thể xin mở bằng thỉnh nguyện.
+4. **Tiệm tạp hóa:** engine bán hàng; chủ tiệm là một AI, được chia 10% mỗi giao dịch và chỉnh giá ±20%.
+5. **Bộ hình ảnh:** được phép tải Ninja Adventure, PixelFarm (bản miễn phí), Kenney Tiny Town và Roguelike RPG. Đọc giấy phép trong file tải về trước khi dùng.
+6. **Âm thanh:** có nhạc và tiếng động, mặc định tắt.
+7. **Nhánh:** làm thẳng trên `main`.
