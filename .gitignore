@@ -5,3 +5,6 @@ data/*
 .DS_Store
 *.log
 .claude/
+
+# downloaded asset packs (sources; only the files the game uses are copied into web/assets)
+assets-src/
