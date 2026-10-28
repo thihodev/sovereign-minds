@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Làng AI · cảnh mẫu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+  :root {
+    --wood: #8f4a2b; --wood-dark: #4e2a1c; --wood-light: #c9773f;
+    --paper: #f7e2b5; --paper-dark: #e8c88a; --ink: #3b2416; --muted: #7a5536;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #1b1a20; overflow: hidden; }
+  body { font-family: "VT323", monospace; color: var(--ink); -webkit-font-smoothing: none; }
+  #view { position: fixed; inset: 0; display: block; width: 100vw; height: 100vh; cursor: grab; image-rendering: pixelated; }
+  #view.drag { cursor: grabbing; }
+  .box {
+    background: var(--paper);
+    border: 4px solid var(--wood-dark);
+    box-shadow: inset 0 0 0 3px var(--wood-light), inset 0 0 0 5px var(--paper-dark), 0 4px 0 rgba(0,0,0,.35);
+    border-radius: 6px;
+  }
+  #clock { position: fixed; top: 12px; right: 12px; padding: 8px 16px 8px 14px; font-size: 26px; line-height: 1; display: flex; align-items: center; gap: 10px; user-select: none; }
+  #clock .icon { width: 28px; height: 28px; image-rendering: pixelated; }
+  #clock .sep { color: var(--muted); }
+  #controls { position: fixed; left: 12px; bottom: 12px; padding: 10px 14px 12px; font-size: 20px; display: grid; gap: 8px; min-width: 330px; user-select: none; }
+  #controls .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #controls .lbl { width: 72px; color: var(--muted); }
+  .btn {
+    font: inherit; font-size: 20px; line-height: 1; color: var(--ink); cursor: pointer;
+    background: var(--paper-dark); border: 2px solid var(--wood-dark); border-radius: 4px; padding: 3px 9px 4px;
+    box-shadow: 0 2px 0 var(--wood-dark);
+  }
+  .btn:hover { background: #f0d49a; }
+  .btn.on { background: var(--wood-light); color: #fff6e0; box-shadow: inset 0 2px 0 var(--wood-dark); transform: translateY(2px); }
+  .btn:focus-visible, input:focus-visible { outline: 2px solid #2d697b; outline-offset: 2px; }
+  input[type=range] { flex: 1; accent-color: var(--wood); min-width: 150px; }
+  #timeval { width: 52px; text-align: right; font-size: 22px; }
+  #hint { color: var(--muted); font-size: 17px; }
+  #card { position: fixed; right: 12px; top: 74px; width: 300px; padding: 14px; font-size: 20px; display: none; }
+  #card.open { display: block; }
+  #card .head { display: flex; gap: 12px; align-items: center; }
+  #card .face { position: relative; width: 96px; height: 96px; flex: none; }
+  #card .face canvas { position: absolute; inset: 0; width: 96px; height: 96px; image-rendering: pixelated; }
+  #card h2 { margin: 0; font-size: 30px; font-weight: normal; line-height: 1; }
+  #card .job { color: var(--muted); font-size: 19px; }
+  #card .bars { margin: 12px 0 8px; display: grid; gap: 5px; }
+  #card .bar { display: grid; grid-template-columns: 92px 1fr 34px; align-items: center; gap: 6px; }
+  #card .meter { height: 12px; background: #e3c48e; border: 2px solid var(--wood-dark); border-radius: 2px; overflow: hidden; }
+  #card .meter i { display: block; height: 100%; }
+  #card .doing { border-top: 2px dashed var(--paper-dark); padding-top: 8px; line-height: 1.15; }
+  #card .close { position: absolute; top: 6px; right: 8px; font-size: 18px; padding: 0 6px 2px; }
+  #card .hearts { color: #e0394c; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Cảnh làng mẫu"></canvas>
+
+<div id="clock" class="box" aria-live="polite">
+  <canvas class="icon" id="wicon" width="14" height="14"></canvas>
+  <span id="clocktext">Xuân 12 · Thứ Ba · 14:30</span>
+</div>
+
+<div id="controls" class="box">
+  <div class="row"><span class="lbl">Mùa</span>
+    <button class="btn" data-season="xuan">Xuân</button><button class="btn" data-season="ha">Hạ</button><button class="btn" data-season="thu">Thu</button><button class="btn" data-season="dong">Đông</button>
+  </div>
+  <div class="row"><span class="lbl">Giờ</span>
+    <input id="time" type="range" min="360" max="1440" step="10" value="870" aria-label="Giờ trong ngày"><span id="timeval">14:30</span>
+  </div>
+  <div class="row"><span class="lbl">Trời</span>
+    <button class="btn" data-weather="clear">Quang</button><button class="btn" data-weather="rain">Mưa</button><button class="btn" data-weather="snow">Tuyết</button>
+  </div>
+  <div class="row" id="hint">Kéo để đi · cuộn để phóng to (×<span id="zoomval">3</span>) · bấm vào dân làng</div>
+</div>
+
+<div id="card" class="box" role="dialog" aria-label="Thẻ dân làng">
+  <button class="btn close" id="cardclose" aria-label="Đóng">×</button>
+  <div class="head">
+    <div class="face"><canvas id="facebox" width="48" height="48"></canvas></div>
+    <div><h2 id="cname"></h2><div class="job" id="cjob"></div><div class="hearts" id="chearts"></div></div>
+  </div>
+  <div class="bars" id="cbars"></div>
+  <div class="doing" id="cdoing"></div>
+</div>
+
+<script src="mockup.js"></script>
+</body>
+</html>
